@@ -986,6 +986,8 @@ completion poller; idle NAKs remain scheduled, while completed reports are
 copied, toggles advanced, and DMA frames reclaimed before resubmission.
 The persistent transfer slot now retains the full bounded packet-count range,
 including 4096-byte transfers split across one-byte maximum packets.
+Persistent interrupt scheduling now honors each USB interrupt endpoint's
+declared `bInterval` instead of submitting the queue head on every frame.
 The UEFI memory-map capture now rejects malformed successful firmware results
 unless descriptor size and map length satisfy the boot contract, and bounds
 replacement-map publication to the allocated buffer.

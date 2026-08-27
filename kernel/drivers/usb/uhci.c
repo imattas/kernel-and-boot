@@ -373,11 +373,13 @@ static int uhci_interrupt_transfer_locked(uint8_t address, uint8_t endpoint, voi
 
 static int uhci_interrupt_submit_locked(uint8_t address, uint8_t endpoint,
                                         void *data, uint16_t length,
-                                        uint16_t max_packet, uint8_t *toggle) {
+                                        uint16_t max_packet, uint8_t interval,
+                                        uint8_t *toggle) {
     if (uhci_async_pending || uhci_io_disabled || !controller_base ||
         !controller_frame_list || !data || address > 127 ||
         (endpoint & 0x7fU) > 15 || length == 0 || length > 4096 ||
-        max_packet == 0 || max_packet > 64 || !toggle || *toggle > 1)
+        max_packet == 0 || max_packet > 64 || interval == 0 ||
+        !toggle || *toggle > 1)
         return 0;
     uint32_t packet_count = (length + max_packet - 1U) / max_packet;
     uint64_t qh_frame = physical_alloc_frame();
@@ -410,7 +412,8 @@ static int uhci_interrupt_submit_locked(uint8_t address, uint8_t endpoint,
     if (!uhci_set_running(0)) goto fail;
     volatile uint32_t *frame_list =
         (volatile uint32_t *)(uintptr_t)controller_frame_list;
-    for (uint32_t i = 0; i < 1024; ++i) frame_list[i] = (uint32_t)qh_frame | 2U;
+    for (uint32_t i = 0; i < 1024; ++i)
+        frame_list[i] = i % interval == 0 ? (uint32_t)qh_frame | 2U : 1U;
     __asm__ volatile ("outl %0, %1" :: "a"((uint32_t)controller_frame_list),
                       "Nd"((uint16_t)(controller_base + UHCI_FLBASEADD)));
     if (!uhci_set_running(1)) goto fail;
@@ -482,10 +485,11 @@ uint32_t uhci_interrupt_count(void) { return uhci_interrupts; }
 uint32_t uhci_last_transfer_td_status(void) { return uhci_last_td_status_value; }
 uint16_t uhci_last_controller_status(void) { return uhci_last_status_value; }
 int uhci_interrupt_submit(uint8_t address, uint8_t endpoint, void *data,
-                          uint16_t length, uint16_t max_packet, uint8_t *toggle) {
+                          uint16_t length, uint16_t max_packet, uint8_t interval,
+                          uint8_t *toggle) {
     uint64_t flags = spinlock_lock_irqsave(&uhci_lock);
     int result = uhci_interrupt_submit_locked(address, endpoint, data, length,
-                                               max_packet, toggle);
+                                               max_packet, interval, toggle);
     spinlock_unlock_irqrestore(&uhci_lock, flags);
     return result;
 }

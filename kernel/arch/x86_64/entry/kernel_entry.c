@@ -103,6 +103,7 @@ static network_runtime_context_t network_runtime;
 static input_queue_t *input_runtime_queue;
 static uint8_t input_runtime_endpoint;
 static uint16_t input_runtime_packet;
+static uint8_t input_runtime_interval;
 static uint8_t input_runtime_toggle;
 static uint8_t input_runtime_report[64];
 static usb_hid_keyboard_state_t input_runtime_hid_state;
@@ -144,6 +145,7 @@ static void input_runtime_task(void *argument) {
             input_runtime_pending = uhci_interrupt_submit(
                 1, input_runtime_endpoint, input_runtime_report,
                 input_runtime_packet, input_runtime_packet,
+                input_runtime_interval,
                 &input_runtime_toggle);
         scheduler_yield();
     }
@@ -513,6 +515,7 @@ void kernel_main(void *boot_info) {
                     (endpoint->attributes & 3U) == 3U && !uhci_interrupt_endpoint) {
                     uhci_interrupt_endpoint = endpoint->address;
                     uhci_interrupt_packet = endpoint->max_packet_size;
+                    input_runtime_interval = endpoint->interval;
                 }
             }
             offset = (uint16_t)(offset + descriptor_length);
@@ -1870,6 +1873,7 @@ void kernel_main(void *boot_info) {
         input_runtime_pending = uhci_interrupt_submit(
             1, input_runtime_endpoint, input_runtime_report,
             input_runtime_packet, input_runtime_packet,
+            input_runtime_interval,
             &input_runtime_toggle);
         usb_hid_keyboard_state_initialize(&input_runtime_hid_state);
         serial_write(input_runtime_pending ? "UHCI HID interrupt transfer scheduled\r\n" :

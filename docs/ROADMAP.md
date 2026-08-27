@@ -87,10 +87,10 @@ the enabled CPU count and LAPIC address under QEMU. A bounded processor table
 now records discovered APIC IDs and marks the BSP online. The AP trampoline
 and LAPIC INIT/SIPI path now bring the second QEMU CPU online. Each QEMU CPU
 now owns and loads a separate early IDT, enables its local APIC timer, and
-enters an interruptible idle loop. Per-CPU lookup is APIC-identified and global
-tick accounting is BSP-owned. Tick counts are exposed as a monotonic
-nanosecond clock with overflow-safe waits and BSP-owned global tick accounting;
-the BSP and AP now calibrate their periodic APIC timer against the PIT with a
+enters an interruptible idle loop. Per-CPU lookup is APIC-identified; the BSP
+owns the system-wide tick clock while each logical CPU also records its own
+bounded tick count. Tick counts are exposed as a monotonic nanosecond clock
+with overflow-safe waits; the BSP and AP now calibrate their periodic APIC timer against the PIT with a
 bounded fallback. The
 kernel now has intrusive, spinlock-protected FIFO wait queues with duplicate
 enqueue rejection, removal, dequeue, and task-state definitions. The scheduler

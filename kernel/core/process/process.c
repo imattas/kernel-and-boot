@@ -93,6 +93,7 @@ process_t *process_lookup_retain(uint64_t id) {
     process_t *result = 0;
     for (uint32_t i = 0; i < PROCESS_MAX; ++i)
         if (process_table[i] && process_table[i]->id == id) {
+            if (process_table[i]->references == UINT32_MAX) break;
             ++process_table[i]->references;
             result = process_table[i];
             break;

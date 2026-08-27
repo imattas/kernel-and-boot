@@ -637,6 +637,8 @@ lock and releases it after delivery; process teardown drops its table-owned
 reference, preventing concurrent target lookup from becoming a use-after-free.
 The QEMU process lifecycle probe now retains a target across teardown and
 releases it only after table removal, exercising the deferred object lifetime.
+Retained process lookup now rejects reference-count saturation instead of
+wrapping ownership to zero.
 Cross-process signal syscalls now require the same UID or
 `SECURITY_CAP_SYS_ADMIN`; self-signaling remains valid for every live process.
 Blocking signal waits now use the scheduler wait-queue handoff, and QEMU

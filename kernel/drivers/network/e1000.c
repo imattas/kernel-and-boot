@@ -315,11 +315,13 @@ int e1000_receive(void *data, uint16_t capacity, uint16_t *length) {
         }
     }
     if (invalid || total == 0 || total > UINT16_MAX) {
-        while (e1000_rx_index != index) {
-            e1000_rx_ring[e1000_rx_index].status = 0;
-            e1000_rx_ring[e1000_rx_index].errors = 0;
-            e1000_rx_index = (e1000_rx_index + 1U) % E1000_RING_COUNT;
+        uint32_t recycle = e1000_rx_index;
+        for (uint32_t consumed = 0; consumed < descriptors; ++consumed) {
+            e1000_rx_ring[recycle].status = 0;
+            e1000_rx_ring[recycle].errors = 0;
+            recycle = (recycle + 1U) % E1000_RING_COUNT;
         }
+        e1000_rx_index = recycle;
         e1000_dma_write_barrier();
         e1000_regs[E1000_RDT / 4] =
             (e1000_rx_index + E1000_RING_COUNT - 1U) % E1000_RING_COUNT;

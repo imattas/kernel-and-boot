@@ -406,6 +406,9 @@ oversized descriptors instead of silently truncating packets.
 RX delivery now assembles bounded packets spanning multiple completed
 descriptors, recycles every consumed descriptor, and rejects incomplete,
 errored, and capacity-overflowing frames without exposing partial data.
+The e1000 RX rejection path now recycles by consumed-descriptor count, so a
+malformed frame spanning the entire ring cannot wrap the index and strand all
+RX descriptors.
 The e1000 receive control register now selects 4096-byte buffers to match the
 DMA frame allocation and packet-length contract.
 The driver now reports the controller's hardware link state; link-down is

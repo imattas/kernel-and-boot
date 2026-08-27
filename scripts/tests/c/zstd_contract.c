@@ -17,6 +17,8 @@ int main(void) {
     uint8_t output[261] = {0};
     uint32_t size = 0;
     btrfs_zstd_sequence_header_t sequence;
+    uint8_t match[16] = {'a', 'b', 'c'};
+    uint32_t match_size = 3;
     assert(btrfs_zstd_decompress(raw, sizeof(raw), output, sizeof(output), &size));
     assert(size == 5 && memcmp(output, "hello", 5) == 0);
     assert(btrfs_zstd_decompress(huffman, sizeof(huffman), output, sizeof(output), &size));
@@ -36,5 +38,9 @@ int main(void) {
            sequence.header_size == 2);
     assert(btrfs_zstd_read_sequence_header((const uint8_t[]){255, 0, 1, 0}, 4, &sequence));
     assert(sequence.count == 0x8000 && sequence.header_size == 4);
+    assert(btrfs_zstd_copy_match(match, sizeof(match), &match_size, 3, 6));
+    assert(match_size == 9 && memcmp(match, "abcabcabc", 9) == 0);
+    assert(!btrfs_zstd_copy_match(match, sizeof(match), &match_size, 0, 1));
+    assert(!btrfs_zstd_copy_match(match, 8, &match_size, 3, 6));
     return 0;
 }

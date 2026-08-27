@@ -60,6 +60,19 @@ int btrfs_zstd_read_sequence_header(const uint8_t *input, uint32_t input_size,
     return 1;
 }
 
+int btrfs_zstd_copy_match(uint8_t *output, uint32_t capacity,
+                          uint32_t *output_size, uint32_t offset,
+                          uint32_t length) {
+    uint32_t start;
+    if (!output || !output_size || *output_size > capacity || offset == 0 ||
+        offset > *output_size ||
+        length > capacity - *output_size) return 0;
+    start = *output_size;
+    for (uint32_t i = 0; i < length; ++i) output[start + i] = output[start + i - offset];
+    *output_size += length;
+    return 1;
+}
+
 static uint32_t zstd_stream_bits(const uint8_t *source, uint32_t bits,
                                  int64_t *offset) {
     int64_t start = *offset - (int64_t)bits;

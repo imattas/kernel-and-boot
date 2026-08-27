@@ -56,9 +56,9 @@ int storage_read(uint32_t device, uint64_t lba, uint32_t count, void *buffer) {
         spinlock_unlock_irqrestore(&storage_lock, flags);
         return 0;
     }
-    int result = devices[device].read(lba, count, buffer);
+    storage_read_fn read = devices[device].read;
     spinlock_unlock_irqrestore(&storage_lock, flags);
-    return result;
+    return read(lba, count, buffer);
 }
 
 int storage_write(uint32_t device, uint64_t lba, uint32_t count,
@@ -70,7 +70,7 @@ int storage_write(uint32_t device, uint64_t lba, uint32_t count,
         spinlock_unlock_irqrestore(&storage_lock, flags);
         return 0;
     }
-    int result = devices[device].write(lba, count, buffer);
+    storage_write_fn write = devices[device].write;
     spinlock_unlock_irqrestore(&storage_lock, flags);
-    return result;
+    return write(lba, count, buffer);
 }

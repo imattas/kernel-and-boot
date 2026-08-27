@@ -29,6 +29,8 @@ typedef struct {
 } ipv4_reassembly_table_t;
 
 void ipv4_reassembly_initialize(ipv4_reassembly_table_t *table);
+void ipv4_reassembly_expire(ipv4_reassembly_table_t *table, uint64_t now,
+                            uint64_t timeout);
 int ipv4_reassembly_add(ipv4_reassembly_table_t *table, uint16_t identification,
                         const uint8_t source[4], const uint8_t destination[4],
                         uint8_t protocol, uint16_t offset, uint8_t more,

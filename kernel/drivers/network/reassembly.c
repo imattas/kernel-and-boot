@@ -28,6 +28,17 @@ void ipv4_reassembly_initialize(ipv4_reassembly_table_t *table) {
         clear_entry(&table->entries[i]);
 }
 
+void ipv4_reassembly_expire(ipv4_reassembly_table_t *table, uint64_t now,
+                            uint64_t timeout) {
+    if (!table || timeout == 0) return;
+    uint64_t flags = spinlock_lock_irqsave(&table->lock);
+    for (uint32_t i = 0; i < IPV4_REASSEMBLY_SLOTS; ++i)
+        if (table->entries[i].valid && now >= table->entries[i].last_seen &&
+            now - table->entries[i].last_seen >= timeout)
+            clear_entry(&table->entries[i]);
+    spinlock_unlock_irqrestore(&table->lock, flags);
+}
+
 int ipv4_reassembly_add(ipv4_reassembly_table_t *table, uint16_t identification,
                         const uint8_t source[4], const uint8_t destination[4],
                         uint8_t protocol, uint16_t offset, uint8_t more,

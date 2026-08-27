@@ -132,6 +132,7 @@ uint32_t network_service(network_packet_queue_t *queue,
                          uint16_t reassembly_capacity) {
     if (!queue || !local_hardware || !local_protocol || !cache ||
         budget == 0) return 0;
+    if (reassembly) ipv4_reassembly_expire(reassembly, now, 1000);
     (void)network_e1000_poll(queue, budget);
     uint32_t serviced = 0;
     while (serviced < budget) {

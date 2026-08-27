@@ -961,7 +961,7 @@ allocated data cluster, and the contract covers this case.
 validates the primary and backup boot-region checksums, supports bounded
 directory-relative lookup and reads, validates directory entry-set checksums,
 and compares validated UTF-8 names with their on-disk UTF-16 names. Ext4 now has
-read-only inode, directory, direct/indirect-block reads, and extent-tree file
+inode, directory, direct/indirect-block reads, and extent-tree file
 reads through a VFS adapter. Ext4 now resolves inode tables across multiple
 block groups, supports 64-bit block-count/inode-table metadata, and combines
 the on-disk low/high inode size fields. XFS and
@@ -1020,7 +1020,7 @@ now implemented and
 contracted, including the two-state interleaved stream form. FSE
 normalized-header parsing is now also implemented and contracted, and the
 reusable initialized/peek/update stream API is now implemented and contracted.
-The read-only Btrfs extent path now dispatches Zstandard records and has a
+The Btrfs extent path now dispatches Zstandard records and has a
 sector-checksummed compressed-extent contract.
 The predefined LL/offset/ML distributions and RLE sequence-table mode are now
 implemented and contracted. A shared sequence-table selector now handles

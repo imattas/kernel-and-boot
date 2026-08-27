@@ -15,6 +15,11 @@ typedef struct {
     acpi_header_t header; uint32_t lapic_address; uint32_t flags;
 } __attribute__((packed)) acpi_madt_t;
 
+typedef struct {
+    uint8_t address_space; uint8_t bit_width; uint8_t bit_offset;
+    uint8_t access_size; uint64_t address;
+} __attribute__((packed)) acpi_gas_t;
+
 #define ACPI_MAX_TABLE_LENGTH (1024U * 1024U)
 
 static uint32_t enabled_cpus;
@@ -29,6 +34,13 @@ static uint32_t io_apic_count;
 static uint32_t irq_gsi[16];
 static uint16_t irq_flags[16];
 static uint8_t irq_override[16];
+static uint16_t reset_port;
+static uint8_t reset_value;
+static int reset_ready;
+
+static void io_write8(uint16_t port, uint8_t value) {
+    __asm__ volatile ("outb %0, %1" :: "a"(value), "Nd"(port));
+}
 
 static int table_range_valid(uint64_t address, uint32_t length) {
     return address != 0 && address <= UINT32_MAX && length != 0 &&
@@ -50,6 +62,7 @@ static int signature_is(const char *actual, const char *expected, uint32_t lengt
 int acpi_initialize(uint64_t rsdp_address) {
     enabled_cpus = 0; local_apic_base = 0; io_apic_base = 0; io_apic_gsi_base = 0;
     io_apic_count = 0;
+    reset_port = 0; reset_value = 0; reset_ready = 0;
     for (uint32_t i = 0; i < ACPI_IOAPIC_CAPACITY; ++i) {
         io_apic_bases[i] = 0; io_apic_gsi_bases[i] = 0;
     }
@@ -76,12 +89,24 @@ int acpi_initialize(uint64_t rsdp_address) {
     for (uint32_t i = 0; i < entry_bytes / sizeof(uint64_t); ++i) {
         if (!table_range_valid(entries[i], sizeof(acpi_header_t))) continue;
         const acpi_header_t *table = (const acpi_header_t *)(uintptr_t)entries[i];
+        if (signature_is(table->signature, "FACP", 4) && table->length >= 129 &&
+            table_range_valid(entries[i], table->length) &&
+            checksum_ok(table, table->length)) {
+            const acpi_gas_t *gas = (const acpi_gas_t *)
+                ((const uint8_t *)table + 116);
+            if (gas->address_space == 1 && gas->bit_offset == 0 &&
+                gas->bit_width >= 8 && gas->access_size <= 2 &&
+                gas->address <= 0xffffU) {
+                reset_port = (uint16_t)gas->address;
+                reset_value = *((const uint8_t *)table + 128);
+                reset_ready = 1;
+            }
+        }
         if (signature_is(table->signature, "APIC", 4)) {
             if (table->length >= sizeof(acpi_madt_t) &&
                 table_range_valid(entries[i], table->length) &&
                 checksum_ok(table, table->length))
                 madt = (const acpi_madt_t *)table;
-            break;
         }
     }
     if (!madt) return 0;
@@ -141,3 +166,9 @@ uint32_t acpi_ioapic_gsi_base_for_gsi(uint32_t gsi) {
 }
 uint32_t acpi_irq_to_gsi(uint8_t irq) { return irq < 16 ? irq_gsi[irq] : 0xffffffffU; }
 uint16_t acpi_irq_flags(uint8_t irq) { return irq < 16 && irq_override[irq] ? irq_flags[irq] : 0; }
+int acpi_reset_available(void) { return reset_ready; }
+int acpi_reset(void) {
+    if (!reset_ready) return 0;
+    io_write8(reset_port, reset_value);
+    return 1;
+}

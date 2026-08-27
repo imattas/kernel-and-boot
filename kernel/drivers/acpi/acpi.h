@@ -4,6 +4,8 @@
 #include <stdint.h>
 
 int acpi_initialize(uint64_t rsdp_address);
+int acpi_reset_available(void);
+int acpi_reset(void);
 uint32_t acpi_cpu_count(void);
 uint32_t acpi_cpu_apic_id(uint32_t index);
 uint64_t acpi_lapic_base(void);

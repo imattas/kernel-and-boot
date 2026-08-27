@@ -951,6 +951,8 @@ void kernel_main(void *boot_info) {
     serial_write(" ready=");
     serial_write_hex(ahci_ready_port_count());
     serial_write("\r\n");
+    serial_write(acpi_reset_available() ? "ACPI reset service ready\r\n" :
+                 "ACPI reset service unavailable\r\n");
     static uint16_t ahci_identify_words[256];
     if (!ahci_identify(ahci_identify_words)) {
         serial_write("AHCI identify failure\r\n");

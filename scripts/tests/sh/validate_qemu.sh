@@ -11,6 +11,7 @@ grep -F 'address space foundation ready' "$log" >/dev/null
 grep -F 'user image loader ready' "$log" >/dev/null
 grep -E 'acpi RSDP=0x[0-9a-fA-F]*[1-9a-fA-F]' "$log" >/dev/null
 grep -F 'ACPI MADT CPUs=' "$log" >/dev/null
+grep -E 'ACPI reset service (ready|unavailable)' "$log" >/dev/null
 grep -F 'per-CPU BSP ready' "$log" >/dev/null
 grep -F 'SMP online=' "$log" >/dev/null
 grep -E 'pci devices=0x[0-9a-fA-F]*[1-9a-fA-F] resources=0x[0-9a-fA-F]*[1-9a-fA-F]' "$log" >/dev/null

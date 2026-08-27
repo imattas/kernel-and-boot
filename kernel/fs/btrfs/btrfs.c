@@ -862,7 +862,7 @@ int btrfs_write_file(btrfs_fs_t *fs, uint64_t tree_bytenr, uint64_t inode,
         if (chunk > remaining) chunk = remaining;
         if (sector_logical < disk_bytenr + data_offset ||
             sector_logical > UINT64_MAX - fs->sector_size ||
-            sector_logical + fs->sector_size > disk_bytenr + data_offset + data_size ||
+            sector_logical >= disk_bytenr + data_offset + disk_size ||
             !btrfs_read_checked(fs, sector_logical, fs->sector_size, data)) return 0;
         for (uint32_t i = 0; i < fs->sector_size; ++i) original[i] = data[i];
         for (uint32_t i = 0; i < chunk; ++i) data[in_sector + i] = source[i];

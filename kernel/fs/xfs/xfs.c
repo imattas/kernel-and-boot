@@ -189,7 +189,7 @@ int xfs_write_file(xfs_fs_t *fs, uint64_t inode, uint64_t offset,
     uint32_t core = fs->inode_size == 256 ? 100U : 176U;
     uint64_t file_size = be64(&data[56]);
     if (offset > file_size || (uint64_t)size > file_size - offset ||
-        core > fs->inode_size || (be16(&data[0]) & 0xf000U) != 0x8000U)
+        core > fs->inode_size || (be16(&data[2]) & 0xf000U) != 0x8000U)
         return 0;
     if (data[5] == XFS_FORMAT_LOCAL) {
         if (offset > fs->inode_size - core ||

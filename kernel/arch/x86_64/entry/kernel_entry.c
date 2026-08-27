@@ -1494,7 +1494,12 @@ void kernel_main(void *boot_info) {
     }
     serial_write("framebuffer surface ready\r\n");
     framebuffer_t firmware_framebuffer;
-    if (!info->framebuffer_base || !framebuffer_initialize(&firmware_framebuffer,
+    uint64_t firmware_pixels = (uint64_t)info->framebuffer_pitch * info->framebuffer_height;
+    if (!info->framebuffer_base || info->framebuffer_base >= (1ULL << 32) ||
+        firmware_pixels > UINT64_MAX / sizeof(uint32_t) ||
+        firmware_pixels * sizeof(uint32_t) > (1ULL << 32) - info->framebuffer_base ||
+        info->framebuffer_size < firmware_pixels * sizeof(uint32_t) ||
+        !framebuffer_initialize(&firmware_framebuffer,
             (void *)(uintptr_t)info->framebuffer_base, info->framebuffer_width,
             info->framebuffer_height, info->framebuffer_pitch) ||
         !framebuffer_put_pixel(&firmware_framebuffer, 0, 0, 0)) {

@@ -15,6 +15,9 @@ static void store32(uint8_t *p, uint32_t value) {
     p[0] = (uint8_t)value; p[1] = (uint8_t)(value >> 8);
     p[2] = (uint8_t)(value >> 16); p[3] = (uint8_t)(value >> 24);
 }
+static void store16(uint8_t *p, uint16_t value) {
+    p[0] = (uint8_t)value; p[1] = (uint8_t)(value >> 8);
+}
 static uint64_t inode_size_value(const uint8_t *inode) {
     return (uint64_t)load32(&inode[4]) | ((uint64_t)load32(&inode[108]) << 32);
 }
@@ -377,6 +380,59 @@ static int ext4_resize_blocks(ext4_fs_t *fs, uint32_t inode_number,
     return write_inode(fs, inode_number, inode);
 }
 
+static int ext4_resize_extent_file(ext4_fs_t *fs, uint32_t inode_number,
+                                    uint8_t *inode, uint64_t new_size) {
+    uint64_t old_size = inode_size_value(inode);
+    uint64_t old_blocks = (old_size + fs->block_size - 1U) / fs->block_size;
+    uint64_t new_blocks = (new_size + fs->block_size - 1U) / fs->block_size;
+    uint64_t delta = new_blocks - old_blocks;
+    uint8_t *header = &inode[40];
+    uint16_t entries = load16(&header[2]), maximum = load16(&header[4]);
+    uint16_t depth = load16(&header[6]);
+    uint32_t allocated[1024];
+    uint32_t allocated_count = 0;
+    if (new_size <= old_size) return 1;
+    if (delta == 0 || delta > 1024U || load16(header) != EXT4_EXTENT_MAGIC ||
+        depth != 0 || entries > maximum || maximum > 4U ||
+        12U + (uint32_t)maximum * 12U > 60U ||
+        (new_size > UINT32_MAX && !fs->has_64bit)) return 0;
+    for (uint64_t logical = old_blocks; logical < new_blocks; ++logical) {
+        if (logical > UINT32_MAX) goto fail;
+        uint64_t physical;
+        if (!ext4_alloc_block(fs, &physical) || physical > 0xffffffffffffULL)
+            goto fail;
+        allocated[allocated_count++] = (uint32_t)physical;
+        if (entries != 0) {
+            uint8_t *extent = &inode[52U + (uint32_t)(entries - 1U) * 12U];
+            uint32_t first = load32(extent);
+            uint16_t raw_length = load16(&extent[4]);
+            uint32_t length = raw_length & 0x7fffU;
+            uint64_t start = ((uint64_t)load16(&extent[6]) << 32) |
+                             load32(&extent[8]);
+            if ((raw_length & 0x8000U) == 0 && length < 0x7fffU &&
+                (uint64_t)first + length == logical && start + length == physical) {
+                store16(&extent[4], (uint16_t)(length + 1U));
+                continue;
+            }
+        }
+        if (entries >= maximum) goto fail;
+        uint8_t *extent = &inode[52U + (uint32_t)entries * 12U];
+        store32(extent, (uint32_t)logical);
+        store16(&extent[4], 1);
+        store16(&extent[6], (uint16_t)(physical >> 32));
+        store32(&extent[8], (uint32_t)physical);
+        ++entries;
+        store16(&header[2], entries);
+    }
+    store32(&inode[4], (uint32_t)new_size);
+    store32(&inode[108], (uint32_t)(new_size >> 32));
+    if (write_inode(fs, inode_number, inode)) return 1;
+fail:
+    while (allocated_count != 0)
+        if (!ext4_set_block_used(fs, allocated[--allocated_count], 0)) return 0;
+    return 0;
+}
+
 static int extent_data_block(const ext4_fs_t *fs, const uint8_t *header,
                              uint32_t logical, uint64_t *physical, uint8_t *hole,
                              uint8_t depth, uint8_t root) {
@@ -544,7 +600,8 @@ int ext4_write_file(ext4_fs_t *fs, uint32_t inode_number, uint64_t offset,
     uint64_t file_size = inode_size_value(inode);
     if (offset > UINT64_MAX - size || offset > file_size) return 0;
     uint64_t end = offset + size;
-    if (end > file_size && (load32(&inode[32]) & EXT4_EXTENTS_FL) != 0) return 0;
+    if (end > file_size && (load32(&inode[32]) & EXT4_EXTENTS_FL) != 0 &&
+        !ext4_resize_extent_file(fs, inode_number, inode, end)) return 0;
     if (end > file_size && !ext4_resize_blocks(fs, inode_number, inode, end)) return 0;
     file_size = end > file_size ? end : file_size;
     uint8_t block[4096];

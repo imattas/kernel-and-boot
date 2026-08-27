@@ -17,11 +17,13 @@ int main(void) {
         image[3 * 1024 + block / 8] |= (uint8_t)(1U << (block & 7));
     for (uint32_t block = 15; block <= 18; ++block)
         image[3 * 1024 + block / 8] |= (uint8_t)(1U << (block & 7));
+    image[3 * 1024 + 19 / 8] |= (uint8_t)(1U << (19 & 7));
     uint8_t *root_inode = &image[5 * 1024 + 128]; put16(root_inode, 0x41ed); put32(&root_inode[4], 1024); put32(&root_inode[40], 7);
     uint8_t *file_inode = &image[5 * 1024 + 256]; put16(file_inode, 0x81a4); put32(&file_inode[4], 5); put32(&file_inode[40], 8);
     uint8_t *sparse_inode = &image[5 * 1024 + 640]; put16(sparse_inode, 0x81a4); put32(&sparse_inode[4], 1024);
     uint8_t *indirect_inode = &image[5 * 1024 + 384]; put16(indirect_inode, 0x81a4); put32(&indirect_inode[4], 12293); put32(&indirect_inode[88], 9);
     uint8_t *double_inode = &image[5 * 1024 + 768]; put16(double_inode, 0x81a4); put32(&double_inode[4], (12U + 256U + 2U) * 1024U); put32(&double_inode[92], 15);
+    uint8_t *extent_leaf_inode = &image[5 * 1024 + 896]; put16(extent_leaf_inode, 0x81a4); put32(&extent_leaf_inode[4], 1024); put32(&extent_leaf_inode[32], 0x00080000); put16(&extent_leaf_inode[40], 0xf30a); put16(&extent_leaf_inode[42], 1); put16(&extent_leaf_inode[44], 4); put16(&extent_leaf_inode[46], 0); put32(&extent_leaf_inode[52], 0); put16(&extent_leaf_inode[56], 1); put32(&extent_leaf_inode[60], 19);
     uint8_t *extent_inode = &image[5 * 1024 + 512]; put16(extent_inode, 0x81a4); put32(&extent_inode[4], 1024); put32(&extent_inode[32], 0x00080000); put16(&extent_inode[40], 0xf30a); put16(&extent_inode[42], 1); put16(&extent_inode[44], 4); put16(&extent_inode[46], 1); put32(&extent_inode[52], 0); put32(&extent_inode[56], 11);
     uint8_t *dir = &image[7 * 1024]; put32(dir, 2); put16(&dir[4], 12); dir[6] = 1; dir[7] = 2; dir[8] = '.';
     put32(&dir[12], 2); put16(&dir[16], 12); dir[18] = 2; dir[19] = 2; dir[20] = '.'; dir[21] = '.';
@@ -32,6 +34,7 @@ int main(void) {
     memcpy(&image[14 * 1024], "group", 5);
     put32(&image[9 * 1024], 10); memcpy(&image[10 * 1024], "indir", 5);
     put32(&image[15 * 1024], 16); put32(&image[16 * 1024], 17); put32(&image[16 * 1024 + 4], 18);
+    memcpy(&image[19 * 1024], "extent", 6);
     put16(&image[11 * 1024], 0xf30a); put16(&image[11 * 1024 + 2], 1); put16(&image[11 * 1024 + 4], 4); put32(&image[11 * 1024 + 12], 0); put16(&image[11 * 1024 + 16], 1); put32(&image[11 * 1024 + 20], 12); memcpy(&image[12 * 1024], "deep", 4);
     storage_initialize(); storage_device_t device = {.name = "ram-ext4", .block_size = 512, .block_count = 128, .read = image_read, .write = image_write}; assert(storage_register(&device));
     ext4_fs_t fs; assert(ext4_mount(&fs, 0)); uint32_t inode = 0; uint64_t size = 0;
@@ -60,6 +63,9 @@ int main(void) {
     assert(ext4_truncate_file(&fs, 7, (12U + 256U + 1U) * 1024U));
     assert(ext4_inode_size(&fs, 7, &size) && size == (12U + 256U + 1U) * 1024U);
     assert((image[3 * 1024 + 18 / 8] & (1U << (18 & 7))) == 0);
+    assert(ext4_write_file(&fs, 8, 1024, "growth", 6));
+    assert(ext4_inode_size(&fs, 8, &size) && size == 1030);
+    memset(output, 0, sizeof(output)); assert(ext4_read_file(&fs, 8, 1024, output, 6) && memcmp(output, "growth", 6) == 0);
     memset(output, 0, sizeof(output)); assert(ext4_read_file(&fs, 5, 0, output, 4)); assert(memcmp(output, "deep", 4) == 0);
     uint64_t group_size = 0;
     memset(output, 0, sizeof(output)); assert(ext4_inode_size(&fs, 9, &group_size) && group_size == 5);

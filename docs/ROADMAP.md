@@ -674,6 +674,8 @@ The generic block layer now has a storage-backed adapter, with boot-time
 verification reading the FAT32 image through the registered storage device.
 Mounted VFS path traversal now lets `..` escape a mounted filesystem root back
 to its mountpoint hierarchy.
+The kernel now reads and validates the CMOS real-time clock with bounded update
+window handling, BCD/binary decoding, and 12/24-hour conversion.
 
 ## Phase 10 — Userland begins after the kernel gate
 

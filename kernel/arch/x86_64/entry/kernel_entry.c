@@ -53,6 +53,7 @@
 #include "../../../drivers/pci/pci.h"
 #include "../../../drivers/storage/storage.h"
 #include "../../../drivers/storage/ata.h"
+#include "../../../drivers/time/rtc.h"
 #include "../../../core/process/user_image.h"
 #include "../../../core/process/process.h"
 #include "../../../core/process/thread.h"
@@ -1688,6 +1689,12 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("generic clock ready\r\n");
+    rtc_datetime_t rtc_now;
+    if (!rtc_read_datetime(&rtc_now)) {
+        serial_write("RTC read failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("RTC ready\r\n");
     uint64_t preempt_deadline = timer_ticks() + 20;
     preempt_task_a_ticks = 0;
     preempt_task_b_ticks = 0;

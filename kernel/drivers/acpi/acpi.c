@@ -21,6 +21,7 @@ typedef struct {
 } __attribute__((packed)) acpi_gas_t;
 
 #define ACPI_MAX_TABLE_LENGTH (1024U * 1024U)
+#define ACPI_MMIO_PAGE_SIZE 0x1000ULL
 
 static uint32_t enabled_cpus;
 static uint32_t apic_ids[64];
@@ -47,6 +48,12 @@ static int table_range_valid(uint64_t address, uint32_t length) {
     return address != 0 && address <= UINT32_MAX && length != 0 &&
            length <= ACPI_MAX_TABLE_LENGTH &&
            address <= UINT64_MAX - (uint64_t)length;
+}
+
+static int mmio_base_valid(uint64_t address) {
+    return address != 0 && address < (1ULL << 32) &&
+           (address & (ACPI_MMIO_PAGE_SIZE - 1U)) == 0 &&
+           address <= UINT64_MAX - ACPI_MMIO_PAGE_SIZE;
 }
 
 static int checksum_ok(const void *address, uint32_t length) {
@@ -112,6 +119,7 @@ int acpi_initialize(uint64_t rsdp_address) {
         }
     }
     if (!madt) return 0;
+    if (!mmio_base_valid(madt->lapic_address)) return 0;
     local_apic_base = madt->lapic_address;
     const uint8_t *cursor = (const uint8_t *)madt + sizeof(acpi_madt_t);
     const uint8_t *end = (const uint8_t *)madt + madt->header.length;
@@ -123,15 +131,19 @@ int acpi_initialize(uint64_t rsdp_address) {
         else if (type == 1 && length >= 12 && io_apic_count < ACPI_IOAPIC_CAPACITY) {
             uint64_t base = *(const uint32_t *)(cursor + 4);
             uint32_t gsi_base = *(const uint32_t *)(cursor + 8);
-            if (base == 0 || base >= (1ULL << 32)) return 0;
+            if (!mmio_base_valid(base)) return 0;
             volatile uint32_t *ioapic = (volatile uint32_t *)(uintptr_t)base;
             ioapic[0] = 1;
             uint32_t version = ioapic[4];
             uint32_t max_redirection = (version >> 16) & 0xffU;
             if (gsi_base > UINT32_MAX - max_redirection) return 0;
+            uint32_t limit = gsi_base + max_redirection;
+            for (uint32_t previous = 0; previous < io_apic_count; ++previous)
+                if (gsi_base <= io_apic_gsi_limits[previous] &&
+                    io_apic_gsi_bases[previous] <= limit) return 0;
             io_apic_bases[io_apic_count] = base;
             io_apic_gsi_bases[io_apic_count] = gsi_base;
-            io_apic_gsi_limits[io_apic_count] = gsi_base + max_redirection;
+            io_apic_gsi_limits[io_apic_count] = limit;
             if (!io_apic_base) {
                 io_apic_base = base;
                 io_apic_gsi_base = gsi_base;

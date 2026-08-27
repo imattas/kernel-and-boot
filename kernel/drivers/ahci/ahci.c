@@ -40,6 +40,7 @@
                                  (1U << 25) | (1U << 26) | (1U << 27) | \
                                  (1U << 28) | (1U << 30) | (1U << 31))
 #define AHCI_PORT_IRQ_MASK (0x0000001fU | AHCI_PORT_IS_ERROR_MASK)
+#define AHCI_PORT_REGISTER_SIZE 0x40U
 
 extern void arch_ahci_irq_stub(void);
 
@@ -120,7 +121,7 @@ static int ahci_match(const device_t *device) {
 }
 
 static int ahci_probe(device_t *device) {
-    if (!device || device->resources[AHCI_BAR_INDEX].size == 0 ||
+    if (!device || device->resources[AHCI_BAR_INDEX].size < AHCI_PORT_BASE ||
         device->resources[AHCI_BAR_INDEX].address == 0 ||
         device->resources[AHCI_BAR_INDEX].address >= 0x100000000ULL ||
         (device->resources[AHCI_BAR_INDEX].flags & 1U) != 0 ||
@@ -138,7 +139,11 @@ static int ahci_probe(device_t *device) {
     ahci_io_disabled = 0;
     for (uint32_t port = 0; port < 32; ++port) {
         if ((implemented_ports & (1U << port)) == 0) continue;
-        volatile uint32_t *regs = abar + (AHCI_PORT_BASE + port * AHCI_PORT_STRIDE) / 4;
+        uint64_t port_offset = AHCI_PORT_BASE + (uint64_t)port * AHCI_PORT_STRIDE;
+        if (port_offset > device->resources[AHCI_BAR_INDEX].size ||
+            device->resources[AHCI_BAR_INDEX].size - port_offset <
+                AHCI_PORT_REGISTER_SIZE) continue;
+        volatile uint32_t *regs = abar + port_offset / 4;
         uint32_t ssts = regs[AHCI_PORT_SSTS / 4];
         if ((ssts & 0x0fU) != 3 || ((ssts >> 8) & 0x0fU) != 1) continue;
         if (regs[AHCI_PORT_SIG / 4] != AHCI_SIGNATURE_SATA) continue;

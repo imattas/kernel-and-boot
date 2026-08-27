@@ -264,6 +264,8 @@ the FAT32 and VFS probes therefore exercise the AHCI-backed storage device.
 AHCI probe binding now requires a link-ready SATA port with the supported device
 signature, and releases the BAR instead of exposing an unusable controller.
 AHCI probe validation now rejects I/O BARs before treating the ABAR as MMIO.
+AHCI port discovery now verifies that every implemented port’s register block
+fits inside the published ABAR size before dereferencing its MMIO registers.
 The generic storage registry now serializes registration, enumeration, and
 backend dispatch, rejects duplicate device names, and has hosted contract-test
 build support without executing privileged interrupt-state instructions.

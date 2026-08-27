@@ -145,6 +145,25 @@ int btrfs_zstd_execute_sequence(uint8_t *output, uint32_t output_capacity,
                                  sequence->offset, sequence->match_length);
 }
 
+int btrfs_zstd_execute_sequences(uint8_t *output, uint32_t output_capacity,
+                                 uint32_t *output_size, const uint8_t *literals,
+                                 uint32_t literal_size,
+                                 const btrfs_zstd_sequence_t *sequences,
+                                 uint32_t sequence_count) {
+    uint32_t literal_offset = 0;
+    if (!output || !output_size || !literals || (!sequences && sequence_count) ||
+        *output_size > output_capacity) return 0;
+    for (uint32_t i = 0; i < sequence_count; ++i)
+        if (!btrfs_zstd_execute_sequence(output, output_capacity, output_size,
+                                         literals, literal_size, &literal_offset,
+                                         &sequences[i])) return 0;
+    if (literal_offset > literal_size || literal_size - literal_offset >
+        output_capacity - *output_size) return 0;
+    for (uint32_t i = literal_offset; i < literal_size; ++i)
+        output[(*output_size)++] = literals[i];
+    return 1;
+}
+
 int btrfs_zstd_decode_sequence(const btrfs_fse_table_t *literal_table,
                                const btrfs_fse_table_t *match_table,
                                const btrfs_fse_table_t *offset_table,

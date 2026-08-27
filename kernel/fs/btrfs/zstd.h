@@ -41,6 +41,11 @@ int btrfs_zstd_execute_sequence(uint8_t *output, uint32_t output_capacity,
                                 uint32_t *output_size, const uint8_t *literals,
                                 uint32_t literal_size, uint32_t *literal_offset,
                                 const btrfs_zstd_sequence_t *sequence);
+int btrfs_zstd_execute_sequences(uint8_t *output, uint32_t output_capacity,
+                                 uint32_t *output_size, const uint8_t *literals,
+                                 uint32_t literal_size,
+                                 const btrfs_zstd_sequence_t *sequences,
+                                 uint32_t sequence_count);
 int btrfs_zstd_decode_sequence(const btrfs_fse_table_t *literal_table,
                                const btrfs_fse_table_t *match_table,
                                const btrfs_fse_table_t *offset_table,

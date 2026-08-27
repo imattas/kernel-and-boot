@@ -352,6 +352,8 @@ literal runs and performs validated overlapping matches; FSE symbol wiring and
 complete compressed-block sequence integration remain. FSE states are now
 wired into one-sequence decoding with offset, match-length, and literal-length
 extra-bit consumption and optional state updates.
+The block-output layer now executes all decoded sequences and appends trailing
+literals with bounded total-output validation.
 Zstandard sequence-table preparation now consumes and validates LL/offset/ML
 mode tables in order, including inherited repeat tables.
 The multi-sequence coordinator now decodes exactly the declared count and

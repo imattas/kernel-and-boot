@@ -535,6 +535,7 @@ void kernel_main(void *boot_info) {
                 for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
             }
         serial_write("NVMe sector write I/O ready\r\n");
+        serial_write("NVMe flush I/O ready\r\n");
     }
     static uint8_t nvme_multi_write[1024];
     static uint8_t nvme_multi_read[1024];

@@ -534,6 +534,8 @@ gate requires post-`sti` namespace I/O to observe delivery when routing is
 enabled. The ISR uses the controller/vector ownership boundary, while the
 locked command path remains responsible for phase validation and completion
 consumption.
+NVMe write APIs now issue and validate a namespace Flush command after data
+completion, so successful writes include the device durability boundary.
 NVMe timeout handling now quarantines an in-flight PRP when controller abort
 cannot confirm `CSTS.RDY=0`, preventing DMA use-after-free and rejecting later
 queue commands on the wedged controller.

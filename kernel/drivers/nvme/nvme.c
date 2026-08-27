@@ -369,12 +369,55 @@ static int nvme_io(uint64_t lba, void *buffer, uint32_t count, int write) {
     return success;
 }
 
+static int nvme_flush(void) {
+    if (nvme_disabled || !active_io_ready || !active_regs) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&nvme_lock);
+    volatile nvme_command_t *sq =
+        (volatile nvme_command_t *)(uintptr_t)active_io_sq;
+    volatile nvme_completion_t *cq =
+        (volatile nvme_completion_t *)(uintptr_t)active_io_cq;
+    volatile nvme_command_t *command = &sq[active_io_sq_tail];
+    for (uint32_t i = 0; i < sizeof(*command) / sizeof(uint32_t); ++i)
+        ((volatile uint32_t *)command)[i] = 0;
+    uint16_t command_id = active_command_id++;
+    command->command = (uint32_t)command_id << 16;
+    command->namespace_id = 1;
+    active_io_sq_tail = (uint16_t)((active_io_sq_tail + 1U) % active_queue_entries);
+    volatile uint32_t *sq_doorbell =
+        (volatile uint32_t *)((uintptr_t)active_regs +
+                              NVME_ADMIN_SQ_DOORBELL + 2U * active_doorbell_stride);
+    *sq_doorbell = active_io_sq_tail;
+    int success = 0;
+    int completed = 0;
+    for (uint32_t wait = 0; wait < NVME_TIMEOUT_ATTEMPTS; ++wait) {
+        volatile nvme_completion_t *completion = &cq[active_io_cq_head];
+        uint16_t status = completion->status;
+        if ((status & 1U) != active_io_cq_phase ||
+            completion->command_id != command_id) continue;
+        success = (status >> 1) == 0;
+        completed = 1;
+        ++active_io_cq_head;
+        if (active_io_cq_head == active_queue_entries) {
+            active_io_cq_head = 0;
+            active_io_cq_phase ^= 1U;
+        }
+        volatile uint32_t *cq_doorbell =
+            (volatile uint32_t *)((uintptr_t)active_regs +
+                                  NVME_ADMIN_SQ_DOORBELL + 3U * active_doorbell_stride);
+        *cq_doorbell = active_io_cq_head;
+        break;
+    }
+    if (!completed) (void)nvme_abort_controller();
+    spinlock_unlock_irqrestore(&nvme_lock, flags);
+    return success;
+}
+
 int nvme_read_sector(uint64_t lba, void *buffer) {
     return nvme_io(lba, buffer, 1, 0);
 }
 
 int nvme_write_sector(uint64_t lba, const void *buffer) {
-    return nvme_io(lba, (void *)buffer, 1, 1);
+    return nvme_io(lba, (void *)buffer, 1, 1) && nvme_flush();
 }
 
 int nvme_read_sectors(uint64_t lba, uint32_t count, void *buffer) {
@@ -382,7 +425,7 @@ int nvme_read_sectors(uint64_t lba, uint32_t count, void *buffer) {
 }
 
 int nvme_write_sectors(uint64_t lba, uint32_t count, const void *buffer) {
-    return nvme_io(lba, (void *)buffer, count, 1);
+    return nvme_io(lba, (void *)buffer, count, 1) && nvme_flush();
 }
 
 int nvme_initialize(void) {

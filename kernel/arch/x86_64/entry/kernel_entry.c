@@ -2348,6 +2348,7 @@ void kernel_main(void *boot_info) {
         18, 1, 0, 2, 0, 0, 0, 64, 0x34, 0x12, 0x78, 0x56, 0, 1, 1, 2, 3, 1
     };
     static const uint8_t usb_endpoint_descriptor[7] = {7, 5, 0x81, 2, 64, 0, 1};
+    static const uint8_t usb_invalid_bulk_endpoint[7] = {7, 5, 0x02, 2, 3, 0, 1};
     usb_device_t usb_device;
     uint8_t invalid_usb_device_descriptor[18];
     for (uint32_t descriptor_byte = 0; descriptor_byte < 18; ++descriptor_byte)
@@ -2360,6 +2361,8 @@ void kernel_main(void *boot_info) {
         usb_device.vendor_id != 0x1234 ||
         !usb_device_add_endpoint(&usb_device, usb_endpoint_descriptor,
                                   sizeof(usb_endpoint_descriptor)) ||
+        usb_device_add_endpoint(&usb_device, usb_invalid_bulk_endpoint,
+                                sizeof(usb_invalid_bulk_endpoint)) ||
         usb_device_add_endpoint(&usb_device, usb_endpoint_descriptor,
                                 sizeof(usb_endpoint_descriptor)) ||
         usb_device.endpoint_count != 1 ||

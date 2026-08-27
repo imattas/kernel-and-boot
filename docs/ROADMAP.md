@@ -1080,6 +1080,9 @@ declared `bInterval` instead of submitting the queue head on every frame.
 UHCI bulk transfers now have a dedicated validated submission path rather than
 silently entering the interrupt-transfer API; bulk queue ownership and future
 non-periodic scheduling changes are isolated from HID interrupt transfers.
+USB endpoint descriptor validation now rejects packet sizes that UHCI cannot
+represent and rejects nonstandard full-speed bulk packet sizes before endpoint
+metadata reaches a transfer driver.
 The UEFI memory-map capture now rejects malformed successful firmware results
 unless descriptor size and map length satisfy the boot contract, and bounds
 replacement-map publication to the allocated buffer.

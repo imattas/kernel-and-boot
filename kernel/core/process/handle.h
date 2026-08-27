@@ -6,10 +6,13 @@
 #define PROCESS_HANDLE_READ 0x01U
 #define PROCESS_HANDLE_WRITE 0x02U
 #define PROCESS_HANDLE_EXEC 0x04U
+#define PROCESS_HANDLE_SLOT_BITS 5U
+#define PROCESS_HANDLE_SLOT_MASK (PROCESS_HANDLE_CAPACITY - 1U)
 typedef struct { void *object; uint32_t rights; } process_handle_t;
 typedef struct {
     spinlock_t lock;
     process_handle_t entries[PROCESS_HANDLE_CAPACITY];
+    uint16_t generations[PROCESS_HANDLE_CAPACITY];
 } process_handle_table_t;
 void process_handle_table_initialize(process_handle_table_t *table);
 int process_handle_open(process_handle_table_t *table, void *object, uint32_t rights);

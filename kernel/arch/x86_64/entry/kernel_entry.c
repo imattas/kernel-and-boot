@@ -1040,8 +1040,10 @@ void kernel_main(void *boot_info) {
     serial_write("process lifecycle ready\r\n");
     process_t *signal_process = process_create(2);
     static uint8_t handle_probe_object;
+    static uint8_t handle_replacement_object;
     int handle_probe = signal_process ? process_handle_open(&signal_process->handles,
         &handle_probe_object, PROCESS_HANDLE_READ | PROCESS_HANDLE_WRITE) : 0;
+    int replacement_handle = 0;
     uint32_t signal = 0;
     if (!signal_process || process_lookup(2) != signal_process || !handle_probe ||
         process_handle_get(&signal_process->handles, (uint32_t)handle_probe,
@@ -1049,6 +1051,13 @@ void kernel_main(void *boot_info) {
         process_handle_get(&signal_process->handles, (uint32_t)handle_probe,
                            PROCESS_HANDLE_EXEC) != 0 ||
         !process_handle_close(&signal_process->handles, (uint32_t)handle_probe) ||
+        process_handle_get(&signal_process->handles, (uint32_t)handle_probe, 0) != 0 ||
+        !(replacement_handle = process_handle_open(&signal_process->handles,
+            &handle_replacement_object, PROCESS_HANDLE_READ)) ||
+        process_handle_get(&signal_process->handles, (uint32_t)handle_probe, 0) != 0 ||
+        process_handle_get(&signal_process->handles, (uint32_t)replacement_handle,
+                           PROCESS_HANDLE_READ) != &handle_replacement_object ||
+        !process_handle_close(&signal_process->handles, (uint32_t)replacement_handle) ||
         !process_send_signal(signal_process, 2) ||
         !process_set_signal_mask(signal_process, 1U << 4) ||
         !process_take_signal(signal_process, &signal) || signal != 2 ||

@@ -91,7 +91,8 @@ int network_build_arp_reply(const void *frame, uint16_t length,
 uint32_t network_service(network_packet_queue_t *queue,
                          const uint8_t local_hardware[ETHERNET_ADDRESS_SIZE],
                          const uint8_t local_protocol[4], arp_cache_t *cache,
-                         uint64_t now, uint32_t budget) {
+                         udp_endpoint_table_t *udp_table, uint64_t now,
+                         uint32_t budget) {
     if (!queue || !local_hardware || !local_protocol || !cache ||
         budget == 0) return 0;
     (void)network_e1000_poll(queue, budget);
@@ -118,8 +119,16 @@ uint32_t network_service(network_packet_queue_t *queue,
         } else if (view.kind == NETWORK_FRAME_ICMP &&
                    view.icmp.type == ICMP_TYPE_ECHO_REQUEST &&
                    network_build_icmp_echo_reply(frame, length, reply,
-                                                 sizeof(reply), &reply_length))
+                                                 sizeof(reply), &reply_length)) {
             (void)network_e1000_transmit(reply, reply_length);
+        } else if (view.kind == NETWORK_FRAME_UDP && udp_table) {
+            (void)udp_endpoint_deliver(udp_table, view.ipv4.destination,
+                                       view.udp.destination_port,
+                                       view.ipv4.source,
+                                       view.udp.source_port,
+                                       view.udp.payload,
+                                       view.udp.payload_length);
+        }
         ++serviced;
     }
     return serviced;

@@ -959,10 +959,25 @@ void kernel_main(void *boot_info) {
     static arp_cache_t network_service_probe_cache;
     network_packet_queue_initialize(&network_service_probe_queue);
     arp_cache_initialize(&network_service_probe_cache);
+    udp_endpoint_table_initialize(&udp_endpoint_probe_table);
+    if (!udp_endpoint_bind(&udp_endpoint_probe_table, ipv4_probe_destination,
+                           6001, &udp_endpoint_any) ||
+        !network_packet_queue_push(&network_service_probe_queue,
+                                   network_dispatch_frame,
+                                   network_dispatch_frame_length)) {
+        serial_write("network service setup failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
     if (network_service(&network_service_probe_queue, ethernet_probe_source,
                         ipv4_probe_destination, &network_service_probe_cache,
-                        1, 4) != 0 ||
-        network_packet_queue_count(&network_service_probe_queue) != 0) {
+                        &udp_endpoint_probe_table, 1, 4) != 1 ||
+        network_packet_queue_count(&network_service_probe_queue) != 0 ||
+        !udp_endpoint_receive(&udp_endpoint_probe_table, udp_endpoint_any,
+                              udp_endpoint_source, &udp_endpoint_source_port,
+                              udp_endpoint_output, sizeof(udp_endpoint_output),
+                              &udp_endpoint_output_length) ||
+        udp_endpoint_source_port != 6000 || udp_endpoint_output_length != 3 ||
+        udp_endpoint_output[0] != 0xa1) {
         serial_write("network service failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }

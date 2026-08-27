@@ -23,8 +23,22 @@ void vfs_mount_table_initialize(vfs_mount_table_t *table) {
 int vfs_mount(vfs_mount_table_t *table, vfs_node_t *mountpoint,
               vfs_node_t *root) {
     if (!table || !mountpoint || !root ||
-        mountpoint->type != VFS_NODE_DIRECTORY || root->type != VFS_NODE_DIRECTORY)
+        mountpoint->type != VFS_NODE_DIRECTORY || root->type != VFS_NODE_DIRECTORY ||
+        mountpoint == root)
         return 0;
+
+    /* A mounted root must not contain its mountpoint, or path traversal can
+       re-enter the same mount indefinitely. */
+    vfs_node_t *ancestor = mountpoint;
+    for (uint32_t depth = 0; ancestor && depth < 256U; ++depth) {
+        if (ancestor == root) return 0;
+        uint64_t ancestor_flags = spinlock_lock_irqsave(&ancestor->lock);
+        vfs_node_t *parent = ancestor->parent;
+        spinlock_unlock_irqrestore(&ancestor->lock, ancestor_flags);
+        ancestor = parent;
+    }
+    if (ancestor) return 0;
+
     uint64_t flags = spinlock_lock_irqsave(&table->lock);
     uint32_t free_slot = VFS_MAX_MOUNTS;
     for (uint32_t i = 0; i < VFS_MAX_MOUNTS; ++i) {

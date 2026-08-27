@@ -1422,6 +1422,7 @@ void kernel_main(void *boot_info) {
     vfs_mount_table_initialize(&vfs_mounts);
     if (!vfs_mounted_root || !vfs_mounted_file ||
         !vfs_node_add_child(vfs_mounted_root, vfs_mounted_file) ||
+        vfs_mount(&vfs_mounts, vfs_dev, vfs_root) ||
         !vfs_mount(&vfs_mounts, vfs_dev, vfs_mounted_root)) {
         serial_write("VFS mount failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");

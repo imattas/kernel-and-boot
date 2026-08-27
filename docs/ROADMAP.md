@@ -793,6 +793,8 @@ VFS now exposes retained directory-child iteration for safe enumeration by
 filesystem adapters and future userland traversal.
 VFS removal now unlocks both nodes when a non-child is supplied, with a boot
 regression probe covering that failure path before later traversal operations.
+VFS mount validation now rejects self-mounts and mounts whose root contains the
+mountpoint, preventing cyclic mounted-path traversal.
 VFS nodes now expose bounded write callbacks alongside reads, with boot-time
 write-path validation.
 Physical frame allocation now zero-fills reclaimed pages, with boot-time

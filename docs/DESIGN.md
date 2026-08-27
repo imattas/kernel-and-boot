@@ -187,6 +187,9 @@ preserving the queued-message drain rule.
 
 ### `fs`
 Owns the VFS and filesystem-independent caching plus kernel-provided pseudo filesystems such as device and process views. The initial VFS layer provides reference-counted hierarchy nodes, duplicate-safe child insertion, removal, and absolute path lookup with `.` and `..` handling. `fs/block` provides bounded, callback-backed sector I/O without depending on a concrete hardware driver, and `fs/cache` provides a bounded write-through sector cache. `devfs` exposes registered devices as read-only VFS device nodes, while `procfs` provides a read-only `/self/pid` pseudo-file through the VFS read callback. The FAT12 reader validates the generated image BPB, FAT, root entries, and cluster reads, and its VFS adapter exposes read-only file nodes.
+Writable filesystem adapters serialize direct node reads and writes with
+per-file IRQ-safe locks, preserving consistency for callers outside the file
+description layer.
 
 ### `drivers`
 Owns hardware and firmware-facing drivers. The initial decomposition reserves areas for ACPI, PCI, storage, NVMe, AHCI, USB, input, serial, display, and firmware integration. The ATA PIO driver now exposes bounded read/write storage operations through the storage contract and claims its active PCI resources. AHCI discovery enables the controller only for matching PCI SATA devices and records implemented ports. The input layer provides a bounded IRQ-safe event queue, and the PS/2 keyboard backend initializes the controller and emits set-1 scancode events. The display layer provides a bounds-checked packed-pixel framebuffer surface. USB descriptor parsing validates device and endpoint descriptors before controller binding.

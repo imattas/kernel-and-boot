@@ -1,14 +1,18 @@
 #include "exfat_vfs.h"
 #include "../../mm/heap/heap.h"
 
-typedef struct { exfat_fs_t *fs; char name[32]; uint64_t size; } exfat_vfs_file_t;
+typedef struct { exfat_fs_t *fs; char name[32]; uint64_t size; spinlock_t lock; } exfat_vfs_file_t;
 static void exfat_vfs_destroy(void *private_data) { kfree(private_data); }
 
 static int exfat_vfs_read(vfs_node_t *node, uint64_t offset,
                           void *buffer, uint32_t size) {
     exfat_vfs_file_t *file = node ? (exfat_vfs_file_t *)node->private_data : 0;
     if (!file || offset > file->size || size > file->size - offset) return 0;
-    return exfat_read_file(file->fs, file->name, offset, buffer, size) ? (int)size : 0;
+    uint64_t flags = spinlock_lock_irqsave(&file->lock);
+    int result = exfat_read_file(file->fs, file->name, offset, buffer, size) ?
+                 (int)size : 0;
+    spinlock_unlock_irqrestore(&file->lock, flags);
+    return result;
 }
 
 static int exfat_vfs_write(vfs_node_t *node, uint64_t offset,
@@ -16,8 +20,11 @@ static int exfat_vfs_write(vfs_node_t *node, uint64_t offset,
     exfat_vfs_file_t *file = node ? (exfat_vfs_file_t *)node->private_data : 0;
     if (!file || offset > file->size || (uint64_t)size > file->size - offset)
         return 0;
-    return exfat_write_file(file->fs, file->name, offset, buffer, size) ?
-           (int)size : 0;
+    uint64_t flags = spinlock_lock_irqsave(&file->lock);
+    int result = exfat_write_file(file->fs, file->name, offset, buffer, size) ?
+                 (int)size : 0;
+    spinlock_unlock_irqrestore(&file->lock, flags);
+    return result;
 }
 
 int exfat_vfs_attach_file(exfat_fs_t *fs, vfs_node_t *root,
@@ -29,7 +36,7 @@ int exfat_vfs_attach_file(exfat_fs_t *fs, vfs_node_t *root,
         size > UINT64_MAX) return 0;
     exfat_vfs_file_t *file = (exfat_vfs_file_t *)kmalloc(sizeof(*file));
     if (!file) return 0;
-    file->fs = fs; file->size = size;
+    file->fs = fs; file->size = size; spinlock_init(&file->lock);
     uint32_t i = 0;
     for (; i + 1 < sizeof(file->name) && filesystem_name[i]; ++i)
         file->name[i] = filesystem_name[i];

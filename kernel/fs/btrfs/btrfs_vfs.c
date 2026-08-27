@@ -6,7 +6,11 @@ static void btrfs_vfs_destroy(void *data) { kfree(data); }
 static int btrfs_vfs_read(vfs_node_t *node, uint64_t offset, void *buffer, uint32_t size) {
     btrfs_vfs_file_t *file = node ? (btrfs_vfs_file_t *)node->private_data : 0;
     if (!file || offset > file->size || size > file->size - offset) return 0;
-    return btrfs_read_file(file->fs, file->tree, file->inode, offset, buffer, size) ? (int)size : 0;
+    uint64_t flags = spinlock_lock_irqsave(&file->lock);
+    int result = btrfs_read_file(file->fs, file->tree, file->inode, offset,
+                                 buffer, size) ? (int)size : 0;
+    spinlock_unlock_irqrestore(&file->lock, flags);
+    return result;
 }
 static int btrfs_vfs_write(vfs_node_t *node, uint64_t offset,
                            const void *buffer, uint32_t size) {

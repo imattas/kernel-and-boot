@@ -962,6 +962,9 @@ within existing contiguous or FAT-linked extents; allocation, append, and
 truncate remain separate metadata operations.
 The exFAT contract now exercises an actual write followed by a readback on the
 synthetic filesystem image.
+FAT32, exFAT, ext4, XFS, and Btrfs VFS file adapters now serialize direct node
+reads and writes with per-file IRQ-safe locks, so concurrent filesystem users
+cannot interleave adapter operations.
 ExFAT lookup now accepts zero-length regular files, including files with no
 allocated data cluster, and the contract covers this case.
 validates the primary and backup boot-region checksums, supports bounded

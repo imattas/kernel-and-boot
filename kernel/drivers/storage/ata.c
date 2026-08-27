@@ -5,6 +5,7 @@
 static uint16_t io_base = 0x1f0;
 static uint16_t control_base = 0x3f6;
 static uint64_t sector_count;
+static int lba48_supported;
 static device_driver_t ata_driver;
 
 static void out8(uint16_t port, uint8_t value) {
@@ -55,24 +56,42 @@ static int identify(void) {
                      ((uint64_t)identify_data[101] << 16) |
                      ((uint64_t)identify_data[102] << 32) |
                      ((uint64_t)identify_data[103] << 48);
-    sector_count = lba48 != 0
+    lba48_supported = (identify_data[83] & (1U << 10)) != 0;
+    sector_count = lba48_supported && lba48 != 0
         ? lba48
         : (uint64_t)identify_data[60] | ((uint64_t)identify_data[61] << 16);
     return sector_count != 0;
 }
 
+static void ata_issue(uint64_t lba, uint32_t count, uint8_t command) {
+    if (lba48_supported) {
+        out8(io_base + 6, 0xe0);
+        out8(io_base + 2, (uint8_t)(count >> 8));
+        out8(io_base + 3, (uint8_t)(lba >> 24));
+        out8(io_base + 4, (uint8_t)(lba >> 32));
+        out8(io_base + 5, (uint8_t)(lba >> 40));
+        out8(io_base + 2, (uint8_t)count);
+        out8(io_base + 3, (uint8_t)lba);
+        out8(io_base + 4, (uint8_t)(lba >> 8));
+        out8(io_base + 5, (uint8_t)(lba >> 16));
+        out8(io_base + 7, command);
+        return;
+    }
+    out8(io_base + 6, (uint8_t)(0xe0 | ((lba >> 24) & 0x0f)));
+    out8(io_base + 2, (uint8_t)count);
+    out8(io_base + 3, (uint8_t)lba);
+    out8(io_base + 4, (uint8_t)(lba >> 8));
+    out8(io_base + 5, (uint8_t)(lba >> 16));
+    out8(io_base + 7, command);
+}
+
 static int ata_read(uint64_t lba, uint32_t count, void *buffer) {
-    if (lba > 0x0fffffffULL || count == 0 || count > 256 ||
+    if (!buffer || (!lba48_supported && lba > 0x0fffffffULL) || count == 0 || count > 256 ||
         lba >= sector_count || count > sector_count - lba) return 0;
     uint8_t *output = (uint8_t *)buffer;
     for (uint32_t sector = 0; sector < count; ++sector) {
         uint64_t current = lba + sector;
-        out8(io_base + 6, (uint8_t)(0xe0 | ((current >> 24) & 0x0f)));
-        out8(io_base + 2, 1);
-        out8(io_base + 3, (uint8_t)current);
-        out8(io_base + 4, (uint8_t)(current >> 8));
-        out8(io_base + 5, (uint8_t)(current >> 16));
-        out8(io_base + 7, 0x20);
+        ata_issue(current, 1, lba48_supported ? 0x24 : 0x20);
         if (!wait_status(0x88, 0x08)) return 0;
         for (uint32_t word = 0; word < 256; ++word) {
             uint16_t value = in16(io_base);
@@ -84,17 +103,12 @@ static int ata_read(uint64_t lba, uint32_t count, void *buffer) {
 }
 
 static int ata_write(uint64_t lba, uint32_t count, const void *buffer) {
-    if (lba > 0x0fffffffULL || count == 0 || count > 256 ||
+    if ((!lba48_supported && lba > 0x0fffffffULL) || count == 0 || count > 256 ||
         lba >= sector_count || count > sector_count - lba || !buffer) return 0;
     const uint8_t *input = (const uint8_t *)buffer;
     for (uint32_t sector = 0; sector < count; ++sector) {
         uint64_t current = lba + sector;
-        out8(io_base + 6, (uint8_t)(0xe0 | ((current >> 24) & 0x0f)));
-        out8(io_base + 2, 1);
-        out8(io_base + 3, (uint8_t)current);
-        out8(io_base + 4, (uint8_t)(current >> 8));
-        out8(io_base + 5, (uint8_t)(current >> 16));
-        out8(io_base + 7, 0x30);
+        ata_issue(current, 1, lba48_supported ? 0x34 : 0x30);
         if (!wait_status(0x88, 0x08)) return 0;
         for (uint32_t word = 0; word < 256; ++word)
             out16(io_base, (uint16_t)input[sector * 512 + word * 2] |
@@ -145,6 +159,7 @@ static int ata_probe(device_t *device) {
 }
 
 int ata_initialize(void) {
+    lba48_supported = 0;
     ata_driver.name = "ata-pio";
     ata_driver.bus = DEVICE_BUS_PCI;
     ata_driver.match = ata_match;

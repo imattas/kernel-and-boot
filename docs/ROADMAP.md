@@ -251,6 +251,8 @@ AHCI command timeouts now stop and restart the port engine with bounded CR/FR
 quiescence and error-state clearing before DMA buffers are released.
 The identified AHCI disk is now registered with the generic storage layer;
 the FAT32 and VFS probes therefore exercise the AHCI-backed storage device.
+The ATA PIO fallback now selects validated LBA48 task-file commands when the
+device advertises 48-bit addressing, while retaining the bounded LBA28 path.
 Driver enumeration and hardware
 coverage remain incomplete. The QEMU gate now supplies an emulated e1000 NIC
 so its controller path and bounded TX/RX descriptor operations can be exercised;

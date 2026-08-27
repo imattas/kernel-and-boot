@@ -284,12 +284,14 @@ static int nvme_io(uint64_t lba, void *buffer, uint32_t count, int write) {
                               NVME_ADMIN_SQ_DOORBELL + 2U * active_doorbell_stride);
     *sq_doorbell = active_io_sq_tail;
     int success = 0;
+    int completed = 0;
     for (uint32_t wait = 0; wait < 1000000; ++wait) {
         volatile nvme_completion_t *completion = &cq[active_io_cq_head];
         uint16_t status = completion->status;
         if ((status & 1U) != active_io_cq_phase ||
             completion->command_id != command_id) continue;
         success = (status >> 1) == 0;
+        completed = 1;
         ++active_io_cq_head;
         if (active_io_cq_head == active_queue_entries) {
             active_io_cq_head = 0;
@@ -306,7 +308,7 @@ static int nvme_io(uint64_t lba, void *buffer, uint32_t count, int write) {
         uint8_t *destination = (uint8_t *)buffer;
         for (uint32_t i = 0; i < count * 512U; ++i) destination[i] = source[i];
     }
-    if (!success) nvme_abort_controller();
+    if (!completed) nvme_abort_controller();
     physical_free_frame(data_frame);
     spinlock_unlock_irqrestore(&nvme_lock, flags);
     return success;

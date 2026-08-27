@@ -282,7 +282,8 @@ NVMe namespace I/O now supports bounded multi-sector transfers within one DMA
 page and is covered by a real two-sector write/read-back QEMU check. Admin and
 namespace queue state is serialized with an interrupt-safe lock; timed-out
 commands disable the controller and wait for `CSTS.RDY` to clear before PRP
-buffers are released.
+buffers are released, while completed device-error statuses are consumed
+without unnecessarily destroying a healthy queue.
 The scheduler now has an explicit core boundary
 and round-robin policy module. Process pending/blocked signal state and explicit
 termination status are now implemented; signal delivery policy remains bounded

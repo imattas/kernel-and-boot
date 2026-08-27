@@ -111,6 +111,7 @@ static int e1000_probe(device_t *device) {
     e1000_tx_pending = 0; e1000_rx_index = 0;
     arch_set_interrupt_gate(E1000_IRQ_VECTOR, arch_e1000_irq_stub);
     e1000_msi_enabled = pci_enable_msi(device, E1000_IRQ_VECTOR);
+    if (!e1000_msi_enabled) e1000_msi_enabled = pci_enable_legacy_irq(device, E1000_IRQ_VECTOR);
     ++controllers;
     return 1;
 fail:

@@ -1,4 +1,5 @@
 #include "apic.h"
+#include "../../../drivers/acpi/acpi.h"
 
 #define CPUID_FEAT_EDX_APIC (1u << 9)
 #define IA32_APIC_BASE 0x1b
@@ -140,5 +141,29 @@ int arch_apic_timer_initialize(void) {
     uint32_t initial_count = apic_timer_calibrate();
     lapic_write(APIC_REG_LVT_TIMER, APIC_TIMER_VECTOR | APIC_TIMER_PERIODIC);
     lapic_write(APIC_REG_TIMER_INITIAL, initial_count);
+    return 1;
+}
+
+int arch_ioapic_route_irq(uint8_t irq, uint8_t vector) {
+    uint64_t base = acpi_ioapic_base();
+    uint32_t gsi = acpi_irq_to_gsi(irq);
+    if (!base || gsi == 0xffffffffU || vector < 0x20 || vector > 0xfe)
+        return 0;
+    volatile uint32_t *ioapic = (volatile uint32_t *)(uintptr_t)base;
+    ioapic[0] = 1;
+    uint32_t max_redirection = (ioapic[4] >> 16) & 0xffU;
+    uint32_t gsi_base = acpi_ioapic_gsi_base();
+    if (gsi < gsi_base || gsi - gsi_base > max_redirection) return 0;
+    uint32_t index = 0x10U + (gsi - gsi_base) * 2U;
+    uint32_t low = vector | (1U << 16);
+    uint16_t flags = acpi_irq_flags(irq);
+    if ((flags & 0x3U) == 3U) low |= 1U << 13;
+    if ((flags & 0xcU) == 0xcU) low |= 1U << 15;
+    ioapic[0] = index + 1U;
+    ioapic[4] = 0;
+    ioapic[0] = index;
+    ioapic[4] = low;
+    ioapic[0] = index;
+    ioapic[4] = low & ~(1U << 16);
     return 1;
 }

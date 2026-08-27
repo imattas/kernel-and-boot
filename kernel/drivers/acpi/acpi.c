@@ -18,6 +18,11 @@ typedef struct {
 static uint32_t enabled_cpus;
 static uint32_t apic_ids[64];
 static uint64_t local_apic_base;
+static uint64_t io_apic_base;
+static uint32_t io_apic_gsi_base;
+static uint32_t irq_gsi[16];
+static uint16_t irq_flags[16];
+static uint8_t irq_override[16];
 
 static int checksum_ok(const void *address, uint32_t length) {
     const uint8_t *bytes = address; uint8_t checksum = 0;
@@ -31,8 +36,11 @@ static int signature_is(const char *actual, const char *expected, uint32_t lengt
 }
 
 int acpi_initialize(uint64_t rsdp_address) {
-    enabled_cpus = 0; local_apic_base = 0;
+    enabled_cpus = 0; local_apic_base = 0; io_apic_base = 0; io_apic_gsi_base = 0;
     for (uint32_t i = 0; i < 64; ++i) apic_ids[i] = 0;
+    for (uint32_t i = 0; i < 16; ++i) {
+        irq_gsi[i] = i; irq_flags[i] = 0; irq_override[i] = 0;
+    }
     if (!rsdp_address) return 0;
     const acpi_rsdp_t *rsdp = (const acpi_rsdp_t *)(uintptr_t)rsdp_address;
     if (!signature_is(rsdp->signature, "RSD PTR ", 8) || !checksum_ok(rsdp, 20) ||
@@ -62,6 +70,15 @@ int acpi_initialize(uint64_t rsdp_address) {
         if (length < 2 || cursor + length > end) return 0;
         if (type == 0 && length >= 8 && (*(const uint32_t *)(cursor + 4) & 1) && enabled_cpus < 64)
             apic_ids[enabled_cpus++] = cursor[3];
+        else if (type == 1 && length >= 12 && !io_apic_base) {
+            io_apic_base = *(const uint32_t *)(cursor + 4);
+            io_apic_gsi_base = *(const uint32_t *)(cursor + 8);
+        }
+        else if (type == 2 && length >= 10 && cursor[3] < 16) {
+            irq_gsi[cursor[3]] = *(const uint32_t *)(cursor + 4);
+            irq_flags[cursor[3]] = *(const uint16_t *)(cursor + 8);
+            irq_override[cursor[3]] = 1;
+        }
         else if (type == 9 && length >= 16 && (*(const uint32_t *)(cursor + 8) & 1) && enabled_cpus < 64)
             apic_ids[enabled_cpus++] = *(const uint32_t *)(cursor + 4);
         cursor += length;
@@ -72,3 +89,7 @@ int acpi_initialize(uint64_t rsdp_address) {
 uint32_t acpi_cpu_count(void) { return enabled_cpus; }
 uint32_t acpi_cpu_apic_id(uint32_t index) { return index < enabled_cpus ? apic_ids[index] : 0xffffffffU; }
 uint64_t acpi_lapic_base(void) { return local_apic_base; }
+uint64_t acpi_ioapic_base(void) { return io_apic_base; }
+uint32_t acpi_ioapic_gsi_base(void) { return io_apic_gsi_base; }
+uint32_t acpi_irq_to_gsi(uint8_t irq) { return irq < 16 ? irq_gsi[irq] : 0xffffffffU; }
+uint16_t acpi_irq_flags(uint8_t irq) { return irq < 16 && irq_override[irq] ? irq_flags[irq] : 0; }

@@ -181,7 +181,7 @@ $(KERNEL_IRQ_OBJ): kernel/arch/x86_64/interrupts/irq.c kernel/arch/x86_64/interr
 	$(CC) -target x86_64-pc-none-elf -std=c11 -ffreestanding -fno-builtin -fno-stack-protector -fPIE -fno-plt \
 		-mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@
 
-$(KERNEL_APIC_OBJ): kernel/arch/x86_64/interrupts/apic.c kernel/arch/x86_64/interrupts/apic.h kernel/arch/x86_64/cpu/cpu.h | $(BUILD_DIR)/kernel
+$(KERNEL_APIC_OBJ): kernel/arch/x86_64/interrupts/apic.c kernel/arch/x86_64/interrupts/apic.h kernel/arch/x86_64/cpu/cpu.h kernel/drivers/acpi/acpi.h | $(BUILD_DIR)/kernel
 	$(CC) -target x86_64-pc-none-elf -std=c11 -ffreestanding -fno-builtin -fno-stack-protector -fPIE -fno-plt \
 		-mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@
 
@@ -431,7 +431,7 @@ $(KERNEL_DEVICE_OBJ): kernel/device/device.c kernel/device/device.h | $(BUILD_DI
 	$(CC) -target x86_64-pc-none-elf -std=c11 -ffreestanding -fno-builtin -fno-stack-protector -fPIE -fno-plt \
 		-mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@
 
-$(KERNEL_PCI_OBJ): kernel/drivers/pci/pci.c kernel/drivers/pci/pci.h kernel/device/device.h | $(BUILD_DIR)/kernel
+$(KERNEL_PCI_OBJ): kernel/drivers/pci/pci.c kernel/drivers/pci/pci.h kernel/device/device.h kernel/arch/x86_64/interrupts/apic.h | $(BUILD_DIR)/kernel
 	$(CC) -target x86_64-pc-none-elf -std=c11 -ffreestanding -fno-builtin -fno-stack-protector -fPIE -fno-plt \
 		-mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@
 

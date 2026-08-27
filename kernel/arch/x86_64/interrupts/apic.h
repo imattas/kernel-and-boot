@@ -9,5 +9,6 @@ uint32_t arch_apic_id(void);
 void arch_apic_eoi(void);
 int arch_apic_startup(uint32_t apic_id, uint8_t vector);
 int arch_apic_timer_initialize(void);
+int arch_ioapic_route_irq(uint8_t irq, uint8_t vector);
 
 #endif

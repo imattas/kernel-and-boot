@@ -12,5 +12,6 @@ uint32_t pci_config_read32(uint8_t bus, uint8_t slot, uint8_t function,
 void pci_config_write32(uint8_t bus, uint8_t slot, uint8_t function,
                         uint8_t offset, uint32_t value);
 int pci_enable_msi(const device_t *device, uint8_t vector);
+int pci_enable_legacy_irq(const device_t *device, uint8_t vector);
 
 #endif

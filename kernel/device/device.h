@@ -39,6 +39,8 @@ struct device {
     uint8_t class_code;
     uint8_t subclass;
     uint8_t programming_interface;
+    uint8_t irq_line;
+    uint8_t irq_pin;
     device_resource_t resources[6];
     const device_driver_t *resource_owner[6];
     const device_driver_t *driver;

@@ -1,6 +1,7 @@
 #include "pci.h"
 #include "../../device/device.h"
 #include "../../core/printk/serial.h"
+#include "../../arch/x86_64/interrupts/apic.h"
 
 #define PCI_CONFIG_ADDRESS 0xcf8
 #define PCI_CONFIG_DATA 0xcfc
@@ -101,6 +102,11 @@ int pci_enable_msi(const device_t *device, uint8_t vector) {
     return 0;
 }
 
+int pci_enable_legacy_irq(const device_t *device, uint8_t vector) {
+    return device && device->irq_line < 16 &&
+           arch_ioapic_route_irq(device->irq_line, vector);
+}
+
 static void enable_device(uint8_t bus, uint8_t slot, uint8_t function) {
     uint32_t command_status = config_read(bus, slot, function, 0x04);
     uint16_t command = (uint16_t)command_status;
@@ -194,7 +200,9 @@ static void scan_function(uint8_t bus, uint8_t slot, uint8_t function) {
         .device_id = config_read16(bus, slot, function, 0x02),
         .class_code = config_read8(bus, slot, function, 0x0b),
         .subclass = config_read8(bus, slot, function, 0x0a),
-        .programming_interface = config_read8(bus, slot, function, 0x09)
+        .programming_interface = config_read8(bus, slot, function, 0x09),
+        .irq_line = config_read8(bus, slot, function, 0x3c),
+        .irq_pin = config_read8(bus, slot, function, 0x3d)
     };
     uint8_t header = config_read8(bus, slot, function, PCI_HEADER_TYPE);
     read_resources(&device, header);

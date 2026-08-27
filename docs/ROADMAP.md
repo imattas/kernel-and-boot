@@ -854,6 +854,11 @@ AP IDT gates now use the selector belonging to the active AP trampoline code
 segment, while the BSP retains its kernel selector; the two-CPU QEMU gate
 reaches the AP online marker without a table-load fault.
 
+x86-64 exception stubs now normalize CPU-pushed and synthetic error-code
+frames before entering the panic path. Panic diagnostics report the fault
+vector, error code, instruction pointer, code selector, and flags, preserving
+actionable architectural state for later crash-dump and recovery work.
+
 This gate includes all non-driver kernel core services and VFS abstractions,
 then the complete driver phase, with build integration, focused tests, and QEMU
 evidence for each. The current syscall/ring-3 probe and ATA driver are

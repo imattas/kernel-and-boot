@@ -28,15 +28,19 @@ arch_default_interrupt:
     hlt
     jmp .halt
 
-extern arch_exception_panic
+extern arch_exception_panic_frame
 %assign vector 0
 %rep 32
 global arch_exception_stub_%+vector
 arch_exception_stub_%+vector:
     cli
+%if vector != 8 && vector != 10 && vector != 11 && vector != 12 && vector != 13 && vector != 14 && vector != 17 && vector != 21 && vector != 29 && vector != 30
+    push qword 0
+%endif
     push vector
-    pop rdi
-    call arch_exception_panic
+    mov rdi, [rsp]
+    lea rsi, [rsp + 8]
+    call arch_exception_panic_frame
 .exception_halt_%+vector:
     hlt
     jmp .exception_halt_%+vector

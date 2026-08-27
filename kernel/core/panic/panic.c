@@ -23,6 +23,21 @@ __attribute__((noreturn)) void kernel_panic_exception(uint64_t vector) {
     for (;;) __asm__ volatile ("hlt" ::: "memory");
 }
 
+__attribute__((noreturn)) void kernel_panic_exception_frame(
+    uint64_t vector, uint64_t error_code, uint64_t rip, uint64_t cs,
+    uint64_t rflags) {
+    __asm__ volatile ("cli" ::: "memory");
+    if (__atomic_exchange_n(&panic_state, 1, __ATOMIC_ACQ_REL) == 0) {
+        serial_write("\r\nKERNEL EXCEPTION vector="); serial_write_hex(vector);
+        serial_write(" error="); serial_write_hex(error_code);
+        serial_write(" rip="); serial_write_hex(rip);
+        serial_write(" cs="); serial_write_hex(cs);
+        serial_write(" rflags="); serial_write_hex(rflags);
+        serial_write("\r\n");
+    }
+    for (;;) __asm__ volatile ("hlt" ::: "memory");
+}
+
 uint32_t kernel_panic_state(void) {
     return __atomic_load_n(&panic_state, __ATOMIC_ACQUIRE);
 }

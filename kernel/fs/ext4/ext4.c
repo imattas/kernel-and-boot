@@ -601,6 +601,7 @@ static int ext4_shrink_extent_file(ext4_fs_t *fs, uint32_t inode_number,
     uint64_t released = 0;
     uint8_t leaf_data[4096];
     uint8_t middle_data[4096];
+    uint8_t upper_data[4096];
     uint8_t *header = &inode[40], *records = &inode[52];
     uint16_t entries = load16(&header[2]), maximum = load16(&header[4]);
     uint16_t depth = load16(&header[6]);
@@ -611,7 +612,7 @@ static int ext4_shrink_extent_file(ext4_fs_t *fs, uint32_t inode_number,
     uint16_t root_entries = entries;
     if (depth == 1 && (root_entries == 0 || root_entries > maximum)) {
         return 0;
-    } else if (depth != 0 && depth != 1 && depth != 2) {
+    } else if (depth != 0 && depth != 1 && depth != 2 && depth != 3) {
         return 0;
     }
     if (new_size % fs->block_size != 0 && new_blocks != 0) {
@@ -665,6 +666,37 @@ static int ext4_shrink_extent_file(ext4_fs_t *fs, uint32_t inode_number,
         }
         root_entries = middle_entries == 0 ? 0 : 1;
         store16(&inode[42], root_entries);
+    } else if (depth == 3) {
+        if (root_entries != 1) return 0;
+        uint8_t *root_index = &inode[52];
+        uint64_t upper_block = (uint64_t)load32(&root_index[4]) |
+                               ((uint64_t)load16(&root_index[10]) << 32);
+        if (upper_block >= fs->block_count || !read_block(fs, upper_block, upper_data) ||
+            load16(upper_data) != EXT4_EXTENT_MAGIC || load16(&upper_data[6]) != 2 ||
+            load16(&upper_data[2]) != 1 || load16(&upper_data[4]) == 0 ||
+            load16(&upper_data[4]) > (fs->block_size - 12U) / 12U)
+            return 0;
+        uint8_t *upper_index = &upper_data[12];
+        uint64_t middle_block = (uint64_t)load32(&upper_index[4]) |
+                                ((uint64_t)load16(&upper_index[10]) << 32);
+        if (middle_block >= fs->block_count || !read_block(fs, middle_block, middle_data) ||
+            load16(middle_data) != EXT4_EXTENT_MAGIC || load16(&middle_data[6]) != 1 ||
+            load16(&middle_data[2]) != 1 || load16(&middle_data[4]) == 0 ||
+            load16(&middle_data[4]) > (fs->block_size - 12U) / 12U)
+            return 0;
+        uint8_t *middle_index = &middle_data[12];
+        uint64_t leaf_block = (uint64_t)load32(&middle_index[4]) |
+                              ((uint64_t)load16(&middle_index[10]) << 32);
+        if (leaf_block >= fs->block_count || !read_block(fs, leaf_block, leaf_data) ||
+            !ext4_trim_extent_leaf(fs, leaf_data, new_blocks, &released)) return 0;
+        if (load16(&leaf_data[2]) != 0) {
+            if (!write_block(fs, leaf_block, leaf_data)) return 0;
+        } else if (!ext4_set_block_used(fs, leaf_block, 0) ||
+                   !ext4_set_block_used(fs, middle_block, 0) ||
+                   !ext4_set_block_used(fs, upper_block, 0)) {
+            return 0;
+        }
+        if (load16(&leaf_data[2]) == 0) store16(&inode[42], 0);
     } else if (depth == 1) {
         for (uint16_t leaf_index = root_entries; leaf_index != 0;) {
             --leaf_index;

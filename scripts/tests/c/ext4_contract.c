@@ -12,7 +12,9 @@ int main(void) {
     memset(image, 0, sizeof(image)); uint8_t *sb = &image[2 * 512];
     put32(&sb[0], 8); put32(&sb[4], 64); put32(&sb[20], 1); put32(&sb[24], 0);
     put32(&sb[32], 32); put32(&sb[40], 8); put16(&sb[56], 0xef53); put16(&sb[88], 128); put16(&sb[254], 32);
-    put32(&image[2 * 1024], 3); put32(&image[2 * 1024 + 8], 5); put32(&image[2 * 1024 + 32 + 8], 13);
+    put32(&image[2 * 1024], 3); put32(&image[2 * 1024 + 8], 5);
+    put32(&image[2 * 1024 + 32], 34); put32(&image[2 * 1024 + 32 + 4], 35);
+    put32(&image[2 * 1024 + 32 + 8], 13);
     for (uint32_t block = 0; block < 15; ++block)
         image[3 * 1024 + block / 8] |= (uint8_t)(1U << (block & 7));
     for (uint32_t block = 15; block <= 18; ++block)
@@ -22,8 +24,10 @@ int main(void) {
         image[3 * 1024 + block / 8] |= (uint8_t)(1U << (block & 7));
     for (uint32_t block = 27; block <= 29; ++block)
         image[3 * 1024 + block / 8] |= (uint8_t)(1U << (block & 7));
-    for (uint32_t block = 30; block <= 33; ++block)
+    for (uint32_t block = 30; block <= 31; ++block)
         image[3 * 1024 + block / 8] |= (uint8_t)(1U << (block & 7));
+    for (uint32_t block = 0; block <= 3; ++block)
+        image[34 * 1024 + block / 8] |= (uint8_t)(1U << (block & 7));
     uint8_t *root_inode = &image[5 * 1024 + 128]; put16(root_inode, 0x41ed); put32(&root_inode[4], 1024); put32(&root_inode[40], 7);
     uint8_t *file_inode = &image[5 * 1024 + 256]; put16(file_inode, 0x81a4); put32(&file_inode[4], 5); put32(&file_inode[40], 8);
     uint8_t *sparse_inode = &image[5 * 1024 + 640]; put16(sparse_inode, 0x81a4); put32(&sparse_inode[4], 1024);
@@ -85,6 +89,12 @@ int main(void) {
     assert(ext4_inode_size(&fs, 12, &size) && size == 1025);
     memset(output, 0, sizeof(output));
     assert(ext4_read_file(&fs, 12, 1024, output, 1) && output[0] == 'z');
+    assert(ext4_truncate_file(&fs, 12, 0));
+    assert(ext4_inode_size(&fs, 12, &size) && size == 0 &&
+           (image[3 * 1024 + 36 / 8] & (1U << (36 & 7))) == 0 &&
+           (image[3 * 1024 + 30 / 8] & (1U << (30 & 7))) == 0 &&
+           (image[3 * 1024 + 31 / 8] & (1U << (31 & 7))) == 0 &&
+           (image[34 * 1024 + 0] & 0x03U) == 0);
     uint8_t growth[5000]; memset(growth, 'x', sizeof(growth));
     assert(ext4_write_file(&fs, inode, 5, growth, sizeof(growth)));
     assert(ext4_inode_size(&fs, inode, &size) && size == 5005);

@@ -385,6 +385,8 @@ including mounted lookups, preventing absolute paths from escaping their VFS
 namespace.
 VFS child attachment and removal now serialize child ownership and child-count
 checks, preventing a node from being concurrently claimed by two directories.
+VFS attachment now rejects ancestor cycles, preserving a tree rather than
+allowing an ancestor to be inserted below one of its descendants.
 VFS reclamation now serializes child-count and private-destructor publication,
 then runs destruction outside the node lock before releasing the allocation.
 Credential access checks now reject permission values outside the supported

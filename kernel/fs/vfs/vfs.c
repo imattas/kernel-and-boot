@@ -103,6 +103,13 @@ int vfs_node_add_child(vfs_node_t *parent, vfs_node_t *child) {
         spinlock_unlock_irqrestore(&parent->lock, flags);
         return 0;
     }
+    for (vfs_node_t *ancestor = parent; ancestor; ancestor = ancestor->parent) {
+        if (ancestor == child) {
+            spinlock_unlock_irqrestore(&child->lock, child_flags);
+            spinlock_unlock_irqrestore(&parent->lock, flags);
+            return 0;
+        }
+    }
     for (vfs_node_t *existing = parent->first_child; existing;
          existing = existing->next_sibling) {
         if (string_equal(existing->name, child->name)) {

@@ -1105,6 +1105,9 @@ schedule; bulk queue ownership is isolated from HID interrupt transfers.
 UHCI frame-list, queue-head, and transfer-descriptor ownership now uses
 explicit x86 DMA write/read barriers across controller start and completion
 polling.
+UHCI bulk submission now accepts standards-valid zero-length packets as a
+ single TD, while retaining strict nonzero payload validation for interrupt
+ transfers.
 USB endpoint descriptor validation now rejects packet sizes that UHCI cannot
 represent and rejects nonstandard full-speed bulk packet sizes before endpoint
 metadata reaches a transfer driver.

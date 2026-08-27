@@ -314,10 +314,13 @@ static int uhci_control_transfer_locked(uint8_t address, uint8_t endpoint,
 static int uhci_data_transfer_locked(uint8_t address, uint8_t endpoint, void *data,
                             uint16_t length, uint16_t max_packet,
                             uint8_t *toggle, int bulk) {
-    if (uhci_io_disabled || !controller_base || !controller_frame_list || !data || address > 127 ||
-        (endpoint & 0x7fU) > 15 || length == 0 || length > 4096 || max_packet == 0 ||
+    if (uhci_io_disabled || !controller_base || !controller_frame_list ||
+        (!data && length != 0) || address > 127 ||
+        (endpoint & 0x7fU) > 15 || (!bulk && length == 0) || length > 4096 ||
+        max_packet == 0 ||
         max_packet > 64 || !toggle || *toggle > 1) return 0;
-    uint32_t packet_count = (length + max_packet - 1U) / max_packet;
+    uint32_t packet_count = length == 0 ? 1U :
+        (length + max_packet - 1U) / max_packet;
     uint64_t qh_frame = physical_alloc_frame();
     uint32_t td_pages = (uint32_t)(((uint64_t)packet_count * sizeof(uhci_td_t) +
                                     4095U) / 4096U);
@@ -346,7 +349,8 @@ static int uhci_data_transfer_locked(uint8_t address, uint8_t endpoint, void *da
         td[i].status = uhci_td_status(i + 1U == packet_count);
         td[i].token = uhci_token(input ? 0x69 : 0xe1, address,
                                  endpoint & 0x0fU, current_toggle, chunk);
-        td[i].buffer = (uint32_t)(data_frame + i * max_packet);
+        td[i].buffer = length == 0 ? 0U :
+            (uint32_t)(data_frame + i * max_packet);
         current_toggle ^= 1U;
     }
     if (bulk && (uhci_async_pending || !uhci_bulk_anchor_frame)) {
@@ -423,8 +427,9 @@ static int uhci_data_transfer_locked(uint8_t address, uint8_t endpoint, void *da
 static int uhci_bulk_transfer_locked(uint8_t address, uint8_t endpoint, void *data,
                                      uint16_t length, uint16_t max_packet,
                                      uint8_t *toggle) {
-    if (uhci_io_disabled || !controller_base || !controller_frame_list || !data ||
-        address > 127 || (endpoint & 0x7fU) > 15 || length == 0 || length > 4096 ||
+    if (uhci_io_disabled || !controller_base || !controller_frame_list ||
+        (!data && length != 0) || address > 127 ||
+        (endpoint & 0x7fU) > 15 || length > 4096 ||
         max_packet == 0 || max_packet > 64 || !toggle || *toggle > 1)
         return 0;
 

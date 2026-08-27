@@ -557,7 +557,7 @@ void kernel_main(void *boot_info) {
     uint8_t uhci_bulk_probe = 0;
     uint8_t uhci_bulk_toggle = 0;
     if (uhci_controller_count() != 0 &&
-        uhci_bulk_transfer(1, 0x81, &uhci_bulk_probe, 0, 64,
+        uhci_bulk_transfer(128, 0x81, &uhci_bulk_probe, 0, 64,
                            &uhci_bulk_toggle)) {
         serial_write("UHCI bulk validation failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");

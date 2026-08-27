@@ -354,6 +354,9 @@ and user-range validation now share an IRQ-safe address-space lock, protecting
 page-table and owned-frame metadata across SMP callers.
 Process-table startup now has an explicit initializer that resets table,
 current-process, and lock state before process/thread creation.
+Process state, image/stack ownership, signal state, and process-owned thread
+lists now use per-process IRQ-safe locking, with locked teardown helpers that
+avoid recursive lock acquisition.
 Physical-memory initialization now rejects zero-sized or overflowing kernel
 ranges before reserving kernel frames, avoiding bitmap corruption from a bad
 firmware boot contract.

@@ -20,5 +20,6 @@ process_thread_t *process_thread_lookup(const struct process *process,
 int process_thread_start(process_thread_t *thread);
 int process_thread_destroy(process_thread_t *thread);
 int process_thread_destroy_all(struct process *process);
+int process_thread_destroy_all_locked(struct process *process);
 
 #endif

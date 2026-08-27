@@ -5,6 +5,7 @@
 #include "user_image.h"
 #include "../../security/credentials.h"
 #include "handle.h"
+#include "../../core/sync/spinlock.h"
 
 typedef struct process_thread process_thread_t;
 
@@ -19,6 +20,7 @@ typedef enum {
 #define PROCESS_MAX 64U
 
 typedef struct process {
+    spinlock_t lock;
     uint64_t id;
     process_state_t state;
     address_space_t address_space;

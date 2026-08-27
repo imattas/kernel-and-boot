@@ -34,6 +34,7 @@ BTRFS_TEST := $(TEST_DIR)/btrfs_contract
 DEFLATE_TEST := $(TEST_DIR)/deflate_contract
 LZO_TEST := $(TEST_DIR)/lzo_contract
 ZSTD_TEST := $(TEST_DIR)/zstd_contract
+FSE_TEST := $(TEST_DIR)/fse_contract
 UEFI_OBJ := $(BUILD_DIR)/uefi/efi_main.obj
 UEFI_ENTRY_OBJ := $(BUILD_DIR)/uefi/entry.obj
 UEFI_CONSOLE_OBJ := $(BUILD_DIR)/uefi/console.obj
@@ -67,7 +68,7 @@ OVMF_CODE ?= /usr/share/edk2/x64/OVMF_CODE.4m.fd
 OVMF_VARS ?= /usr/share/edk2/x64/OVMF_VARS.4m.fd
 QEMU_LOG := $(BUILD_DIR)/qemu-serial.log
 
-.PHONY: all test image qemu-test fat32-test exfat-test ext4-test xfs-test btrfs-test deflate-test lzo-test zstd-test run clean distclean
+.PHONY: all test image qemu-test fat32-test exfat-test ext4-test xfs-test btrfs-test deflate-test lzo-test zstd-test fse-test run clean distclean
 
 all: $(CONTRACT_ELF) $(UEFI_EFI) $(KERNEL_ELF)
 
@@ -236,6 +237,7 @@ KERNEL_BTRFS_OBJ := $(BUILD_DIR)/kernel/btrfs.o
 KERNEL_BTRFS_DEFLATE_OBJ := $(BUILD_DIR)/kernel/btrfs_deflate.o
 KERNEL_BTRFS_LZO_OBJ := $(BUILD_DIR)/kernel/btrfs_lzo.o
 KERNEL_BTRFS_ZSTD_OBJ := $(BUILD_DIR)/kernel/btrfs_zstd.o
+KERNEL_BTRFS_FSE_OBJ := $(BUILD_DIR)/kernel/btrfs_fse.o
 KERNEL_BTRFS_VFS_OBJ := $(BUILD_DIR)/kernel/btrfs_vfs.o
 KERNEL_INPUT_OBJ := $(BUILD_DIR)/kernel/input.o
 KERNEL_PS2_OBJ := $(BUILD_DIR)/kernel/ps2.o
@@ -245,7 +247,7 @@ KERNEL_UHCI_OBJ := $(BUILD_DIR)/kernel/uhci.o
 KERNEL_AHCI_OBJ := $(BUILD_DIR)/kernel/ahci.o
 KERNEL_NVME_OBJ := $(BUILD_DIR)/kernel/nvme.o
 KERNEL_E1000_OBJ := $(BUILD_DIR)/kernel/e1000.o
-KERNEL_NVME_OBJ := $(KERNEL_NVME_OBJ) $(KERNEL_E1000_OBJ) $(KERNEL_EXFAT_VFS_OBJ) $(KERNEL_EXT4_OBJ) $(KERNEL_EXT4_VFS_OBJ) $(KERNEL_XFS_OBJ) $(KERNEL_XFS_VFS_OBJ) $(KERNEL_BTRFS_OBJ) $(KERNEL_BTRFS_DEFLATE_OBJ) $(KERNEL_BTRFS_LZO_OBJ) $(KERNEL_BTRFS_ZSTD_OBJ) $(KERNEL_BTRFS_VFS_OBJ)
+KERNEL_NVME_OBJ := $(KERNEL_NVME_OBJ) $(KERNEL_E1000_OBJ) $(KERNEL_EXFAT_VFS_OBJ) $(KERNEL_EXT4_OBJ) $(KERNEL_EXT4_VFS_OBJ) $(KERNEL_XFS_OBJ) $(KERNEL_XFS_VFS_OBJ) $(KERNEL_BTRFS_OBJ) $(KERNEL_BTRFS_DEFLATE_OBJ) $(KERNEL_BTRFS_LZO_OBJ) $(KERNEL_BTRFS_ZSTD_OBJ) $(KERNEL_BTRFS_FSE_OBJ) $(KERNEL_BTRFS_VFS_OBJ)
 KERNEL_DEBUG_OBJ := $(BUILD_DIR)/kernel/debug_assert.o
 KERNEL_CLOCK_OBJ := $(BUILD_DIR)/kernel/clock.o
 
@@ -342,6 +344,10 @@ $(KERNEL_BTRFS_LZO_OBJ): kernel/fs/btrfs/lzo.c kernel/fs/btrfs/lzo.h | $(BUILD_D
 		-mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@
 
 $(KERNEL_BTRFS_ZSTD_OBJ): kernel/fs/btrfs/zstd.c kernel/fs/btrfs/zstd.h | $(BUILD_DIR)/kernel
+	$(CC) -target x86_64-pc-none-elf -std=c11 -ffreestanding -fno-builtin -fno-stack-protector -fPIE -fno-plt \
+		-mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@
+
+$(KERNEL_BTRFS_FSE_OBJ): kernel/fs/btrfs/fse.c kernel/fs/btrfs/fse.h | $(BUILD_DIR)/kernel
 	$(CC) -target x86_64-pc-none-elf -std=c11 -ffreestanding -fno-builtin -fno-stack-protector -fPIE -fno-plt \
 		-mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@
 
@@ -473,6 +479,7 @@ test: all image
 	$(MAKE) deflate-test
 	$(MAKE) lzo-test
 	$(MAKE) zstd-test
+	$(MAKE) fse-test
 	sh scripts/tests/sh/validate_build.sh $(CONTRACT_ELF)
 	sh scripts/tests/sh/validate_uefi.sh $(UEFI_EFI)
 	sh scripts/tests/sh/validate_kernel.sh $(KERNEL_ELF)
@@ -502,6 +509,9 @@ lzo-test: $(LZO_TEST)
 zstd-test: $(ZSTD_TEST)
 	$(ZSTD_TEST)
 
+fse-test: $(FSE_TEST)
+	$(FSE_TEST)
+
 $(EXFAT_TEST): scripts/tests/c/exfat_contract.c kernel/fs/exfat/exfat.c kernel/fs/exfat/exfat.h kernel/drivers/storage/storage.c kernel/drivers/storage/storage.h | $(TEST_DIR)
 	$(CC) -std=c11 -Wall -Wextra -Werror -I. -o $@ scripts/tests/c/exfat_contract.c kernel/fs/exfat/exfat.c kernel/drivers/storage/storage.c
 
@@ -522,6 +532,9 @@ $(LZO_TEST): scripts/tests/c/lzo_contract.c kernel/fs/btrfs/lzo.c kernel/fs/btrf
 
 $(ZSTD_TEST): scripts/tests/c/zstd_contract.c kernel/fs/btrfs/zstd.c kernel/fs/btrfs/zstd.h | $(TEST_DIR)
 	$(CC) -std=c11 -Wall -Wextra -Werror -I. -o $@ scripts/tests/c/zstd_contract.c kernel/fs/btrfs/zstd.c
+
+$(FSE_TEST): scripts/tests/c/fse_contract.c kernel/fs/btrfs/fse.c kernel/fs/btrfs/fse.h | $(TEST_DIR)
+	$(CC) -std=c11 -Wall -Wextra -Werror -I. -o $@ scripts/tests/c/fse_contract.c kernel/fs/btrfs/fse.c
 
 $(FAT32_TEST): scripts/tests/c/fat32_contract.c kernel/fs/fat/fat32.c kernel/fs/fat/fat32.h kernel/drivers/storage/storage.h | $(TEST_DIR)
 	$(CC) -std=c11 -Wall -Wextra -Werror -O2 -I. scripts/tests/c/fat32_contract.c kernel/fs/fat/fat32.c -o $@

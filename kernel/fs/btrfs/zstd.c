@@ -259,6 +259,17 @@ static uint32_t zstd_stream_bits(const uint8_t *source, uint32_t bits,
     int64_t start = *offset - (int64_t)bits;
     uint32_t result = 0, shift = 0;
     *offset = start;
+    uint32_t missing = 0;
+    if (start < 0) {
+        missing = (uint32_t)-start;
+        if (missing >= bits) {
+            bits = 0;
+            missing = 0;
+        } else {
+            bits -= missing;
+        }
+        start = 0;
+    }
     while (bits && start >= 0) {
         uint32_t available = 8U - (uint32_t)(start & 7);
         uint32_t count = bits < available ? bits : available;
@@ -266,6 +277,7 @@ static uint32_t zstd_stream_bits(const uint8_t *source, uint32_t bits,
         result |= (((uint32_t)source[start >> 3] >> (start & 7)) & mask) << shift;
         shift += count; bits -= count; start += count;
     }
+    if (missing) result <<= missing;
     return result;
 }
 

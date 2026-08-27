@@ -1030,6 +1030,9 @@ Writes into multi-block unwritten extents now split the extent into preserved
 unwritten ranges and an initialized block, so untouched sectors remain zero.
 The XFS contract now exercises a partial write through a multi-block unwritten
 extent and verifies both neighboring ranges remain zero-filled.
+XFS extent-backed truncation now zeroes the retained tail of the final data
+block, and growth validation searches the complete extent list rather than
+only the first record.
 Btrfs regular-file truncation now accepts zero-length targets, updating the
 inode item through the checksum-protected tree-node path.
 Btrfs inline extents now support bounded growth when the leaf node has

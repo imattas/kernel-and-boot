@@ -274,9 +274,12 @@ int xfs_write_file(xfs_fs_t *fs, uint64_t inode, uint64_t offset,
     int metadata_changed = 0;
     if (grew) {
         uint64_t physical = 0, extent_length = 0;
-        uint8_t unwritten = 0;
-        if (!xfs_extent(&data[core], (end - 1U) / fs->block_size,
-                        &physical, &extent_length, &unwritten)) return 0;
+        uint8_t unwritten = 0, found = 0;
+        uint64_t last_logical = (end - 1U) / fs->block_size;
+        for (uint32_t i = 0; i < extent_count; ++i)
+            if (xfs_extent(&data[core + i * 16U], last_logical, &physical,
+                           &extent_length, &unwritten)) { found = 1; break; }
+        if (!found) return 0;
     }
     uint64_t logical = offset / fs->block_size;
     uint32_t in_block = (uint32_t)(offset % fs->block_size);
@@ -335,6 +338,25 @@ int xfs_truncate_file(xfs_fs_t *fs, uint64_t inode, uint64_t size) {
         uint32_t core = data[4] == 2 ? XFS_CORE_V2_SIZE : 100U;
         if (size > fs->inode_size - core) return 0;
         for (uint64_t i = size; i < be64(&data[56]); ++i) data[core + i] = 0;
+    } else if (data[5] == XFS_FORMAT_EXTENTS && size % fs->block_size != 0) {
+        uint32_t core = data[4] == 2 ? XFS_CORE_V2_SIZE : 100U;
+        uint32_t extent_count = be32(&data[76]);
+        if (extent_count == 0 || extent_count > (fs->inode_size - core) / 16U)
+            return 0;
+        uint64_t physical = 0, length = 0;
+        uint8_t unwritten = 0, found = 0;
+        uint64_t logical = size / fs->block_size;
+        for (uint32_t i = 0; i < extent_count; ++i)
+            if (xfs_extent(&data[core + i * 16U], logical, &physical, &length,
+                           &unwritten)) { found = 1; break; }
+        if (found && !unwritten) {
+            uint8_t block[4096];
+            if (physical >= fs->block_count || !xfs_read_block(fs, physical, block))
+                return 0;
+            for (uint32_t i = (uint32_t)(size % fs->block_size);
+                 i < fs->block_size; ++i) block[i] = 0;
+            if (!xfs_write_block(fs, physical, block)) return 0;
+        }
     }
     store_be64(&data[56], size);
     return xfs_write_inode(fs, inode, data);

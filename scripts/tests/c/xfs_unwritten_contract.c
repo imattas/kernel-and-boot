@@ -49,5 +49,13 @@ int main(void) {
     memset(output, 0xa5, sizeof(output));
     assert(xfs_read_file(&fs, 128, 8192, output, sizeof(output)));
     for (uint32_t i = 0; i < sizeof(output); ++i) assert(output[i] == 0);
+    assert(xfs_truncate_file(&fs, 128, 4100));
+    memset(output, 0xa5, sizeof(output));
+    assert(xfs_read_file(&fs, 128, 4096, output, 4));
+    for (uint32_t i = 0; i < 4; ++i) assert(output[i] == 0);
+    assert(xfs_write_file(&fs, 128, 4100, "y", 1));
+    memset(output, 0xa5, sizeof(output));
+    assert(xfs_read_file(&fs, 128, 4096, output, 5));
+    assert(output[0] == 0 && output[3] == 0 && output[4] == 'y');
     return 0;
 }

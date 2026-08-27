@@ -729,6 +729,9 @@ FAT32 and exFAT have filesystem parsers and VFS file adapters. ExFAT remains
 read-only, while FAT32 supports bounded in-place writes to existing file
 extents, including sector and cluster crossings, through its VFS adapter;
 allocation and file growth remain a separate milestone.
+FAT32 in-place writes now serialize the complete read-modify-write operation
+with a filesystem write lock, preventing concurrent writers from interleaving
+sector updates.
 FAT32 mount validation now uses 64-bit geometry arithmetic, verifies the image
 fits its registered block device, and rejects FAT tables too small for the
 published cluster count.

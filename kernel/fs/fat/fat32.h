@@ -23,6 +23,7 @@ typedef struct {
     uint32_t fat_sector_number;
     uint8_t fat_sector_valid;
     spinlock_t fat_lock;
+    spinlock_t write_lock;
     uint8_t mounted;
 } fat32_fs_t;
 

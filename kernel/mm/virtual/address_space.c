@@ -165,7 +165,9 @@ static int address_space_map_page_locked(address_space_t *space,
                                          uint64_t flags) {
     if (!space || space->root == 0 || (virtual_address & (PAGE_SIZE - 1)) != 0 ||
         (physical_address & (PAGE_SIZE - 1)) != 0 || virtual_address < (1ULL << 39) ||
-        virtual_address >= (1ULL << 48) || physical_address >= 0x100000000ULL)
+        virtual_address >= (1ULL << 48) || physical_address >= 0x100000000ULL ||
+        (flags & ~(ADDRESS_SPACE_WRITABLE | ADDRESS_SPACE_USER |
+                   ADDRESS_SPACE_EXECUTABLE)) != 0)
         return 0;
     uint64_t *new_root = (uint64_t *)(uintptr_t)space->root;
     uint32_t owned_before = space->owned_count;

@@ -366,6 +366,8 @@ freeing, and availability queries.
 Virtual memory mapping, address-space lifecycle, page-flag updates, unmapping,
 and user-range validation now share an IRQ-safe address-space lock, protecting
 page-table and owned-frame metadata across SMP callers.
+User address-space mappings now reject flags outside the defined writable,
+user, and executable set, with a boot-time invalid-flag regression probe.
 Scheduler current-task, idle-task, preemption, counter, and lifecycle state now
 use an IRQ-safe scheduler lock around shared metadata and queue transitions.
 Process-table startup now has an explicit initializer that resets table,

@@ -211,6 +211,7 @@ void kernel_main(void *boot_info) {
         !address_space_page_executable(&process_space, 0x8000001000ULL) ||
         !process_page || !address_space_map_page(&process_space, 0x8000000000ULL,
                                                   process_page, ADDRESS_SPACE_WRITABLE | ADDRESS_SPACE_USER) ||
+        address_space_map_page(&process_space, 0x8000001000ULL, process_page, 0x100ULL) ||
         address_space_map_page(&process_space, 0x8000000000ULL, process_page,
                                ADDRESS_SPACE_WRITABLE | ADDRESS_SPACE_USER) ||
         address_space_page_executable(&process_space, 0x8000000000ULL) ||

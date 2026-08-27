@@ -725,7 +725,10 @@ milestone groundwork only; they do not pass this gate.
 
 ## Filesystem milestone before drivers
 
-FAT32 and exFAT have read-only parsers and VFS file adapters. exFAT now
+FAT32 and exFAT have filesystem parsers and VFS file adapters. ExFAT remains
+read-only, while FAT32 supports bounded in-place writes to existing file
+extents, including sector and cluster crossings, through its VFS adapter;
+allocation and file growth remain a separate milestone.
 FAT32 mount validation now uses 64-bit geometry arithmetic, verifies the image
 fits its registered block device, and rejects FAT tables too small for the
 published cluster count.

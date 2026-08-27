@@ -38,6 +38,8 @@ int fat32_lookup_name_in_directory(fat32_fs_t *fs, uint32_t directory_cluster,
 int fat32_read_cluster(fat32_fs_t *fs, uint32_t cluster, void *buffer);
 int fat32_read_file(fat32_fs_t *fs, const char short_name[11],
                     uint32_t offset, void *buffer, uint32_t size);
+int fat32_write_file(fat32_fs_t *fs, const char short_name[11],
+                     uint32_t offset, const void *buffer, uint32_t size);
 int fat32_read_file_in_directory(fat32_fs_t *fs, uint32_t directory_cluster,
                                  const char short_name[11], uint32_t offset,
                                  void *buffer, uint32_t size);

@@ -93,6 +93,11 @@ int main(void) {
         fprintf(stderr, "values %u %u %u %u\n", output[0], output[511], output[512], output[699]);
         return fail("cluster-chain read failed");
     }
+    const uint8_t update[] = "update";
+    if (!fat32_write_file(&fs, name, 510, update, sizeof(update) - 1) ||
+        !fat32_read_file(&fs, name, 510, output, sizeof(update) - 1) ||
+        memcmp(output, update, sizeof(update) - 1) != 0)
+        return fail("cross-cluster write failed");
     const char directory_name[11] = {'S','U','B','D','I','R',' ',' ',' ',' ',' '};
     const char nested_name[11] = {'N','E','S','T','E','D',' ',' ','T','X','T'};
     if (!fat32_lookup_in_directory(&fs, 2, directory_name, &cluster, &size, &is_directory) ||

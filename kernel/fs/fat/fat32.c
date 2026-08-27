@@ -275,6 +275,46 @@ int fat32_read_file(fat32_fs_t *fs, const char short_name[11],
     return fat32_read_file_cluster(fs, cluster, file_size, offset, buffer, size);
 }
 
+int fat32_write_file(fat32_fs_t *fs, const char short_name[11],
+                     uint32_t offset, const void *buffer, uint32_t size) {
+    uint32_t cluster, file_size;
+    if (!fs || !fs->mounted || !buffer || size == 0 ||
+        !fat32_lookup(fs, short_name, &cluster, &file_size) ||
+        offset > file_size || size > file_size - offset) return 0;
+    uint32_t cluster_size = fs->sectors_per_cluster * FAT32_SECTOR_SIZE;
+    uint32_t skip = offset / cluster_size, inside = offset % cluster_size;
+    for (uint32_t i = 0; i < skip; ++i) {
+        uint32_t next;
+        if (!fat_next(fs, cluster, &next) || next >= 0x0ffffff8U ||
+            !cluster_valid(fs, next)) return 0;
+        cluster = next;
+    }
+    const uint8_t *input = (const uint8_t *)buffer;
+    uint8_t sector_data[FAT32_SECTOR_SIZE];
+    uint32_t remaining = size;
+    for (uint32_t hops = 0; remaining != 0 && hops < fs->data_clusters; ++hops) {
+        uint64_t sector = (uint64_t)fs->data_start +
+                          (uint64_t)(cluster - 2U) * fs->sectors_per_cluster +
+                          inside / FAT32_SECTOR_SIZE;
+        uint32_t sector_offset = inside % FAT32_SECTOR_SIZE;
+        uint32_t copy = FAT32_SECTOR_SIZE - sector_offset;
+        if (copy > remaining) copy = remaining;
+        if (sector > UINT32_MAX || !read_sector(fs->device, (uint32_t)sector,
+                                                sector_data)) return 0;
+        for (uint32_t i = 0; i < copy; ++i)
+            sector_data[sector_offset + i] = input[i];
+        if (!storage_write(fs->device, (uint32_t)sector, 1, sector_data)) return 0;
+        input += copy; remaining -= copy; inside += copy;
+        if (remaining != 0 && inside == cluster_size) {
+            uint32_t next;
+            if (!fat_next(fs, cluster, &next) || next >= 0x0ffffff8U ||
+                !cluster_valid(fs, next)) return 0;
+            cluster = next; inside = 0;
+        }
+    }
+    return remaining == 0;
+}
+
 int fat32_read_file_in_directory(fat32_fs_t *fs, uint32_t directory_cluster,
                                  const char short_name[11], uint32_t offset,
                                  void *buffer, uint32_t size) {

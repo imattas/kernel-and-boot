@@ -340,7 +340,8 @@ Btrfs regular extents now also support native LZO length-header and
 sector-segment framing with bounded LZO1X decoding. A
 format is not considered complete merely because its superblock is recognized.
 Zstandard frame parsing now has strict raw/RLE block contracts plus compressed
-blocks using direct-weight Huffman literals. Bounded FSE table construction,
+blocks using direct-weight Huffman literals, with an FSE-compressed Huffman-weight
+decoder path now implemented. Bounded FSE table construction,
 reverse-bitstream state decoding, and compressed-block sequence execution are
 now implemented and
 contracted, including the two-state interleaved stream form. FSE
@@ -352,8 +353,10 @@ The predefined LL/offset/ML distributions and RLE sequence-table mode are now
 implemented and contracted. A shared sequence-table selector now handles
 predefined, RLE, FSE-compressed, and repeat modes with bounded consumption.
 Zstandard sequence-section count/mode header parsing is now implemented and
-contracted; FSE-compressed Huffman literal streams and checksum verification
-remain bounded follow-up work. The bounded overlap-safe match-copy primitive is now
+contracted; checksum verification is complete for frames that carry a checksum.
+An end-to-end generated FSE-weight literal vector remains to be added to the
+contract suite.
+The bounded overlap-safe match-copy primitive is now
 implemented and contracted, including destination-underflow rejection.
 Zstandard sequence code expansion for literal lengths, match lengths, and
 offsets is now implemented and contracted. Sequence execution now copies

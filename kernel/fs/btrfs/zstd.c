@@ -286,7 +286,7 @@ static int zstd_huffman_decode(const uint8_t *source, uint32_t source_size,
     }
     if (!weight_sum) return 0;
     max_bits = zstd_highest_bit(weight_sum) + 1U;
-    if (max_bits > 16U) return 0;
+    if (max_bits > 11U) return 0;
     uint32_t left = (1U << max_bits) - weight_sum;
     if (!left || (left & (left - 1U))) return 0;
     uint32_t last_weight = zstd_highest_bit(left) + 1U;
@@ -345,13 +345,23 @@ static int decode_compressed_literals(const uint8_t *input, uint32_t size,
         if (!regenerated || !compressed || regenerated > capacity || compressed > size - 3U)
             return 0;
         tree_header = input[3];
-        if (tree_header < 128U) return 0;
-        count = tree_header - 127U;
-        tree_bytes = (count + 1U) / 2U;
-        if (count >= 256U || tree_bytes > compressed - 1U) return 0;
-        for (uint32_t i = 0; i < count; ++i)
-            weights[i] = (uint8_t)(i & 1U ? input[4U + i / 2U] & 0x0fU :
-                                   input[4U + i / 2U] >> 4);
+        if (tree_header < 128U) {
+            btrfs_fse_table_t table; uint32_t fse_header = 0, weight_count = 0;
+            if (!tree_header || tree_header > compressed - 1U ||
+                !btrfs_fse_read_header(&table, input + 4U, tree_header, 6U, &fse_header) ||
+                fse_header >= tree_header ||
+                !btrfs_fse_decode_interleaved2(&table, input + 4U + fse_header,
+                                               tree_header - fse_header, weights, 255U,
+                                               &weight_count) || !weight_count) return 0;
+            count = weight_count; tree_bytes = tree_header;
+        } else {
+            count = tree_header - 127U;
+            tree_bytes = (count + 1U) / 2U;
+            if (count >= 256U || tree_bytes > compressed - 1U) return 0;
+            for (uint32_t i = 0; i < count; ++i)
+                weights[i] = (uint8_t)(i & 1U ? input[4U + i / 2U] & 0x0fU :
+                                       input[4U + i / 2U] >> 4);
+        }
         if (!zstd_huffman_decode(input + 4U + tree_bytes,
                                  compressed - 1U - tree_bytes, weights,
                                  count, output, capacity, regenerated)) return 0;

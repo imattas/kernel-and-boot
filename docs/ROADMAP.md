@@ -352,6 +352,8 @@ literal runs and performs validated overlapping matches; FSE symbol wiring and
 complete compressed-block sequence integration remain. FSE states are now
 wired into one-sequence decoding with offset, match-length, and literal-length
 extra-bit consumption and optional state updates.
+Zstandard sequence-table preparation now consumes and validates LL/offset/ML
+mode tables in order, including inherited repeat tables.
 
 ## Phase 10 — Userland begins after the kernel gate
 

@@ -17,6 +17,9 @@ int main(void) {
     uint8_t output[261] = {0};
     uint32_t size = 0;
     btrfs_zstd_sequence_header_t sequence;
+    btrfs_fse_table_t sequence_tables[3];
+    btrfs_fse_table_t sequence_previous[3];
+    uint32_t tables_consumed = 0;
     btrfs_zstd_sequence_t values;
     uint8_t literals[] = {'a', 'b', 'c'};
     uint8_t sequence_output[16] = {0};
@@ -45,6 +48,25 @@ int main(void) {
            sequence.header_size == 2);
     assert(btrfs_zstd_read_sequence_header((const uint8_t[]){255, 0, 1, 0}, 4, &sequence));
     assert(sequence.count == 0x8000 && sequence.header_size == 4);
+    assert(btrfs_zstd_read_sequence_header((const uint8_t[]){5, 0x00}, 2, &sequence));
+    assert(btrfs_zstd_prepare_sequence_tables((const uint8_t[]){5, 0x00}, 2,
+                                               &sequence, 0, sequence_tables,
+                                               &tables_consumed));
+    assert(tables_consumed == 2 && sequence_tables[0].size == 64 &&
+           sequence_tables[1].size == 32 && sequence_tables[2].size == 64);
+    assert(btrfs_zstd_read_sequence_header((const uint8_t[]){5, 0x54, 1, 2, 3}, 5,
+                                           &sequence));
+    assert(btrfs_zstd_prepare_sequence_tables((const uint8_t[]){5, 0x54, 1, 2, 3}, 5,
+                                               &sequence, 0, sequence_tables,
+                                               &tables_consumed));
+    assert(tables_consumed == 5 && sequence_tables[0].symbols[0] == 1 &&
+           sequence_tables[1].symbols[0] == 2 && sequence_tables[2].symbols[0] == 3);
+    sequence_previous[0] = sequence_tables[0]; sequence_previous[1] = sequence_tables[1];
+    sequence_previous[2] = sequence_tables[2];
+    assert(btrfs_zstd_read_sequence_header((const uint8_t[]){5, 0xfc}, 2, &sequence));
+    assert(btrfs_zstd_prepare_sequence_tables((const uint8_t[]){5, 0xfc}, 2,
+                                               &sequence, sequence_previous,
+                                               sequence_tables, &tables_consumed));
     assert(btrfs_zstd_copy_match(match, sizeof(match), &match_size, 3, 6));
     assert(match_size == 9 && memcmp(match, "abcabcabc", 9) == 0);
     assert(!btrfs_zstd_copy_match(match, sizeof(match), &match_size, 0, 1));

@@ -60,6 +60,33 @@ int btrfs_zstd_read_sequence_header(const uint8_t *input, uint32_t input_size,
     return 1;
 }
 
+int btrfs_zstd_prepare_sequence_tables(const uint8_t *input, uint32_t input_size,
+                                        const btrfs_zstd_sequence_header_t *header,
+                                        const btrfs_fse_table_t previous[3],
+                                        btrfs_fse_table_t tables[3],
+                                        uint32_t *consumed) {
+    uint8_t modes;
+    uint32_t position, used;
+    if (!input || !header || !tables || !consumed || !header->count ||
+        header->header_size > input_size) return 0;
+    modes = input[header->header_size - 1U];
+    if (modes & 3U) return 0;
+    position = header->header_size;
+    for (uint32_t part = 0; part < 3U; ++part) {
+        uint8_t mode = part == 0U ? (uint8_t)(modes >> 6) :
+                        part == 1U ? (uint8_t)((modes >> 4) & 3U) :
+                                     (uint8_t)((modes >> 2) & 3U);
+        const btrfs_fse_table_t *prior = previous ? &previous[part] : 0;
+        if (position > input_size || !btrfs_fse_select_sequence_table(
+                &tables[part], prior, part, mode, input + position,
+                input_size - position, &used)) return 0;
+        if (used > input_size - position) return 0;
+        position += used;
+    }
+    *consumed = position;
+    return 1;
+}
+
 int btrfs_zstd_copy_match(uint8_t *output, uint32_t capacity,
                           uint32_t *output_size, uint32_t offset,
                           uint32_t length) {

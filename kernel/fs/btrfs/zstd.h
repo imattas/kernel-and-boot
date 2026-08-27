@@ -23,6 +23,11 @@ int btrfs_zstd_decompress(const uint8_t *input, uint32_t input_size,
                           uint32_t *output_size);
 int btrfs_zstd_read_sequence_header(const uint8_t *input, uint32_t input_size,
                                     btrfs_zstd_sequence_header_t *header);
+int btrfs_zstd_prepare_sequence_tables(const uint8_t *input, uint32_t input_size,
+                                        const btrfs_zstd_sequence_header_t *header,
+                                        const btrfs_fse_table_t previous[3],
+                                        btrfs_fse_table_t tables[3],
+                                        uint32_t *consumed);
 int btrfs_zstd_copy_match(uint8_t *output, uint32_t capacity,
                           uint32_t *output_size, uint32_t offset,
                           uint32_t length);

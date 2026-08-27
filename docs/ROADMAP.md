@@ -327,7 +327,8 @@ milestone is complete. Btrfs regular extents now support bounded zlib-wrapped
 DEFLATE streams, including stored, fixed-Huffman, and dynamic-Huffman blocks,
 with Adler-32 validation and sector-checksum-protected input. Encryption and
 the remaining compression formats remain before the filesystem milestone is
-complete. A
+complete. Btrfs regular extents now also support native LZO length-header and
+sector-segment framing with bounded LZO1X decoding. A
 format is not considered complete merely because its superblock is recognized.
 
 ## Phase 10 — Userland begins after the kernel gate

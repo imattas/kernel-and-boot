@@ -1,5 +1,6 @@
 #include "btrfs.h"
 #include "deflate.h"
+#include "lzo.h"
 #include "../../drivers/storage/storage.h"
 #include "../../mm/heap/heap.h"
 
@@ -456,6 +457,45 @@ static int btrfs_read_checked(btrfs_fs_t *fs, uint64_t logical, uint32_t bytes,
     return btrfs_validate_data(fs, logical, data, bytes);
 }
 
+static int btrfs_lzo_inflate(const uint8_t *compressed, uint32_t compressed_size,
+                             uint32_t start_offset, uint32_t sector_size,
+                             uint8_t *decoded, uint32_t decoded_capacity,
+                             uint32_t *decoded_size) {
+    uint8_t *segment;
+    uint32_t total, position = 4, output = 0;
+    if (!compressed || compressed_size < 4 || !decoded || !decoded_size ||
+        !sector_size || sector_size > 65536U || compressed_size > 65536U)
+        return 0;
+    total = le32(compressed);
+    if (total < 4 || total > compressed_size) return 0;
+    segment = (uint8_t *)kmalloc(sector_size);
+    if (!segment) return 0;
+    while (position < total) {
+        uint32_t offset = (start_offset + position) % sector_size;
+        uint32_t left = sector_size - offset;
+        uint32_t length, produced = 0;
+        if (left < 4) {
+            while (position < total && left--) {
+                if (compressed[position++] != 0) { kfree(segment); return 0; }
+            }
+            continue;
+        }
+        if (position > total - 4) { kfree(segment); return 0; }
+        length = le32(&compressed[position]); position += 4;
+        if (!length || length > total - position ||
+            output > decoded_capacity || sector_size > decoded_capacity - output ||
+            !btrfs_lzo1x_decompress(&compressed[position], length, segment,
+                                     sector_size, &produced) || produced > sector_size ||
+            produced > decoded_capacity - output)
+            { kfree(segment); return 0; }
+        for (uint32_t i = 0; i < produced; ++i) decoded[output + i] = segment[i];
+        output += produced; position += length;
+    }
+    kfree(segment);
+    *decoded_size = output;
+    return position == total;
+}
+
 int btrfs_read_extent_data(btrfs_fs_t *fs, uint64_t tree_bytenr, uint64_t inode,
                            uint64_t extent_offset, uint64_t file_offset,
                            void *buffer, uint32_t size) {
@@ -501,6 +541,35 @@ int btrfs_read_extent_data(btrfs_fs_t *fs, uint64_t tree_bytenr, uint64_t inode,
         if (compressed && decoded && btrfs_read_checked(fs, sector_logical, covered, compressed) &&
             btrfs_zlib_inflate(compressed + in_sector, (uint32_t)disk_size, decoded,
                                (uint32_t)data_size, &decoded_size) &&
+            relative <= decoded_size && size <= decoded_size - relative) {
+            for (uint32_t i = 0; i < size; ++i) ((uint8_t *)buffer)[i] = decoded[relative + i];
+            result = 1;
+        }
+        kfree(decoded); kfree(compressed);
+        return result;
+    }
+    if (item[16] == 2) {
+        uint64_t disk_bytenr = le64(&item[21]);
+        uint64_t disk_size = le64(&item[29]);
+        uint64_t data_offset = le64(&item[37]);
+        uint64_t data_size = le64(&item[45]);
+        if (extent_type != 1 || data_size == 0 || data_size > 65536U || disk_size == 0 ||
+            disk_size > 65536U || data_offset > disk_size || relative > data_size ||
+            size > data_size - relative || file_offset > UINT64_MAX - disk_bytenr - data_offset)
+            return 0;
+        uint64_t logical = disk_bytenr + data_offset;
+        uint64_t sector_logical = logical - logical % fs->sector_size;
+        uint32_t in_sector = (uint32_t)(logical - sector_logical);
+        uint32_t transfer = in_sector + (uint32_t)disk_size;
+        uint32_t covered = (transfer + fs->sector_size - 1U) / fs->sector_size * fs->sector_size;
+        uint8_t *compressed = 0, *decoded = 0;
+        uint32_t decoded_size = 0; int result = 0;
+        if (transfer < disk_size || covered < transfer || covered > 65536U) return 0;
+        compressed = (uint8_t *)kmalloc(covered);
+        decoded = (uint8_t *)kmalloc((uint32_t)data_size);
+        if (compressed && decoded && btrfs_read_checked(fs, sector_logical, covered, compressed) &&
+            btrfs_lzo_inflate(compressed + in_sector, (uint32_t)disk_size, in_sector,
+                              fs->sector_size, decoded, (uint32_t)data_size, &decoded_size) &&
             relative <= decoded_size && size <= decoded_size - relative) {
             for (uint32_t i = 0; i < size; ++i) ((uint8_t *)buffer)[i] = decoded[relative + i];
             result = 1;

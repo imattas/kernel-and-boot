@@ -3,6 +3,7 @@
 #include "../../mm/physical/frame.h"
 #include "../../arch/x86_64/cpu/tables.h"
 #include "../pci/pci.h"
+#include "../../core/sync/spinlock.h"
 
 #define PCI_CLASS_MASS_STORAGE 0x01
 #define PCI_SUBCLASS_SATA 0x06
@@ -46,6 +47,7 @@ static volatile uint32_t *active_abar;
 static uint32_t active_port_number;
 static int ahci_irq_enabled;
 static volatile uint32_t ahci_interrupts;
+static spinlock_t ahci_lock;
 
 static int ahci_stop_engine(void) {
     if (!active_port) return 0;
@@ -138,6 +140,7 @@ int ahci_initialize(void) {
     controllers = 0;
     ports = 0;
     ready_ports = 0;
+    spinlock_init(&ahci_lock);
     active_abar = 0;
     active_port_number = 0;
     ahci_irq_enabled = 0;
@@ -185,7 +188,7 @@ typedef struct {
     uint32_t data_base, data_base_high, reserved2, byte_count;
 } __attribute__((packed)) ahci_command_table_t;
 
-int ahci_identify(uint16_t *words) {
+static int ahci_identify_locked(uint16_t *words) {
     if (!active_port || !active_command_list || !words || active_data) return 0;
     active_command_table = physical_alloc_frame();
     active_data = physical_alloc_frame();
@@ -233,7 +236,7 @@ int ahci_identify(uint16_t *words) {
     return completed;
 }
 
-int ahci_read_sector(uint64_t lba, void *buffer) {
+static int ahci_read_sector_locked(uint64_t lba, void *buffer) {
     if (!active_port || !active_command_list || !buffer || active_data) return 0;
     active_command_table = physical_alloc_frame();
     active_data = physical_alloc_frame();
@@ -277,7 +280,7 @@ int ahci_read_sector(uint64_t lba, void *buffer) {
     return completed;
 }
 
-int ahci_write_sector(uint64_t lba, const void *buffer) {
+static int ahci_write_sector_locked(uint64_t lba, const void *buffer) {
     if (!active_port || !active_command_list || !buffer || active_data) return 0;
     active_command_table = physical_alloc_frame();
     active_data = physical_alloc_frame();
@@ -380,10 +383,37 @@ static int ahci_io_sectors(uint64_t lba, uint32_t count, void *buffer, int write
     return completed;
 }
 
+int ahci_identify(uint16_t *words) {
+    uint64_t flags = spinlock_lock_irqsave(&ahci_lock);
+    int result = ahci_identify_locked(words);
+    spinlock_unlock_irqrestore(&ahci_lock, flags);
+    return result;
+}
+
+int ahci_read_sector(uint64_t lba, void *buffer) {
+    uint64_t flags = spinlock_lock_irqsave(&ahci_lock);
+    int result = ahci_read_sector_locked(lba, buffer);
+    spinlock_unlock_irqrestore(&ahci_lock, flags);
+    return result;
+}
+
+int ahci_write_sector(uint64_t lba, const void *buffer) {
+    uint64_t flags = spinlock_lock_irqsave(&ahci_lock);
+    int result = ahci_write_sector_locked(lba, buffer);
+    spinlock_unlock_irqrestore(&ahci_lock, flags);
+    return result;
+}
+
 int ahci_read_sectors(uint64_t lba, uint32_t count, void *buffer) {
-    return ahci_io_sectors(lba, count, buffer, 0);
+    uint64_t flags = spinlock_lock_irqsave(&ahci_lock);
+    int result = ahci_io_sectors(lba, count, buffer, 0);
+    spinlock_unlock_irqrestore(&ahci_lock, flags);
+    return result;
 }
 
 int ahci_write_sectors(uint64_t lba, uint32_t count, const void *buffer) {
-    return ahci_io_sectors(lba, count, (void *)buffer, 1);
+    uint64_t flags = spinlock_lock_irqsave(&ahci_lock);
+    int result = ahci_io_sectors(lba, count, (void *)buffer, 1);
+    spinlock_unlock_irqrestore(&ahci_lock, flags);
+    return result;
 }

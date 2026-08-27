@@ -528,6 +528,12 @@ static int nvme_io_range(uint64_t lba, void *buffer, uint32_t count, int write) 
 static int nvme_flush(void) {
     if (nvme_disabled || !active_io_ready || !active_regs) return 0;
     uint64_t flags = spinlock_lock_irqsave(&nvme_lock);
+    if ((active_regs[NVME_CSTS / 4] & NVME_CSTS_CFS) != 0) {
+        __atomic_fetch_add(&nvme_errors, 1U, __ATOMIC_RELAXED);
+        (void)nvme_abort_controller();
+        spinlock_unlock_irqrestore(&nvme_lock, flags);
+        return 0;
+    }
     volatile nvme_command_t *sq =
         (volatile nvme_command_t *)(uintptr_t)active_io_sq;
     volatile nvme_completion_t *cq =
@@ -547,6 +553,7 @@ static int nvme_flush(void) {
     int success = 0;
     int completed = 0;
     for (uint32_t wait = 0; wait < NVME_TIMEOUT_ATTEMPTS; ++wait) {
+        if ((active_regs[NVME_CSTS / 4] & NVME_CSTS_CFS) != 0) break;
         nvme_dma_read_barrier();
         volatile nvme_completion_t *completion = &cq[active_io_cq_head];
         uint16_t status = completion->status;

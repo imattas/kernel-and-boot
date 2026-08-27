@@ -1338,6 +1338,8 @@ count non-success completions, with the boot storage gate asserting a clean
 completion-error count after its read/write coverage.
 NVMe admin and I/O polling now detects the controller-fatal-status bit before
 examining queue entries, forcing the existing bounded abort/quarantine path.
+NVMe flush submission now performs the same fatal-status check before and during
+completion polling, aborting a failed controller before returning failure.
 NVMe submission queues and completion queues now use explicit x86 DMA
 write/read barriers around doorbells and ownership polling.
 NVMe admin command submission now retains a volatile hardware-owned command

@@ -54,6 +54,14 @@
 
 extern void arch_pci_shared_irq_stub(void);
 
+static void e1000_dma_write_barrier(void) {
+    __asm__ volatile ("sfence" ::: "memory");
+}
+
+static void e1000_dma_read_barrier(void) {
+    __asm__ volatile ("lfence" ::: "memory");
+}
+
 typedef struct { uint64_t address; uint16_t length; uint8_t cso, command, status, css; uint16_t special; } __attribute__((packed)) e1000_tx_desc_t;
 typedef struct { uint64_t address; uint16_t length, checksum; uint8_t status, errors; uint16_t special; } __attribute__((packed)) e1000_rx_desc_t;
 
@@ -141,6 +149,7 @@ static int e1000_probe(device_t *device) {
     /* BSIZE=00 with BSEX selects the 4096-byte receive buffers above. */
     regs[E1000_RCTL / 4] = E1000_RCTL_EN | E1000_RCTL_BAM | E1000_RCTL_BSEX;
     regs[E1000_CTRL / 4] |= E1000_CTRL_ASDE;
+    e1000_dma_write_barrier();
     (void)regs[E1000_ICR / 4];
     regs[E1000_IMS / 4] = E1000_INTERRUPT_MASK;
     e1000_regs = regs; e1000_tx_ring = tx; e1000_rx_ring = rx;
@@ -234,6 +243,7 @@ int e1000_transmit(const void *data, uint16_t length) {
     descriptor->status = 0;
     e1000_tx_index = (e1000_tx_index + 1U) % E1000_RING_COUNT;
     ++e1000_tx_pending;
+    e1000_dma_write_barrier();
     e1000_regs[E1000_TDT / 4] = e1000_tx_index;
     spinlock_unlock_irqrestore(&e1000_lock, flags);
     return 1;
@@ -249,6 +259,7 @@ uint32_t e1000_service(void) {
         __atomic_fetch_add(&e1000_link_events, 1U, __ATOMIC_RELAXED);
     if ((causes & E1000_IMS_RXO) != 0)
         __atomic_fetch_add(&e1000_rx_overruns, 1U, __ATOMIC_RELAXED);
+    e1000_dma_read_barrier();
     while (e1000_tx_pending != 0 &&
            (e1000_tx_ring[e1000_tx_reclaim_index].status & E1000_DESC_DONE) != 0) {
         if ((e1000_tx_ring[e1000_tx_reclaim_index].status &
@@ -270,6 +281,7 @@ int e1000_receive(void *data, uint16_t capacity, uint16_t *length) {
     uint32_t total = 0;
     uint32_t descriptors = 0;
     int invalid = 0;
+    e1000_dma_read_barrier();
     for (;;) {
         e1000_rx_desc_t *descriptor = &e1000_rx_ring[index];
         if ((descriptor->status & E1000_DESC_DONE) == 0) {

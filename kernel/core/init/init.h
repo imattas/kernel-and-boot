@@ -9,7 +9,8 @@ static inline void kernel_init_state_initialize(kernel_init_state_t *state) {
 }
 static inline int kernel_init_state_advance(kernel_init_state_t *state,
                                             kernel_init_stage_t next) {
-    if (!state || next <= state->stage || next > KERNEL_INIT_SERVICES) return 0;
+    if (!state || next <= state->stage || next > KERNEL_INIT_SERVICES ||
+        next != (kernel_init_stage_t)(state->stage + 1)) return 0;
     state->stage = next; return 1;
 }
 #endif

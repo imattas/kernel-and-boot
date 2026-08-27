@@ -151,6 +151,12 @@ void kernel_main(void *boot_info) {
     kernel_init_state_initialize(&init_state);
     serial_init();
     serial_write("serial driver ready\r\n");
+    kernel_init_state_t invalid_init;
+    kernel_init_state_initialize(&invalid_init);
+    if (kernel_init_state_advance(&invalid_init, KERNEL_INIT_MEMORY)) {
+        serial_write("kernel initialization ordering failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
     if (!kernel_init_state_advance(&init_state, KERNEL_INIT_EARLY))
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     serial_write("os kernel architectural entry\r\n");

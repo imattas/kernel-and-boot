@@ -352,8 +352,10 @@ termination status are now implemented; signal delivery policy remains bounded
 to the kernel process object until userland exists. ACPI parsing is now owned by
 the kernel ACPI driver boundary rather than an empty driver scaffold. The boot
 path now tracks ordered initialization stages and validates the firmware boot
-contract through a dedicated boundary. CR3 activation is now isolated behind
-the x86_64 memory architecture boundary, and the paging primitive is now
+contract through a dedicated boundary. Initialization-stage transitions now
+require the immediate next phase, with a boot-time rejection probe for skipped
+phases. CR3 activation is now isolated behind the x86_64 memory architecture
+boundary, and the paging primitive is now
 independently compiled instead of embedded in the virtual-address-space layer.
 The unused BIOS scaffold directory
 was removed; BIOS remains a separate later boot path.

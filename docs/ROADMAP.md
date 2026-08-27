@@ -747,6 +747,9 @@ syscalls observe the correct process namespace and descriptor table.
 User-thread creation now rejects the noncanonical upper boundary at exactly
 `0x0001000000000000`, keeping both entry and stack validation within the
 currently supported canonical user address range.
+Process stack mapping applies the same strict upper-bound check before frame
+allocation, preventing a stack range that ends at the noncanonical boundary
+from being installed and then rolled back later.
 Processes now expose an exit wait primitive: waiters block on a dedicated
 queue, termination publishes the exit status and wakes them, and destruction
 refuses to reclaim a process while exit waiters remain.

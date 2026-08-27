@@ -213,7 +213,7 @@ int process_map_user_stack(process_t *process, uint64_t page_address) {
     if (process->state != PROCESS_READY ||
         (page_address & (PAGE_SIZE - 1)) != 0 ||
         page_address < (1ULL << 39) ||
-        page_address > (1ULL << 48) -
+        page_address >= (1ULL << 48) -
                        PROCESS_USER_STACK_PAGES * PAGE_SIZE ||
         process->user_stack_page_count != 0) {
         spinlock_unlock_irqrestore(&process->lock, flags);

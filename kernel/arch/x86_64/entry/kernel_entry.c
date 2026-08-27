@@ -2083,6 +2083,17 @@ void kernel_main(void *boot_info) {
         serial_write("user process setup failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
+    task_t *user_context_probe = task_create_user(
+        2, &runtime_process->address_space, runtime_process->image.entry,
+        runtime_process->user_stack_top, 4096);
+    if (!user_context_probe ||
+        task_create_user(3, &runtime_process->address_space,
+                         runtime_process->user_stack_top,
+                         runtime_process->user_stack_top, 4096) ||
+        !task_destroy_kernel(user_context_probe)) {
+        serial_write("user task context failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
     serial_write("process lifecycle ready\r\n");
     process_t *signal_process = process_create(2);
     static uint8_t handle_probe_object;

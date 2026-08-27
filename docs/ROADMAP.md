@@ -625,6 +625,10 @@ congruence, rejecting malformed executable alignment metadata at boot.
 Process user stacks now allocate a bounded eight-page writable region with
 overflow-safe bounds, partial-allocation rollback, and complete teardown;
 the QEMU process probe validates the full stack range.
+The task layer now validates an executable entry and writable user stack,
+prepares a kernel context associated with the process address space, and
+provides a deferred privilege-transition bootstrap path; the boot probe creates
+and reclaims this context without starting ring 3.
 Scheduler current-task, idle-task, preemption, counter, and lifecycle state now
 use an IRQ-safe scheduler lock around shared metadata and queue transitions.
 Scheduler block and wake transitions now hold that lock across wait-queue

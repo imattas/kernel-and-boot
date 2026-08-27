@@ -2,7 +2,9 @@ bits 64
 
 global task_context_switch
 global arch_task_bootstrap
+global arch_user_task_bootstrap
 extern scheduler_task_exit
+extern arch_user_task_start
 
 task_context_switch:
     lea rax, [rsp + 8]
@@ -33,3 +35,9 @@ arch_task_bootstrap:
     cli
     hlt
     jmp .halt
+
+arch_user_task_bootstrap:
+    mov rdi, r12
+    mov rsi, r13
+    mov rdx, r14
+    jmp arch_user_task_start

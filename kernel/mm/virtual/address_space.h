@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-typedef struct {
+typedef struct address_space {
     uint64_t root;
     uint64_t owned_frames[32];
     uint32_t owned_count;

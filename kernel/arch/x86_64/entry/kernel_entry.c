@@ -1450,6 +1450,10 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("PS2 mouse packet ready\r\n");
+    if (ps2_mouse_initialize(&input_queue))
+        serial_write("PS2 mouse controller ready\r\n");
+    else
+        serial_write("PS2 mouse unavailable\r\n");
     kernel_assert(kernel_debug_range_valid(0x100, 0x200, 0x1000),
                   "debug range assertion failure");
     kernel_assert(!kernel_debug_range_valid(0x1000, 1, 0x1000),

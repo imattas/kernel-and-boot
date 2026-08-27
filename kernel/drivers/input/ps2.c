@@ -2,7 +2,11 @@
 #include "../../arch/x86_64/time/timer.h"
 
 static input_queue_t *keyboard_queue;
+static input_queue_t *mouse_queue;
 static uint8_t extended_scancode;
+static uint8_t mouse_packet[3];
+static uint8_t mouse_packet_length;
+static int mouse_enabled;
 
 static void out8(uint16_t port, uint8_t value) {
     __asm__ volatile ("outb %0, %1" :: "a"(value), "Nd"(port));
@@ -68,6 +72,14 @@ static int keyboard_command_noarg(uint8_t command) {
     return in8(0x60) == 0xfa;
 }
 
+static int mouse_command_noarg(uint8_t command) {
+    if (!wait_write()) return 0;
+    out8(0x64, 0xd4);
+    if (!wait_write()) return 0;
+    out8(0x60, command);
+    return wait_read() && in8(0x60) == 0xfa;
+}
+
 int ps2_keyboard_initialize(input_queue_t *queue) {
     if (!queue || !wait_write()) return 0;
     out8(0x64, 0xad);
@@ -88,6 +100,44 @@ int ps2_keyboard_initialize(input_queue_t *queue) {
     keyboard_queue = queue;
     extended_scancode = 0;
     return 1;
+}
+
+int ps2_mouse_initialize(input_queue_t *queue) {
+    mouse_enabled = 0;
+    mouse_queue = 0;
+    mouse_packet_length = 0;
+    if (!queue || !wait_write()) return 0;
+    out8(0x64, 0xa8);
+    uint8_t config = 0;
+    if (!controller_command(0x20, &config)) return 0;
+    config |= 0x02U;
+    if (!controller_write_config(config) || !mouse_command_noarg(0xf4))
+        return 0;
+    mouse_queue = queue;
+    mouse_enabled = 1;
+    return 1;
+}
+
+int ps2_mouse_enabled(void) { return mouse_enabled; }
+
+int ps2_mouse_poll(input_queue_t *queue) {
+    if (!queue || !mouse_enabled || (in8(0x64) & 1U) == 0 ||
+        (in8(0x64) & 0x20U) == 0) return 0;
+    uint8_t byte = in8(0x60);
+    if (mouse_packet_length == 0 && (byte & 0x08U) == 0) return 0;
+    mouse_packet[mouse_packet_length++] = byte;
+    if (mouse_packet_length < 3) return 1;
+    input_event_t events[3];
+    uint32_t event_count = 0;
+    mouse_packet_length = 0;
+    if (!ps2_mouse_decode(mouse_packet, events, &event_count)) return 0;
+    for (uint32_t i = 0; i < event_count; ++i)
+        if (!input_queue_push(queue, &events[i])) return 0;
+    return 1;
+}
+
+void ps2_mouse_irq(void) {
+    if (mouse_queue) (void)ps2_mouse_poll(mouse_queue);
 }
 
 void ps2_keyboard_irq(void) {

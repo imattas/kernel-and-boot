@@ -118,7 +118,7 @@ static int e1000_probe(device_t *device) {
     regs[E1000_RCTL / 4] = E1000_RCTL_EN | E1000_RCTL_BAM | E1000_RCTL_BSEX;
     regs[E1000_CTRL / 4] |= E1000_CTRL_ASDE;
     (void)regs[E1000_ICR / 4];
-    regs[E1000_IMS / 4] = E1000_IMS_RXDMT0 | E1000_IMS_RXT0 | E1000_IMS_TXDW;
+    regs[E1000_IMS / 4] = E1000_INTERRUPT_MASK;
     e1000_regs = regs; e1000_tx_ring = tx; e1000_rx_ring = rx;
     e1000_tx_index = 0; e1000_tx_reclaim_index = 0;
     e1000_tx_pending = 0; e1000_rx_index = 0;

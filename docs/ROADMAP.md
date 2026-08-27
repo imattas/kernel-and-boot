@@ -324,6 +324,9 @@ of silently treating errored completions as successful reclamation; the QEMU
 probe requires a clean completion.
 e1000 interrupt handling now enables and accounts for link-state-change and
 receive-overrun causes instead of dropping those device events.
+The e1000 initialization path now enables the complete declared interrupt
+mask, including link-change and receive-overrun causes, so those handlers are
+reachable on real hardware rather than only represented in software.
 UHCI control transfers now build a bounded multi-packet endpoint-0 TD chain,
 validate the setup transfer length, alternate data toggles, and verify every
 TD before releasing DMA frames.

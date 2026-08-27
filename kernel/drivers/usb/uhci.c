@@ -376,6 +376,24 @@ static int uhci_interrupt_transfer_locked(uint8_t address, uint8_t endpoint, voi
     return complete;
 }
 
+/* Bulk endpoints use the controller's asynchronous/bulk queue.  Keep this
+ * entry point separate from the periodic interrupt API so callers cannot
+ * accidentally couple bulk I/O to interrupt-transfer scheduling changes. */
+static int uhci_bulk_transfer_locked(uint8_t address, uint8_t endpoint, void *data,
+                                     uint16_t length, uint16_t max_packet,
+                                     uint8_t *toggle) {
+    if (uhci_io_disabled || !controller_base || !controller_frame_list || !data ||
+        address > 127 || (endpoint & 0x7fU) > 15 || length == 0 || length > 4096 ||
+        max_packet == 0 || max_packet > 64 || !toggle || *toggle > 1)
+        return 0;
+
+    /* UHCI has no separate bulk register: bulk QHs are linked from the frame
+     * list and are serviced every frame.  The synchronous engine below builds
+     * exactly that non-periodic queue and waits for its completion. */
+    return uhci_interrupt_transfer_locked(address, endpoint, data, length,
+                                          max_packet, toggle);
+}
+
 static int uhci_interrupt_submit_locked(uint8_t address, uint8_t endpoint,
                                         void *data, uint16_t length,
                                         uint16_t max_packet, uint8_t interval,
@@ -530,8 +548,8 @@ int uhci_interrupt_transfer(uint8_t address, uint8_t endpoint, void *data,
 int uhci_bulk_transfer(uint8_t address, uint8_t endpoint, void *data,
                        uint16_t length, uint16_t max_packet, uint8_t *toggle) {
     uint64_t flags = spinlock_lock_irqsave(&uhci_lock);
-    int result = uhci_interrupt_transfer_locked(address, endpoint, data, length,
-                                                max_packet, toggle);
+    int result = uhci_bulk_transfer_locked(address, endpoint, data, length,
+                                           max_packet, toggle);
     spinlock_unlock_irqrestore(&uhci_lock, flags);
     return result;
 }

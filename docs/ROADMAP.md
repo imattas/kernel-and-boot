@@ -1077,6 +1077,9 @@ synchronous and persistent UHCI paths allocate enough contiguous TD frames for
 that range instead of overflowing a single 4 KiB descriptor page.
 Persistent interrupt scheduling now honors each USB interrupt endpoint's
 declared `bInterval` instead of submitting the queue head on every frame.
+UHCI bulk transfers now have a dedicated validated submission path rather than
+silently entering the interrupt-transfer API; bulk queue ownership and future
+non-periodic scheduling changes are isolated from HID interrupt transfers.
 The UEFI memory-map capture now rejects malformed successful firmware results
 unless descriptor size and map length satisfy the boot contract, and bounds
 replacement-map publication to the allocated buffer.

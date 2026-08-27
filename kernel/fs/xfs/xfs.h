@@ -24,5 +24,6 @@ int xfs_read_file(xfs_fs_t *fs, uint64_t inode, uint64_t offset,
                   void *buffer, uint32_t size);
 int xfs_write_file(xfs_fs_t *fs, uint64_t inode, uint64_t offset,
                    const void *buffer, uint32_t size);
+int xfs_truncate_file(xfs_fs_t *fs, uint64_t inode, uint64_t size);
 
 #endif

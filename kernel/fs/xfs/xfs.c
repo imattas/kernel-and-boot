@@ -19,6 +19,12 @@ static uint16_t be16(const uint8_t *p) {
 static uint64_t be64(const uint8_t *p) {
     return ((uint64_t)be32(p) << 32) | be32(p + 4);
 }
+static void store_be64(uint8_t *p, uint64_t value) {
+    p[0] = (uint8_t)(value >> 56); p[1] = (uint8_t)(value >> 48);
+    p[2] = (uint8_t)(value >> 40); p[3] = (uint8_t)(value >> 32);
+    p[4] = (uint8_t)(value >> 24); p[5] = (uint8_t)(value >> 16);
+    p[6] = (uint8_t)(value >> 8); p[7] = (uint8_t)value;
+}
 
 int xfs_mount(xfs_fs_t *fs, uint32_t device) {
     if (!fs || !storage_device_at(device) ||
@@ -222,4 +228,12 @@ int xfs_write_file(xfs_fs_t *fs, uint64_t inode, uint64_t offset,
         source += chunk; remaining -= chunk; ++logical; in_block = 0;
     }
     return 1;
+}
+
+int xfs_truncate_file(xfs_fs_t *fs, uint64_t inode, uint64_t size) {
+    uint8_t data[4096];
+    if (!fs || !fs->mounted || size == 0 || !xfs_read_inode(fs, inode, data) ||
+        (be16(&data[2]) & 0xf000U) != 0x8000U || size >= be64(&data[56])) return 0;
+    store_be64(&data[56], size);
+    return xfs_write_inode(fs, inode, data);
 }

@@ -1010,6 +1010,9 @@ flag correctly and return zeroes for sparse gaps and unwritten extents. XFS
 regular files now support bounded read-modify-write updates for inline data and
 mapped written extents through the VFS adapter; sparse and unwritten extents
 remain protected.
+XFS now supports bounded nonzero shrink/truncation by persistently updating the
+big-endian inode data length, with the VFS adapter synchronizing its cached
+file size.
 Btrfs regular files now support bounded read-modify-write updates for
 uncompressed, mapped extents, publish mirrored data and checksum-tree metadata
 when available, and update the checksum-tree entry; compressed, sparse, and metadata-changing writes remain

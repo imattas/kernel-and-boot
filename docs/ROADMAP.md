@@ -1083,6 +1083,9 @@ v4 BNO leaf header/count encoding while retaining the existing contract format.
 XFS BNO allocation now traverses an authenticated two-level v4 root and leaf,
 updates the selected leaf and root key, recomputes AGF accounting, and rolls
 back all modified blocks if publication fails.
+The matching two-level v4 BNO release path now validates all leaves, rejects
+overlap, inserts or coalesces within the selected leaf, updates its root key,
+and rolls back the leaf, root, and AGF on publication failure.
 Multi-level BNO/CNT trees and full transaction logging remain later hardening
 work.
 Btrfs regular-file truncation now accepts zero-length targets, updating the

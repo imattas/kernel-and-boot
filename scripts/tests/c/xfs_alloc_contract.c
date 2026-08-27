@@ -73,5 +73,8 @@ int main(void) {
     assert(g32(&real_leaf[16]) == 12 && g32(&real_leaf[20]) == 1 &&
            g32(&real_root[16]) == 12 && g32(&real_root[20]) == 1 &&
            g32(&agf[40]) == 1);
+    assert(xfs_free_extent(&fs, 10, 2) && g32(&real_leaf[16]) == 10 &&
+           g32(&real_leaf[20]) == 3 && g32(&real_root[16]) == 10 &&
+           g32(&real_root[20]) == 3 && g32(&agf[40]) == 3);
     return 0;
 }

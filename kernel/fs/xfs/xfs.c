@@ -53,6 +53,7 @@ static int xfs_read_block(const xfs_fs_t *fs, uint64_t block, void *buffer);
 static int xfs_write_block(const xfs_fs_t *fs, uint64_t block, const void *buffer);
 static int xfs_allocate_real_bno(xfs_fs_t *fs, uint32_t allocation_group,
                                  uint32_t blocks, uint64_t *start);
+static int xfs_free_real_bno(xfs_fs_t *fs, uint64_t start, uint32_t blocks);
 
 static uint32_t be32(const uint8_t *p) {
     return ((uint32_t)p[0] << 24) | ((uint32_t)p[1] << 16) |
@@ -163,6 +164,8 @@ int xfs_free_extent(xfs_fs_t *fs, uint64_t start, uint32_t blocks) {
     if (ag_base > fs->block_count - 2U ||
         !xfs_read_block(fs, ag_base + 1U, agf) || be32(agf) != XFS_AGF_MAGIC)
         return 0;
+    if (be32(&agf[4]) == 1U && be32(&agf[28]) > 1U)
+        return xfs_free_real_bno(fs, start, blocks);
     uint32_t root = be32(&agf[16]);
     uint32_t level = be32(&agf[24]);
     if (be32(&agf[4]) == 1U) level = be32(&agf[28]);
@@ -446,6 +449,136 @@ static int xfs_allocate_real_bno(xfs_fs_t *fs, uint32_t allocation_group,
     }
     store_be32(&agf[44], longest);
     *start = ag_base + selected_start;
+    if (!xfs_write_block(fs, ag_base + selected_leaf, leaf) ||
+        !xfs_write_block(fs, ag_base + root_block, root) ||
+        !xfs_write_block(fs, ag_base + 1U, agf)) {
+        (void)xfs_write_block(fs, ag_base + selected_leaf, original_leaf);
+        (void)xfs_write_block(fs, ag_base + root_block, original_root);
+        (void)xfs_write_block(fs, ag_base + 1U, original_agf);
+        return 0;
+    }
+    return 1;
+}
+
+static int xfs_free_real_bno(xfs_fs_t *fs, uint64_t start, uint32_t blocks) {
+    uint8_t agf[4096], original_agf[4096], root[4096], original_root[4096];
+    uint8_t leaf[4096], original_leaf[4096], scan[4096];
+    if (!fs || !fs->mounted || blocks == 0 || start >= fs->block_count ||
+        blocks > fs->block_count - start || fs->block_size < 512U) return 0;
+    uint32_t agno = (uint32_t)(start / fs->ag_blocks);
+    uint32_t relative = (uint32_t)(start % fs->ag_blocks);
+    if (agno >= fs->ag_count || blocks > fs->ag_blocks - relative) return 0;
+    uint64_t ag_base = (uint64_t)agno * fs->ag_blocks;
+    if (ag_base > fs->block_count - 2U ||
+        !xfs_read_block(fs, ag_base + 1U, agf) || be32(agf) != XFS_AGF_MAGIC ||
+        be32(&agf[4]) != 1U || be32(&agf[28]) != 2U) return 0;
+    uint32_t root_block = be32(&agf[16]);
+    uint32_t capacity = (fs->block_size - 16U) / 12U;
+    if (root_block == 0 || root_block >= fs->ag_blocks || capacity == 0 ||
+        !xfs_read_block(fs, ag_base + root_block, root) ||
+        be32(root) != XFS_BNO_MAGIC_REAL || be16(&root[4]) != 1U) return 0;
+    uint32_t root_records = be16(&root[6]);
+    if (root_records == 0 || root_records > capacity) return 0;
+    for (uint32_t i = 0; i < fs->block_size; ++i) {
+        original_agf[i] = agf[i]; original_root[i] = root[i];
+    }
+    uint32_t pointer_offset = 16U + capacity * 8U;
+    uint32_t selected = UINT32_MAX, selected_leaf = 0;
+    uint64_t total_free = 0;
+    for (uint32_t i = 0; i < root_records; ++i) {
+        uint32_t child = be32(&root[pointer_offset + i * 4U]);
+        if (child == 0 || child >= fs->ag_blocks ||
+            !xfs_read_block(fs, ag_base + child, scan) ||
+            be32(scan) != XFS_BNO_MAGIC_REAL || be16(&scan[4]) != 0) return 0;
+        uint32_t records = be16(&scan[6]);
+        if (records == 0 || records > (fs->block_size - 16U) / 8U) return 0;
+        uint32_t previous_end = 0;
+        for (uint32_t r = 0; r < records; ++r) {
+            uint32_t record_start = be32(&scan[16U + r * 8U]);
+            uint32_t record_count = be32(&scan[20U + r * 8U]);
+            if (record_count == 0 || record_start > fs->ag_blocks - record_count ||
+                (r != 0 && record_start < previous_end) ||
+                total_free > UINT32_MAX - record_count) return 0;
+            if (relative < record_start) {
+                if (relative + blocks > record_start) return 0;
+                if (selected == UINT32_MAX) {
+                    selected = i; selected_leaf = child;
+                }
+            } else if (relative < record_start + record_count) return 0;
+            previous_end = record_start + record_count;
+            total_free += record_count;
+        }
+        if (selected == UINT32_MAX && i + 1U == root_records) {
+            selected = i; selected_leaf = child;
+        }
+    }
+    if (selected == UINT32_MAX || total_free != be32(&agf[40]) ||
+        be32(&agf[40]) > UINT32_MAX - blocks ||
+        !xfs_read_block(fs, ag_base + selected_leaf, leaf)) return 0;
+    for (uint32_t i = 0; i < fs->block_size; ++i) original_leaf[i] = leaf[i];
+    uint32_t leaf_records = be16(&leaf[6]);
+    uint32_t insert = leaf_records;
+    for (uint32_t r = 0; r < leaf_records; ++r)
+        if (relative < be32(&leaf[16U + r * 8U])) { insert = r; break; }
+    uint32_t previous = insert == 0 ? UINT32_MAX : insert - 1U;
+    uint32_t next = insert < leaf_records ? insert : UINT32_MAX;
+    int joins_previous = previous != UINT32_MAX &&
+        be32(&leaf[16U + previous * 8U]) + be32(&leaf[20U + previous * 8U]) == relative;
+    int joins_next = next != UINT32_MAX &&
+        relative + blocks == be32(&leaf[16U + next * 8U]);
+    if (joins_previous && joins_next) {
+        uint32_t left = be32(&leaf[20U + previous * 8U]);
+        uint32_t right = be32(&leaf[20U + next * 8U]);
+        if (left > UINT32_MAX - blocks || left + blocks > UINT32_MAX - right) return 0;
+        store_be32(&leaf[20U + previous * 8U], left + blocks + right);
+        for (uint32_t r = next; r + 1U < leaf_records; ++r)
+            for (uint32_t b = 0; b < 8U; ++b)
+                leaf[16U + r * 8U + b] = leaf[16U + (r + 1U) * 8U + b];
+        --leaf_records;
+    } else if (joins_previous) {
+        uint32_t old = be32(&leaf[20U + previous * 8U]);
+        if (old > UINT32_MAX - blocks) return 0;
+        store_be32(&leaf[20U + previous * 8U], old + blocks);
+    } else if (joins_next) {
+        uint32_t old = be32(&leaf[20U + next * 8U]);
+        if (old > UINT32_MAX - blocks) return 0;
+        store_be32(&leaf[16U + next * 8U], relative);
+        store_be32(&leaf[20U + next * 8U], old + blocks);
+    } else {
+        if (leaf_records >= (fs->block_size - 16U) / 8U) return 0;
+        for (uint32_t r = leaf_records; r > insert; --r)
+            for (uint32_t b = 0; b < 8U; ++b)
+                leaf[16U + r * 8U + b] = leaf[16U + (r - 1U) * 8U + b];
+        store_be32(&leaf[16U + insert * 8U], relative);
+        store_be32(&leaf[20U + insert * 8U], blocks);
+        ++leaf_records;
+    }
+    store_be16(&leaf[6], (uint16_t)leaf_records);
+    for (uint32_t i = 0; i < root_records; ++i) {
+        uint32_t child = be32(&root[pointer_offset + i * 4U]);
+        if (child == selected_leaf) {
+            if (leaf_records == 0) return 0;
+            for (uint32_t b = 0; b < 8U; ++b)
+                root[16U + i * 8U + b] = leaf[16U + b];
+        }
+    }
+    uint32_t longest = 0;
+    for (uint32_t i = 0; i < root_records; ++i) {
+        uint32_t child = be32(&root[pointer_offset + i * 4U]);
+        if (child == selected_leaf) {
+            for (uint32_t r = 0; r < leaf_records; ++r)
+                if (be32(&leaf[20U + r * 8U]) > longest)
+                    longest = be32(&leaf[20U + r * 8U]);
+        } else {
+            if (!xfs_read_block(fs, ag_base + child, scan)) return 0;
+            uint32_t records = be16(&scan[6]);
+            for (uint32_t r = 0; r < records; ++r)
+                if (be32(&scan[20U + r * 8U]) > longest)
+                    longest = be32(&scan[20U + r * 8U]);
+        }
+    }
+    store_be32(&agf[40], be32(&agf[40]) + blocks);
+    store_be32(&agf[44], longest);
     if (!xfs_write_block(fs, ag_base + selected_leaf, leaf) ||
         !xfs_write_block(fs, ag_base + root_block, root) ||
         !xfs_write_block(fs, ag_base + 1U, agf)) {

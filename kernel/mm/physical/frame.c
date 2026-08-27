@@ -45,7 +45,11 @@ static void mark_allocated(uint64_t frame, int allocated) {
 int physical_init(const os_boot_info_t *boot_info) {
     if (!boot_info || !boot_info->memory_map || !boot_info->memory_descriptor_size ||
         boot_info->memory_descriptor_size < sizeof(efi_memory_descriptor_t) ||
-        boot_info->memory_map_size < boot_info->memory_descriptor_size) return 0;
+        boot_info->memory_map_size < boot_info->memory_descriptor_size ||
+        boot_info->kernel_base >= MAX_PHYSICAL_ADDRESS ||
+        boot_info->kernel_size == 0 ||
+        boot_info->kernel_size > MAX_PHYSICAL_ADDRESS - boot_info->kernel_base)
+        return 0;
     spinlock_init(&frame_lock);
     for (uint64_t i = 0; i < BITMAP_BYTES; ++i) {
         frame_bitmap[i] = 0xff;
@@ -65,7 +69,7 @@ int physical_init(const os_boot_info_t *boot_info) {
         cursor += boot_info->memory_descriptor_size;
     }
     uint64_t kernel_first = boot_info->kernel_base / FRAME_SIZE;
-    uint64_t kernel_pages = (boot_info->kernel_size + FRAME_SIZE - 1) / FRAME_SIZE;
+    uint64_t kernel_pages = (boot_info->kernel_size - 1) / FRAME_SIZE + 1;
     for (uint64_t page = 0; page < kernel_pages && kernel_first + page < MAX_FRAMES; ++page) mark_frame(kernel_first + page, 0);
     stats.free_frames = 0;
     for (uint64_t frame = 0; frame < MAX_FRAMES; ++frame) if (frame_is_free(frame)) ++stats.free_frames;

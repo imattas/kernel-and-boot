@@ -266,6 +266,8 @@ the boot probe submits a real test frame to the TX ring.
 UHCI interrupt delivery remains on the shared legacy dispatcher because QEMU
 can place UHCI and e1000 on one legacy GSI; the dispatcher explicitly services
 both device handlers before issuing APIC EOI.
+UHCI control and interrupt transfers now reclaim all allocated DMA frames on
+controller stop/restart failures and treat restart failure as a transfer error.
 The e1000 path now has independent build/link ownership, enables bounded
 RX/TX completion causes, and exposes a polling service that acknowledges
 causes and reclaims completed TX entries. TX/RX ring state is serialized with

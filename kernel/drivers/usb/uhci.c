@@ -55,6 +55,15 @@ typedef struct {
     uint32_t element;
 } __attribute__((packed, aligned(16))) uhci_qh_t;
 
+static void uhci_release_transfer_frames(uint64_t qh_frame, uint64_t td_frame,
+                                         uint64_t setup_frame,
+                                         uint64_t data_frame) {
+    if (qh_frame) physical_free_frame(qh_frame);
+    if (td_frame) physical_free_frame(td_frame);
+    if (setup_frame) physical_free_frame(setup_frame);
+    if (data_frame) physical_free_frame(data_frame);
+}
+
 static uint32_t uhci_token(uint8_t pid, uint8_t address, uint8_t endpoint,
                            uint8_t toggle, uint16_t length) {
     uint32_t max_length = length == 0 ? 0x7ffU : (uint32_t)length - 1U;
@@ -187,10 +196,7 @@ int uhci_control_transfer(uint8_t address, uint8_t endpoint,
     uint64_t setup_frame = physical_alloc_frame();
     uint64_t data_frame = length ? physical_alloc_frame() : 0;
     if (!qh_frame || !td_frame || !setup_frame || (length && !data_frame)) {
-        if (qh_frame) physical_free_frame(qh_frame);
-        if (td_frame) physical_free_frame(td_frame);
-        if (setup_frame) physical_free_frame(setup_frame);
-        if (data_frame) physical_free_frame(data_frame);
+        uhci_release_transfer_frames(qh_frame, td_frame, setup_frame, data_frame);
         return 0;
     }
     uhci_qh_t *qh = (uhci_qh_t *)(uintptr_t)qh_frame;
@@ -227,17 +233,17 @@ int uhci_control_transfer(uint8_t address, uint8_t endpoint,
     qh->element = (uint32_t)td_frame;
     volatile uint32_t *frame_list = (volatile uint32_t *)(uintptr_t)controller_frame_list;
     if (!uhci_set_running(0)) {
-        physical_free_frame(qh_frame);
-        physical_free_frame(td_frame);
-        physical_free_frame(setup_frame);
-        if (data_frame) physical_free_frame(data_frame);
+        uhci_release_transfer_frames(qh_frame, td_frame, setup_frame, data_frame);
         return 0;
     }
     uhci_acknowledge_status(uhci_status() & 0x001fU);
     for (uint32_t i = 0; i < 1024; ++i) frame_list[i] = (uint32_t)qh_frame | 2U;
     __asm__ volatile ("outl %0, %1" :: "a"((uint32_t)controller_frame_list),
                       "Nd"((uint16_t)(controller_base + UHCI_FLBASEADD)));
-    uhci_set_running(1);
+    if (!uhci_set_running(1)) {
+        uhci_release_transfer_frames(qh_frame, td_frame, setup_frame, data_frame);
+        return 0;
+    }
     int complete = 0;
     for (uint32_t wait = 0; wait < 1000000; ++wait) {
         if ((status_td->status & UHCI_TD_ACTIVE) == 0) {
@@ -248,19 +254,19 @@ int uhci_control_transfer(uint8_t address, uint8_t endpoint,
         }
         __asm__ volatile ("pause");
     }
-    if (!uhci_set_running(0)) return 0;
+    if (!uhci_set_running(0)) {
+        uhci_release_transfer_frames(qh_frame, td_frame, setup_frame, data_frame);
+        return 0;
+    }
     uint16_t controller_status = uhci_status();
     complete = complete && (controller_status & (UHCI_STATUS_ERROR |
                         UHCI_STATUS_HOST_SYSTEM_ERROR |
                         UHCI_STATUS_PROCESS_ERROR)) == 0;
     for (uint32_t i = 0; i < 1024; ++i) frame_list[i] = 1U;
-    uhci_set_running(1);
+    if (!uhci_set_running(1)) complete = 0;
     if (complete && length && (setup[0] & 0x80U))
         for (uint32_t i = 0; i < length; ++i) ((uint8_t *)data)[i] = data_copy[i];
-    physical_free_frame(qh_frame);
-    physical_free_frame(td_frame);
-    physical_free_frame(setup_frame);
-    if (data_frame) physical_free_frame(data_frame);
+    uhci_release_transfer_frames(qh_frame, td_frame, setup_frame, data_frame);
     return complete;
 }
 
@@ -275,9 +281,7 @@ int uhci_interrupt_transfer(uint8_t address, uint8_t endpoint, void *data,
     uint64_t td_frame = physical_alloc_frame();
     uint64_t data_frame = physical_alloc_frame();
     if (!qh_frame || !td_frame || !data_frame) {
-        if (qh_frame) physical_free_frame(qh_frame);
-        if (td_frame) physical_free_frame(td_frame);
-        if (data_frame) physical_free_frame(data_frame);
+        uhci_release_transfer_frames(qh_frame, td_frame, 0, data_frame);
         return 0;
     }
     uhci_qh_t *qh = (uhci_qh_t *)(uintptr_t)qh_frame;
@@ -303,11 +307,17 @@ int uhci_interrupt_transfer(uint8_t address, uint8_t endpoint, void *data,
     }
     volatile uint32_t *frame_list =
         (volatile uint32_t *)(uintptr_t)controller_frame_list;
-    if (!uhci_set_running(0)) return 0;
+    if (!uhci_set_running(0)) {
+        uhci_release_transfer_frames(qh_frame, td_frame, 0, data_frame);
+        return 0;
+    }
     for (uint32_t i = 0; i < 1024; ++i) frame_list[i] = (uint32_t)qh_frame | 2U;
     __asm__ volatile ("outl %0, %1" :: "a"((uint32_t)controller_frame_list),
                       "Nd"((uint16_t)(controller_base + UHCI_FLBASEADD)));
-    uhci_set_running(1);
+    if (!uhci_set_running(1)) {
+        uhci_release_transfer_frames(qh_frame, td_frame, 0, data_frame);
+        return 0;
+    }
     int complete = 0;
     for (uint32_t wait = 0; wait < 1000000; ++wait) {
         if ((td[packet_count - 1U].status & UHCI_TD_ACTIVE) == 0) {
@@ -318,21 +328,22 @@ int uhci_interrupt_transfer(uint8_t address, uint8_t endpoint, void *data,
         }
         __asm__ volatile ("pause");
     }
-    if (!uhci_set_running(0)) return 0;
+    if (!uhci_set_running(0)) {
+        uhci_release_transfer_frames(qh_frame, td_frame, 0, data_frame);
+        return 0;
+    }
     uint16_t controller_status = uhci_status();
     complete = complete && (controller_status & (UHCI_STATUS_ERROR |
                         UHCI_STATUS_HOST_SYSTEM_ERROR |
                         UHCI_STATUS_PROCESS_ERROR)) == 0;
     for (uint32_t i = 0; i < 1024; ++i) frame_list[i] = 1U;
-    uhci_set_running(1);
+    if (!uhci_set_running(1)) complete = 0;
     if (complete) {
         if (input)
             for (uint16_t i = 0; i < length; ++i) ((uint8_t *)data)[i] = transfer[i];
         *toggle = current_toggle;
     }
-    physical_free_frame(qh_frame);
-    physical_free_frame(td_frame);
-    physical_free_frame(data_frame);
+    uhci_release_transfer_frames(qh_frame, td_frame, 0, data_frame);
     return complete;
 }
 

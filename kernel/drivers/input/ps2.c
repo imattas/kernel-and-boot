@@ -107,6 +107,7 @@ int ps2_keyboard_initialize(input_queue_t *queue) {
     response |= 0x01U;
     response &= (uint8_t)~0x10U;
     if (!controller_write_config(response)) return 0;
+    if (!wait_write()) return 0;
     out8(0x64, 0xae);
     if (!keyboard_command(0xf0, 1)) return 0;
     if (!keyboard_command_noarg(0xf4)) return 0;
@@ -122,6 +123,7 @@ int ps2_mouse_initialize(input_queue_t *queue) {
     mouse_packet_length = 0;
     mouse_packet_size = 3;
     if (!queue || !wait_write()) return 0;
+    if (!wait_write()) return 0;
     out8(0x64, 0xa8);
     uint8_t config = 0;
     uint8_t response = 0;

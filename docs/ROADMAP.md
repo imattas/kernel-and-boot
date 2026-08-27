@@ -1131,6 +1131,9 @@ including negative/corrupt values, with a boot-time regression probe.
 Keyboard polling now checks the controller source bit, so a keyboard IRQ path
 cannot consume mouse data from the shared output buffer; mouse status is read
 once per poll and packet state is reset when mouse scanning is enabled.
+PS/2 keyboard and mouse initialization now waits for controller input-buffer
+availability before issuing channel-enable commands, closing the setup race
+that could drop commands on a busy controller.
 USB HID boot-mouse reports now decode into validated button, X-axis, and
 Y-axis input events.
 The network service now drains bounded NIC input, learns validated ARP

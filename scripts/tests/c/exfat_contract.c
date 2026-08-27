@@ -23,7 +23,7 @@ static void finish_boot_region(uint32_t start) {
 int main(void) {
     memset(image, 0, sizeof(image)); uint8_t *boot = image;
     boot[0] = 0xeb; boot[2] = 0x90; memcpy(&boot[3], "EXFAT   ", 8);
-    put64(&boot[72], 64); put32(&boot[80], 24); put32(&boot[84], 1); put32(&boot[88], 25); put32(&boot[92], 4); put32(&boot[96], 2);
+    put64(&boot[72], 64); put32(&boot[80], 24); put32(&boot[84], 1); put32(&boot[88], 25); put32(&boot[92], 6); put32(&boot[96], 2);
     boot[108] = 9; boot[109] = 0; boot[110] = 1; boot[510] = 0x55; boot[511] = 0xaa;
     memcpy(&image[12 * 512], image, 11 * 512); finish_boot_region(0);
     memcpy(&image[12 * 512], image, 11 * 512); finish_boot_region(12);
@@ -39,11 +39,19 @@ int main(void) {
     uint8_t *subdir = &image[27 * 512]; subdir[0] = 0x85; subdir[1] = 2;
     subdir[32] = 0xc0; subdir[33] = 2; subdir[35] = 9; put32(&subdir[52], 3); put64(&subdir[56], 5);
     subdir[64] = 0xc1; for (uint32_t i = 0; i < 9; ++i) put16(&subdir[66 + i * 2], (uint8_t)name[i]);
+    subdir[96] = 0x85; subdir[97] = 2; subdir[128] = 0xc0; subdir[129] = 2; subdir[131] = 4;
+    put32(&subdir[148], 7); put64(&subdir[152], 4); subdir[160] = 0xc1;
+    put16(&subdir[162], 'c'); put16(&subdir[164], 'a'); put16(&subdir[166], 'f'); put16(&subdir[168], 0x00e9);
     put32(&image[24 * 512 + 4 * 4], 0xfffffff8U);
+    put32(&image[24 * 512 + 7 * 4], 0xfffffff8U); memcpy(&image[30 * 512], "utf8", 4);
     assert(exfat_lookup_in_directory(&fs, 4, "hello.txt", &cluster, &size, &no_fat) &&
            cluster == 3 && size == 5);
     memset(output, 0, sizeof(output)); assert(exfat_read_file_in_directory(&fs, 4, "HELLO.TXT", 0, output, 5) &&
                                              memcmp(output, "hello", 5) == 0);
+    assert(exfat_lookup_in_directory(&fs, 4, "caf\xc3\xa9", &cluster, &size, &no_fat) &&
+           cluster == 7 && size == 4);
+    memset(output, 0, sizeof(output)); assert(exfat_read_file_in_directory(&fs, 4, "caf\xc3\xa9", 0, output, 4) &&
+                                             memcmp(output, "utf8", 4) == 0);
     image[11 * 512] ^= 1; assert(!exfat_mount(&fs, 0)); image[11 * 512] ^= 1;
     image[0] = 0; assert(!exfat_mount(&fs, 0)); return 0;
 }

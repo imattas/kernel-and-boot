@@ -93,16 +93,42 @@ int exfat_read_cluster(exfat_fs_t *fs, uint32_t cluster, void *buffer) {
     return storage_read(fs->device, sector, fs->sectors_per_cluster, buffer);
 }
 
-static int name_equal(const char *left, const char *right) {
-    uint32_t i = 0;
-    while (left[i] && right[i]) {
-        char a = left[i], b = right[i];
-        if (a >= 'a' && a <= 'z') a = (char)(a - 'a' + 'A');
-        if (b >= 'a' && b <= 'z') b = (char)(b - 'a' + 'A');
-        if (a != b) return 0;
-        ++i;
+static int utf8_next(const char **text, uint32_t *codepoint) {
+    const uint8_t *p = (const uint8_t *)*text;
+    uint32_t value, length;
+    if (!p[0]) return 0;
+    if (p[0] < 0x80) { value = p[0]; length = 1; }
+    else if (p[0] >= 0xc2 && p[0] <= 0xdf) { value = p[0] & 0x1fU; length = 2; }
+    else if (p[0] >= 0xe0 && p[0] <= 0xef) { value = p[0] & 0x0fU; length = 3; }
+    else if (p[0] >= 0xf0 && p[0] <= 0xf4) { value = p[0] & 0x07U; length = 4; }
+    else return 0;
+    for (uint32_t i = 1; i < length; ++i) {
+        if ((p[i] & 0xc0U) != 0x80U) return 0;
+        value = (value << 6) | (p[i] & 0x3fU);
     }
-    return left[i] == 0 && right[i] == 0;
+    if ((length == 2 && value < 0x80U) || (length == 3 && value < 0x800U) ||
+        (length == 4 && value < 0x10000U) || value > 0x10ffffU ||
+        (value >= 0xd800U && value <= 0xdfffU)) return 0;
+    *text += length; *codepoint = value; return 1;
+}
+
+static int utf16_name_equal(const uint16_t *units, uint32_t count, const char *name) {
+    const char *cursor = name;
+    for (uint32_t i = 0; i < count; ++i) {
+        uint32_t value;
+        if (!utf8_next(&cursor, &value)) return 0;
+        if (value <= 0xffffU) {
+            uint16_t unit = units[i], wanted = (uint16_t)value;
+            if (unit >= 'a' && unit <= 'z') unit = (uint16_t)(unit - 'a' + 'A');
+            if (wanted >= 'a' && wanted <= 'z') wanted = (uint16_t)(wanted - 'a' + 'A');
+            if (unit != wanted) return 0;
+        } else {
+            uint32_t high = 0xd800U + ((value - 0x10000U) >> 10);
+            uint32_t low = 0xdc00U + ((value - 0x10000U) & 0x3ffU);
+            if (i + 1U >= count || units[i] != high || units[++i] != low) return 0;
+        }
+    }
+    return *cursor == 0;
 }
 
 int exfat_lookup_in_directory(exfat_fs_t *fs, uint32_t directory_cluster,
@@ -123,7 +149,7 @@ int exfat_lookup_in_directory(exfat_fs_t *fs, uint32_t directory_cluster,
             if (secondary_count < 2 || index + secondary_count >= entries) continue;
             const uint8_t *stream = &directory[(index + 1U) * 32U];
             if (stream[0] != 0xc0) continue;
-            char candidate[256] = {0};
+            uint16_t candidate[256] = {0};
             uint32_t name_length = stream[3];
             if (name_length == 0 || name_length >= sizeof(candidate)) continue;
             uint32_t written = 0;
@@ -132,11 +158,10 @@ int exfat_lookup_in_directory(exfat_fs_t *fs, uint32_t directory_cluster,
                 if (name_entry[0] != 0xc1) { written = 0; break; }
                 for (uint32_t character = 0; character < 15 && written < name_length; ++character) {
                     uint16_t value = load16(&name_entry[2 + character * 2U]);
-                    if (value > 0x7f) { written = 0; break; }
-                    candidate[written++] = (char)value;
+                    candidate[written++] = value;
                 }
             }
-            if (written != name_length || !name_equal(candidate, name)) continue;
+            if (written != name_length || !utf16_name_equal(candidate, written, name)) continue;
             *first_cluster = load32(&stream[20]); *size = load64(&stream[24]);
             *no_fat_chain = (stream[1] & 2U) != 0;
             return cluster_valid(fs, *first_cluster) && *size != 0;

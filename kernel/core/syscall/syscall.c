@@ -18,6 +18,10 @@ static int user_range(uint64_t address, uint64_t size, int writable) {
                                            size, writable);
 }
 
+static int valid_signal_number(uint64_t value) {
+    return value >= 1 && value <= PROCESS_SIGNAL_MAX;
+}
+
 int syscall_copy_from_user(void *destination, uint64_t source, uint64_t size) {
     if (size == 0) return 1;
     if (!destination || !user_range(source, size, 0)) return 0;
@@ -55,12 +59,18 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
         case OS_SYSCALL_GETPID:
             return process_current() ? process_current()->id : OS_SYSCALL_ERROR;
         case OS_SYSCALL_SIGNAL_MASK:
-            return process_set_signal_mask(process_current(), (uint32_t)arg1) ? 0 : OS_SYSCALL_ERROR;
+            return arg1 > UINT32_MAX ||
+                   !process_set_signal_mask(process_current(), (uint32_t)arg1) ?
+                   OS_SYSCALL_ERROR : 0;
         case OS_SYSCALL_SIGNAL_SEND:
-            return process_send_signal(process_current(), (uint32_t)arg1) ? 0 : OS_SYSCALL_ERROR;
+            return !valid_signal_number(arg1) ||
+                   !process_send_signal(process_current(), (uint32_t)arg1) ?
+                   OS_SYSCALL_ERROR : 0;
         case OS_SYSCALL_SIGNAL_SEND_TO: {
             process_t *target = process_lookup(arg1);
-            return process_send_signal(target, (uint32_t)arg2) ? 0 : OS_SYSCALL_ERROR;
+            return !valid_signal_number(arg2) ||
+                   !process_send_signal(target, (uint32_t)arg2) ?
+                   OS_SYSCALL_ERROR : 0;
         }
         case OS_SYSCALL_SIGNAL_NEXT: {
             uint32_t signal = 0;

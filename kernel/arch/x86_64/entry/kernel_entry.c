@@ -1179,6 +1179,12 @@ void kernel_main(void *boot_info) {
         syscall_copy[0] != 'o' || syscall_copy[1] != 'k' ||
         syscall_copy[2] != '\0' || process_lookup(1) != runtime_process ||
         syscall_dispatch(OS_SYSCALL_SIGNAL_SEND_TO, 1, 3, 0) != 0 ||
+        syscall_dispatch(OS_SYSCALL_SIGNAL_SEND, 0x100000001ULL, 0, 0) !=
+            OS_SYSCALL_ERROR ||
+        syscall_dispatch(OS_SYSCALL_SIGNAL_MASK, 0x100000000ULL, 0, 0) !=
+            OS_SYSCALL_ERROR ||
+        syscall_dispatch(OS_SYSCALL_SIGNAL_SEND_TO, 1, 0x100000001ULL, 0) !=
+            OS_SYSCALL_ERROR ||
         !process_take_signal(runtime_process, &signal) || signal != 3 ||
         syscall_dispatch(OS_SYSCALL_GETPID, 0, 0, 0) != 1 ||
         syscall_dispatch(99, 0, 0, 0) != OS_SYSCALL_ERROR) {

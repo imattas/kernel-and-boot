@@ -385,6 +385,8 @@ Credential access checks now reject permission values outside the supported
 Unix mode mask instead of silently ignoring malformed bits.
 The signal-next syscall now validates its writable user destination before
 dequeueing a pending signal, preventing invalid pointers from losing signals.
+Signal syscall arguments now reject values outside their declared 32-bit and
+signal-number ranges instead of silently truncating oversized inputs.
 The QEMU kernel probe now verifies that a failed signal dequeue leaves the
 pending signal available for a subsequent valid destination.
 APIC PIT calibration now uses a bounded wait budget and retains a validated

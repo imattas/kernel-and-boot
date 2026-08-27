@@ -981,6 +981,9 @@ status before acknowledging its own controller.
 The UHCI QEMU gate now distinguishes successful control-transfer support and
 IRQ-path configuration from optional IOC delivery, which this emulated device
 does not raise reliably.
+UHCI interrupt-IN transfers now have a persistent bounded frame-list slot and
+completion poller; idle NAKs remain scheduled, while completed reports are
+copied, toggles advanced, and DMA frames reclaimed before resubmission.
 The UEFI memory-map capture now rejects malformed successful firmware results
 unless descriptor size and map length satisfy the boot contract, and bounds
 replacement-map publication to the allocated buffer.

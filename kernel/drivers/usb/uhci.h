@@ -16,5 +16,9 @@ int uhci_control_transfer(uint8_t address, uint8_t endpoint,
 int uhci_interrupt_transfer(uint8_t address, uint8_t endpoint, void *data,
                             uint16_t length, uint16_t max_packet,
                             uint8_t *toggle);
+int uhci_interrupt_submit(uint8_t address, uint8_t endpoint, void *data,
+                          uint16_t length, uint16_t max_packet,
+                          uint8_t *toggle);
+int uhci_interrupt_poll(void);
 
 #endif

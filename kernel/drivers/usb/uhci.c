@@ -48,6 +48,15 @@ static volatile uint16_t uhci_last_status_value;
 static int uhci_low_speed;
 static int uhci_io_disabled;
 static spinlock_t uhci_lock;
+static uint64_t uhci_async_qh_frame;
+static uint64_t uhci_async_td_frame;
+static uint64_t uhci_async_data_frame;
+static uint8_t *uhci_async_data;
+static uint16_t uhci_async_length;
+static uint8_t *uhci_async_toggle;
+static uint8_t uhci_async_packet_count;
+static uint8_t uhci_async_input;
+static uint8_t uhci_async_pending;
 
 typedef struct {
     uint32_t link;
@@ -362,6 +371,90 @@ static int uhci_interrupt_transfer_locked(uint8_t address, uint8_t endpoint, voi
     return complete;
 }
 
+static int uhci_interrupt_submit_locked(uint8_t address, uint8_t endpoint,
+                                        void *data, uint16_t length,
+                                        uint16_t max_packet, uint8_t *toggle) {
+    if (uhci_async_pending || uhci_io_disabled || !controller_base ||
+        !controller_frame_list || !data || address > 127 ||
+        (endpoint & 0x7fU) > 15 || length == 0 || length > 4096 ||
+        max_packet == 0 || max_packet > 64 || !toggle || *toggle > 1)
+        return 0;
+    uint32_t packet_count = (length + max_packet - 1U) / max_packet;
+    uint64_t qh_frame = physical_alloc_frame();
+    uint64_t td_frame = physical_alloc_frame();
+    uint64_t data_frame = physical_alloc_frame();
+    if (!qh_frame || !td_frame || !data_frame) {
+        uhci_release_transfer_frames(qh_frame, td_frame, 0, data_frame);
+        return 0;
+    }
+    uhci_qh_t *qh = (uhci_qh_t *)(uintptr_t)qh_frame;
+    uhci_td_t *td = (uhci_td_t *)(uintptr_t)td_frame;
+    for (uint32_t i = 0; i < 4096 / 4; ++i) ((uint32_t *)td)[i] = 0;
+    int input = (endpoint & 0x80U) != 0;
+    if (!input)
+        for (uint16_t i = 0; i < length; ++i)
+            ((uint8_t *)(uintptr_t)data_frame)[i] = ((uint8_t *)data)[i];
+    qh->head = 1U; qh->element = (uint32_t)td_frame;
+    uint8_t current_toggle = *toggle;
+    for (uint32_t i = 0; i < packet_count; ++i) {
+        uint16_t chunk = (uint16_t)(length - i * max_packet);
+        if (chunk > max_packet) chunk = max_packet;
+        td[i].link = i + 1U < packet_count ?
+            (uint32_t)(td_frame + (i + 1U) * sizeof(uhci_td_t)) : 1U;
+        td[i].status = uhci_td_status(i + 1U == packet_count);
+        td[i].token = uhci_token(input ? 0x69 : 0xe1, address,
+                                 endpoint & 0x0fU, current_toggle, chunk);
+        td[i].buffer = (uint32_t)(data_frame + i * max_packet);
+        current_toggle ^= 1U;
+    }
+    if (!uhci_set_running(0)) goto fail;
+    volatile uint32_t *frame_list =
+        (volatile uint32_t *)(uintptr_t)controller_frame_list;
+    for (uint32_t i = 0; i < 1024; ++i) frame_list[i] = (uint32_t)qh_frame | 2U;
+    __asm__ volatile ("outl %0, %1" :: "a"((uint32_t)controller_frame_list),
+                      "Nd"((uint16_t)(controller_base + UHCI_FLBASEADD)));
+    if (!uhci_set_running(1)) goto fail;
+    uhci_async_qh_frame = qh_frame; uhci_async_td_frame = td_frame;
+    uhci_async_data_frame = data_frame; uhci_async_data = (uint8_t *)data;
+    uhci_async_length = length;
+    uhci_async_toggle = toggle; uhci_async_packet_count = (uint8_t)packet_count;
+    uhci_async_input = (uint8_t)input; uhci_async_pending = 1;
+    return 1;
+fail:
+    uhci_release_transfer_frames(qh_frame, td_frame, 0, data_frame);
+    return 0;
+}
+
+static int uhci_interrupt_poll_locked(void) {
+    if (!uhci_async_pending) return 0;
+    uhci_td_t *td = (uhci_td_t *)(uintptr_t)uhci_async_td_frame;
+    uhci_last_td_status_value = td[uhci_async_packet_count - 1U].status;
+    if (uhci_last_td_status_value & UHCI_TD_ACTIVE) return 0;
+    int complete = 1;
+    for (uint32_t i = 0; i < uhci_async_packet_count; ++i)
+        complete = complete && uhci_td_complete(&td[i]);
+    uhci_last_status_value = uhci_status();
+    complete = complete && !(uhci_last_status_value & (UHCI_STATUS_ERROR |
+        UHCI_STATUS_HOST_SYSTEM_ERROR | UHCI_STATUS_PROCESS_ERROR));
+    if (!uhci_set_running(0)) { uhci_io_disabled = 1; return -1; }
+    volatile uint32_t *frame_list =
+        (volatile uint32_t *)(uintptr_t)controller_frame_list;
+    for (uint32_t i = 0; i < 1024; ++i) frame_list[i] = 1U;
+    int restarted = uhci_set_running(1);
+    if (complete && restarted && uhci_async_input) {
+        uint8_t *transfer = (uint8_t *)(uintptr_t)uhci_async_data_frame;
+        for (uint16_t i = 0; i < uhci_async_length; ++i)
+            uhci_async_data[i] = transfer[i];
+        uint8_t next_toggle = *uhci_async_toggle;
+        for (uint32_t i = 0; i < uhci_async_packet_count; ++i) next_toggle ^= 1U;
+        *uhci_async_toggle = next_toggle;
+    }
+    uhci_release_transfer_frames(uhci_async_qh_frame, uhci_async_td_frame,
+                                 0, uhci_async_data_frame);
+    uhci_async_pending = 0;
+    return complete && restarted ? 1 : -1;
+}
+
 int uhci_initialize(void) {
     controllers = 0;
     root_ports = 0;
@@ -373,6 +466,7 @@ int uhci_initialize(void) {
     uhci_interrupts = 0;
     uhci_last_td_status_value = 0;
     uhci_last_status_value = 0;
+    uhci_async_pending = 0;
     spinlock_init(&uhci_lock);
     uhci_driver.name = "uhci";
     uhci_driver.bus = DEVICE_BUS_PCI;
@@ -387,6 +481,21 @@ int uhci_interrupt_enabled(void) { return uhci_irq_enabled; }
 uint32_t uhci_interrupt_count(void) { return uhci_interrupts; }
 uint32_t uhci_last_transfer_td_status(void) { return uhci_last_td_status_value; }
 uint16_t uhci_last_controller_status(void) { return uhci_last_status_value; }
+int uhci_interrupt_submit(uint8_t address, uint8_t endpoint, void *data,
+                          uint16_t length, uint16_t max_packet, uint8_t *toggle) {
+    uint64_t flags = spinlock_lock_irqsave(&uhci_lock);
+    int result = uhci_interrupt_submit_locked(address, endpoint, data, length,
+                                               max_packet, toggle);
+    spinlock_unlock_irqrestore(&uhci_lock, flags);
+    return result;
+}
+
+int uhci_interrupt_poll(void) {
+    uint64_t flags = spinlock_lock_irqsave(&uhci_lock);
+    int result = uhci_interrupt_poll_locked();
+    spinlock_unlock_irqrestore(&uhci_lock, flags);
+    return result;
+}
 int uhci_control_transfer(uint8_t address, uint8_t endpoint,
                           const uint8_t setup[8], void *data, uint16_t length) {
     uint64_t flags = spinlock_lock_irqsave(&uhci_lock);

@@ -107,6 +107,7 @@ static uint8_t input_runtime_toggle;
 static uint8_t input_runtime_report[64];
 static usb_hid_keyboard_state_t input_runtime_hid_state;
 static int input_runtime_ready;
+static int input_runtime_pending;
 
 static void network_runtime_task(void *argument) {
     network_runtime_context_t *runtime = (network_runtime_context_t *)argument;
@@ -123,11 +124,9 @@ static void network_runtime_task(void *argument) {
 static void input_runtime_task(void *argument) {
     (void)argument;
     for (;;) {
-        if (input_runtime_ready &&
-            uhci_interrupt_transfer(1, input_runtime_endpoint,
-                                    input_runtime_report, input_runtime_packet,
-                                    input_runtime_packet,
-                                    &input_runtime_toggle)) {
+        if (input_runtime_ready && input_runtime_pending) {
+            int completed = uhci_interrupt_poll();
+            if (completed > 0) {
             input_event_t events[20];
             uint32_t event_count = 0;
             if (usb_hid_keyboard_decode_state(input_runtime_report,
@@ -136,7 +135,16 @@ static void input_runtime_task(void *argument) {
                                               events, &event_count))
                 (void)input_queue_push_batch(input_runtime_queue, events,
                                              event_count);
+            input_runtime_pending = 0;
+            } else if (completed < 0) {
+                input_runtime_pending = 0;
+            }
         }
+        if (input_runtime_ready && !input_runtime_pending)
+            input_runtime_pending = uhci_interrupt_submit(
+                1, input_runtime_endpoint, input_runtime_report,
+                input_runtime_packet, input_runtime_packet,
+                &input_runtime_toggle);
         scheduler_yield();
     }
 }
@@ -1859,34 +1867,13 @@ void kernel_main(void *boot_info) {
         input_runtime_endpoint = uhci_interrupt_endpoint;
         input_runtime_packet = uhci_interrupt_packet;
         input_runtime_ready = 1;
-        int uhci_report_ready = 0;
-        for (uint32_t attempt = 0; attempt < 8 && !uhci_report_ready; ++attempt)
-            uhci_report_ready = uhci_interrupt_transfer(
-                1, input_runtime_endpoint, input_runtime_report,
-                input_runtime_packet, input_runtime_packet,
-                &input_runtime_toggle);
-        input_event_t uhci_events[20];
-        uint32_t uhci_event_count = 0;
+        input_runtime_pending = uhci_interrupt_submit(
+            1, input_runtime_endpoint, input_runtime_report,
+            input_runtime_packet, input_runtime_packet,
+            &input_runtime_toggle);
         usb_hid_keyboard_state_initialize(&input_runtime_hid_state);
-        if (uhci_report_ready &&
-            usb_hid_keyboard_decode_state(input_runtime_report,
-                                          input_runtime_packet,
-                                          &input_runtime_hid_state, uhci_events,
-                                          &uhci_event_count)) {
-            for (uint32_t event = 0; event < uhci_event_count; ++event)
-                if (!input_queue_push(&input_queue, &uhci_events[event])) {
-                    serial_write("UHCI HID input delivery failure\r\n");
-                    for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
-                }
-        }
-        if (uhci_report_ready)
-            serial_write("UHCI HID input delivery ready\r\n");
-        else {
-            serial_write("UHCI HID polling ready td=");
-            serial_write_hex_line("", uhci_last_transfer_td_status());
-            serial_write("UHCI HID controller status=");
-            serial_write_hex_line("", uhci_last_controller_status());
-        }
+        serial_write(input_runtime_pending ? "UHCI HID interrupt transfer scheduled\r\n" :
+                     "UHCI HID interrupt scheduling failure\r\n");
     }
     if (!ps2_keyboard_initialize(&input_queue)) {
         serial_write("PS2 keyboard initialization failure\r\n");

@@ -334,12 +334,7 @@ void kernel_main(void *boot_info) {
         }
     }
     if (uhci_root_port_count() != 0 && uhci_interrupt_endpoint != 0) {
-        uint8_t uhci_report[64] = {0};
-        uint8_t uhci_toggle = 0;
-        (void)uhci_interrupt_transfer(1, uhci_interrupt_endpoint, uhci_report,
-                                       uhci_interrupt_packet, uhci_interrupt_packet,
-                                       &uhci_toggle);
-        serial_write("UHCI HID interrupt path ready\r\n");
+        serial_write("UHCI HID interrupt endpoint ready\r\n");
     }
     if (!nvme_initialize()) {
         serial_write("NVMe initialization failure\r\n");
@@ -927,6 +922,23 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("USB HID keyboard ready\r\n");
+    if (uhci_root_port_count() != 0 && uhci_interrupt_endpoint != 0) {
+        uint8_t uhci_report[64] = {0};
+        uint8_t uhci_toggle = 0;
+        int uhci_report_ready = uhci_interrupt_transfer(
+            1, uhci_interrupt_endpoint, uhci_report, uhci_interrupt_packet,
+            uhci_interrupt_packet, &uhci_toggle);
+        input_event_t uhci_event;
+        if (uhci_report_ready &&
+            usb_hid_keyboard_decode(uhci_report, uhci_interrupt_packet,
+                                    &uhci_event) &&
+            !input_queue_push(&input_queue, &uhci_event)) {
+            serial_write("UHCI HID input delivery failure\r\n");
+            for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+        }
+        serial_write(uhci_report_ready ? "UHCI HID input delivery ready\r\n" :
+                     "UHCI HID polling ready\r\n");
+    }
     if (!ps2_keyboard_initialize(&input_queue)) {
         serial_write("PS2 keyboard initialization failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");

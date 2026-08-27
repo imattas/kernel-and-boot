@@ -282,11 +282,12 @@ image.
 Keep this phase independent of concrete hardware drivers.
 
 The filesystem expansion phase has started after the completed UEFI milestone:
-the kernel now contains a bounded read-only exFAT parser and VFS adapter with
+the kernel now contains a bounded exFAT parser and VFS adapter with
 boot-region validation, FAT/no-FAT-chain traversal, UTF-16 directory-name
 decoding, and file reads, backed by an independent in-memory contract test.
 The ext4, XFS, and Btrfs filesystem read/write milestones continue in bounded
-filesystem expansion is tracked separately from the kernel completion gate.
+filesystem expansion; filesystem expansion is tracked separately from the
+kernel completion gate.
 
 ## Phase 8 — Kernel drivers
 
@@ -981,6 +982,9 @@ Btrfs regular files now support bounded read-modify-write updates for
 uncompressed, mapped extents, publish mirrored data when available, and update
 the checksum-tree entry; compressed, sparse, and metadata-changing writes remain
 protected.
+Btrfs inline regular-file data now also supports bounded in-place updates with
+tree-node checksum regeneration; allocation, compression, and size-changing
+metadata operations remain separate.
 Btrfs
 validates its CRC32C superblock checksum
 and supported checksum type, validates tree-node checksums/identity, and reads

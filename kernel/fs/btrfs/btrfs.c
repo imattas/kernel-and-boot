@@ -493,6 +493,44 @@ static int btrfs_update_data_csum(btrfs_fs_t *fs, uint64_t bytenr,
     return 0;
 }
 
+static int btrfs_update_inline_item(btrfs_fs_t *fs, uint64_t bytenr,
+                                    uint64_t inode, uint64_t extent_offset,
+                                    uint32_t relative, const uint8_t *source,
+                                    uint32_t size, uint8_t depth) {
+    uint8_t node[65536];
+    if (!fs || !source || depth > 8 || fs->node_size > sizeof(node) ||
+        !btrfs_read_node(fs, bytenr, node)) return 0;
+    uint32_t count = le32(&node[96]);
+    if (node[100] == 0) {
+        if (count > (fs->node_size - 101U) / 25U) return 0;
+        for (uint32_t i = 0; i < count; ++i) {
+            uint8_t *item = &node[101U + i * 25U];
+            if (key_compare(item, inode, BTRFS_EXTENT_DATA_TYPE,
+                            extent_offset) != 0) continue;
+            uint32_t data_offset = le32(&item[17]), data_size = le32(&item[21]);
+            if (data_offset > fs->node_size || data_size > fs->node_size - data_offset ||
+                data_size < 53U || relative > data_size - 53U ||
+                size > data_size - 53U - relative) return 0;
+            for (uint32_t j = 0; j < size; ++j)
+                node[data_offset + 53U + relative + j] = source[j];
+            return btrfs_write_node(fs, bytenr, node);
+        }
+        return 0;
+    }
+    if (node[100] > 8 || count == 0 || count > (fs->node_size - 101U) / 33U)
+        return 0;
+    const uint8_t *selected = 0;
+    for (uint32_t i = 0; i < count; ++i) {
+        const uint8_t *item = &node[101U + i * 33U];
+        if (key_compare(item, inode, BTRFS_EXTENT_DATA_TYPE, extent_offset) > 0)
+            break;
+        selected = item;
+    }
+    return selected && btrfs_update_inline_item(fs, le64(&selected[17]), inode,
+                                                 extent_offset, relative, source,
+                                                 size, (uint8_t)(depth + 1U));
+}
+
 static int btrfs_read_checked(btrfs_fs_t *fs, uint64_t logical, uint32_t bytes,
                               uint8_t *data) {
     uint32_t device = 0; uint64_t physical = 0;
@@ -789,8 +827,18 @@ int btrfs_write_file(btrfs_fs_t *fs, uint64_t tree_bytenr, uint64_t inode,
         if (!btrfs_find_extent_start(fs, tree_bytenr, inode, offset, &start) ||
             !btrfs_read_item(fs, tree_bytenr, inode, BTRFS_EXTENT_DATA_TYPE,
                              start, extent, sizeof(extent)) || extent[16] != 0 ||
-            extent[17] != 0 || extent[18] != 0 || extent[20] != 1) return 0;
+            extent[17] != 0 || extent[18] != 0) return 0;
         uint64_t relative = offset - start;
+        if (extent[20] == 0) {
+            uint64_t inline_size = le64(&extent[8]);
+            if (relative > UINT32_MAX || relative > inline_size ||
+                remaining > inline_size - relative ||
+                !btrfs_update_inline_item(fs, tree_bytenr, inode, start,
+                                          (uint32_t)relative, source, remaining, 0))
+                return 0;
+            return 1;
+        }
+        if (extent[20] != 1) return 0;
         uint64_t disk_bytenr = le64(&extent[21]);
         uint64_t disk_size = le64(&extent[29]);
         uint64_t data_offset = le64(&extent[37]);

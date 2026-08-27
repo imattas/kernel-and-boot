@@ -2,6 +2,7 @@
 #define OS_KERNEL_MM_SLAB_H
 
 #include <stdint.h>
+#include "../../core/sync/spinlock.h"
 
 typedef struct {
     uint8_t *storage;
@@ -9,6 +10,7 @@ typedef struct {
     uint32_t object_size;
     uint32_t capacity;
     uint32_t available;
+    spinlock_t lock;
 } slab_cache_t;
 
 int slab_cache_initialize(slab_cache_t *cache, void *storage,

@@ -10,35 +10,56 @@ int slab_cache_initialize(slab_cache_t *cache, void *storage,
     cache->object_size = object_size;
     cache->capacity = capacity;
     cache->available = capacity;
+    spinlock_init(&cache->lock);
     for (uint32_t i = 0; i < capacity; ++i) used[i] = 0;
     return 1;
 }
 
 void *slab_cache_allocate(slab_cache_t *cache) {
-    if (!cache || cache->available == 0) return 0;
+    if (!cache) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&cache->lock);
+    if (cache->available == 0) {
+        spinlock_unlock_irqrestore(&cache->lock, flags);
+        return 0;
+    }
     for (uint32_t i = 0; i < cache->capacity; ++i) {
         if (cache->used[i]) continue;
         cache->used[i] = 1;
         --cache->available;
-        return cache->storage + (uint64_t)i * cache->object_size;
+        void *object = cache->storage + (uint64_t)i * cache->object_size;
+        spinlock_unlock_irqrestore(&cache->lock, flags);
+        return object;
     }
+    spinlock_unlock_irqrestore(&cache->lock, flags);
     return 0;
 }
 
 int slab_cache_free(slab_cache_t *cache, void *object) {
     if (!cache || !object) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&cache->lock);
     uintptr_t start = (uintptr_t)cache->storage;
     uintptr_t address = (uintptr_t)object;
     uint64_t span = (uint64_t)cache->object_size * cache->capacity;
     if (address < start || address - start >= span ||
-        (address - start) % cache->object_size != 0) return 0;
+        (address - start) % cache->object_size != 0) {
+        spinlock_unlock_irqrestore(&cache->lock, flags);
+        return 0;
+    }
     uint32_t index = (uint32_t)((address - start) / cache->object_size);
-    if (!cache->used[index]) return 0;
+    if (!cache->used[index]) {
+        spinlock_unlock_irqrestore(&cache->lock, flags);
+        return 0;
+    }
     cache->used[index] = 0;
     ++cache->available;
+    spinlock_unlock_irqrestore(&cache->lock, flags);
     return 1;
 }
 
 uint32_t slab_cache_available(const slab_cache_t *cache) {
-    return cache ? cache->available : 0;
+    if (!cache) return 0;
+    uint64_t flags = spinlock_lock_irqsave((spinlock_t *)&cache->lock);
+    uint32_t available = cache->available;
+    spinlock_unlock_irqrestore((spinlock_t *)&cache->lock, flags);
+    return available;
 }

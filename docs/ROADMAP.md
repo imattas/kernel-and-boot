@@ -328,6 +328,9 @@ caller-supplied monotonic timestamp.
 The bounded IPv4 layer now builds and validates version/IHL, total length,
 TTL, protocol, addresses, and Internet checksums, while rejecting fragmented
 packets until a reassembly component is available.
+The bounded UDP layer now constructs and validates port/length fields and the
+IPv4 pseudo-header checksum, with explicit corruption rejection before payload
+delivery.
 The e1000 ISR now records delivery, and the post-interrupt-enable QEMU probe
 transmits a frame and requires an observed interrupt before continuing.
 The e1000 ISR now preserves cleared interrupt causes for the polling/service

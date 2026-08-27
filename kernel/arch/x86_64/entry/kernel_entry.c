@@ -36,6 +36,7 @@
 #include "../../../drivers/network/arp.h"
 #include "../../../drivers/network/arp_cache.h"
 #include "../../../drivers/network/ipv4.h"
+#include "../../../drivers/network/udp.h"
 #include "../../../time/clock.h"
 #include "../../../debug/assert.h"
 #include "../../../core/task/context.h"
@@ -571,6 +572,32 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("IPv4 packet ready\r\n");
+    static const uint8_t udp_probe_payload[5] = {5, 4, 3, 2, 1};
+    static uint8_t udp_probe_packet[UDP_HEADER_SIZE + sizeof(udp_probe_payload)];
+    uint16_t udp_probe_length = 0;
+    udp_packet_view_t udp_probe_view;
+    if (!udp_packet_build(udp_probe_packet, sizeof(udp_probe_packet),
+                          ipv4_probe_source, ipv4_probe_destination,
+                          4000, 5000, udp_probe_payload,
+                          sizeof(udp_probe_payload), &udp_probe_length) ||
+        udp_probe_length != sizeof(udp_probe_packet) ||
+        !udp_packet_parse(udp_probe_packet, udp_probe_length,
+                          ipv4_probe_source, ipv4_probe_destination,
+                          &udp_probe_view) || udp_probe_view.source_port != 4000 ||
+        udp_probe_view.destination_port != 5000 ||
+        udp_probe_view.payload_length != sizeof(udp_probe_payload) ||
+        udp_probe_view.payload[0] != 5) {
+        serial_write("UDP packet failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    udp_probe_packet[7] ^= 1U;
+    if (udp_packet_parse(udp_probe_packet, udp_probe_length,
+                         ipv4_probe_source, ipv4_probe_destination,
+                         &udp_probe_view)) {
+        serial_write("UDP checksum failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("UDP packet ready\r\n");
     if (e1000_controller_count() != 0 &&
         !e1000_transmit(network_probe_packet, sizeof(network_probe_packet))) {
         serial_write("e1000 transmit failure\r\n");

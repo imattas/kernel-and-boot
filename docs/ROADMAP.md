@@ -22,6 +22,9 @@ ACPI table selection and GOP framebuffer discovery are now independently
 implemented in the UEFI firmware module and linked through the same loader
 context; a NASM entry shim, firmware-sized file loading, watchdog control, and
 growable memory-map capture remain covered by the OVMF gate.
+Unused empty UEFI and BIOS scaffold directories have been removed; source
+ownership now follows the implemented UEFI core and the explicitly deferred
+BIOS path.
 
 ## Phase 1 — UEFI bootloader foundation
 

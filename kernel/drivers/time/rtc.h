@@ -13,5 +13,6 @@ typedef struct {
 } rtc_datetime_t;
 
 int rtc_read_datetime(rtc_datetime_t *datetime);
+void rtc_initialize(void);
 
 #endif

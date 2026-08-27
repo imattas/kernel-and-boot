@@ -1101,6 +1101,9 @@ path during the same scheduler return test.
 Process exit now clears the global current-process context before waking
 waiters, and the ring-3 gate verifies that exited processes are not reused by
 subsequent kernel work.
+RTC initialization now explicitly initializes its CMOS transaction lock, and
+RTC reads require two bounded, matching full-date samples so midnight/year
+rollovers cannot publish mixed calendar fields.
 The ring-3 entry stub now initializes user argument registers instead of
 leaking the kernel bootstrap's entry pointer into the first syscall argument;
 the exit transition probe validates the corrected boundary.

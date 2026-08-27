@@ -34,6 +34,8 @@ static uint8_t cmos_read(uint8_t index) {
 
 static spinlock_t rtc_lock;
 
+void rtc_initialize(void) { spinlock_init(&rtc_lock); }
+
 static int decode(uint8_t value, uint8_t status_b, uint8_t *decoded) {
     if (!decoded) return 0;
     if ((status_b & CMOS_BINARY_MODE) != 0) {
@@ -62,51 +64,47 @@ static int valid(const rtc_datetime_t *value) {
 int rtc_read_datetime(rtc_datetime_t *datetime) {
     if (!datetime) return 0;
     uint64_t flags = spinlock_lock_irqsave(&rtc_lock);
-    rtc_datetime_t first, second;
     int success = 0;
     for (uint32_t sample = 0; sample < 3 && !success; ++sample) {
         uint8_t status_b = cmos_read(CMOS_STATUS_B);
-        uint8_t raw_hour = cmos_read(CMOS_HOUR), year, month, day, hour;
-        uint8_t minute, second_value, century;
-        int stable = 0;
-        for (uint32_t attempt = 0; attempt < 100000; ++attempt) {
-            if ((cmos_read(CMOS_STATUS_A) & CMOS_UPDATE_IN_PROGRESS) == 0) {
-                stable = 1;
-                break;
+        rtc_datetime_t readings[2];
+        for (uint32_t reading = 0; reading < 2 && !success; ++reading) {
+            int stable = 0;
+            for (uint32_t attempt = 0; attempt < 100000; ++attempt) {
+                if ((cmos_read(CMOS_STATUS_A) & CMOS_UPDATE_IN_PROGRESS) == 0) {
+                    stable = 1;
+                    break;
+                }
+                __asm__ volatile ("pause" ::: "memory");
             }
-            __asm__ volatile ("pause" ::: "memory");
+            uint8_t year, month, day, hour, minute, second, century;
+            uint8_t raw_hour = cmos_read(CMOS_HOUR);
+            if (!stable || !decode(cmos_read(CMOS_YEAR), status_b, &year) ||
+                !decode(cmos_read(CMOS_MONTH), status_b, &month) ||
+                !decode(cmos_read(CMOS_DAY), status_b, &day) ||
+                !decode((uint8_t)(raw_hour & 0x7fU), status_b, &hour) ||
+                !decode(cmos_read(CMOS_MINUTE), status_b, &minute) ||
+                !decode(cmos_read(CMOS_SECOND), status_b, &second) ||
+                !decode(cmos_read(CMOS_CENTURY), status_b, &century))
+                break;
+            readings[reading] = (rtc_datetime_t){
+                .year = (uint16_t)(year + 2000U), .month = month, .day = day,
+                .hour = hour, .minute = minute, .second = second};
+            if ((status_b & CMOS_24_HOUR) == 0 && (raw_hour & 0x80U) != 0)
+                readings[reading].hour = (uint8_t)((hour % 12U) + 12U);
+            if (century >= 19 && century <= 99)
+                readings[reading].year = (uint16_t)(century * 100U + year);
+            if (!valid(&readings[reading])) break;
+            if (reading == 1 && readings[0].year == readings[1].year &&
+                readings[0].month == readings[1].month &&
+                readings[0].day == readings[1].day &&
+                readings[0].hour == readings[1].hour &&
+                readings[0].minute == readings[1].minute &&
+                readings[0].second == readings[1].second) {
+                *datetime = readings[1];
+                success = 1;
+            }
         }
-        if (!stable || !decode(cmos_read(CMOS_YEAR), status_b, &year) ||
-            !decode(cmos_read(CMOS_MONTH), status_b, &month) ||
-            !decode(cmos_read(CMOS_DAY), status_b, &day) ||
-            !decode((uint8_t)(raw_hour & 0x7fU), status_b, &hour) ||
-            !decode(cmos_read(CMOS_MINUTE), status_b, &minute) ||
-            !decode(cmos_read(CMOS_SECOND), status_b, &second_value) ||
-            !decode(cmos_read(CMOS_CENTURY), status_b, &century))
-            continue;
-        first = (rtc_datetime_t){
-            .year = (uint16_t)(year + 2000U), .month = month, .day = day,
-            .hour = hour, .minute = minute, .second = second_value};
-        if ((status_b & CMOS_24_HOUR) == 0 && (raw_hour & 0x80U) != 0)
-            first.hour = (uint8_t)((first.hour % 12U) + 12U);
-        if (century >= 19 && century <= 99)
-            first.year = (uint16_t)(century * 100U + year);
-        if (!valid(&first)) continue;
-        if ((cmos_read(CMOS_STATUS_A) & CMOS_UPDATE_IN_PROGRESS) != 0) continue;
-        uint8_t raw_second = cmos_read(CMOS_SECOND), raw_minute = cmos_read(CMOS_MINUTE);
-        uint8_t raw_hour_again = cmos_read(CMOS_HOUR);
-        if (!decode(raw_second, status_b, &second_value) ||
-            !decode(raw_minute, status_b, &minute) ||
-            !decode((uint8_t)(raw_hour_again & 0x7fU), status_b, &hour)) continue;
-        second = first;
-        second.second = second_value; second.minute = minute; second.hour = hour;
-        if ((status_b & CMOS_24_HOUR) == 0 && (raw_hour_again & 0x80U) != 0)
-            second.hour = (uint8_t)((second.hour % 12U) + 12U);
-        success = valid(&second) && first.year == second.year &&
-                  first.month == second.month && first.day == second.day &&
-                  first.hour == second.hour && first.minute == second.minute &&
-                  first.second == second.second;
-        if (success) *datetime = second;
     }
     spinlock_unlock_irqrestore(&rtc_lock, flags);
     return success;

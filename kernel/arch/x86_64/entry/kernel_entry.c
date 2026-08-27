@@ -2684,6 +2684,7 @@ void kernel_main(void *boot_info) {
     }
     serial_write("generic clock ready\r\n");
     rtc_datetime_t rtc_now;
+    rtc_initialize();
     if (!rtc_read_datetime(&rtc_now)) {
         serial_write("RTC read failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");

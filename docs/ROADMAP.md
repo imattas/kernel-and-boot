@@ -1024,6 +1024,9 @@ ExFAT growth now allocates and zeroes new clusters, converts no-FAT-chain files
 to explicit FAT chains, and zero-length truncation releases the complete chain.
 The exFAT contract now exercises an actual write followed by a readback on the
 synthetic filesystem image.
+ExFAT directory creation now allocates and zeroes a child cluster, publishes a
+UTF-16 directory entry set with directory attributes and a valid checksum, and
+releases the child allocation if parent metadata publication fails.
 FAT32, exFAT, ext4, XFS, and Btrfs VFS file adapters now serialize direct node
 reads and writes with per-file IRQ-safe locks, so concurrent filesystem users
 cannot interleave adapter operations.

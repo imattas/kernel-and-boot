@@ -93,6 +93,9 @@ int main(void) {
     assert(exfat_lookup(&fs, "new.txt", &cluster, &size, &no_fat) && cluster == 0 && size == 0);
     assert(exfat_unlink_file_in_directory(&fs, 2, "new.txt"));
     assert(!exfat_lookup(&fs, "new.txt", &cluster, &size, &no_fat));
+    assert(exfat_create_directory_in_directory(&fs, 2, "newdir"));
+    assert(exfat_lookup(&fs, "newdir", &cluster, &size, &no_fat) &&
+           cluster >= 2 && size == 0 && !no_fat);
     root[2] ^= 1; assert(!exfat_lookup(&fs, "HELLO.TXT", &cluster, &size, &no_fat)); root[2] ^= 1;
     image[11 * 512] ^= 1; assert(!exfat_mount(&fs, 0)); image[11 * 512] ^= 1;
     image[0] = 0; assert(!exfat_mount(&fs, 0)); return 0;

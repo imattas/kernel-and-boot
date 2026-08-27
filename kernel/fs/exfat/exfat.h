@@ -37,6 +37,8 @@ int exfat_set_attributes_in_directory(exfat_fs_t *fs, uint32_t directory_cluster
                                       const char *name, uint16_t attributes);
 int exfat_create_file_in_directory(exfat_fs_t *fs, uint32_t directory_cluster,
                                    const char *name, uint16_t attributes);
+int exfat_create_directory_in_directory(exfat_fs_t *fs, uint32_t directory_cluster,
+                                         const char *name);
 int exfat_unlink_file_in_directory(exfat_fs_t *fs, uint32_t directory_cluster,
                                    const char *name);
 

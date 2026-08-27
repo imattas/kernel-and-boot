@@ -659,8 +659,8 @@ $(FSE_TEST): scripts/tests/c/fse_contract.c kernel/fs/btrfs/fse.c kernel/fs/btrf
 $(CACHE_TEST): scripts/tests/c/cache_contract.c kernel/fs/cache/cache.c kernel/fs/cache/cache.h kernel/fs/block/block.c kernel/fs/block/block.h kernel/core/sync/spinlock.c kernel/core/sync/spinlock.h | $(TEST_DIR)
 	$(CC) -std=c11 -Wall -Wextra -Werror -I. -o $@ scripts/tests/c/cache_contract.c kernel/fs/cache/cache.c kernel/fs/block/block.c kernel/core/sync/spinlock.c
 
-$(FAT32_TEST): scripts/tests/c/fat32_contract.c kernel/fs/fat/fat32.c kernel/fs/fat/fat32_vfs.c kernel/fs/vfs/vfs.c kernel/fs/fat/fat32.h kernel/drivers/storage/storage.h kernel/core/sync/spinlock.c | $(TEST_DIR)
-	$(CC) -std=c11 -Wall -Wextra -Werror -O2 -I. scripts/tests/c/fat32_contract.c kernel/fs/fat/fat32.c kernel/fs/fat/fat32_vfs.c kernel/fs/vfs/vfs.c kernel/core/sync/spinlock.c -o $@
+$(FAT32_TEST): scripts/tests/c/fat32_contract.c kernel/fs/fat/fat32.c kernel/fs/fat/fat32_vfs.c kernel/fs/vfs/vfs.c kernel/fs/fat/fat32.h kernel/drivers/storage/storage.h kernel/core/sync/spinlock.c kernel/security/credentials.c kernel/security/credentials.h | $(TEST_DIR)
+	$(CC) -std=c11 -Wall -Wextra -Werror -O2 -I. scripts/tests/c/fat32_contract.c kernel/fs/fat/fat32.c kernel/fs/fat/fat32_vfs.c kernel/fs/vfs/vfs.c kernel/core/sync/spinlock.c kernel/security/credentials.c -o $@
 
 image: $(IMAGE)
 

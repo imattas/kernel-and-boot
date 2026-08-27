@@ -1537,10 +1537,18 @@ void kernel_main(void *boot_info) {
     }
     vfs_node_release(vfs_first_child);
     serial_write("VFS directory iteration ready\r\n");
+    vfs_node_t *vfs_private_directory = vfs_node_create("private", VFS_NODE_DIRECTORY,
+                                                        0, 0, 0700);
+    if (!vfs_private_directory || !vfs_node_add_child(vfs_root, vfs_private_directory)) {
+        if (vfs_private_directory) vfs_node_release(vfs_private_directory);
+        serial_write("VFS permissions setup failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    vfs_node_release(vfs_private_directory);
     uint8_t vfs_write_storage[16] = {0};
     static const uint8_t vfs_write_data[4] = {'v', 'f', 's', '!'};
     vfs_node_t *vfs_write_node = vfs_node_create("write_probe", VFS_NODE_REGULAR,
-                                                  0, 0, 0644);
+                                                  1000, 1000, 0666);
     if (!vfs_write_node || !vfs_node_set_write(vfs_write_node, vfs_probe_write,
                                                vfs_write_storage) ||
         !vfs_node_set_read(vfs_write_node, vfs_probe_read, vfs_write_storage) ||
@@ -1554,6 +1562,7 @@ void kernel_main(void *boot_info) {
     }
     vfs_node_release(vfs_write_node);
     serial_write("VFS write ready\r\n");
+    serial_write("VFS permissions ready\r\n");
     vfs_node_t *proc_root = procfs_create(42);
     vfs_node_t *proc_pid = proc_root ?
         vfs_lookup_path(proc_root, "/self/pid") : 0;
@@ -2437,6 +2446,18 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("relative path syscalls ready\r\n");
+    static const char private_path[] = "/private";
+    static const char device_path[] = "/dev/pci0";
+    if (!syscall_copy_to_user(0x8000002000ULL, private_path, sizeof(private_path)) ||
+        syscall_dispatch(OS_SYSCALL_CHDIR, 0x8000002000ULL,
+                         sizeof(private_path) - 1, 0) != OS_SYSCALL_ERROR ||
+        !syscall_copy_to_user(0x8000002000ULL, device_path, sizeof(device_path)) ||
+        syscall_dispatch(OS_SYSCALL_OPEN, 0x8000002000ULL,
+                         sizeof(device_path) - 1, VFS_FILE_WRITE) != OS_SYSCALL_ERROR) {
+        serial_write("VFS permission syscall failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("VFS permission syscalls ready\r\n");
     if (!kernel_init_state_advance(&init_state, KERNEL_INIT_SERVICES))
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     serial_write("user mode deferred until kernel completion\r\n");

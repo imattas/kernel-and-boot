@@ -1,6 +1,18 @@
 #include "vfs.h"
 #include "../../mm/heap/heap.h"
 
+int vfs_node_access(const vfs_node_t *node,
+                    const security_context_t *context, uint32_t requested) {
+    if (!node || !context || requested == 0 || (requested & ~7U) != 0)
+        return 0;
+    uint64_t flags = spinlock_lock_irqsave((spinlock_t *)&node->lock);
+    uint64_t owner_uid = node->owner_uid;
+    uint64_t owner_gid = node->owner_gid;
+    uint32_t mode = node->mode;
+    spinlock_unlock_irqrestore((spinlock_t *)&node->lock, flags);
+    return security_can_access(context, owner_uid, owner_gid, mode, requested);
+}
+
 static uint32_t string_length(const char *value) {
     uint32_t length = 0;
     while (value && value[length] != '\0') ++length;

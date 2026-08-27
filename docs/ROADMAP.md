@@ -256,6 +256,8 @@ The namespace ABI now reconstructs and validates the current path through a
 root-bounded `getcwd` syscall, including retained ancestry during traversal.
 VFS path resolution now distinguishes absolute root paths from working-directory
 relative paths, with `..` confined at the process namespace root.
+VFS-backed `open` and `chdir` now enforce Unix owner/group/other mode bits
+against the calling process credentials, including directory search permission.
 Current-process exit now publishes an exit status, wakes signal and exit
 waiters, and terminates the scheduler task through a dedicated exit syscall;
 successful ring-3 invocation remains deferred with the rest of userland.

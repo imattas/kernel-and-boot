@@ -934,7 +934,7 @@ int btrfs_truncate_file(btrfs_fs_t *fs, uint64_t tree_bytenr, uint64_t inode,
                         uint64_t size) {
     uint64_t old_size = 0; uint32_t mode = 0;
     uint8_t extent[53];
-    if (!fs || !fs->mounted || size == 0 ||
+    if (!fs || !fs->mounted ||
         !btrfs_inode_stat(fs, tree_bytenr, inode, &old_size, &mode) ||
         (mode & 0170000U) != 0100000U || size >= old_size ||
         !btrfs_read_item(fs, tree_bytenr, inode, BTRFS_EXTENT_DATA_TYPE, 0,

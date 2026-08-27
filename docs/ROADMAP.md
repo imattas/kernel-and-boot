@@ -1005,6 +1005,8 @@ and readback.
 XFS local-format regular files now support bounded append growth within the
 inode payload and zero-length truncation with inline data clearing; extent
 allocation remains a separate XFS metadata milestone.
+Btrfs regular-file truncation now accepts zero-length targets, updating the
+inode item through the checksum-protected tree-node path.
 validates the primary and backup boot-region checksums, supports bounded
 directory-relative lookup and reads, validates directory entry-set checksums,
 and compares validated UTF-8 names with their on-disk UTF-16 names. Ext4 now has

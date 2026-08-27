@@ -343,8 +343,9 @@ contracted; FSE symbol tables and literal/match sequence execution remain
 before Btrfs exposure. The bounded overlap-safe match-copy primitive is now
 implemented and contracted, including destination-underflow rejection.
 Zstandard sequence code expansion for literal lengths, match lengths, and
-offsets is now implemented and contracted; FSE symbol wiring and complete
-sequence execution remain.
+offsets is now implemented and contracted. Sequence execution now copies
+literal runs and performs validated overlapping matches; FSE symbol wiring and
+complete compressed-block sequence integration remain.
 
 ## Phase 10 — Userland begins after the kernel gate
 

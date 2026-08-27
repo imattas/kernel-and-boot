@@ -101,6 +101,23 @@ int btrfs_zstd_expand_sequence(uint8_t literal_length_code,
     return sequence->offset != 0;
 }
 
+int btrfs_zstd_execute_sequence(uint8_t *output, uint32_t output_capacity,
+                                uint32_t *output_size, const uint8_t *literals,
+                                uint32_t literal_size, uint32_t *literal_offset,
+                                const btrfs_zstd_sequence_t *sequence) {
+    if (!output || !output_size || !literals || !literal_offset || !sequence ||
+        *output_size > output_capacity || *literal_offset > literal_size ||
+        sequence->literal_length > literal_size - *literal_offset ||
+        sequence->literal_length > output_capacity - *output_size)
+        return 0;
+    for (uint32_t i = 0; i < sequence->literal_length; ++i)
+        output[*output_size + i] = literals[*literal_offset + i];
+    *output_size += sequence->literal_length;
+    *literal_offset += sequence->literal_length;
+    return btrfs_zstd_copy_match(output, output_capacity, output_size,
+                                 sequence->offset, sequence->match_length);
+}
+
 static uint32_t zstd_stream_bits(const uint8_t *source, uint32_t bits,
                                  int64_t *offset) {
     int64_t start = *offset - (int64_t)bits;

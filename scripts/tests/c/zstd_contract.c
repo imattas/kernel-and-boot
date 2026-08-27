@@ -18,6 +18,9 @@ int main(void) {
     uint32_t size = 0;
     btrfs_zstd_sequence_header_t sequence;
     btrfs_zstd_sequence_t values;
+    uint8_t literals[] = {'a', 'b', 'c'};
+    uint8_t sequence_output[16] = {0};
+    uint32_t literal_offset = 0, sequence_output_size = 0;
     uint8_t match[16] = {'a', 'b', 'c'};
     uint32_t match_size = 3;
     assert(btrfs_zstd_decompress(raw, sizeof(raw), output, sizeof(output), &size));
@@ -47,5 +50,14 @@ int main(void) {
     assert(values.literal_length == 26 && values.match_length == 42 && values.offset == 13);
     assert(!btrfs_zstd_expand_sequence(36, 0, 0, 0, 0, 0, &values));
     assert(!btrfs_zstd_expand_sequence(0, 1, 0, 0, 0, 0, &values));
+    values.literal_length = 3; values.match_length = 6; values.offset = 3;
+    assert(btrfs_zstd_execute_sequence(sequence_output, sizeof(sequence_output),
+                                       &sequence_output_size, literals, sizeof(literals),
+                                       &literal_offset, &values));
+    assert(sequence_output_size == 9 && memcmp(sequence_output, "abcabcabc", 9) == 0);
+    values.literal_length = 1;
+    assert(!btrfs_zstd_execute_sequence(sequence_output, sizeof(sequence_output),
+                                        &sequence_output_size, literals, sizeof(literals),
+                                        &literal_offset, &values));
     return 0;
 }

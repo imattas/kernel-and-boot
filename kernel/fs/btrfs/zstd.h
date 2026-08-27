@@ -31,5 +31,9 @@ int btrfs_zstd_expand_sequence(uint8_t literal_length_code,
                                uint32_t match_length_extra,
                                uint8_t offset_code, uint32_t offset_extra,
                                btrfs_zstd_sequence_t *sequence);
+int btrfs_zstd_execute_sequence(uint8_t *output, uint32_t output_capacity,
+                                uint32_t *output_size, const uint8_t *literals,
+                                uint32_t literal_size, uint32_t *literal_offset,
+                                const btrfs_zstd_sequence_t *sequence);
 
 #endif

@@ -429,6 +429,9 @@ accesses to unrelated ports.
 The boot path now attempts a HID interrupt poll, tolerates an idle keyboard’s
 valid no-report response, and feeds any completed decoded report into the
 shared input event queue.
+PS/2 mouse initialization now verifies the controller auxiliary-port test
+before enabling mouse commands, preventing an unavailable second port from
+being published as an active input backend.
 PCI now assigns bounded low-MMIO addresses to unmapped or above-4-GiB memory
 BARs, allowing the NVMe admin path to operate under the current identity map.
 PCI enumeration now enables memory/I/O space and bus mastering before BAR

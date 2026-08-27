@@ -109,6 +109,8 @@ int ps2_mouse_initialize(input_queue_t *queue) {
     if (!queue || !wait_write()) return 0;
     out8(0x64, 0xa8);
     uint8_t config = 0;
+    uint8_t response = 0;
+    if (!controller_command(0xa9, &response) || response != 0x00) return 0;
     if (!controller_command(0x20, &config)) return 0;
     config |= 0x02U;
     if (!controller_write_config(config) || !mouse_command_noarg(0xf4))

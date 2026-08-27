@@ -21,15 +21,19 @@ int usb_device_parse_descriptor(usb_device_t *device,
 
 int usb_device_add_endpoint(usb_device_t *device, const uint8_t *descriptor,
                             uint32_t length) {
+    uint16_t max_packet;
     if (!device || !descriptor || length < 7 || descriptor[0] < 7 ||
         descriptor[1] != 5 || descriptor[0] > length ||
         (descriptor[2] & 0x7f) == 0 || (descriptor[2] & 0x7f) > 0x0f ||
-        (descriptor[3] & 3) == 0 || load16(&descriptor[4]) == 0 ||
+        (descriptor[3] & 3) == 0 ||
+        ((descriptor[3] & 3) == 3 && descriptor[6] == 0) ||
+        (max_packet = load16(&descriptor[4])) == 0 ||
+        (max_packet & 0xf800U) != 0 ||
         device->endpoint_count >= USB_MAX_ENDPOINTS) return 0;
     usb_endpoint_t *endpoint = &device->endpoints[device->endpoint_count++];
     endpoint->address = descriptor[2];
     endpoint->attributes = descriptor[3];
-    endpoint->max_packet_size = load16(&descriptor[4]);
+    endpoint->max_packet_size = max_packet;
     endpoint->interval = descriptor[6];
     return 1;
 }

@@ -110,6 +110,7 @@ static int ahci_probe(device_t *device) {
     if (!device || device->resources[AHCI_BAR_INDEX].size == 0 ||
         device->resources[AHCI_BAR_INDEX].address == 0 ||
         device->resources[AHCI_BAR_INDEX].address >= 0x100000000ULL ||
+        (device->resources[AHCI_BAR_INDEX].flags & 1U) != 0 ||
         !device_claim_resource(device, AHCI_BAR_INDEX, &ahci_driver)) return 0;
     volatile uint32_t *abar = (volatile uint32_t *)(uintptr_t)
         device->resources[AHCI_BAR_INDEX].address;

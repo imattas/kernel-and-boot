@@ -256,6 +256,7 @@ The identified AHCI disk is now registered with the generic storage layer;
 the FAT32 and VFS probes therefore exercise the AHCI-backed storage device.
 AHCI probe binding now requires a link-ready SATA port with the supported device
 signature, and releases the BAR instead of exposing an unusable controller.
+AHCI probe validation now rejects I/O BARs before treating the ABAR as MMIO.
 The generic storage registry now serializes registration, enumeration, and
 backend dispatch, rejects duplicate device names, and has hosted contract-test
 build support without executing privileged interrupt-state instructions.

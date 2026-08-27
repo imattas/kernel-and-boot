@@ -67,6 +67,7 @@ static uint16_t uhci_async_packet_count;
 static uint32_t uhci_async_td_pages;
 static uint8_t uhci_async_input;
 static uint8_t uhci_async_pending;
+static int uhci_async_completion;
 
 typedef struct {
     uint32_t link;
@@ -491,7 +492,9 @@ static int uhci_interrupt_submit_locked(uint8_t address, uint8_t endpoint,
     uhci_async_data_frame = data_frame; uhci_async_data = (uint8_t *)data;
     uhci_async_length = length;
     uhci_async_toggle = toggle; uhci_async_packet_count = (uint16_t)packet_count;
-    uhci_async_input = (uint8_t)input; uhci_async_pending = 1;
+    uhci_async_input = (uint8_t)input;
+    uhci_async_completion = 0;
+    uhci_async_pending = 1;
     return 1;
 fail:
     uhci_release_transfer_frames(qh_frame, td_frame, 0, td_pages, data_frame);
@@ -546,6 +549,7 @@ int uhci_initialize(void) {
     uhci_last_td_status_value = 0;
     uhci_last_status_value = 0;
     uhci_async_pending = 0;
+    uhci_async_completion = 0;
     spinlock_init(&uhci_lock);
     uhci_driver.name = "uhci";
     uhci_driver.bus = DEVICE_BUS_PCI;
@@ -576,7 +580,9 @@ int uhci_interrupt_submit(uint8_t address, uint8_t endpoint, void *data,
 
 int uhci_interrupt_poll(void) {
     uint64_t flags = spinlock_lock_irqsave(&uhci_lock);
-    int result = uhci_interrupt_poll_locked();
+    int result = uhci_async_pending ? uhci_interrupt_poll_locked()
+                                    : uhci_async_completion;
+    if (!uhci_async_pending) uhci_async_completion = 0;
     spinlock_unlock_irqrestore(&uhci_lock, flags);
     return result;
 }
@@ -617,6 +623,10 @@ void uhci_interrupt_handler(void) {
     if ((status & UHCI_INTR_MASK) != 0) {
         __atomic_fetch_add(&uhci_interrupts, 1U, __ATOMIC_RELAXED);
         uhci_acknowledge_status(status & 0x001fU);
+        if (uhci_async_pending) {
+            int completion = uhci_interrupt_poll_locked();
+            if (completion != 0) uhci_async_completion = completion;
+        }
     }
     spinlock_unlock_irqrestore(&uhci_lock, flags);
 }

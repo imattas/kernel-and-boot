@@ -536,6 +536,9 @@ status after quiescence instead of trusting TD status alone.
 UHCI transfer DMA is quarantined when a post-submit stop cannot confirm HALTED,
 disabling further I/O rather than freeing descriptors that may still be owned
 by the controller.
+UHCI asynchronous transfer completion is now consumed from the IRQ handler and
+handed back through the existing poll API, while retaining polling fallback when
+the controller does not deliver an interrupt.
 USB HID decoding is now an independently compiled and linked driver component;
 the USB descriptor parser no longer embeds another source file.
 USB endpoint parsing now rejects reserved `wMaxPacketSize` bits and zero

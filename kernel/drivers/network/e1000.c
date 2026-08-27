@@ -30,6 +30,7 @@
 #define E1000_TCTL_PSP (1U << 3)
 #define E1000_RCTL_EN (1U << 1)
 #define E1000_RCTL_BAM (1U << 15)
+#define E1000_RCTL_BSEX (1U << 25)
 #define E1000_RING_COUNT 64U
 #define E1000_TX_CMD_EOP 0x01U
 #define E1000_TX_CMD_IFCS 0x02U
@@ -103,7 +104,8 @@ static int e1000_probe(device_t *device) {
     regs[E1000_RDLEN / 4] = 64 * sizeof(e1000_rx_desc_t); regs[E1000_RDH / 4] = 0; regs[E1000_RDT / 4] = 63;
     regs[E1000_TIPG / 4] = 0x0060200aU;
     regs[E1000_TCTL / 4] = E1000_TCTL_EN | E1000_TCTL_PSP | (0x10U << 4) | (0x40U << 12);
-    regs[E1000_RCTL / 4] = E1000_RCTL_EN | E1000_RCTL_BAM;
+    /* BSIZE=00 with BSEX selects the 4096-byte receive buffers above. */
+    regs[E1000_RCTL / 4] = E1000_RCTL_EN | E1000_RCTL_BAM | E1000_RCTL_BSEX;
     regs[E1000_CTRL / 4] |= E1000_CTRL_ASDE;
     (void)regs[E1000_ICR / 4];
     regs[E1000_IMS / 4] = E1000_IMS_RXDMT0 | E1000_IMS_RXT0 | E1000_IMS_TXDW;

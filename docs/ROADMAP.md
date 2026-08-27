@@ -272,6 +272,8 @@ oversized descriptors instead of silently truncating packets.
 RX delivery now assembles bounded packets spanning multiple completed
 descriptors, recycles every consumed descriptor, and rejects incomplete,
 errored, and capacity-overflowing frames without exposing partial data.
+The e1000 receive control register now selects 4096-byte buffers to match the
+DMA frame allocation and packet-length contract.
 The driver reports whether PCI MSI or ACPI-MADT IOAPIC legacy routing was
 enabled. The standard QEMU e1000 model exposes no usable MSI capability, so
 the QEMU gate now validates the routed legacy interrupt path instead of

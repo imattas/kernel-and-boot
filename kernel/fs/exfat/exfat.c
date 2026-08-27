@@ -19,6 +19,25 @@ static int cluster_valid(const exfat_fs_t *fs, uint32_t cluster) {
            cluster < fs->cluster_count + 2U;
 }
 
+static uint32_t boot_checksum(const exfat_fs_t *fs, uint32_t start) {
+    uint8_t sector[EXFAT_SECTOR_SIZE];
+    uint32_t checksum = 0;
+    for (uint32_t number = 0; number < 11U; ++number) {
+        if (!read_sector(fs, start + number, sector)) return 0;
+        for (uint32_t i = 0; i < EXFAT_SECTOR_SIZE; ++i)
+            checksum = ((checksum >> 1) | (checksum << 31)) + sector[i];
+    }
+    if (!read_sector(fs, start + 11U, sector)) return 0;
+    for (uint32_t i = 0; i < EXFAT_SECTOR_SIZE; i += 4U)
+        if (load32(&sector[i]) != checksum) return 0;
+    return checksum;
+}
+
+static int validate_boot_regions(uint32_t device) {
+    exfat_fs_t probe = {.device = device};
+    return boot_checksum(&probe, 0) != 0 && boot_checksum(&probe, 12) != 0;
+}
+
 static int fat_next(const exfat_fs_t *fs, uint32_t cluster, uint32_t *next) {
     uint8_t sector[EXFAT_SECTOR_SIZE * 2U];
     uint64_t byte_offset = (uint64_t)cluster * 4U;
@@ -42,6 +61,7 @@ int exfat_mount(exfat_fs_t *fs, uint32_t device) {
         boot[0] != 0xeb || boot[2] != 0x90 ||
         boot[3] != 'E' || boot[4] != 'X' || boot[5] != 'F' || boot[6] != 'A' ||
         boot[7] != 'T' || boot[8] != ' ' || boot[9] != ' ' || boot[10] != ' ') return 0;
+    if (!validate_boot_regions(device)) return 0;
     uint8_t bytes_shift = boot[108], sectors_shift = boot[109];
     uint32_t bytes_per_sector = 1U << bytes_shift;
     uint32_t sectors_per_cluster = 1U << sectors_shift;

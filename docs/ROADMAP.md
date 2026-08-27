@@ -32,6 +32,10 @@ Create the UEFI executable environment and loader architecture. Establish firmwa
 
 ## Phase 2 — Architectural kernel entry
 
+The syscall ABI now exposes validated waiting for an exited process, including
+retained process lookup, user-status copyout, self-wait rejection, and cleanup
+of the retained process object.
+
 Establish early stack/state assumptions, descriptor tables, exception handling, interrupt infrastructure, CPU feature discovery, panic/diagnostic paths, and a documented boot-to-kernel contract.
 
 ### Current status

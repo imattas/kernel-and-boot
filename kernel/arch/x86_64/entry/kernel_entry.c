@@ -2128,6 +2128,11 @@ void kernel_main(void *boot_info) {
         serial_write("process registry reap failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
+    process_t *wait_syscall_process = process_create(6);
+    if (!wait_syscall_process || !process_terminate(wait_syscall_process, 11)) {
+        serial_write("process wait setup failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
     process_t *retained_process = process_create(5);
     process_t *retained_lookup = process_lookup_retain(5);
     if (!retained_process || retained_lookup != retained_process ||
@@ -2188,6 +2193,13 @@ void kernel_main(void *boot_info) {
             OS_SYSCALL_ERROR ||
         syscall_dispatch(OS_SYSCALL_SIGNAL_SEND_TO, 1, 0x100000001ULL, 0) !=
             OS_SYSCALL_ERROR ||
+        syscall_dispatch(OS_SYSCALL_PROCESS_WAIT, 6, 0x8000009fffULL, 0) !=
+            OS_SYSCALL_ERROR ||
+        syscall_dispatch(OS_SYSCALL_PROCESS_WAIT, 6, 0x8000002000ULL, 0) != 0 ||
+        !syscall_copy_from_user(&waited_status, 0x8000002000ULL,
+                                sizeof(waited_status)) || waited_status != 11 ||
+        syscall_dispatch(OS_SYSCALL_PROCESS_WAIT, 1, 0x8000002000ULL, 0) !=
+            OS_SYSCALL_ERROR ||
         !process_take_signal(runtime_process, &signal) || signal != 3 ||
         syscall_dispatch(OS_SYSCALL_GETPID, 0, 0, 0) != 1 ||
         syscall_dispatch(99, 0, 0, 0) != OS_SYSCALL_ERROR) {
@@ -2206,6 +2218,10 @@ void kernel_main(void *boot_info) {
         !syscall_copy_from_user(&signal_result, 0x8000002000ULL, sizeof(signal_result)) ||
         signal_result != 2) {
         serial_write("signal syscall failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    if (!process_destroy(wait_syscall_process)) {
+        serial_write("process wait reap failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("signal syscalls ready\r\n");

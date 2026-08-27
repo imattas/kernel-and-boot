@@ -193,8 +193,13 @@ static void enable_device(uint8_t bus, uint8_t slot, uint8_t function) {
 }
 
 static uint64_t bar_size(uint32_t mask, uint64_t high_mask, int wide) {
+    if (!wide) {
+        uint32_t low_mask = mask & ~0xfu;
+        if (low_mask == 0) return 0;
+        return (uint32_t)(~low_mask + 1U);
+    }
     uint64_t combined = (uint64_t)(mask & ~0xfu) |
-                        (wide ? (uint64_t)high_mask << 32 : 0);
+                        ((uint64_t)(uint32_t)high_mask << 32);
     if (combined == 0) return 0;
     uint64_t size = (~combined) + 1;
     return size == 0 ? 0 : size;

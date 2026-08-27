@@ -28,6 +28,7 @@
 #define E1000_RAL 0x5400
 #define E1000_RAH 0x5404
 #define E1000_RAH_AV (1U << 31)
+#define E1000_REQUIRED_MMIO_SIZE 0x5408U
 #define E1000_CTRL_RST (1U << 26)
 #define E1000_CTRL_ASDE (1U << 5)
 #define E1000_TCTL_EN (1U << 1)
@@ -83,9 +84,11 @@ static int e1000_match(const device_t *device) {
 
 static int e1000_probe(device_t *device) {
     if (controllers != 0) return 0;
-    if (!device || device->resources[E1000_BAR].size < 0x4000 ||
+    if (!device || device->resources[E1000_BAR].size < E1000_REQUIRED_MMIO_SIZE ||
         device->resources[E1000_BAR].address == 0 ||
         device->resources[E1000_BAR].address >= 0x100000000ULL ||
+        device->resources[E1000_BAR].size > 0x100000000ULL -
+            device->resources[E1000_BAR].address ||
         (device->resources[E1000_BAR].flags & 1U) != 0 ||
         !device_claim_resource(device, E1000_BAR, &e1000_driver)) return 0;
     uint64_t tx_frame = 0;

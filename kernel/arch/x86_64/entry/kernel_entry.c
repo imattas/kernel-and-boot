@@ -38,6 +38,7 @@
 #include "../../../drivers/network/ipv4.h"
 #include "../../../drivers/network/udp.h"
 #include "../../../drivers/network/icmp.h"
+#include "../../../drivers/network/route.h"
 #include "../../../time/clock.h"
 #include "../../../debug/assert.h"
 #include "../../../core/task/context.h"
@@ -624,6 +625,27 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("ICMP packet ready\r\n");
+    ipv4_route_table_t route_probe_table;
+    ipv4_route_entry_t route_probe_result;
+    ipv4_route_table_initialize(&route_probe_table);
+    if (!ipv4_route_add(&route_probe_table, 0, 0, 0x01010101, 1, 100) ||
+        !ipv4_route_add(&route_probe_table, 0x0a000000, 8, 0x02020202, 1, 50) ||
+        !ipv4_route_add(&route_probe_table, 0x0a010000, 16, 0x03030303, 2, 100) ||
+        !ipv4_route_lookup(&route_probe_table, 0x0a010203, &route_probe_result) ||
+        route_probe_result.interface_id != 2 ||
+        route_probe_result.gateway != 0x03030303 ||
+        !ipv4_route_add(&route_probe_table, 0x0a010000, 16, 0x04040404, 3, 10) ||
+        !ipv4_route_lookup(&route_probe_table, 0x0a010203, &route_probe_result) ||
+        route_probe_result.interface_id != 3 ||
+        !ipv4_route_remove(&route_probe_table, 0x0a010000, 16, 3) ||
+        !ipv4_route_lookup(&route_probe_table, 0x0a010203, &route_probe_result) ||
+        route_probe_result.interface_id != 2 ||
+        ipv4_route_lookup(&route_probe_table, 0xc0a80001, &route_probe_result) == 0 ||
+        !ipv4_route_remove(&route_probe_table, 0, 0, 1)) {
+        serial_write("IPv4 route failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("IPv4 route ready\r\n");
     if (e1000_controller_count() != 0 &&
         !e1000_transmit(network_probe_packet, sizeof(network_probe_packet))) {
         serial_write("e1000 transmit failure\r\n");

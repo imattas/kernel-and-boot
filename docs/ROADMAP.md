@@ -334,6 +334,9 @@ delivery.
 The bounded ICMPv4 echo layer now constructs and validates request/reply
 headers, identifiers, sequences, payloads, and Internet checksums, rejecting
 corrupted control packets before dispatch.
+The bounded IPv4 route table now canonicalizes network prefixes, serializes
+route updates and lookups, selects longest-prefix matches with metric
+tie-breaking, and supports explicit route removal.
 The e1000 ISR now records delivery, and the post-interrupt-enable QEMU probe
 transmits a frame and requires an observed interrupt before continuing.
 The e1000 ISR now preserves cleared interrupt causes for the polling/service

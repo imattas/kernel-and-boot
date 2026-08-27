@@ -384,7 +384,9 @@ VFS path traversal now confines `..` resolution to the caller-supplied root,
 including mounted lookups, preventing absolute paths from escaping their VFS
 namespace.
 VFS child attachment and removal now serialize child ownership and child-count
- checks, preventing a node from being concurrently claimed by two directories.
+checks, preventing a node from being concurrently claimed by two directories.
+VFS reclamation now serializes child-count and private-destructor publication,
+then runs destruction outside the node lock before releasing the allocation.
 Credential access checks now reject permission values outside the supported
 Unix mode mask instead of silently ignoring malformed bits.
 The signal-next syscall now validates its writable user destination before

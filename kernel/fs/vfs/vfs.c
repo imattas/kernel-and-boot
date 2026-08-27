@@ -18,11 +18,20 @@ static int string_equal(const char *left, const char *right) {
 }
 
 static void node_free_if_unused(vfs_node_t *node) {
-    if (node && __atomic_load_n(&node->references, __ATOMIC_ACQUIRE) == 0 &&
-        node->child_count == 0) {
-        if (node->private_destroy) node->private_destroy(node->private_data);
-        kfree(node);
+    if (!node) return;
+    uint64_t flags = spinlock_lock_irqsave(&node->lock);
+    if (__atomic_load_n(&node->references, __ATOMIC_ACQUIRE) != 0 ||
+        node->child_count != 0) {
+        spinlock_unlock_irqrestore(&node->lock, flags);
+        return;
     }
+    vfs_private_destroy_fn destroy = node->private_destroy;
+    void *private_data = node->private_data;
+    node->private_destroy = 0;
+    node->private_data = 0;
+    spinlock_unlock_irqrestore(&node->lock, flags);
+    if (destroy) destroy(private_data);
+    kfree(node);
 }
 
 vfs_node_t *vfs_node_create(const char *name, vfs_node_type_t type,

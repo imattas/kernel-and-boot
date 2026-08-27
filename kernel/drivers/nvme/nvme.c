@@ -95,6 +95,8 @@ static int nvme_probe(device_t *device) {
     if (!device || device->resources[NVME_BAR_INDEX].size < 0x1000 ||
         device->resources[NVME_BAR_INDEX].address == 0 ||
         device->resources[NVME_BAR_INDEX].address >= 0x100000000ULL ||
+        device->resources[NVME_BAR_INDEX].size > 0x100000000ULL -
+            device->resources[NVME_BAR_INDEX].address ||
         (device->resources[NVME_BAR_INDEX].flags & 1U) != 0 ||
         !device_claim_resource(device, NVME_BAR_INDEX, &nvme_driver)) return 0;
     uint64_t asq = 0;
@@ -106,6 +108,10 @@ static int nvme_probe(device_t *device) {
     if (!nvme_wait_ready(regs, 0)) goto fail;
     uint64_t cap = ((uint64_t)regs[1] << 32) | regs[0];
     uint32_t queue_entries = (uint32_t)(cap & NVME_CAP_MQES_MASK) + 1U;
+    uint32_t doorbell_stride = 4U << ((cap >> NVME_CAP_DSTRD_SHIFT) & 0xfU);
+    uint64_t last_doorbell = NVME_ADMIN_SQ_DOORBELL +
+                             3ULL * doorbell_stride + sizeof(uint32_t);
+    if (last_doorbell > device->resources[NVME_BAR_INDEX].size) goto fail;
     if (queue_entries > 64) queue_entries = 64;
     if (queue_entries == 0) goto fail;
     asq = physical_alloc_frame();
@@ -128,7 +134,7 @@ static int nvme_probe(device_t *device) {
     active_cq_head = 0;
     active_cq_phase = 1;
     active_command_id = 0;
-    active_doorbell_stride = 4U << ((cap >> NVME_CAP_DSTRD_SHIFT) & 0xfU);
+    active_doorbell_stride = doorbell_stride;
     active_io_sq = 0;
     active_io_cq = 0;
     active_io_ready = 0;

@@ -1211,12 +1211,12 @@ void kernel_main(void *boot_info) {
             for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
         }
     serial_write("AHCI sector write ready\r\n");
-    uint8_t ahci_multi_write[1024];
-    uint8_t ahci_multi_read[1024];
+    uint8_t ahci_multi_write[5120];
+    uint8_t ahci_multi_read[5120];
     for (uint32_t i = 0; i < sizeof(ahci_multi_write); ++i)
         ahci_multi_write[i] = (uint8_t)(0xc3U ^ i);
-    if (!ahci_write_sectors(122, 2, ahci_multi_write) ||
-        !ahci_read_sectors(122, 2, ahci_multi_read)) {
+    if (!ahci_write_sectors(122, 10, ahci_multi_write) ||
+        !ahci_read_sectors(122, 10, ahci_multi_read)) {
         serial_write("AHCI multi-sector I/O failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }

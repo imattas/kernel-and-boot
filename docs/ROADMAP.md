@@ -308,6 +308,9 @@ USB/NVMe/network error and interrupt paths, is still required before the kernel
 completion gate.
 AHCI now also exposes bounded multi-sector READ/WRITE DMA transfers within one
 page and the QEMU gate verifies a two-sector write/read-back operation.
+AHCI public and storage-backed I/O now split larger valid requests into bounded
+8-sector DMA commands, and QEMU verifies a ten-sector request across that
+command boundary.
 AHCI command timeouts now stop and restart the port engine with bounded CR/FR
 quiescence and error-state clearing before DMA buffers are released.
 The identified AHCI disk is now registered with the generic storage layer;

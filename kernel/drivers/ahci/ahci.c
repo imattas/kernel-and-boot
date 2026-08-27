@@ -525,6 +525,21 @@ static int ahci_io_sectors(uint64_t lba, uint32_t count, void *buffer, int write
     return ahci_finish_command(completed);
 }
 
+static int ahci_io_range_locked(uint64_t lba, uint32_t count, void *buffer,
+                                int write) {
+    if (!ahci_lba_valid(lba, count) || !buffer) return 0;
+    uint32_t completed = 0;
+    while (completed < count) {
+        uint32_t chunk = count - completed;
+        if (chunk > 8U) chunk = 8U;
+        if (!ahci_io_sectors(lba + completed, chunk,
+                             (uint8_t *)buffer + (uint64_t)completed * 512U,
+                             write)) return 0;
+        completed += chunk;
+    }
+    return 1;
+}
+
 static int ahci_storage_read_context(uint64_t lba, uint32_t count,
                                      void *buffer, void *context) {
     uint32_t port = (uint32_t)(uintptr_t)context;
@@ -532,7 +547,7 @@ static int ahci_storage_read_context(uint64_t lba, uint32_t count,
     int result = port < 32 && port_state[port].identified;
     if (result) {
         ahci_select_port_locked(port);
-        result = ahci_io_sectors(lba, count, buffer, 0);
+        result = ahci_io_range_locked(lba, count, buffer, 0);
     }
     spinlock_unlock_irqrestore(&ahci_lock, flags);
     return result;
@@ -545,7 +560,7 @@ static int ahci_storage_write_context(uint64_t lba, uint32_t count,
     int result = port < 32 && port_state[port].identified;
     if (result) {
         ahci_select_port_locked(port);
-        result = ahci_io_sectors(lba, count, (void *)buffer, 1);
+        result = ahci_io_range_locked(lba, count, (void *)buffer, 1);
     }
     spinlock_unlock_irqrestore(&ahci_lock, flags);
     return result;
@@ -606,14 +621,14 @@ int ahci_write_sector(uint64_t lba, const void *buffer) {
 
 int ahci_read_sectors(uint64_t lba, uint32_t count, void *buffer) {
     uint64_t flags = spinlock_lock_irqsave(&ahci_lock);
-    int result = ahci_io_sectors(lba, count, buffer, 0);
+    int result = ahci_io_range_locked(lba, count, buffer, 0);
     spinlock_unlock_irqrestore(&ahci_lock, flags);
     return result;
 }
 
 int ahci_write_sectors(uint64_t lba, uint32_t count, const void *buffer) {
     uint64_t flags = spinlock_lock_irqsave(&ahci_lock);
-    int result = ahci_io_sectors(lba, count, (void *)buffer, 1);
+    int result = ahci_io_range_locked(lba, count, (void *)buffer, 1);
     spinlock_unlock_irqrestore(&ahci_lock, flags);
     return result;
 }

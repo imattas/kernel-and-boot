@@ -46,6 +46,13 @@ static int nvme_irq_enabled;
 static volatile uint32_t nvme_interrupts;
 static int nvme_disabled;
 static uint64_t nvme_quarantined_prp;
+static uint64_t active_namespace_sectors;
+
+static int nvme_lba_valid(uint64_t lba, uint32_t count) {
+    return active_namespace_sectors != 0 && count != 0 &&
+           lba < active_namespace_sectors &&
+           (uint64_t)count <= active_namespace_sectors - lba;
+}
 
 static int nvme_submit_admin_words(uint8_t opcode, uint32_t namespace_id,
                                    uint64_t prp1, const uint32_t words[6],
@@ -242,6 +249,10 @@ int nvme_identify_namespace(void *buffer) {
         const uint8_t *source = (const uint8_t *)(uintptr_t)frame;
         uint8_t *destination = (uint8_t *)buffer;
         for (uint32_t i = 0; i < 4096; ++i) destination[i] = source[i];
+        uint64_t sectors = 0;
+        for (uint32_t i = 0; i < 8; ++i)
+            sectors |= (uint64_t)((const uint8_t *)buffer)[i] << (i * 8U);
+        active_namespace_sectors = sectors;
     }
     if (frame != nvme_quarantined_prp) physical_free_frame(frame);
     return success;
@@ -281,7 +292,8 @@ fail:
 }
 
 static int nvme_io(uint64_t lba, void *buffer, uint32_t count, int write) {
-    if (nvme_disabled || !active_io_ready || !buffer || count == 0 || count > 8) return 0;
+    if (nvme_disabled || !active_io_ready || !nvme_lba_valid(lba, count) ||
+        !buffer || count > 8) return 0;
     uint64_t flags = spinlock_lock_irqsave(&nvme_lock);
     uint64_t data_frame = physical_alloc_frame();
     if (!data_frame) {
@@ -372,6 +384,7 @@ int nvme_initialize(void) {
     nvme_interrupts = 0;
     nvme_disabled = 0;
     nvme_quarantined_prp = 0;
+    active_namespace_sectors = 0;
     spinlock_init(&nvme_lock);
     nvme_driver.name = "nvme";
     nvme_driver.bus = DEVICE_BUS_PCI;

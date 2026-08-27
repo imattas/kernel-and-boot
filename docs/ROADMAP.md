@@ -662,6 +662,8 @@ ARP parsing accepts the Ethernet minimum-frame padding while still requiring
 the complete fixed-size ARP wire payload.
 AHCI sector I/O now uses ATA 48-bit DMA commands and rejects LBAs outside the
 48-bit address range instead of silently truncating them.
+NVMe I/O now enforces the namespace size reported by IDENTIFY before PRP
+allocation and command submission.
 
 ## Phase 10 — Userland begins after the kernel gate
 

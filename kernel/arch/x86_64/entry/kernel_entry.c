@@ -40,6 +40,7 @@
 #include "../../../drivers/network/icmp.h"
 #include "../../../drivers/network/route.h"
 #include "../../../drivers/network/packet_queue.h"
+#include "../../../drivers/network/network.h"
 #include "../../../time/clock.h"
 #include "../../../debug/assert.h"
 #include "../../../core/task/context.h"
@@ -468,7 +469,6 @@ void kernel_main(void *boot_info) {
     }
     serial_write("e1000 driver ready controllers=");
     serial_write_hex_line("", e1000_controller_count());
-    static const uint8_t network_probe_packet[60] = {0};
     static const uint8_t ethernet_probe_destination[6] =
         {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
     static const uint8_t ethernet_probe_source[6] =
@@ -673,12 +673,21 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("network packet queue ready\r\n");
+    network_packet_queue_initialize(&network_probe_queue);
+    if (network_e1000_poll(&network_probe_queue, 4) != 0 ||
+        network_packet_queue_count(&network_probe_queue) != 0) {
+        serial_write("network interface receive failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
     if (e1000_controller_count() != 0 &&
-        !e1000_transmit(network_probe_packet, sizeof(network_probe_packet))) {
+        !network_e1000_transmit(ethernet_probe_frame, ethernet_probe_length)) {
         serial_write("e1000 transmit failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
-    if (e1000_controller_count() != 0) serial_write("e1000 network I/O ready\r\n");
+    if (e1000_controller_count() != 0) {
+        serial_write("network interface ready\r\n");
+        serial_write("e1000 network I/O ready\r\n");
+    }
     if (e1000_controller_count() != 0)
         serial_write(e1000_link_up() ? "e1000 link ready\r\n" :
                      "e1000 link down\r\n");

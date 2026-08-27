@@ -340,6 +340,9 @@ tie-breaking, and supports explicit route removal.
 The bounded Ethernet packet queue now serializes producer/consumer ownership,
 copies complete MTU-sized frames, reports queue depth and drops, and rejects
 invalid frame sizes without allowing overflow.
+The e1000 network adapter now validates Ethernet frames at the protocol
+boundary before transmission and provides bounded polling that transfers
+completed hardware RX frames into the packet queue.
 The e1000 ISR now records delivery, and the post-interrupt-enable QEMU probe
 transmits a frame and requires an observed interrupt before continuing.
 The e1000 ISR now preserves cleared interrupt causes for the polling/service

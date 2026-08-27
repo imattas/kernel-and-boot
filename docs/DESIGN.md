@@ -54,6 +54,11 @@ Owns processor- and platform-specific mechanisms: earliest kernel entry, CPU sta
 ### `core`
 Owns architecture-independent kernel initialization, panic handling, diagnostic output, and foundational synchronization infrastructure.
 
+Process creation also provides a bounded automatic-ID path. It selects an
+unused PID under the registry lock, then relies on the normal insertion
+collision check before publication, so concurrent creators cannot publish the
+same identifier.
+
 ### `mm`
 Owns physical memory management, virtual address-space management, kernel heap facilities, and slab/object allocation. The long-term design should distinguish physical ownership, virtual mappings, allocation policy, and architecture-specific page-table mechanics.
 

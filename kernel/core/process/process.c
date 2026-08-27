@@ -106,6 +106,30 @@ process_t *process_create(uint64_t id) {
     return 0;
 }
 
+process_t *process_create_auto(void) {
+    for (uint32_t attempt = 0; attempt < PROCESS_MAX; ++attempt) {
+        uint64_t flags = spinlock_lock_irqsave(&process_table_lock);
+        uint32_t candidate = 0;
+        for (uint32_t id = 1; id <= PROCESS_MAX; ++id) {
+            uint8_t used = 0;
+            for (uint32_t index = 0; index < PROCESS_MAX; ++index)
+                if (process_table[index] && process_table[index]->id == id) {
+                    used = 1;
+                    break;
+                }
+            if (!used) {
+                candidate = id;
+                break;
+            }
+        }
+        spinlock_unlock_irqrestore(&process_table_lock, flags);
+        if (!candidate) return 0;
+        process_t *process = process_create(candidate);
+        if (process) return process;
+    }
+    return 0;
+}
+
 int process_set_namespace(process_t *process, vfs_node_t *root,
                           vfs_node_t *working_directory) {
     if (!process || !root || !working_directory ||

@@ -2898,6 +2898,13 @@ void kernel_main(void *boot_info) {
     serial_write("signal blocking ready\r\n");
     serial_write("process signals ready\r\n");
     serial_write("process handles ready\r\n");
+    process_t *automatic_process = process_create_auto();
+    if (!automatic_process || automatic_process->id == 0 ||
+        !process_destroy(automatic_process)) {
+        serial_write("automatic process allocation failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("automatic process allocation ready\r\n");
     syscall_initialize();
     if (!process_activate(runtime_process)) {
         serial_write("user address space activation failure\r\n");

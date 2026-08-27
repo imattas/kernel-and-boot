@@ -285,6 +285,9 @@ the kernel gate now exercises a successful ring-3 write/exit invocation before
 userland is populated.
 The process registry now serializes duplicate-ID checks, insertion, lookup,
 and removal across concurrent lifecycle operations.
+Kernel process creation now provides bounded automatic PID allocation with
+collision-safe reuse and a QEMU lifecycle probe; explicit-ID creation remains
+available for controlled kernel tests.
 The bootable `dist/os.img` is now a standards-compliant FAT32 superfloppy
 with two FAT copies, backup boot/FSInfo sectors, and valid directory metadata;
 `fsck.fat`, `mdir`, and the QEMU UEFI/AHCI/NVMe paths all validate the same

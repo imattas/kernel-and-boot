@@ -863,6 +863,8 @@ file-description contract for write-only handles; the QEMU syscall probe covers
 repositioning a write-only file before close.
 APIC PIT calibration now uses a bounded wait budget and retains a validated
 fallback count, preventing slow firmware emulation from blocking kernel boot.
+The timer layer now records bounded per-CPU tick counters while retaining the
+BSP-derived monotonic clock used by the kernel ABI.
 UEFI memory-map retries now release rejected candidate pools and validate boot
 services before dereferencing them, keeping ExitBootServices preparation
 bounded without leaking retry buffers.

@@ -92,8 +92,9 @@ priority, and enables the spurious-interrupt vector. The BSP APIC timer uses
 the initial 100 Hz divisor/count configuration. APs install their own early IDT
 and enable the same local timer after their online acknowledgement. The generic
 timer layer converts ticks to a saturating nanosecond value and uses
-overflow-safe deadlines for blocking waits. Calibration and per-AP timekeeping
-state remain future work.
+overflow-safe deadlines for blocking waits. The timer also records bounded
+per-CPU tick counters while retaining the BSP-derived system clock for ABI
+timestamps; hardware calibration remains a separate platform-specific concern.
 
 The ACPI platform layer validates the firmware RSDP checksums, walks the XSDT,
 validates the MADT checksum, and counts enabled legacy-APIC and x2APIC processor

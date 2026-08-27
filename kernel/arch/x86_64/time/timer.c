@@ -5,18 +5,25 @@
 #include "../../../core/task/scheduler.h"
 
 static volatile uint64_t ticks;
+static volatile uint64_t cpu_ticks[64];
 #define TIMER_FREQUENCY_HZ 100U
 #define TIMER_NS_PER_TICK (1000000000ULL / TIMER_FREQUENCY_HZ)
 
 void timer_tick(void) {
     const arch_percpu_t *cpu = arch_percpu_current();
-    if (cpu && cpu->logical_id == 0) ++ticks;
+    if (!cpu || cpu->logical_id >= 64) return;
+    __atomic_fetch_add(&cpu_ticks[cpu->logical_id], 1, __ATOMIC_RELAXED);
+    if (cpu->logical_id == 0) __atomic_fetch_add(&ticks, 1, __ATOMIC_RELAXED);
 }
 void arch_scheduler_timer_interrupt(void) {
     const arch_percpu_t *cpu = arch_percpu_current();
     if (cpu && cpu->logical_id == 0) scheduler_timer_interrupt();
 }
 uint64_t timer_ticks(void) { return __atomic_load_n(&ticks, __ATOMIC_RELAXED); }
+uint64_t timer_cpu_ticks(uint32_t logical_id) {
+    return logical_id < 64 ?
+        __atomic_load_n(&cpu_ticks[logical_id], __ATOMIC_RELAXED) : 0;
+}
 uint32_t timer_frequency_hz(void) { return TIMER_FREQUENCY_HZ; }
 uint64_t timer_now_ns(void) {
     uint64_t count = timer_ticks();

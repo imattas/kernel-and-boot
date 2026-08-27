@@ -122,6 +122,18 @@ int vfs_file_readdir(vfs_file_t *file, vfs_dirent_t *entry) {
     return 1;
 }
 
+int vfs_file_stat(vfs_file_t *file, vfs_stat_t *stat) {
+    if (!file || !stat || !file->node) return 0;
+    vfs_node_t *node = file->node;
+    uint64_t flags = spinlock_lock_irqsave(&node->lock);
+    stat->owner_uid = node->owner_uid;
+    stat->owner_gid = node->owner_gid;
+    stat->mode = node->mode;
+    stat->type = node->type;
+    spinlock_unlock_irqrestore(&node->lock, flags);
+    return 1;
+}
+
 int vfs_file_seek(vfs_file_t *file, uint64_t offset) {
     if (!file) return 0;
     uint64_t flags = spinlock_lock_irqsave(&file->lock);

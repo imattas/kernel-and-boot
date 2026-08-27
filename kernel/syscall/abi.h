@@ -27,7 +27,8 @@ enum {
     OS_SYSCALL_CHANNEL_RECEIVE_WAIT = 20,
     OS_SYSCALL_YIELD = 21,
     OS_SYSCALL_CHDIR = 22,
-    OS_SYSCALL_GETCWD = 23
+    OS_SYSCALL_GETCWD = 23,
+    OS_SYSCALL_FSTAT = 24
 };
 
 #define OS_SYSCALL_ERROR UINT64_MAX
@@ -39,5 +40,12 @@ typedef struct {
     char name[32];
     uint32_t type;
 } os_syscall_dirent_t;
+
+typedef struct {
+    uint64_t owner_uid;
+    uint64_t owner_gid;
+    uint32_t mode;
+    uint32_t type;
+} os_syscall_stat_t;
 
 #endif

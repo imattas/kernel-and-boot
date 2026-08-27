@@ -298,6 +298,23 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
             vfs_node_release(root);
             return valid ? length - 1 : OS_SYSCALL_ERROR;
         }
+        case OS_SYSCALL_FSTAT: {
+            process_t *process = process_current();
+            if (!process || !user_range(arg2, sizeof(os_syscall_stat_t), 1))
+                return OS_SYSCALL_ERROR;
+            process_handle_ref_t ref = {0};
+            vfs_stat_t stat = {0};
+            int valid = process_handle_get_retain(&process->handles,
+                                                  (uint32_t)arg1, 0, &ref) &&
+                        vfs_file_stat((vfs_file_t *)ref.object, &stat);
+            if (valid) {
+                os_syscall_stat_t result = {stat.owner_uid, stat.owner_gid,
+                                            stat.mode, (uint32_t)stat.type};
+                valid = syscall_copy_to_user(arg2, &result, sizeof(result));
+            }
+            process_handle_release_ref(&ref);
+            return valid ? 0 : OS_SYSCALL_ERROR;
+        }
         case OS_SYSCALL_SIGNAL_NEXT: {
             uint32_t signal = 0;
             if (!user_range(arg1, sizeof(signal), 1) ||

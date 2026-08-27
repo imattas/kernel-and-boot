@@ -254,6 +254,8 @@ Processes now support root-confined working-directory changes through a
 validated `chdir` syscall; non-directory targets are rejected.
 The namespace ABI now reconstructs and validates the current path through a
 root-bounded `getcwd` syscall, including retained ancestry during traversal.
+The descriptor ABI now exposes retained-handle `fstat`, returning a locked
+snapshot of VFS type, mode, and owner metadata through validated copyout.
 VFS path resolution now distinguishes absolute root paths from working-directory
 relative paths, with `..` confined at the process namespace root.
 VFS-backed `open` and `chdir` now enforce Unix owner/group/other mode bits

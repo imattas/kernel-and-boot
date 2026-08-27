@@ -502,6 +502,11 @@ invalidation, LRU eviction, and device-wide invalidation against a backing
 block device.
 Task wait nodes now record their owning queue, so removal from the wrong queue
 cannot corrupt either queue's linked list.
+Task wait nodes now have their own lock, acquired after the queue lock, so
+concurrent moves between different wait queues cannot race ownership metadata
+or linked-list pointers.
+Wait-node initialization is now explicit and shared by task objects and static
+kernel waiters, preventing uninitialized lock state during early boot probes.
 Scheduler initialization now precedes process-thread lifecycle operations, so
 thread startup and teardown never touch an uninitialized ready queue.
 The kernel Makefile now explicitly tracks the wait-queue header for

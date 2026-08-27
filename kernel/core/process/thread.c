@@ -53,7 +53,7 @@ int process_thread_start(process_thread_t *thread) {
     process_t *process = thread->process;
     uint64_t flags = spinlock_lock_irqsave(&process->lock);
     if (process->state == PROCESS_EXITED || thread->task->state != TASK_READY ||
-        thread->task->wait_node.queued) {
+        task_wait_node_queued(&thread->task->wait_node)) {
         spinlock_unlock_irqrestore(&process->lock, flags);
         return 0;
     }
@@ -68,7 +68,7 @@ static int process_thread_destroy_locked(process_thread_t *thread) {
     process_thread_t **link = &process->threads;
     while (*link && *link != thread) link = &(*link)->next;
     if (!*link) return 0;
-    if (thread->task->wait_node.queued &&
+    if (task_wait_node_queued(&thread->task->wait_node) &&
         !scheduler_remove(thread->task)) return 0;
     if (!task_destroy_kernel(thread->task)) return 0;
     *link = thread->next;

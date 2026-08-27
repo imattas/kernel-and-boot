@@ -1,5 +1,15 @@
 #include "wait_queue.h"
 
+void task_wait_node_initialize(task_wait_node_t *node, void *owner) {
+    if (!node) return;
+    spinlock_init(&node->lock);
+    node->previous = 0;
+    node->next = 0;
+    node->queue = 0;
+    node->owner = owner;
+    node->queued = 0;
+}
+
 void task_wait_queue_initialize(task_wait_queue_t *queue) {
     spinlock_init(&queue->lock);
     queue->head = 0;
@@ -10,7 +20,9 @@ void task_wait_queue_initialize(task_wait_queue_t *queue) {
 int task_wait_queue_enqueue(task_wait_queue_t *queue, task_wait_node_t *node) {
     if (!queue || !node) return 0;
     uint64_t flags = spinlock_lock_irqsave(&queue->lock);
+    uint64_t node_flags = spinlock_lock_irqsave(&node->lock);
     if (node->queued) {
+        spinlock_unlock_irqrestore(&node->lock, node_flags);
         spinlock_unlock_irqrestore(&queue->lock, flags);
         return 0;
     }
@@ -22,6 +34,7 @@ int task_wait_queue_enqueue(task_wait_queue_t *queue, task_wait_node_t *node) {
     else queue->head = node;
     queue->tail = node;
     ++queue->count;
+    spinlock_unlock_irqrestore(&node->lock, node_flags);
     spinlock_unlock_irqrestore(&queue->lock, flags);
     return 1;
 }
@@ -42,7 +55,11 @@ task_wait_node_t *task_wait_queue_dequeue(task_wait_queue_t *queue) {
     if (!queue) return 0;
     uint64_t flags = spinlock_lock_irqsave(&queue->lock);
     task_wait_node_t *node = queue->head;
-    if (node) unlink_node(queue, node);
+    if (node) {
+        uint64_t node_flags = spinlock_lock_irqsave(&node->lock);
+        unlink_node(queue, node);
+        spinlock_unlock_irqrestore(&node->lock, node_flags);
+    }
     spinlock_unlock_irqrestore(&queue->lock, flags);
     return node;
 }
@@ -50,10 +67,20 @@ task_wait_node_t *task_wait_queue_dequeue(task_wait_queue_t *queue) {
 int task_wait_queue_remove(task_wait_queue_t *queue, task_wait_node_t *node) {
     if (!queue || !node) return 0;
     uint64_t flags = spinlock_lock_irqsave(&queue->lock);
+    uint64_t node_flags = spinlock_lock_irqsave(&node->lock);
     int removed = node->queued && node->queue == queue;
     if (removed) unlink_node(queue, node);
+    spinlock_unlock_irqrestore(&node->lock, node_flags);
     spinlock_unlock_irqrestore(&queue->lock, flags);
     return removed;
+}
+
+int task_wait_node_queued(task_wait_node_t *node) {
+    if (!node) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&node->lock);
+    int queued = node->queued != 0;
+    spinlock_unlock_irqrestore(&node->lock, flags);
+    return queued;
 }
 
 uint32_t task_wait_queue_count(const task_wait_queue_t *queue) {

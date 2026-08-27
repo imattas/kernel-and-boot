@@ -34,7 +34,7 @@ int scheduler_enqueue(task_t *task) {
 int scheduler_remove(task_t *task) {
     if (!task) return 0;
     uint64_t flags = spinlock_lock_irqsave(&scheduler_lock);
-    int result = task != current_task && task->wait_node.queued &&
+    int result = task != current_task && task_wait_node_queued(&task->wait_node) &&
                  task_wait_queue_remove(&ready_queue, &task->wait_node);
     spinlock_unlock_irqrestore(&scheduler_lock, flags);
     return result;
@@ -144,7 +144,7 @@ __attribute__((noreturn)) void scheduler_task_exit(void) {
 int scheduler_block(task_t *task, task_wait_queue_t *queue) {
     if (!task || !queue) return 0;
     uint64_t flags = spinlock_lock_irqsave(&scheduler_lock);
-    if (task->state == TASK_TERMINATED || task->wait_node.queued) {
+    if (task->state == TASK_TERMINATED || task_wait_node_queued(&task->wait_node)) {
         spinlock_unlock_irqrestore(&scheduler_lock, flags);
         return 0;
     }
@@ -162,7 +162,7 @@ int scheduler_block_current(task_wait_queue_t *queue) {
     uint64_t flags = spinlock_lock_irqsave(&scheduler_lock);
     task_t *blocked = current_task;
     if (!blocked || blocked->state == TASK_TERMINATED ||
-        blocked->wait_node.queued || !queue ||
+        task_wait_node_queued(&blocked->wait_node) || !queue ||
         !task_wait_queue_enqueue(queue, &blocked->wait_node)) {
         spinlock_unlock_irqrestore(&scheduler_lock, flags);
         return 0;
@@ -195,7 +195,8 @@ int scheduler_block_current_with_lock(task_wait_queue_t *queue,
     }
 
     uint64_t flags = spinlock_lock_irqsave(&scheduler_lock);
-    if (blocked->state == TASK_TERMINATED || blocked->wait_node.queued ||
+    if (blocked->state == TASK_TERMINATED ||
+        task_wait_node_queued(&blocked->wait_node) ||
         !task_wait_queue_enqueue(queue, &blocked->wait_node)) {
         spinlock_unlock_irqrestore(&scheduler_lock, flags);
         spinlock_unlock_irqrestore(held_lock, held_flags);

@@ -12,6 +12,7 @@ typedef enum {
 } task_state_t;
 
 typedef struct task_wait_node {
+    spinlock_t lock;
     struct task_wait_node *previous;
     struct task_wait_node *next;
     struct task_wait_queue *queue;
@@ -26,10 +27,12 @@ typedef struct task_wait_queue {
     uint32_t count;
 } task_wait_queue_t;
 
+void task_wait_node_initialize(task_wait_node_t *node, void *owner);
 void task_wait_queue_initialize(task_wait_queue_t *queue);
 int task_wait_queue_enqueue(task_wait_queue_t *queue, task_wait_node_t *node);
 task_wait_node_t *task_wait_queue_dequeue(task_wait_queue_t *queue);
 int task_wait_queue_remove(task_wait_queue_t *queue, task_wait_node_t *node);
+int task_wait_node_queued(task_wait_node_t *node);
 uint32_t task_wait_queue_count(const task_wait_queue_t *queue);
 
 #endif

@@ -5,8 +5,7 @@ void task_initialize(task_t *task, uint32_t id) {
     task->id = id;
     task->state = TASK_READY;
     task->context = (task_context_t){0};
-    task->wait_node = (task_wait_node_t){0};
-    task->wait_node.owner = task;
+    task_wait_node_initialize(&task->wait_node, task);
     task->stack = 0;
     task->stack_size = 0;
 }
@@ -30,7 +29,8 @@ task_t *task_create_kernel(uint32_t id, void (*entry)(void *), void *argument,
 }
 
 int task_destroy_kernel(task_t *task) {
-    if (!task || task->wait_node.queued || task->state == TASK_RUNNING) return 0;
+    if (!task || task_wait_node_queued(&task->wait_node) ||
+        task->state == TASK_RUNNING) return 0;
     kfree(task->stack);
     kfree(task);
     return 1;

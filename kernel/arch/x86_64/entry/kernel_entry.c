@@ -1845,6 +1845,8 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("process thread lifecycle ready\r\n");
+    task_wait_node_initialize(&task_demo_waiter_a, 0);
+    task_wait_node_initialize(&task_demo_waiter_b, 0);
     task_wait_queue_initialize(&task_demo_waiters);
     if (!task_wait_queue_enqueue(&task_demo_waiters, &task_demo_waiter_a) ||
         !task_wait_queue_enqueue(&task_demo_waiters, &task_demo_waiter_b) ||

@@ -11,6 +11,9 @@
 
 static uint16_t load16(const uint8_t *p) { return (uint16_t)p[0] | ((uint16_t)p[1] << 8); }
 static uint32_t load32(const uint8_t *p) { return (uint32_t)load16(p) | ((uint32_t)load16(p + 2) << 16); }
+static uint64_t inode_size_value(const uint8_t *inode) {
+    return (uint64_t)load32(&inode[4]) | ((uint64_t)load32(&inode[108]) << 32);
+}
 
 static int read_block(const ext4_fs_t *fs, uint64_t block, void *buffer) {
     if (!fs || !buffer || block >= fs->block_count || fs->block_size > 4096U) return 0;
@@ -168,7 +171,7 @@ int ext4_lookup(ext4_fs_t *fs, uint32_t directory_inode, const char *name,
     if (!fs || !fs->mounted || !name || !inode_number || name[0] == 0) return 0;
     uint8_t inode[4096], block[4096];
     if (!read_inode(fs, directory_inode, inode) || (load16(inode) & 0xf000U) != 0x4000U) return 0;
-    uint64_t directory_size = load32(&inode[4]);
+    uint64_t directory_size = inode_size_value(inode);
     uint32_t block_count = (uint32_t)((directory_size + fs->block_size - 1U) / fs->block_size);
     for (uint32_t logical = 0; logical < block_count; ++logical) {
         uint64_t physical = 0;
@@ -195,7 +198,7 @@ int ext4_inode_size(ext4_fs_t *fs, uint32_t inode_number, uint64_t *size) {
     uint8_t inode[4096];
     if (!size || !read_inode(fs, inode_number, inode)) return 0;
     if ((load16(inode) & 0xf000U) != 0x8000U) return 0;
-    *size = load32(&inode[4]);
+    *size = inode_size_value(inode);
     return 1;
 }
 
@@ -204,7 +207,7 @@ int ext4_read_file(ext4_fs_t *fs, uint32_t inode_number, uint64_t offset,
     if (!fs || !buffer || size == 0) return 0;
     uint8_t inode[4096];
     if (!read_inode(fs, inode_number, inode)) return 0;
-    uint64_t file_size = load32(&inode[4]);
+    uint64_t file_size = inode_size_value(inode);
     if (offset > file_size || size > file_size - offset) return 0;
     uint8_t block[4096]; uint8_t *destination = buffer;
     uint32_t in_block = (uint32_t)(offset % fs->block_size); uint64_t logical = offset / fs->block_size;

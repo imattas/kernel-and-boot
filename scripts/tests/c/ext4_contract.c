@@ -37,6 +37,8 @@ int main(void) {
     assert(ext4_read_file(&fs, 9, 0, output, 5) && memcmp(output, "group", 5) == 0);
     put32(&sb[96], 0x00000080U); put16(&sb[254], 64);
     put32(&image[2 * 1024 + 40], 0); put32(&image[2 * 1024 + 64 + 8], 13); assert(ext4_mount(&fs, 0));
+    put32(&group_file_inode[108], 1); assert(ext4_inode_size(&fs, 9, &group_size)); assert(
+                                               group_size == 0x100000005ULL);
     memset(output, 0, sizeof(output)); assert(ext4_read_file(&fs, 9, 0, output, 5) &&
                                             memcmp(output, "group", 5) == 0);
     image[2 * 512 + 56] = 0; assert(!ext4_mount(&fs, 0)); return 0;

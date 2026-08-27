@@ -304,7 +304,8 @@ milestone groundwork only; they do not pass this gate.
 FAT32 and exFAT have read-only parsers and VFS file adapters. Ext4 now has
 read-only inode, directory, direct/indirect-block reads, and extent-tree file
 reads through a VFS adapter. Ext4 now resolves inode tables across multiple
-block groups and supports 64-bit block-count/inode-table metadata. XFS and
+block groups, supports 64-bit block-count/inode-table metadata, and combines
+the on-disk low/high inode size fields. XFS and
 Btrfs now have strict read-only superblock and geometry
 mount layers with contract tests. XFS now maps allocation-group inode numbers,
 reads v1/v2 inodes, supports short-form directories, inline files, extent

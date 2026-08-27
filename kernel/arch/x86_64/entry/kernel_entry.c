@@ -1043,6 +1043,23 @@ void kernel_main(void *boot_info) {
         serial_write("TCP endpoint data failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
+    network_frame_view_t tcp_response_probe_view;
+    if (!network_build_tcp_response(tcp_endpoint_probe_frame,
+                                    tcp_endpoint_probe_frame_length,
+                                    ethernet_probe_source,
+                                    ipv4_probe_destination,
+                                    &tcp_endpoint_probe_result,
+                                    tcp_endpoint_probe_outbound,
+                                    sizeof(tcp_endpoint_probe_outbound),
+                                    &tcp_endpoint_probe_outbound_length) ||
+        !network_decode_frame(tcp_endpoint_probe_outbound,
+                              tcp_endpoint_probe_outbound_length,
+                              &tcp_response_probe_view) ||
+        tcp_response_probe_view.kind != NETWORK_FRAME_TCP ||
+        tcp_response_probe_view.tcp.flags != TCP_FLAG_ACK) {
+        serial_write("TCP response framing failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
     tcp_segment_view_t tcp_endpoint_probe_outbound_view;
     if (!tcp_endpoint_send_segment(&tcp_endpoint_probe_table,
                                    tcp_endpoint_probe_handle,

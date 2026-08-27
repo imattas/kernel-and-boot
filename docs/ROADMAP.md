@@ -462,6 +462,9 @@ transmission active beyond the initialization probes.
 The persistent network service now dispatches validated TCP frames into the
 kernel TCP endpoint table alongside UDP, with the QEMU service probe covering
 SYN, ACK, and subsequent outbound stream generation through the service queue.
+The service now builds checksummed TCP responses with reversed Ethernet/IP
+addresses and transmits valid SYN-ACK/ACK control replies through e1000; the
+QEMU probe validates the response framing contract.
 IPv4 reassembly now has an explicit periodic expiry operation, and the runtime
 network service purges stale incomplete datagrams even when no new fragments
 arrive.

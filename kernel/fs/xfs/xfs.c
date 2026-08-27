@@ -350,6 +350,7 @@ static int xfs_write_block(const xfs_fs_t *fs, uint64_t block, const void *buffe
 static int xfs_allocate_real_bno(xfs_fs_t *fs, uint32_t allocation_group,
                                  uint32_t blocks, uint64_t *start) {
     uint8_t agf[4096], original_agf[4096], root[4096], original_root[4096];
+    uint8_t scan[4096];
     uint8_t leaf[4096], original_leaf[4096];
     if (!fs || !fs->mounted || !start || blocks == 0 ||
         allocation_group >= fs->ag_count || fs->block_size < 512U) return 0;
@@ -440,12 +441,12 @@ static int xfs_allocate_real_bno(xfs_fs_t *fs, uint32_t allocation_group,
                     root[16U + i * 8U + b] = leaf[16U + b];
             }
         }
-        uint8_t scan[4096];
-        if (!xfs_read_block(fs, ag_base + child, scan)) return 0;
-        uint32_t records = be16(&scan[6]);
+        const uint8_t *source = child == selected_leaf ? leaf : scan;
+        if (child != selected_leaf && !xfs_read_block(fs, ag_base + child, scan)) return 0;
+        uint32_t records = be16(&source[6]);
         for (uint32_t r = 0; r < records; ++r)
-            if (be32(&scan[20U + r * 8U]) > longest)
-                longest = be32(&scan[20U + r * 8U]);
+            if (be32(&source[20U + r * 8U]) > longest)
+                longest = be32(&source[20U + r * 8U]);
     }
     store_be32(&agf[44], longest);
     *start = ag_base + selected_start;

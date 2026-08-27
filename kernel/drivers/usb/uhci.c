@@ -478,9 +478,16 @@ static int uhci_interrupt_submit_locked(uint8_t address, uint8_t endpoint,
     for (uint32_t i = 0; i < td_pages * 4096U / 4U; ++i)
         ((uint32_t *)td)[i] = 0;
     int input = (endpoint & 0x80U) != 0;
-    if (!input)
+    if (input) {
+        /* A device may legally complete an interrupt IN transfer short.
+         * Clear the DMA page first so bytes beyond that packet can never
+         * expose stale physical-frame contents to the report decoder. */
+        for (uint16_t i = 0; i < length; ++i)
+            ((uint8_t *)(uintptr_t)data_frame)[i] = 0;
+    } else {
         for (uint16_t i = 0; i < length; ++i)
             ((uint8_t *)(uintptr_t)data_frame)[i] = ((uint8_t *)data)[i];
+    }
     qh->head = 1U; qh->element = (uint32_t)td_frame;
     uint8_t current_toggle = *toggle;
     for (uint32_t i = 0; i < packet_count; ++i) {

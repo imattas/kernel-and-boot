@@ -533,6 +533,8 @@ arrive.
 UHCI HID interrupt reports now feed a persistent preemptible input service task;
 PS/2 remains available through its routed interrupt handlers and the shared
 kernel input queue.
+UHCI interrupt-IN DMA buffers are now cleared before submission, so short HID
+ reports cannot expose stale bytes from a reused physical frame to decoders.
 The e1000 ISR now records delivery, and the post-interrupt-enable QEMU probe
 transmits a frame and requires an observed interrupt before continuing.
 The e1000 ISR now preserves cleared interrupt causes for the polling/service

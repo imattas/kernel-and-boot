@@ -137,6 +137,31 @@ int btrfs_fse_decode_interleaved2(const btrfs_fse_table_t *table,
     return 1;
 }
 
+int btrfs_fse_stream_init(const btrfs_fse_table_t *table, const uint8_t *stream,
+                          uint32_t stream_size, uint32_t *state, int64_t *offset) {
+    uint8_t last;
+    if (!table || !stream || !stream_size || !state || !offset || !table->size ||
+        table->accuracy_log > 10U || !stream[stream_size - 1U]) return 0;
+    last = stream[stream_size - 1U];
+    *offset = (int64_t)stream_size * 8 - (int64_t)(8U - highest_bit(last));
+    *state = stream_bits(stream, table->accuracy_log, offset);
+    return *state < table->size;
+}
+
+int btrfs_fse_stream_peek(const btrfs_fse_table_t *table, uint32_t state,
+                          uint8_t *symbol) {
+    if (!table || !symbol || state >= table->size) return 0;
+    *symbol = table->symbols[state];
+    return 1;
+}
+
+int btrfs_fse_stream_update(const btrfs_fse_table_t *table, const uint8_t *stream,
+                            uint32_t *state, int64_t *offset) {
+    if (!table || !stream || !state || !offset || *state >= table->size) return 0;
+    *state = table->new_state[*state] + stream_bits(stream, table->bits[*state], offset);
+    return *state < table->size;
+}
+
 int btrfs_fse_read_header(btrfs_fse_table_t *table, const uint8_t *stream,
                           uint32_t stream_size, uint32_t max_accuracy_log,
                           uint32_t *consumed) {

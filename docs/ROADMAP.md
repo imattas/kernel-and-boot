@@ -336,7 +336,8 @@ Huffman weights/literals and sequence execution are still pending; bounded FSE
 table construction and reverse-bitstream state decoding are now implemented and
 contracted, including the two-state interleaved stream form. FSE
 normalized-header parsing is now also implemented and
-contracted, so
+contracted, and the reusable initialized/peek/update stream API is now
+implemented and contracted, so
 Zstandard is not exposed through Btrfs yet.
 Zstandard sequence-section count/mode header parsing is now implemented and
 contracted; FSE symbol tables and literal/match sequence execution remain

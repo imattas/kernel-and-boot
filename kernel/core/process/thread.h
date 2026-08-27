@@ -11,6 +11,7 @@ typedef struct process_thread {
     task_t *task;
     struct process_thread *next;
     uint32_t references;
+    uint32_t retained_references;
 } process_thread_t;
 
 process_thread_t *process_thread_create(struct process *process, uint32_t id,

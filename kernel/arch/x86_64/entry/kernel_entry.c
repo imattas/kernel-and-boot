@@ -1847,11 +1847,15 @@ void kernel_main(void *boot_info) {
         thread_process->thread_count != 1 ||
         !process_thread_start(thread_probe) || scheduler_ready_count() != 1 ||
         !process_thread_destroy(thread_probe) || thread_process->thread_count != 0 ||
-        !process_destroy(thread_process)) {
+        process_destroy(thread_process)) {
         serial_write("process thread lifecycle failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     process_thread_release(looked_up_thread);
+    if (!process_destroy(thread_process)) {
+        serial_write("process thread release failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
     process_t *owned_thread_process = process_create(3);
     process_thread_t *owned_thread = owned_thread_process ?
         process_thread_create(owned_thread_process, 201, process_thread_probe, 0, 4096) : 0;

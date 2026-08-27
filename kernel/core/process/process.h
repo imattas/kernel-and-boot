@@ -30,6 +30,7 @@ typedef struct process {
     security_context_t security;
     process_thread_t *threads;
     uint32_t thread_count;
+    uint32_t retained_thread_references;
     uint64_t user_stack_page;
     uint64_t user_stack_top;
     uint32_t pending_signals;

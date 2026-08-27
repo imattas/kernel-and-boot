@@ -713,6 +713,10 @@ Thread retained-lookup acquisition rejects reference-count saturation instead
 of wrapping ownership to zero.
 Process destruction refuses to reclaim a process while any retained thread
 lookup remains, preserving the owning process lifetime until thread release.
+The process also tracks retained lookups after thread unlink, so destroying a
+thread cannot hide a live thread reference from process teardown.
+The boot probe verifies process destruction is rejected until an unlinked
+retained thread reference is released.
 
 AP IDT gates now use the selector belonging to the active AP trampoline code
 segment, while the BSP retains its kernel selector; the two-CPU QEMU gate

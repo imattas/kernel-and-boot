@@ -53,6 +53,7 @@ process_t *process_create(uint64_t id) {
     process_handle_table_initialize(&process->handles);
     process->threads = 0;
     process->thread_count = 0;
+    process->retained_thread_references = 0;
     if (!address_space_create(&process->address_space)) {
         kfree(process);
         return 0;
@@ -175,6 +176,10 @@ int process_destroy(process_t *process) {
             spinlock_unlock_irqrestore(&process->lock, process_flags);
             return 0;
         }
+    if (process->retained_thread_references != 0) {
+        spinlock_unlock_irqrestore(&process->lock, process_flags);
+        return 0;
+    }
     if (process_current() == process || process->state == PROCESS_RUNNING ||
         task_wait_queue_count(&process->signal_waiters) != 0 ||
         !process_thread_destroy_all_locked(process)) {

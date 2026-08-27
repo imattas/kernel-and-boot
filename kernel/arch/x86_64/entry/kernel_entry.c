@@ -39,6 +39,7 @@
 #include "../../../drivers/network/udp.h"
 #include "../../../drivers/network/icmp.h"
 #include "../../../drivers/network/route.h"
+#include "../../../drivers/network/packet_queue.h"
 #include "../../../time/clock.h"
 #include "../../../debug/assert.h"
 #include "../../../core/task/context.h"
@@ -646,6 +647,32 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("IPv4 route ready\r\n");
+    static network_packet_queue_t network_probe_queue;
+    static uint8_t network_probe_received[ETHERNET_MAX_FRAME_SIZE];
+    network_packet_queue_initialize(&network_probe_queue);
+    if (!network_packet_queue_push(&network_probe_queue, ethernet_probe_frame,
+                                   ethernet_probe_length) ||
+        network_packet_queue_count(&network_probe_queue) != 1 ||
+        !network_packet_queue_pop(&network_probe_queue, network_probe_received,
+                                  sizeof(network_probe_received),
+                                  &ethernet_probe_length) ||
+        ethernet_probe_length != ETHERNET_MIN_FRAME_SIZE ||
+        network_probe_received[0] != 0xff ||
+        network_packet_queue_count(&network_probe_queue) != 0) {
+        serial_write("network packet queue failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    for (uint32_t i = 0; i < NETWORK_PACKET_QUEUE_CAPACITY; ++i)
+        (void)network_packet_queue_push(&network_probe_queue,
+                                        ethernet_probe_frame,
+                                        ETHERNET_MIN_FRAME_SIZE);
+    if (network_packet_queue_push(&network_probe_queue, ethernet_probe_frame,
+                                  ETHERNET_MIN_FRAME_SIZE) ||
+        network_packet_queue_dropped(&network_probe_queue) != 1) {
+        serial_write("network packet queue overflow failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("network packet queue ready\r\n");
     if (e1000_controller_count() != 0 &&
         !e1000_transmit(network_probe_packet, sizeof(network_probe_packet))) {
         serial_write("e1000 transmit failure\r\n");

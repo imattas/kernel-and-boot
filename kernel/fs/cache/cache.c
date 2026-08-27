@@ -102,6 +102,16 @@ int block_cache_write(block_cache_t *cache, block_registry_t *registry,
     return 1;
 }
 
+int block_cache_flush(block_cache_t *cache, block_registry_t *registry,
+                      uint32_t device) {
+    if (!cache || !registry) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&cache->lock);
+    block_device_t *descriptor = block_registry_at(registry, device);
+    int valid = descriptor != 0;
+    spinlock_unlock_irqrestore(&cache->lock, flags);
+    return valid && block_registry_flush(registry, device);
+}
+
 void block_cache_invalidate(block_cache_t *cache, block_registry_t *registry,
                             uint32_t device, uint64_t sector) {
     if (!cache || !registry) return;

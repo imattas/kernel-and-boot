@@ -699,6 +699,8 @@ releases that lock before invoking hardware, preventing callback re-entry
 deadlocks and keeping registry operations independent of device latency.
 The block cache now performs cache-miss reads and write-through device I/O
 outside its metadata lock, then merges bounded results under lock.
+The cache now exposes an explicit flush operation that delegates to the
+underlying block device, completing the write-through durability boundary.
 The cache contract now verifies misses, hits, write-through coherence, sector
 invalidation, LRU eviction, and device-wide invalidation against a backing
 block device.

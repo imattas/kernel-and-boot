@@ -45,8 +45,9 @@ int main(void) {
     memset(value, 0x5a, sizeof(value));
     block_registry_initialize(&registry);
     assert(block_registry_register(&registry, &device));
-    assert(block_registry_flush(&registry, 0) && flushes == 1);
     block_cache_initialize(&cache);
+    assert(block_registry_flush(&registry, 0) && flushes == 1);
+    assert(block_cache_flush(&cache, &registry, 0) && flushes == 2);
 
     assert(block_cache_read(&cache, &registry, 0, 0, buffer, sizeof(buffer)));
     assert(reads == 1);

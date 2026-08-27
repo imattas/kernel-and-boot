@@ -30,6 +30,8 @@ int block_cache_read(block_cache_t *cache, block_registry_t *registry,
 int block_cache_write(block_cache_t *cache, block_registry_t *registry,
                       uint32_t device, uint64_t sector, const void *buffer,
                       uint32_t size);
+int block_cache_flush(block_cache_t *cache, block_registry_t *registry,
+                      uint32_t device);
 void block_cache_invalidate(block_cache_t *cache, block_registry_t *registry,
                             uint32_t device, uint64_t sector);
 void block_cache_invalidate_device(block_cache_t *cache,

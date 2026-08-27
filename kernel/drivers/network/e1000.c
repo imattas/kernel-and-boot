@@ -42,7 +42,10 @@
 #define E1000_IMS_RXDMT0 (1U << 4)
 #define E1000_IMS_RXT0 (1U << 7)
 #define E1000_IMS_TXDW (1U << 0)
-#define E1000_INTERRUPT_MASK (E1000_IMS_RXDMT0 | E1000_IMS_RXT0 | E1000_IMS_TXDW)
+#define E1000_IMS_LSC (1U << 2)
+#define E1000_IMS_RXO (1U << 6)
+#define E1000_INTERRUPT_MASK (E1000_IMS_RXDMT0 | E1000_IMS_RXT0 | E1000_IMS_TXDW | \
+                              E1000_IMS_LSC | E1000_IMS_RXO)
 #define E1000_IRQ_VECTOR 0x51
 
 extern void arch_e1000_irq_stub(void);
@@ -66,6 +69,8 @@ static int e1000_msi_enabled;
 static volatile uint32_t e1000_interrupts;
 static volatile uint32_t e1000_pending_causes;
 static volatile uint32_t e1000_tx_errors;
+static volatile uint32_t e1000_link_events;
+static volatile uint32_t e1000_rx_overruns;
 
 static int e1000_match(const device_t *device) {
     return device && device->bus == DEVICE_BUS_PCI && device->class_code == 0x02 &&
@@ -143,6 +148,8 @@ int e1000_initialize(void) {
     e1000_interrupts = 0;
     e1000_pending_causes = 0;
     e1000_tx_errors = 0;
+    e1000_link_events = 0;
+    e1000_rx_overruns = 0;
     spinlock_init(&e1000_lock);
     for (uint32_t i = 0; i < E1000_RING_COUNT; ++i) {
         e1000_rx_buffers[i] = 0;
@@ -159,6 +166,8 @@ int e1000_link_up(void) {
 int e1000_interrupt_enabled(void) { return e1000_msi_enabled; }
 uint32_t e1000_interrupt_count(void) { return e1000_interrupts; }
 uint32_t e1000_tx_error_count(void) { return e1000_tx_errors; }
+uint32_t e1000_link_event_count(void) { return e1000_link_events; }
+uint32_t e1000_rx_overrun_count(void) { return e1000_rx_overruns; }
 void e1000_interrupt_handler(void) {
     if (!e1000_regs) return;
     uint32_t causes = e1000_regs[E1000_ICR / 4];
@@ -195,6 +204,8 @@ uint32_t e1000_service(void) {
     uint32_t causes = __atomic_exchange_n(&e1000_pending_causes, 0,
                                           __ATOMIC_ACQUIRE);
     causes |= e1000_regs[E1000_ICR / 4];
+    if ((causes & E1000_IMS_LSC) != 0) ++e1000_link_events;
+    if ((causes & E1000_IMS_RXO) != 0) ++e1000_rx_overruns;
     while (e1000_tx_pending != 0 &&
            (e1000_tx_ring[e1000_tx_reclaim_index].status & E1000_DESC_DONE) != 0) {
         if ((e1000_tx_ring[e1000_tx_reclaim_index].status &

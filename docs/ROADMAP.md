@@ -316,6 +316,8 @@ path, preventing the accounting read from hiding completion work from service.
 e1000 TX completion service now records hardware descriptor error bits instead
 of silently treating errored completions as successful reclamation; the QEMU
 probe requires a clean completion.
+e1000 interrupt handling now enables and accounts for link-state-change and
+receive-overrun causes instead of dropping those device events.
 UHCI control transfers now build a bounded multi-packet endpoint-0 TD chain,
 validate the setup transfer length, alternate data toggles, and verify every
 TD before releasing DMA frames.

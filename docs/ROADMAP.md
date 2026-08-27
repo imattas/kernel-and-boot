@@ -1002,6 +1002,9 @@ Ext4 direct-block regular files now support bounded growth through the group
 block bitmap, zero-filled newly allocated blocks, inode pointer updates, and
 block release during shrink/truncate; the contract covers multi-block growth
 and readback.
+Ext4 growth now also supports a single-indirect block table, including table
+allocation, pointer updates, zero-filled data blocks, and readback across the
+indirect boundary.
 XFS local-format regular files now support bounded append growth within the
 inode payload and zero-length truncation with inline data clearing; extent
 allocation remains a separate XFS metadata milestone.

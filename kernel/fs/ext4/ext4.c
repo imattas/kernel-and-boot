@@ -208,23 +208,49 @@ static int ext4_alloc_block(ext4_fs_t *fs, uint64_t *block) {
     return 0;
 }
 
-static int ext4_resize_direct(ext4_fs_t *fs, uint32_t inode_number,
+static int ext4_resize_blocks(ext4_fs_t *fs, uint32_t inode_number,
                               uint8_t *inode, uint64_t new_size) {
     uint64_t old_size = inode_size_value(inode);
     uint64_t old_blocks = (old_size + fs->block_size - 1U) / fs->block_size;
     uint64_t new_blocks = (new_size + fs->block_size - 1U) / fs->block_size;
-    if (new_blocks > 12U || (new_size > UINT32_MAX && !fs->has_64bit)) return 0;
+    uint64_t pointers = fs->block_size / 4U;
+    if (new_blocks > 12U + pointers ||
+        (new_size > UINT32_MAX && !fs->has_64bit)) return 0;
+    uint32_t indirect = load32(&inode[88]);
+    uint8_t table[4096];
     if (new_blocks > old_blocks) {
         for (uint64_t i = old_blocks; i < new_blocks; ++i) {
             uint64_t block;
-            if (!ext4_alloc_block(fs, &block)) return 0;
-            store32(&inode[40 + i * 4U], (uint32_t)block);
+            if (i >= 12U && indirect == 0) {
+                if (!ext4_alloc_block(fs, &block) || !write_block(fs, block,
+                    (uint8_t[4096]){0})) return 0;
+                indirect = (uint32_t)block; store32(&inode[88], indirect);
+            }
+            if (i < 12U) {
+                if (!ext4_alloc_block(fs, &block)) return 0;
+                store32(&inode[40 + i * 4U], (uint32_t)block);
+            } else {
+                if (!read_block(fs, indirect, table)) return 0;
+                uint64_t table_index = i - 12U;
+                if (load32(&table[table_index * 4U]) != 0) return 0;
+                if (!ext4_alloc_block(fs, &block)) return 0;
+                store32(&table[table_index * 4U], (uint32_t)block);
+                if (!write_block(fs, indirect, table)) return 0;
+            }
         }
     } else if (new_blocks < old_blocks) {
+        if (indirect && !read_block(fs, indirect, table)) return 0;
         for (uint64_t i = new_blocks; i < old_blocks; ++i) {
-            uint64_t block = load32(&inode[40 + i * 4U]);
+            uint64_t block = i < 12U ? load32(&inode[40 + i * 4U]) :
+                              load32(&table[(i - 12U) * 4U]);
             if (block && !ext4_set_block_used(fs, block, 0)) return 0;
-            store32(&inode[40 + i * 4U], 0);
+            if (i < 12U) store32(&inode[40 + i * 4U], 0);
+            else store32(&table[(i - 12U) * 4U], 0);
+        }
+        if (indirect && new_blocks > 12U && !write_block(fs, indirect, table)) return 0;
+        if (indirect && new_blocks <= 12U) {
+            if (!ext4_set_block_used(fs, indirect, 0)) return 0;
+            store32(&inode[88], 0);
         }
     }
     store32(&inode[4], (uint32_t)new_size);
@@ -400,7 +426,7 @@ int ext4_write_file(ext4_fs_t *fs, uint32_t inode_number, uint64_t offset,
     if (offset > UINT64_MAX - size || offset > file_size) return 0;
     uint64_t end = offset + size;
     if (end > file_size && (load32(&inode[32]) & EXT4_EXTENTS_FL) != 0) return 0;
-    if (end > file_size && !ext4_resize_direct(fs, inode_number, inode, end)) return 0;
+    if (end > file_size && !ext4_resize_blocks(fs, inode_number, inode, end)) return 0;
     file_size = end > file_size ? end : file_size;
     uint8_t block[4096];
     const uint8_t *source = (const uint8_t *)buffer;
@@ -430,5 +456,5 @@ int ext4_truncate_file(ext4_fs_t *fs, uint32_t inode_number, uint64_t size) {
         (load16(inode) & 0xf000U) != 0x8000U ||
         size > inode_size_value(inode)) return 0;
     if ((load32(&inode[32]) & EXT4_EXTENTS_FL) != 0) return write_inode_size(fs, inode_number, size);
-    return ext4_resize_direct(fs, inode_number, inode, size);
+    return ext4_resize_blocks(fs, inode_number, inode, size);
 }

@@ -47,6 +47,12 @@ int main(void) {
     assert(ext4_truncate_file(&fs, inode, 3));
     assert(ext4_inode_size(&fs, inode, &size) && size == 3);
     memset(output, 0, sizeof(output)); assert(ext4_read_file(&fs, 4, 1024U * 12U, output, 5)); assert(memcmp(output, "indir", 5) == 0);
+    uint8_t indirect_growth[1024]; memset(indirect_growth, 'z', sizeof(indirect_growth));
+    assert(ext4_write_file(&fs, 4, 12293, indirect_growth, sizeof(indirect_growth)));
+    assert(ext4_inode_size(&fs, 4, &size) && size == 13317);
+    uint8_t indirect_readback[1024]; memset(indirect_readback, 0, sizeof(indirect_readback));
+    assert(ext4_read_file(&fs, 4, 12293, indirect_readback, sizeof(indirect_readback)) &&
+           memcmp(indirect_readback, indirect_growth, sizeof(indirect_growth)) == 0);
     memset(output, 0, sizeof(output)); assert(ext4_read_file(&fs, 5, 0, output, 4)); assert(memcmp(output, "deep", 4) == 0);
     uint64_t group_size = 0;
     memset(output, 0, sizeof(output)); assert(ext4_inode_size(&fs, 9, &group_size) && group_size == 5);

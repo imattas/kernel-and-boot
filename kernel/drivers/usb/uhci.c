@@ -54,7 +54,7 @@ static uint64_t uhci_async_data_frame;
 static uint8_t *uhci_async_data;
 static uint16_t uhci_async_length;
 static uint8_t *uhci_async_toggle;
-static uint8_t uhci_async_packet_count;
+static uint16_t uhci_async_packet_count;
 static uint8_t uhci_async_input;
 static uint8_t uhci_async_pending;
 
@@ -417,7 +417,7 @@ static int uhci_interrupt_submit_locked(uint8_t address, uint8_t endpoint,
     uhci_async_qh_frame = qh_frame; uhci_async_td_frame = td_frame;
     uhci_async_data_frame = data_frame; uhci_async_data = (uint8_t *)data;
     uhci_async_length = length;
-    uhci_async_toggle = toggle; uhci_async_packet_count = (uint8_t)packet_count;
+    uhci_async_toggle = toggle; uhci_async_packet_count = (uint16_t)packet_count;
     uhci_async_input = (uint8_t)input; uhci_async_pending = 1;
     return 1;
 fail:

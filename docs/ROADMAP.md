@@ -984,6 +984,8 @@ does not raise reliably.
 UHCI interrupt-IN transfers now have a persistent bounded frame-list slot and
 completion poller; idle NAKs remain scheduled, while completed reports are
 copied, toggles advanced, and DMA frames reclaimed before resubmission.
+The persistent transfer slot now retains the full bounded packet-count range,
+including 4096-byte transfers split across one-byte maximum packets.
 The UEFI memory-map capture now rejects malformed successful firmware results
 unless descriptor size and map length satisfy the boot contract, and bounds
 replacement-map publication to the allocated buffer.

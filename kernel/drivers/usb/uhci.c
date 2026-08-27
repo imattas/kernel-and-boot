@@ -43,6 +43,8 @@ static uint64_t controller_frame_list;
 static device_driver_t uhci_driver;
 static int uhci_irq_enabled;
 static volatile uint32_t uhci_interrupts;
+static volatile uint32_t uhci_last_td_status_value;
+static volatile uint16_t uhci_last_status_value;
 static int uhci_low_speed;
 static int uhci_io_disabled;
 static spinlock_t uhci_lock;
@@ -267,6 +269,7 @@ static int uhci_control_transfer_locked(uint8_t address, uint8_t endpoint,
         return 0;
     }
     uint16_t controller_status = uhci_status();
+    uhci_last_status_value = controller_status;
     complete = complete && (controller_status & (UHCI_STATUS_ERROR |
                         UHCI_STATUS_HOST_SYSTEM_ERROR |
                         UHCI_STATUS_PROCESS_ERROR)) == 0;
@@ -343,6 +346,8 @@ static int uhci_interrupt_transfer_locked(uint8_t address, uint8_t endpoint, voi
         return 0;
     }
     uint16_t controller_status = uhci_status();
+    uhci_last_td_status_value = td[packet_count - 1U].status;
+    uhci_last_status_value = controller_status;
     complete = complete && (controller_status & (UHCI_STATUS_ERROR |
                         UHCI_STATUS_HOST_SYSTEM_ERROR |
                         UHCI_STATUS_PROCESS_ERROR)) == 0;
@@ -366,6 +371,8 @@ int uhci_initialize(void) {
     uhci_io_disabled = 0;
     uhci_irq_enabled = 0;
     uhci_interrupts = 0;
+    uhci_last_td_status_value = 0;
+    uhci_last_status_value = 0;
     spinlock_init(&uhci_lock);
     uhci_driver.name = "uhci";
     uhci_driver.bus = DEVICE_BUS_PCI;
@@ -378,6 +385,8 @@ uint32_t uhci_controller_count(void) { return controllers; }
 uint32_t uhci_root_port_count(void) { return root_ports; }
 int uhci_interrupt_enabled(void) { return uhci_irq_enabled; }
 uint32_t uhci_interrupt_count(void) { return uhci_interrupts; }
+uint32_t uhci_last_transfer_td_status(void) { return uhci_last_td_status_value; }
+uint16_t uhci_last_controller_status(void) { return uhci_last_status_value; }
 int uhci_control_transfer(uint8_t address, uint8_t endpoint,
                           const uint8_t setup[8], void *data, uint16_t length) {
     uint64_t flags = spinlock_lock_irqsave(&uhci_lock);

@@ -495,6 +495,8 @@ UHCI interrupt transfers now reject endpoint values before token bit-packing,
 preventing invalid endpoint numbers from being silently truncated.
 UHCI interrupt transfers now accept the USB endpoint direction bit while still
 validating the four-bit endpoint number, enabling real interrupt-IN HID paths.
+The UHCI HID startup probe now retries bounded interrupt polls to absorb
+transient device scheduling latency before selecting the fallback status.
 UHCI control/interrupt transfers and ISR status acknowledgement now share an
 IRQ-safe driver lock, preventing SMP callers and interrupt delivery from
 interleaving controller state transitions.

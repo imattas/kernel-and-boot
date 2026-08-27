@@ -1859,10 +1859,12 @@ void kernel_main(void *boot_info) {
         input_runtime_endpoint = uhci_interrupt_endpoint;
         input_runtime_packet = uhci_interrupt_packet;
         input_runtime_ready = 1;
-        int uhci_report_ready = uhci_interrupt_transfer(
-            1, input_runtime_endpoint, input_runtime_report,
-            input_runtime_packet, input_runtime_packet,
-            &input_runtime_toggle);
+        int uhci_report_ready = 0;
+        for (uint32_t attempt = 0; attempt < 8 && !uhci_report_ready; ++attempt)
+            uhci_report_ready = uhci_interrupt_transfer(
+                1, input_runtime_endpoint, input_runtime_report,
+                input_runtime_packet, input_runtime_packet,
+                &input_runtime_toggle);
         input_event_t uhci_events[20];
         uint32_t uhci_event_count = 0;
         usb_hid_keyboard_state_initialize(&input_runtime_hid_state);
@@ -1877,8 +1879,14 @@ void kernel_main(void *boot_info) {
                     for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
                 }
         }
-        serial_write(uhci_report_ready ? "UHCI HID input delivery ready\r\n" :
-                     "UHCI HID polling ready\r\n");
+        if (uhci_report_ready)
+            serial_write("UHCI HID input delivery ready\r\n");
+        else {
+            serial_write("UHCI HID polling ready td=");
+            serial_write_hex_line("", uhci_last_transfer_td_status());
+            serial_write("UHCI HID controller status=");
+            serial_write_hex_line("", uhci_last_controller_status());
+        }
     }
     if (!ps2_keyboard_initialize(&input_queue)) {
         serial_write("PS2 keyboard initialization failure\r\n");

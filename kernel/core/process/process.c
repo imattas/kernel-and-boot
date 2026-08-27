@@ -258,7 +258,8 @@ process_t *process_clone_user(process_t *parent, uint64_t id,
     vfs_node_retain(root);
     vfs_node_retain(working);
     process_t *child = process_create(id);
-    if (!child || !user_image_clone(&cloned_space, &parent->image, &cloned_image)) {
+    if (!child || !user_image_clone(&cloned_space, &parent->image, &cloned_image) ||
+        !address_space_clone_anonymous(&cloned_space, &parent->address_space)) {
         spinlock_unlock_irqrestore(&parent->lock, parent_flags);
         vfs_node_release(working);
         vfs_node_release(root);

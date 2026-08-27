@@ -2814,10 +2814,16 @@ void kernel_main(void *boot_info) {
         !address_space_unmap_anonymous(&runtime_process->address_space,
                                        anonymous_probe_address, 2) ||
         address_space_user_range_valid(&runtime_process->address_space,
-                                       anonymous_probe_address, 2 * 0x1000ULL, 1)) {
+                                       anonymous_probe_address, 2 * 0x1000ULL, 1) ||
+        !address_space_map_anonymous(&runtime_process->address_space,
+                                     anonymous_probe_address, 1,
+                                     ADDRESS_SPACE_WRITABLE)) {
         serial_write("anonymous memory lifecycle failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
+    volatile uint8_t *anonymous_source = (volatile uint8_t *)(uintptr_t)
+        runtime_process->address_space.anonymous_frames[0].physical_address;
+    anonymous_source[0] = 0x5a;
     serial_write("anonymous memory lifecycle ready\r\n");
     process_t *constructed_process = process_create_user(
         7, user_image_probe, sizeof(user_image_probe), 0x8000010000ULL,
@@ -2834,8 +2840,17 @@ void kernel_main(void *boot_info) {
         cloned_process->root_directory != runtime_process->root_directory ||
         cloned_process->image.pages[0] == runtime_process->image.pages[0] ||
         cloned_process->user_stack_pages[0] == runtime_process->user_stack_pages[0] ||
+        cloned_process->address_space.anonymous_count != 1 ||
+        cloned_process->address_space.anonymous_frames[0].physical_address ==
+            runtime_process->address_space.anonymous_frames[0].physical_address ||
+        ((volatile uint8_t *)(uintptr_t)cloned_process->address_space.anonymous_frames[0].physical_address)[0] != 0x5a ||
         !process_destroy(cloned_process)) {
         serial_write("user process clone failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    if (!address_space_unmap_anonymous(&runtime_process->address_space,
+                                       anonymous_probe_address, 1)) {
+        serial_write("anonymous clone cleanup failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("user process clone ready\r\n");

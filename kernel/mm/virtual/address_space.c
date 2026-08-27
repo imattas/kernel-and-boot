@@ -23,6 +23,9 @@ static uint64_t active_root;
 static const address_space_t *active_space;
 static spinlock_t address_space_lock;
 
+static int address_space_unmap_page_locked(address_space_t *space,
+                                           uint64_t virtual_address);
+
 static void clear_table(uint64_t *table) {
     for (uint64_t i = 0; i < 512; ++i) table[i] = 0;
 }
@@ -233,14 +236,19 @@ static int address_space_map_page_locked(address_space_t *space,
 
 int address_space_clone_anonymous(address_space_t *destination,
                                   const address_space_t *source) {
-    if (!destination || !source || destination == source || destination->root != 0 ||
+    if (!destination || !source || destination == source ||
         source->root == 0 || source->anonymous_count > ADDRESS_SPACE_MAX_ANONYMOUS_PAGES)
         return 0;
     uint64_t lock_flags = spinlock_lock_irqsave(&address_space_lock);
-    if (!address_space_create_locked(destination)) {
-        spinlock_unlock_irqrestore(&address_space_lock, lock_flags);
-        return 0;
+    uint8_t created_space = 0;
+    if (destination->root == 0) {
+        if (!address_space_create_locked(destination)) {
+            spinlock_unlock_irqrestore(&address_space_lock, lock_flags);
+            return 0;
+        }
+        created_space = 1;
     }
+    uint32_t anonymous_before = destination->anonymous_count;
     for (uint32_t index = 0; index < source->anonymous_count; ++index) {
         const uint64_t virtual_address = source->anonymous_frames[index].virtual_address;
         const uint64_t source_frame = source->anonymous_frames[index].physical_address;
@@ -249,7 +257,15 @@ int address_space_clone_anonymous(address_space_t *destination,
         if (!destination_frame || !address_space_map_page_locked(
                 destination, virtual_address, destination_frame, flags)) {
             if (destination_frame) physical_free_frame(destination_frame);
-            (void)address_space_destroy_locked(destination);
+            while (destination->anonymous_count > anonymous_before) {
+                uint32_t last = destination->anonymous_count - 1;
+                uint64_t address = destination->anonymous_frames[last].virtual_address;
+                uint64_t frame = destination->anonymous_frames[last].physical_address;
+                (void)address_space_unmap_page_locked(destination, address);
+                --destination->anonymous_count;
+                physical_free_frame(frame);
+            }
+            if (created_space) (void)address_space_destroy_locked(destination);
             spinlock_unlock_irqrestore(&address_space_lock, lock_flags);
             return 0;
         }

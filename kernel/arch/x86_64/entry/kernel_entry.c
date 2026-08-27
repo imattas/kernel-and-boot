@@ -1412,6 +1412,23 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("USB HID keyboard ready\r\n");
+    static const uint8_t hid_mouse_probe_report[3] = {0x05, 0x04, 0xfb};
+    input_event_t hid_mouse_probe_events[3];
+    uint32_t hid_mouse_probe_count = 0;
+    if (!usb_hid_mouse_decode(hid_mouse_probe_report,
+                              sizeof(hid_mouse_probe_report),
+                              hid_mouse_probe_events,
+                              &hid_mouse_probe_count) ||
+        hid_mouse_probe_count != 3 ||
+        hid_mouse_probe_events[0].type != INPUT_EVENT_BUTTON ||
+        hid_mouse_probe_events[0].value != 5 ||
+        hid_mouse_probe_events[1].value != 4 ||
+        hid_mouse_probe_events[2].code != 1 ||
+        hid_mouse_probe_events[2].value != -5) {
+        serial_write("USB HID mouse failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("USB HID mouse ready\r\n");
     if (uhci_root_port_count() != 0 && uhci_interrupt_endpoint != 0) {
         uint8_t uhci_report[64] = {0};
         uint8_t uhci_toggle = 0;

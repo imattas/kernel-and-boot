@@ -12,3 +12,17 @@ int usb_hid_keyboard_decode(const uint8_t *report, uint32_t length,
     event->timestamp = 0;
     return 1;
 }
+
+int usb_hid_mouse_decode(const uint8_t *report, uint32_t length,
+                         input_event_t events[3], uint32_t *event_count) {
+    if (!report || !events || !event_count || length != 3 ||
+        (report[0] & 0xf8U) != 0) return 0;
+    events[0] = (input_event_t){INPUT_EVENT_BUTTON, 0,
+                                (int32_t)(report[0] & 0x07U), 0};
+    events[1] = (input_event_t){INPUT_EVENT_AXIS, 0,
+                                (int32_t)(int8_t)report[1], 0};
+    events[2] = (input_event_t){INPUT_EVENT_AXIS, 1,
+                                (int32_t)(int8_t)report[2], 0};
+    *event_count = 3;
+    return 1;
+}

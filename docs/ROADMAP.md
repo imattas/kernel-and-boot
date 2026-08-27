@@ -666,6 +666,8 @@ NVMe I/O now enforces the namespace size reported by IDENTIFY before PRP
 allocation and command submission.
 PS/2 mouse packets now have a validated decoder that rejects bad sync and
 overflow bits and emits button, X-axis, and Y-axis input events.
+USB HID boot-mouse reports now decode into validated button, X-axis, and
+Y-axis input events.
 
 ## Phase 10 — Userland begins after the kernel gate
 

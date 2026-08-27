@@ -1701,6 +1701,8 @@ void kernel_main(void *boot_info) {
         usb_device.vendor_id != 0x1234 ||
         !usb_device_add_endpoint(&usb_device, usb_endpoint_descriptor,
                                   sizeof(usb_endpoint_descriptor)) ||
+        usb_device_add_endpoint(&usb_device, usb_endpoint_descriptor,
+                                sizeof(usb_endpoint_descriptor)) ||
         usb_device.endpoint_count != 1 ||
         usb_device.endpoints[0].max_packet_size != 64) {
         serial_write("USB descriptor failure\r\n");

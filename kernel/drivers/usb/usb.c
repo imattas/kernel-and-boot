@@ -32,6 +32,8 @@ int usb_device_add_endpoint(usb_device_t *device, const uint8_t *descriptor,
         (max_packet = load16(&descriptor[4])) == 0 ||
         (max_packet & 0xf800U) != 0 ||
         device->endpoint_count >= USB_MAX_ENDPOINTS) return 0;
+    for (uint32_t i = 0; i < device->endpoint_count; ++i)
+        if (device->endpoints[i].address == descriptor[2]) return 0;
     usb_endpoint_t *endpoint = &device->endpoints[device->endpoint_count++];
     endpoint->address = descriptor[2];
     endpoint->attributes = descriptor[3];

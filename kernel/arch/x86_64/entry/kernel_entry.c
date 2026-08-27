@@ -83,6 +83,28 @@ static volatile uint8_t ipc_block_probe_result;
 static process_t *signal_wait_probe_process;
 static volatile uint8_t signal_wait_probe_result;
 static uint8_t ahci_read_probe[512];
+typedef struct {
+    network_packet_queue_t *queue;
+    arp_cache_t *arp_cache;
+    ipv4_reassembly_table_t *reassembly;
+    udp_endpoint_table_t *udp;
+    uint8_t *local_hardware;
+    const uint8_t *local_protocol;
+    uint8_t *reassembly_output;
+} network_runtime_context_t;
+static network_runtime_context_t network_runtime;
+
+static void network_runtime_task(void *argument) {
+    network_runtime_context_t *runtime = (network_runtime_context_t *)argument;
+    for (;;) {
+        (void)network_service(runtime->queue, runtime->local_hardware,
+                              runtime->local_protocol, runtime->arp_cache,
+                              runtime->udp, timer_ticks(), 8,
+                              runtime->reassembly, runtime->reassembly_output,
+                              IPV4_REASSEMBLY_MAX_PAYLOAD);
+        scheduler_yield();
+    }
+}
 static void process_thread_probe(void *argument) { (void)argument; }
 static int block_probe_read(void *context, uint64_t sector, uint32_t count,
                             void *buffer) {
@@ -959,6 +981,13 @@ void kernel_main(void *boot_info) {
     static arp_cache_t network_service_probe_cache;
     static ipv4_reassembly_table_t network_reassembly_probe_table;
     static uint8_t network_reassembly_probe_output[IPV4_REASSEMBLY_MAX_PAYLOAD];
+    network_runtime.queue = &network_service_probe_queue;
+    network_runtime.arp_cache = &network_service_probe_cache;
+    network_runtime.reassembly = &network_reassembly_probe_table;
+    network_runtime.udp = &udp_endpoint_probe_table;
+    network_runtime.local_hardware = ethernet_probe_source;
+    network_runtime.local_protocol = ipv4_probe_destination;
+    network_runtime.reassembly_output = network_reassembly_probe_output;
     network_packet_queue_initialize(&network_service_probe_queue);
     arp_cache_initialize(&network_service_probe_cache);
     ipv4_reassembly_initialize(&network_reassembly_probe_table);
@@ -2064,6 +2093,20 @@ void kernel_main(void *boot_info) {
     if (!kernel_init_state_advance(&init_state, KERNEL_INIT_SERVICES))
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     serial_write("user mode deferred until kernel completion\r\n");
+    if (e1000_controller_count() != 0) {
+        task_t *network_task = task_create_kernel(500, network_runtime_task,
+                                                   &network_runtime, 16384);
+        if (!network_task || !scheduler_enqueue(network_task)) {
+            serial_write("network runtime task setup failure\r\n");
+            for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+        }
+        scheduler_enable_preemption(1);
+        serial_write("network runtime service ready\r\n");
+        if (!scheduler_start()) {
+            serial_write("network runtime task start failure\r\n");
+            for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+        }
+    }
     for (;;) {
         __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }

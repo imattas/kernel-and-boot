@@ -33,6 +33,10 @@ static uint32_t le32(const uint8_t *p) {
 static uint64_t le64(const uint8_t *p) {
     return (uint64_t)le32(p) | ((uint64_t)le32(p + 4) << 32);
 }
+static void store32(uint8_t *p, uint32_t value) {
+    p[0] = (uint8_t)value; p[1] = (uint8_t)(value >> 8);
+    p[2] = (uint8_t)(value >> 16); p[3] = (uint8_t)(value >> 24);
+}
 
 static int btrfs_map_at(const btrfs_fs_t *fs, uint64_t logical, uint32_t bytes,
                         uint8_t mirror, uint32_t *device, uint64_t *physical) {
@@ -446,6 +450,49 @@ static int btrfs_validate_data(const btrfs_fs_t *fs, uint64_t logical,
     return 1;
 }
 
+static int btrfs_write_node(btrfs_fs_t *fs, uint64_t bytenr, uint8_t *node) {
+    uint32_t device = 0; uint64_t physical = 0;
+    if (!fs || !node || !btrfs_map(fs, bytenr, fs->node_size, &device, &physical) ||
+        physical % BTRFS_SECTOR_SIZE != 0) return 0;
+    store32(node, crc32c(&node[32], fs->node_size - 32U));
+    return storage_write(device, physical / BTRFS_SECTOR_SIZE,
+                         fs->node_size / BTRFS_SECTOR_SIZE, node);
+}
+
+static int btrfs_update_data_csum(btrfs_fs_t *fs, uint64_t bytenr,
+                                  uint64_t logical, uint32_t checksum,
+                                  uint8_t depth) {
+    uint8_t node[65536];
+    if (!fs || depth > 8 || fs->node_size > sizeof(node) ||
+        !btrfs_read_node(fs, bytenr, node)) return 0;
+    uint32_t count = le32(&node[96]);
+    if (node[100] == 0) {
+        if (count > (fs->node_size - 101U) / 25U) return 0;
+        for (uint32_t i = 0; i < count; ++i) {
+            uint8_t *item = &node[101U + i * 25U];
+            if (le64(item) != BTRFS_EXTENT_CSUM_OBJECTID ||
+                item[8] != BTRFS_EXTENT_CSUM_TYPE) continue;
+            uint64_t start = le64(&item[9]);
+            uint32_t offset = le32(&item[17]), size = le32(&item[21]);
+            if (start > logical || logical - start > UINT64_MAX / sizeof(uint32_t) ||
+                (logical - start) % fs->sector_size != 0 ||
+                size % sizeof(uint32_t) != 0 || offset > fs->node_size ||
+                size > fs->node_size - offset) continue;
+            uint64_t index = (logical - start) / fs->sector_size;
+            if (index >= size / sizeof(uint32_t)) continue;
+            store32(&node[offset + index * sizeof(uint32_t)], checksum);
+            return btrfs_write_node(fs, bytenr, node);
+        }
+        return 0;
+    }
+    if (node[100] > 8 || count == 0 || count > (fs->node_size - 101U) / 33U)
+        return 0;
+    for (uint32_t i = 0; i < count; ++i)
+        if (btrfs_update_data_csum(fs, le64(&node[118U + i * 33U]), logical,
+                                   checksum, (uint8_t)(depth + 1U))) return 1;
+    return 0;
+}
+
 static int btrfs_read_checked(btrfs_fs_t *fs, uint64_t logical, uint32_t bytes,
                               uint8_t *data) {
     uint32_t device = 0; uint64_t physical = 0;
@@ -723,6 +770,60 @@ int btrfs_read_file(btrfs_fs_t *fs, uint64_t tree_bytenr, uint64_t inode,
                                                            start, offset, destination,
                                                            (uint32_t)chunk)) return 0;
         offset += chunk; destination += chunk; remaining -= (uint32_t)chunk;
+    }
+    return 1;
+}
+
+int btrfs_write_file(btrfs_fs_t *fs, uint64_t tree_bytenr, uint64_t inode,
+                     uint64_t offset, const void *buffer, uint32_t size) {
+    uint64_t file_size = 0; uint32_t mode = 0;
+    uint8_t extent[53], data[4096];
+    if (!fs || !fs->mounted || !buffer || !size || fs->sector_size > sizeof(data) ||
+        !btrfs_inode_stat(fs, tree_bytenr, inode, &file_size, &mode) ||
+        (mode & 0170000U) != 0100000U || offset > file_size ||
+        size > file_size - offset) return 0;
+    const uint8_t *source = (const uint8_t *)buffer;
+    uint32_t remaining = size;
+    while (remaining) {
+        uint64_t start = 0;
+        if (!btrfs_find_extent_start(fs, tree_bytenr, inode, offset, &start) ||
+            !btrfs_read_item(fs, tree_bytenr, inode, BTRFS_EXTENT_DATA_TYPE,
+                             start, extent, sizeof(extent)) || extent[16] != 0 ||
+            extent[17] != 0 || extent[18] != 0 || extent[20] != 1) return 0;
+        uint64_t relative = offset - start;
+        uint64_t disk_bytenr = le64(&extent[21]);
+        uint64_t disk_size = le64(&extent[29]);
+        uint64_t data_offset = le64(&extent[37]);
+        uint64_t data_size = le64(&extent[45]);
+        if (!data_size || data_offset > disk_size || relative > data_size ||
+            remaining > data_size - relative || data_offset > disk_size - relative ||
+            offset > UINT64_MAX - disk_bytenr - data_offset) return 0;
+        uint64_t logical = disk_bytenr + data_offset + relative;
+        uint64_t sector_logical = logical - logical % fs->sector_size;
+        uint32_t in_sector = (uint32_t)(logical - sector_logical);
+        uint32_t chunk = fs->sector_size - in_sector;
+        if (chunk > remaining) chunk = remaining;
+        if (sector_logical < disk_bytenr + data_offset ||
+            sector_logical > UINT64_MAX - fs->sector_size ||
+            sector_logical + fs->sector_size > disk_bytenr + data_offset + data_size ||
+            !btrfs_read_checked(fs, sector_logical, fs->sector_size, data)) return 0;
+        for (uint32_t i = 0; i < chunk; ++i) data[in_sector + i] = source[i];
+        uint32_t device = 0; uint64_t physical = 0;
+        if (!btrfs_map(fs, sector_logical, fs->sector_size, &device, &physical) ||
+            physical % BTRFS_SECTOR_SIZE != 0 ||
+            !storage_write(device, physical / BTRFS_SECTOR_SIZE,
+                           fs->sector_size / BTRFS_SECTOR_SIZE, data)) return 0;
+        uint32_t mirror_device = 0; uint64_t mirror_physical = 0;
+        if (btrfs_map_at(fs, sector_logical, fs->sector_size, 1,
+                         &mirror_device, &mirror_physical) &&
+            (mirror_device != device || mirror_physical != physical) &&
+            (mirror_physical % BTRFS_SECTOR_SIZE != 0 ||
+             !storage_write(mirror_device, mirror_physical / BTRFS_SECTOR_SIZE,
+                            fs->sector_size / BTRFS_SECTOR_SIZE, data))) return 0;
+        if (fs->csum_root_bytenr &&
+            !btrfs_update_data_csum(fs, fs->csum_root_bytenr, sector_logical,
+                                    crc32c(data, fs->sector_size), 0)) return 0;
+        source += chunk; remaining -= chunk; offset += chunk;
     }
     return 1;
 }

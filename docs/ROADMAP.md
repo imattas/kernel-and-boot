@@ -977,6 +977,10 @@ records, and a VFS file adapter. XFS extent reads now decode the extent-state
 flag correctly and return zeroes for sparse gaps and unwritten extents. XFS
 regular files now support bounded read-modify-write updates for mapped written
 extents through the VFS adapter; sparse and unwritten extents remain protected.
+Btrfs regular files now support bounded read-modify-write updates for
+uncompressed, mapped extents, publish mirrored data when available, and update
+the checksum-tree entry; compressed, sparse, and metadata-changing writes remain
+protected.
 Btrfs
 validates its CRC32C superblock checksum
 and supported checksum type, validates tree-node checksums/identity, and reads

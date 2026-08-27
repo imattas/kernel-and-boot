@@ -2150,6 +2150,11 @@ void kernel_main(void *boot_info) {
         runtime_process, 2, runtime_process->image.entry,
         runtime_process->user_stack_top, 4096);
     if (!user_context_probe ||
+        user_context_probe->task->context.r12 != (uint64_t)(uintptr_t)runtime_process ||
+        user_context_probe->task->context.r13 !=
+            (uint64_t)(uintptr_t)&runtime_process->address_space ||
+        user_context_probe->task->context.r14 != runtime_process->image.entry ||
+        user_context_probe->task->context.r15 != runtime_process->user_stack_top ||
         process_thread_create_user(runtime_process, 3,
                                    runtime_process->user_stack_top,
                                    runtime_process->user_stack_top, 4096) ||

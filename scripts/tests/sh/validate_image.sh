@@ -26,3 +26,6 @@ assert data[(33 + 2 * 520) * 512 + 64:(33 + 2 * 520) * 512 + 75] == b'BOOT      
 assert data[(34 + 2 * 520) * 512 + 64:(34 + 2 * 520) * 512 + 75] == b'BOOTX64 EFI'
 print('FAT image contract: PASS')
 PY
+if command -v fsck.fat >/dev/null 2>&1; then
+    fsck.fat -n "$image" >/dev/null
+fi

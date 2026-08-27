@@ -606,14 +606,14 @@ void kernel_main(void *boot_info) {
         serial_write("NVMe sector write I/O ready\r\n");
         serial_write("NVMe flush I/O ready\r\n");
     }
-    static uint8_t nvme_multi_write[8192];
-    static uint8_t nvme_multi_read[8192];
+    static uint8_t nvme_multi_write[16384];
+    static uint8_t nvme_multi_read[16384];
     for (uint32_t i = 0; i < sizeof(nvme_multi_write); ++i)
         nvme_multi_write[i] = (uint8_t)(0x5aU ^ i);
     if (nvme_controller_count() != 0 &&
-        (!nvme_write_sectors(122, 16, nvme_multi_write) ||
-         !nvme_read_sectors(122, 16, nvme_multi_read) ||
-         nvme_last_io_page_count() != 2U)) {
+        (!nvme_write_sectors(122, 32, nvme_multi_write) ||
+         !nvme_read_sectors(122, 32, nvme_multi_read) ||
+         nvme_last_io_page_count() != 4U)) {
         serial_write("NVMe multi-sector I/O failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }

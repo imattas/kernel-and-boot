@@ -620,9 +620,9 @@ preventing concurrent SMP probes from interleaving `0xCF8/0xCFC` accesses.
 PCI enumeration now verifies that memory space, I/O space, and bus mastering
 remain enabled after configuration; devices that reject activation are not
 published to the driver-binding layer.
-NVMe namespace I/O now supports bounded multi-sector transfers across two DMA
-pages through PRP1/PRP2 and is covered by a real sixteen-sector write/read-back
-QEMU check. Admin and
+NVMe namespace I/O now supports bounded multi-sector transfers across four DMA
+pages using PRP1, PRP2, and a bounded PRP list, with a real thirty-two-sector
+write/read-back QEMU check. Admin and
 namespace queue state is serialized with an interrupt-safe lock; timed-out
 commands disable the controller and wait for `CSTS.RDY` to clear before PRP
 buffers are released, while completed device-error statuses are consumed

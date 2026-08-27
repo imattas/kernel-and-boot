@@ -21,7 +21,7 @@
 #define NVME_ADMIN_SQ_DOORBELL 0x1000
 #define NVME_TIMEOUT_ATTEMPTS 10000000U
 #define NVME_IRQ_VECTOR 0x53
-#define NVME_MAX_IO_SECTORS_PER_COMMAND 16U
+#define NVME_MAX_IO_SECTORS_PER_COMMAND 32U
 
 extern void arch_nvme_irq_stub(void);
 
@@ -47,6 +47,7 @@ static int nvme_irq_enabled;
 static volatile uint32_t nvme_interrupts;
 static int nvme_disabled;
 static uint64_t nvme_quarantined_prp;
+static uint64_t nvme_quarantined_prp_list;
 static uint64_t active_namespace_sectors;
 static uint32_t nvme_last_io_pages;
 
@@ -156,6 +157,7 @@ fail:
     nvme_irq_enabled = 0;
     nvme_disabled = 0;
     nvme_quarantined_prp = 0;
+    nvme_quarantined_prp_list = 0;
     nvme_last_io_pages = 0;
     device_release_resource(device, NVME_BAR_INDEX, &nvme_driver);
     return 0;
@@ -311,7 +313,10 @@ static int nvme_io(uint64_t lba, void *buffer, uint32_t count, int write) {
     uint64_t flags = spinlock_lock_irqsave(&nvme_lock);
     uint32_t data_pages = (uint32_t)(((uint64_t)count * 512U + 4095U) / 4096U);
     uint64_t data_frame = physical_alloc_frames(data_pages);
-    if (!data_frame) {
+    uint64_t prp_list = data_pages > 2U ? physical_alloc_frame() : 0;
+    if (!data_frame || (data_pages > 2U && !prp_list)) {
+        if (data_frame) physical_free_frames(data_frame, data_pages);
+        if (prp_list) physical_free_frame(prp_list);
         spinlock_unlock_irqrestore(&nvme_lock, flags);
         return 0;
     }
@@ -327,7 +332,13 @@ static int nvme_io(uint64_t lba, void *buffer, uint32_t count, int write) {
     command->command = 0x02U | ((uint32_t)command_id << 16);
     command->namespace_id = 1;
     command->prp1 = data_frame;
-    command->prp2 = data_pages > 1U ? data_frame + 4096U : 0;
+    command->prp2 = data_pages == 1U ? 0 :
+                   (data_pages == 2U ? data_frame + 4096U : prp_list);
+    if (prp_list) {
+        uint64_t *entries = (uint64_t *)(uintptr_t)prp_list;
+        for (uint32_t page = 1; page < data_pages; ++page)
+            entries[page - 1U] = data_frame + (uint64_t)page * 4096U;
+    }
     if (write) {
         const uint8_t *source = (const uint8_t *)buffer;
         uint8_t *destination = (uint8_t *)(uintptr_t)data_frame;
@@ -368,10 +379,14 @@ static int nvme_io(uint64_t lba, void *buffer, uint32_t count, int write) {
         uint8_t *destination = (uint8_t *)buffer;
         for (uint32_t i = 0; i < count * 512U; ++i) destination[i] = source[i];
     }
-    if (!completed && !nvme_abort_controller())
+    if (!completed && !nvme_abort_controller()) {
         nvme_quarantined_prp = data_frame;
+        nvme_quarantined_prp_list = prp_list;
+    }
     if (data_frame != nvme_quarantined_prp)
         physical_free_frames(data_frame, data_pages);
+    if (prp_list != nvme_quarantined_prp_list && prp_list)
+        physical_free_frame(prp_list);
     spinlock_unlock_irqrestore(&nvme_lock, flags);
     return success;
 }

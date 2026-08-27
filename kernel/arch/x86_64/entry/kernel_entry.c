@@ -3034,6 +3034,24 @@ void kernel_main(void *boot_info) {
         serial_write("user address space activation failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
+    static uint8_t noninheritable_object;
+    int noninheritable_handle = process_handle_open(&runtime_process->handles,
+                                                    &noninheritable_object,
+                                                    PROCESS_HANDLE_READ);
+    process_t *noninheritable_child = process_create_auto();
+    if (!noninheritable_handle || !noninheritable_child ||
+        syscall_dispatch(OS_SYSCALL_SET_INHERITABLE,
+                         (uint64_t)(uint32_t)noninheritable_handle, 0, 0) != 0 ||
+        !process_inherit_handles(noninheritable_child, runtime_process) ||
+        process_handle_get(&noninheritable_child->handles,
+                           (uint32_t)noninheritable_handle,
+                           PROCESS_HANDLE_READ) != 0 ||
+        !process_destroy(noninheritable_child) ||
+        !process_handle_close(&runtime_process->handles,
+                              (uint32_t)noninheritable_handle)) {
+        serial_write("descriptor inheritance policy failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
     if (syscall_dispatch(OS_SYSCALL_MAP_ANONYMOUS, anonymous_probe_address,
                          2, ADDRESS_SPACE_WRITABLE) != anonymous_probe_address ||
         syscall_dispatch(OS_SYSCALL_PROTECT_MEMORY, anonymous_probe_address,

@@ -18,6 +18,7 @@ typedef struct {
     process_handle_retain_fn retain;
     uint32_t retained_references;
     uint8_t closing;
+    uint8_t inheritable;
 } process_handle_t;
 typedef struct {
     process_handle_table_t *table;
@@ -44,6 +45,8 @@ int process_handle_open_owned_retain(process_handle_table_t *table, void *object
                                      process_handle_retain_fn retain);
 int process_handle_duplicate(process_handle_table_t *table, uint32_t handle,
                              uint32_t rights);
+int process_handle_set_inheritable(process_handle_table_t *table, uint32_t handle,
+                                   int inheritable);
 void *process_handle_get(const process_handle_table_t *table, uint32_t handle, uint32_t required_rights);
 int process_handle_get_retain(process_handle_table_t *table, uint32_t handle,
                               uint32_t required_rights, process_handle_ref_t *ref);

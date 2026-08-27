@@ -365,6 +365,14 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
                                                (uint32_t)arg2, arg3) ? 0 :
                    OS_SYSCALL_ERROR;
         }
+        case OS_SYSCALL_SET_INHERITABLE: {
+            process_t *process = process_current();
+            if (!process || arg2 > 1) return OS_SYSCALL_ERROR;
+            return process_handle_set_inheritable(&process->handles,
+                                                  (uint32_t)arg1,
+                                                  (int)arg2) ? 0 :
+                   OS_SYSCALL_ERROR;
+        }
         case OS_SYSCALL_SIGNAL_NEXT: {
             uint32_t signal = 0;
             if (!user_range(arg1, sizeof(signal), 1) ||

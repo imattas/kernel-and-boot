@@ -8,6 +8,7 @@ void process_handle_table_initialize(process_handle_table_t *table) {
         table->entries[i].retain = 0;
         table->entries[i].retained_references = 0;
         table->entries[i].closing = 0;
+        table->entries[i].inheritable = 1;
         table->generations[i] = 1;
     }
     table->retained_references = 0;
@@ -43,7 +44,7 @@ int process_handle_table_inherit(process_handle_table_t *destination,
             return 0;
         }
         process_handle_t *entry = &source->entries[i];
-        if (entry->object && !entry->closing && !entry->retain) {
+        if (entry->object && !entry->closing && entry->inheritable && !entry->retain) {
             spinlock_unlock_irqrestore(&second->lock, second_flags);
             spinlock_unlock_irqrestore(&first->lock, first_flags);
             return 0;
@@ -52,7 +53,8 @@ int process_handle_table_inherit(process_handle_table_t *destination,
     for (uint32_t i = 0; i < PROCESS_HANDLE_CAPACITY; ++i) {
         process_handle_t *source_entry = &source->entries[i];
         process_handle_t *destination_entry = &destination->entries[i];
-        if (!source_entry->object || source_entry->closing) continue;
+        if (!source_entry->object || source_entry->closing ||
+            !source_entry->inheritable) continue;
         source_entry->retain(source_entry->object);
         destination_entry->object = source_entry->object;
         destination_entry->rights = source_entry->rights;
@@ -60,6 +62,7 @@ int process_handle_table_inherit(process_handle_table_t *destination,
         destination_entry->retain = source_entry->retain;
         destination_entry->retained_references = 0;
         destination_entry->closing = 0;
+        destination_entry->inheritable = source_entry->inheritable;
     }
     spinlock_unlock_irqrestore(&second->lock, second_flags);
     spinlock_unlock_irqrestore(&first->lock, first_flags);
@@ -87,6 +90,7 @@ int process_handle_open_owned_retain(process_handle_table_t *table, void *object
             table->entries[i].release = release;
             table->entries[i].retain = retain;
             table->entries[i].closing = 0;
+            table->entries[i].inheritable = 1;
             int handle = (int)make_handle(i, table->generations[i]);
             spinlock_unlock_irqrestore(&table->lock, flags);
             return handle;
@@ -116,6 +120,7 @@ int process_handle_duplicate(process_handle_table_t *table, uint32_t handle,
             entry->release = source->release;
             entry->retain = source->retain;
             entry->closing = 0;
+            entry->inheritable = source->inheritable;
             int result = (int)make_handle(i, table->generations[i]);
             spinlock_unlock_irqrestore(&table->lock, flags);
             return result;
@@ -123,6 +128,20 @@ int process_handle_duplicate(process_handle_table_t *table, uint32_t handle,
     }
     spinlock_unlock_irqrestore(&table->lock, flags);
     return 0;
+}
+
+int process_handle_set_inheritable(process_handle_table_t *table, uint32_t handle,
+                                   int inheritable) {
+    uint32_t slot; uint16_t generation;
+    if (!table || (inheritable != 0 && inheritable != 1) ||
+        !decode_handle(handle, &slot, &generation)) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&table->lock);
+    process_handle_t *entry = &table->entries[slot];
+    int valid = table->generations[slot] == generation && !entry->closing &&
+                entry->object != 0;
+    if (valid) entry->inheritable = (uint8_t)inheritable;
+    spinlock_unlock_irqrestore(&table->lock, flags);
+    return valid;
 }
 void *process_handle_get(const process_handle_table_t *table, uint32_t handle,
                          uint32_t required_rights) {

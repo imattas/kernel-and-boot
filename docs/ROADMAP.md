@@ -885,6 +885,9 @@ requires that the target is the caller's child; the QEMU lifecycle probe covers
 child termination, status collection, parent-reference release, and reap.
 Kernel-created processes can now assign a live parent before entering the
 `READY` state, so the syscall wait probe exercises the same ownership rule.
+Process handles now carry an explicit inheritable policy, with a syscall to
+change it; non-inheritable handles are omitted from child-table inheritance
+while retain-capable handles preserve their existing ownership guarantees.
 Current-process publication and lookup now use the process-table lock, so
 syscall and lifecycle paths cannot race on the active process pointer.
 Cross-process signal lookup now retains a process reference under the table

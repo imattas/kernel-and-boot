@@ -245,7 +245,7 @@ int process_wait_signal(process_t *process, uint32_t *signal) {
 int process_terminate(process_t *process, int32_t status) {
     if (!process) return 0;
     uint64_t flags = spinlock_lock_irqsave(&process->lock);
-    if (process->state == PROCESS_EXITED || process == current_process) {
+    if (process->state == PROCESS_EXITED || process == process_current()) {
         spinlock_unlock_irqrestore(&process->lock, flags);
         return 0;
     }

@@ -622,6 +622,9 @@ current-process, and lock state before process/thread creation.
 Process state, image/stack ownership, signal state, and process-owned thread
 lists now use per-process IRQ-safe locking, with locked teardown helpers that
 avoid recursive lock acquisition.
+Process termination now reads current-process ownership through the protected
+process-table accessor instead of racing activation against an unlocked
+global-pointer read.
 Current-process publication and lookup now use the process-table lock, so
 syscall and lifecycle paths cannot race on the active process pointer.
 Cross-process signal syscalls now require the same UID or

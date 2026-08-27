@@ -88,6 +88,11 @@ int main(void) {
            cluster == 7 && size == 4);
     memset(output, 0, sizeof(output)); assert(exfat_read_file_in_directory(&fs, 4, "caf\xc3\xa9", 0, output, 4) &&
                                              memcmp(output, "utf8", 4) == 0);
+    assert(exfat_create_file_in_directory(&fs, 2, "new.txt", 0x20));
+    assert(exfat_set_attributes_in_directory(&fs, 2, "new.txt", 0x21));
+    assert(exfat_lookup(&fs, "new.txt", &cluster, &size, &no_fat) && cluster == 0 && size == 0);
+    assert(exfat_unlink_file_in_directory(&fs, 2, "new.txt"));
+    assert(!exfat_lookup(&fs, "new.txt", &cluster, &size, &no_fat));
     root[2] ^= 1; assert(!exfat_lookup(&fs, "HELLO.TXT", &cluster, &size, &no_fat)); root[2] ^= 1;
     image[11 * 512] ^= 1; assert(!exfat_mount(&fs, 0)); image[11 * 512] ^= 1;
     image[0] = 0; assert(!exfat_mount(&fs, 0)); return 0;

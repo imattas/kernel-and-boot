@@ -997,6 +997,8 @@ FAT32 now reads valid FSInfo metadata and keeps its free-cluster count and
 next-free hint synchronized across bounded append allocation and chain release.
 FAT32 and exFAT now expose bounded directory-entry attribute updates, while
 ext4 and XFS expose persistent permission-mode updates at their inode boundary.
+FAT32 and exFAT now also support bounded regular-file directory-entry creation
+and unlink, including exFAT UTF-16 entry-set checksums and released chains.
 FAT32 FAT-cache and cluster-chain traversal now use a per-filesystem IRQ-safe
 lock, preventing concurrent readers from mixing cached FAT sectors.
 ExFAT mount validation now rejects invalid shift fields before evaluation and

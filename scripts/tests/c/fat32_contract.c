@@ -149,6 +149,13 @@ int main(void) {
         cluster != 7 || size != 4 || is_directory) return fail("long filename lookup failed");
     if (!fat32_read_named_file_in_directory(&fs, 2, "LongName.txt", 0, output, 4) ||
         memcmp(output, "long", 4) != 0) return fail("long filename read failed");
+    const char created_name[11] = {'C','R','E','A','T','E','D',' ','T','X','T'};
+    if (!fat32_create_file_in_directory(&fs, 2, created_name, 0x20) ||
+        !fat32_set_attributes_in_directory(&fs, 2, created_name, 0x21) ||
+        !fat32_lookup_in_directory(&fs, 2, created_name, &cluster, &size, &is_directory) ||
+        size != 0 || is_directory || !fat32_unlink_file_in_directory(&fs, 2, created_name) ||
+        fat32_lookup_in_directory(&fs, 2, created_name, &cluster, &size, &is_directory))
+        return fail("directory create/unlink failed");
     set_fat(3, 0x0ffffff7);
     fs.fat_sector_valid = 0;
     if (fat32_read_file(&fs, name, 0, output, sizeof(output))) return fail("bad cluster accepted");

@@ -3,9 +3,9 @@
 #include <string.h>
 #include "../../../kernel/fs/ext4/ext4.h"
 #include "../../../kernel/drivers/storage/storage.h"
-static uint8_t image[64 * 512];
-static int image_read(uint64_t lba, uint32_t count, void *buffer) { if (lba + count > 64) return 0; memcpy(buffer, &image[lba * 512], count * 512U); return 1; }
-static int image_write(uint64_t lba, uint32_t count, const void *buffer) { if (lba + count > 64) return 0; memcpy(&image[lba * 512], buffer, count * 512U); return 1; }
+static uint8_t image[128 * 512];
+static int image_read(uint64_t lba, uint32_t count, void *buffer) { if (lba + count > 128) return 0; memcpy(buffer, &image[lba * 512], count * 512U); return 1; }
+static int image_write(uint64_t lba, uint32_t count, const void *buffer) { if (lba + count > 128) return 0; memcpy(&image[lba * 512], buffer, count * 512U); return 1; }
 static void put16(uint8_t *p, uint16_t v) { p[0] = v; p[1] = v >> 8; }
 static void put32(uint8_t *p, uint32_t v) { put16(p, v); put16(p + 2, v >> 16); }
 int main(void) {
@@ -27,7 +27,7 @@ int main(void) {
     memcpy(&image[14 * 1024], "group", 5);
     put32(&image[9 * 1024], 10); memcpy(&image[10 * 1024], "indir", 5);
     put16(&image[11 * 1024], 0xf30a); put16(&image[11 * 1024 + 2], 1); put16(&image[11 * 1024 + 4], 4); put32(&image[11 * 1024 + 12], 0); put16(&image[11 * 1024 + 16], 1); put32(&image[11 * 1024 + 20], 12); memcpy(&image[12 * 1024], "deep", 4);
-    storage_initialize(); storage_device_t device = {.name = "ram-ext4", .block_size = 512, .block_count = 64, .read = image_read, .write = image_write}; assert(storage_register(&device));
+    storage_initialize(); storage_device_t device = {.name = "ram-ext4", .block_size = 512, .block_count = 128, .read = image_read, .write = image_write}; assert(storage_register(&device));
     ext4_fs_t fs; assert(ext4_mount(&fs, 0)); uint32_t inode = 0;
     assert(ext4_lookup(&fs, 2, "hello", &inode) && inode == 3);
     char output[6] = {0}; assert(ext4_read_file(&fs, inode, 0, output, 5)); assert(memcmp(output, "world", 5) == 0);

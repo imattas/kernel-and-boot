@@ -27,23 +27,30 @@ int ext4_mount(ext4_fs_t *fs, uint32_t device) {
     uint8_t sb[1024];
     if (!storage_read(device, 2, 2, sb) || load16(&sb[56]) != EXT4_MAGIC) return 0;
     uint32_t log_block_size = load32(&sb[24]);
-    uint32_t block_size = 1024U << log_block_size;
     uint32_t incompat = load32(&sb[96]);
     uint64_t block_count = load32(&sb[4]);
     uint32_t blocks_per_group = load32(&sb[32]);
     uint32_t inodes_per_group = load32(&sb[40]);
     uint32_t inode_size = load16(&sb[88]);
     uint32_t descriptor_size = load16(&sb[254]);
-    if (log_block_size > 2 || block_size < 1024 || block_size > 4096 ||
+    if (log_block_size > 2) return 0;
+    uint32_t block_size = 1024U << log_block_size;
+    uint64_t device_blocks = storage_device_at(device)->block_count;
+    uint32_t sectors_per_block = block_size / EXT4_SECTOR_SIZE;
+    if (block_size < 1024 || block_size > 4096 ||
         (incompat & ~(EXT4_INCOMPAT_FILETYPE | EXT4_INCOMPAT_EXTENTS |
                       EXT4_INCOMPAT_64BIT)) != 0 ||
         block_count == 0 || blocks_per_group == 0 || inodes_per_group == 0 ||
         inode_size < 128 || inode_size > block_size ||
         (block_size % inode_size) != 0 || descriptor_size < 32 ||
         descriptor_size > block_size ||
-        ((incompat & EXT4_INCOMPAT_64BIT) && descriptor_size < 64U)) return 0;
+        ((incompat & EXT4_INCOMPAT_64BIT) && descriptor_size < 64U) ||
+        sectors_per_block == 0 || block_count > device_blocks / sectors_per_block)
+        return 0;
     if (incompat & EXT4_INCOMPAT_64BIT) block_count |= (uint64_t)load32(&sb[336]) << 32;
-    uint64_t groups_count = (block_count + blocks_per_group - 1U) / blocks_per_group;
+    if (block_count > device_blocks / sectors_per_block) return 0;
+    uint64_t groups_count = block_count / blocks_per_group +
+                             (block_count % blocks_per_group != 0);
     if (!groups_count || groups_count > 0xffffffffULL) return 0;
     uint8_t group[4096];
     ext4_fs_t probe = {.device = device, .block_size = block_size, .block_count = block_count};
@@ -179,7 +186,9 @@ int ext4_lookup(ext4_fs_t *fs, uint32_t directory_inode, const char *name,
     uint8_t inode[4096], block[4096];
     if (!read_inode(fs, directory_inode, inode) || (load16(inode) & 0xf000U) != 0x4000U) return 0;
     uint64_t directory_size = inode_size_value(inode);
-    uint32_t block_count = (uint32_t)((directory_size + fs->block_size - 1U) / fs->block_size);
+    uint64_t block_count = directory_size / fs->block_size +
+                           (directory_size % fs->block_size != 0);
+    if (block_count > fs->block_count || block_count > UINT32_MAX) return 0;
     for (uint32_t logical = 0; logical < block_count; ++logical) {
         uint64_t physical = 0;
         uint8_t hole = 0;

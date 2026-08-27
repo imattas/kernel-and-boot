@@ -684,6 +684,9 @@ read-only inode, directory, direct/indirect-block reads, and extent-tree file
 reads through a VFS adapter. Ext4 now resolves inode tables across multiple
 block groups, supports 64-bit block-count/inode-table metadata, and combines
 the on-disk low/high inode size fields. XFS and
+Ext4 mount and directory paths now reject oversized block-size exponents,
+device-capacity mismatches, arithmetic overflow, and truncated directory block
+counts before issuing block I/O.
 Btrfs now have strict read-only superblock and geometry
 mount layers with contract tests. XFS now maps allocation-group inode numbers,
 reads v1/v2 inodes, supports short-form directories, inline files, extent

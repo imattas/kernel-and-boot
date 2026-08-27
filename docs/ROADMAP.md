@@ -435,6 +435,9 @@ process-thread compilation, preventing stale object layouts after task ABI
 changes.
 ACPI IOAPIC discovery now retains bounded multi-IOAPIC GSI ranges and routes
 each legacy PCI IRQ through the controller that owns its GSI.
+ACPI IOAPIC discovery now derives each controller’s actual redirection range
+from its version register, preventing an out-of-range GSI from being assigned
+to the preceding controller merely because its base was lower.
 ACPI intake now bounds RSDP, XSDT, and referenced table lengths and rejects
 unsupported or overflowing table addresses before dereferencing them.
 PCI now programs a validated single-entry MSI-X table when available, with

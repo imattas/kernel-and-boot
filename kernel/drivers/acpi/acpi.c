@@ -30,6 +30,7 @@ static uint32_t io_apic_gsi_base;
 #define ACPI_IOAPIC_CAPACITY 8U
 static uint64_t io_apic_bases[ACPI_IOAPIC_CAPACITY];
 static uint32_t io_apic_gsi_bases[ACPI_IOAPIC_CAPACITY];
+static uint32_t io_apic_gsi_limits[ACPI_IOAPIC_CAPACITY];
 static uint32_t io_apic_count;
 static uint32_t irq_gsi[16];
 static uint16_t irq_flags[16];
@@ -65,6 +66,7 @@ int acpi_initialize(uint64_t rsdp_address) {
     reset_port = 0; reset_value = 0; reset_ready = 0;
     for (uint32_t i = 0; i < ACPI_IOAPIC_CAPACITY; ++i) {
         io_apic_bases[i] = 0; io_apic_gsi_bases[i] = 0;
+        io_apic_gsi_limits[i] = 0;
     }
     for (uint32_t i = 0; i < 64; ++i) apic_ids[i] = 0;
     for (uint32_t i = 0; i < 16; ++i) {
@@ -121,8 +123,15 @@ int acpi_initialize(uint64_t rsdp_address) {
         else if (type == 1 && length >= 12 && io_apic_count < ACPI_IOAPIC_CAPACITY) {
             uint64_t base = *(const uint32_t *)(cursor + 4);
             uint32_t gsi_base = *(const uint32_t *)(cursor + 8);
+            if (base == 0 || base >= (1ULL << 32)) return 0;
+            volatile uint32_t *ioapic = (volatile uint32_t *)(uintptr_t)base;
+            ioapic[0] = 1;
+            uint32_t version = ioapic[4];
+            uint32_t max_redirection = (version >> 16) & 0xffU;
+            if (gsi_base > UINT32_MAX - max_redirection) return 0;
             io_apic_bases[io_apic_count] = base;
             io_apic_gsi_bases[io_apic_count] = gsi_base;
+            io_apic_gsi_limits[io_apic_count] = gsi_base + max_redirection;
             if (!io_apic_base) {
                 io_apic_base = base;
                 io_apic_gsi_base = gsi_base;
@@ -149,7 +158,7 @@ uint32_t acpi_ioapic_gsi_base(void) { return io_apic_gsi_base; }
 uint64_t acpi_ioapic_base_for_gsi(uint32_t gsi) {
     uint32_t selected = 0xffffffffU;
     for (uint32_t i = 0; i < io_apic_count; ++i) {
-        if (gsi >= io_apic_gsi_bases[i] &&
+        if (gsi >= io_apic_gsi_bases[i] && gsi <= io_apic_gsi_limits[i] &&
             (selected == 0xffffffffU ||
              io_apic_gsi_bases[i] > io_apic_gsi_bases[selected])) selected = i;
     }
@@ -158,7 +167,7 @@ uint64_t acpi_ioapic_base_for_gsi(uint32_t gsi) {
 uint32_t acpi_ioapic_gsi_base_for_gsi(uint32_t gsi) {
     uint32_t selected = 0xffffffffU;
     for (uint32_t i = 0; i < io_apic_count; ++i) {
-        if (gsi >= io_apic_gsi_bases[i] &&
+        if (gsi >= io_apic_gsi_bases[i] && gsi <= io_apic_gsi_limits[i] &&
             (selected == 0xffffffffU ||
              io_apic_gsi_bases[i] > io_apic_gsi_bases[selected])) selected = i;
     }

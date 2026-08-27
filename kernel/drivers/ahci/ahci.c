@@ -29,6 +29,9 @@
 #define AHCI_PORT_IE 0x14
 #define AHCI_PORT_PRDBC 0x04
 #define AHCI_SIGNATURE_SATA 0x00000101U
+#define AHCI_ATA_READ_DMA_EXT 0x25U
+#define AHCI_ATA_WRITE_DMA_EXT 0x35U
+#define AHCI_MAX_LBA 0x0000ffffffffffffULL
 #define AHCI_IRQ_VECTOR 0x54
 #define AHCI_GHC_IE (1U << 1)
 #define AHCI_PORT_IS_ERROR_MASK ((1U << 4) | (1U << 5) | (1U << 7) | \
@@ -277,7 +280,8 @@ static int ahci_identify_locked(uint16_t *words) {
 }
 
 static int ahci_read_sector_locked(uint64_t lba, void *buffer) {
-    if (ahci_io_disabled || !active_port || !active_command_list || !buffer || active_data) return 0;
+    if (ahci_io_disabled || lba > AHCI_MAX_LBA || !active_port ||
+        !active_command_list || !buffer || active_data) return 0;
     active_command_table = physical_alloc_frame();
     active_data = physical_alloc_frame();
     if (!active_command_table || !active_data) {
@@ -294,7 +298,8 @@ static int ahci_read_sector_locked(uint64_t lba, void *buffer) {
     header[0].ctba = (uint32_t)active_command_table; header[0].ctbau = 0;
     ahci_command_table_t *table = (ahci_command_table_t *)(uintptr_t)active_command_table;
     table->command_fis.fis_type = 0x27; table->command_fis.flags = 0x80;
-    table->command_fis.command = 0xc8; table->command_fis.device = 0x40;
+    table->command_fis.command = AHCI_ATA_READ_DMA_EXT;
+    table->command_fis.device = 0x40;
     table->command_fis.lba0 = (uint8_t)lba; table->command_fis.lba1 = (uint8_t)(lba >> 8);
     table->command_fis.lba2 = (uint8_t)(lba >> 16); table->command_fis.lba3 = (uint8_t)(lba >> 24);
     table->command_fis.lba4 = (uint8_t)(lba >> 32); table->command_fis.lba5 = (uint8_t)(lba >> 40);
@@ -318,7 +323,8 @@ static int ahci_read_sector_locked(uint64_t lba, void *buffer) {
 }
 
 static int ahci_write_sector_locked(uint64_t lba, const void *buffer) {
-    if (ahci_io_disabled || !active_port || !active_command_list || !buffer || active_data) return 0;
+    if (ahci_io_disabled || lba > AHCI_MAX_LBA || !active_port ||
+        !active_command_list || !buffer || active_data) return 0;
     active_command_table = physical_alloc_frame();
     active_data = physical_alloc_frame();
     if (!active_command_table || !active_data) {
@@ -339,7 +345,8 @@ static int ahci_write_sector_locked(uint64_t lba, const void *buffer) {
     header[0].ctba = (uint32_t)active_command_table; header[0].ctbau = 0;
     ahci_command_table_t *table = (ahci_command_table_t *)(uintptr_t)active_command_table;
     table->command_fis.fis_type = 0x27; table->command_fis.flags = 0x80;
-    table->command_fis.command = 0xca; table->command_fis.device = 0x40;
+    table->command_fis.command = AHCI_ATA_WRITE_DMA_EXT;
+    table->command_fis.device = 0x40;
     table->command_fis.lba0 = (uint8_t)lba; table->command_fis.lba1 = (uint8_t)(lba >> 8);
     table->command_fis.lba2 = (uint8_t)(lba >> 16); table->command_fis.lba3 = (uint8_t)(lba >> 24);
     table->command_fis.lba4 = (uint8_t)(lba >> 32); table->command_fis.lba5 = (uint8_t)(lba >> 40);
@@ -358,8 +365,10 @@ static int ahci_write_sector_locked(uint64_t lba, const void *buffer) {
 }
 
 static int ahci_io_sectors(uint64_t lba, uint32_t count, void *buffer, int write) {
-    if (ahci_io_disabled || !active_port || !active_command_list || !buffer || active_data ||
-        count == 0 || count > 8) return 0;
+    if (ahci_io_disabled || lba > AHCI_MAX_LBA ||
+        (uint64_t)count > AHCI_MAX_LBA - lba || !active_port ||
+        !active_command_list || !buffer || active_data || count == 0 ||
+        count > 8) return 0;
     active_command_table = physical_alloc_frame();
     active_data = physical_alloc_frame();
     if (!active_command_table || !active_data) {
@@ -385,7 +394,8 @@ static int ahci_io_sectors(uint64_t lba, uint32_t count, void *buffer, int write
     ahci_command_table_t *table =
         (ahci_command_table_t *)(uintptr_t)active_command_table;
     table->command_fis.fis_type = 0x27; table->command_fis.flags = 0x80;
-    table->command_fis.command = write ? 0xca : 0xc8;
+    table->command_fis.command = write ? AHCI_ATA_WRITE_DMA_EXT :
+                                       AHCI_ATA_READ_DMA_EXT;
     table->command_fis.device = 0x40;
     table->command_fis.lba0 = (uint8_t)lba;
     table->command_fis.lba1 = (uint8_t)(lba >> 8);

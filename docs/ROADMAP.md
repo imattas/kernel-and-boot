@@ -660,6 +660,8 @@ It now also answers validated ARP requests for the configured local IPv4
 address with correctly addressed Ethernet/ARP replies.
 ARP parsing accepts the Ethernet minimum-frame padding while still requiring
 the complete fixed-size ARP wire payload.
+AHCI sector I/O now uses ATA 48-bit DMA commands and rejects LBAs outside the
+48-bit address range instead of silently truncating them.
 
 ## Phase 10 — Userland begins after the kernel gate
 

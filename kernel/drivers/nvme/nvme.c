@@ -44,6 +44,8 @@ static spinlock_t nvme_lock;
 static device_driver_t nvme_driver;
 static int nvme_irq_enabled;
 static volatile uint32_t nvme_interrupts;
+static int nvme_disabled;
+static uint64_t nvme_quarantined_prp;
 
 static int nvme_submit_admin_words(uint8_t opcode, uint32_t namespace_id,
                                    uint64_t prp1, const uint32_t words[6],
@@ -61,11 +63,16 @@ static int nvme_wait_ready(volatile uint32_t *regs, uint32_t expected) {
     return 0;
 }
 
-static void nvme_abort_controller(void) {
-    if (!active_regs) return;
+static int nvme_abort_controller(void) {
+    if (!active_regs) {
+        nvme_disabled = 1;
+        return 0;
+    }
     active_regs[NVME_CC / 4] &= ~NVME_CC_EN;
-    (void)nvme_wait_ready(active_regs, 0);
+    int stopped = nvme_wait_ready(active_regs, 0);
     active_io_ready = 0;
+    if (!stopped) nvme_disabled = 1;
+    return stopped;
 }
 
 static int nvme_probe(device_t *device) {
@@ -123,6 +130,8 @@ fail:
     active_regs = 0; active_asq = 0; active_acq = 0;
     active_io_sq = 0; active_io_cq = 0; active_io_ready = 0;
     nvme_irq_enabled = 0;
+    nvme_disabled = 0;
+    nvme_quarantined_prp = 0;
     device_release_resource(device, NVME_BAR_INDEX, &nvme_driver);
     return 0;
 }
@@ -149,7 +158,7 @@ typedef struct {
 static int nvme_submit_admin_words(uint8_t opcode, uint32_t namespace_id,
                                    uint64_t prp1, const uint32_t words[6],
                                    uint32_t *result) {
-    if (!active_regs || !active_asq || !active_acq || !active_queue_entries ||
+    if (nvme_disabled || !active_regs || !active_asq || !active_acq || !active_queue_entries ||
         !result) return 0;
     uint64_t flags = spinlock_lock_irqsave(&nvme_lock);
     volatile nvme_command_t *sq = (volatile nvme_command_t *)(uintptr_t)active_asq;
@@ -187,7 +196,7 @@ static int nvme_submit_admin_words(uint8_t opcode, uint32_t namespace_id,
         spinlock_unlock_irqrestore(&nvme_lock, flags);
         return success;
     }
-    nvme_abort_controller();
+    if (prp1 && !nvme_abort_controller()) nvme_quarantined_prp = prp1;
     spinlock_unlock_irqrestore(&nvme_lock, flags);
     return 0;
 }
@@ -209,7 +218,7 @@ int nvme_identify_controller(void *buffer) {
         uint8_t *destination = (uint8_t *)buffer;
         for (uint32_t i = 0; i < 4096; ++i) destination[i] = source[i];
     }
-    physical_free_frame(frame);
+    if (frame != nvme_quarantined_prp) physical_free_frame(frame);
     return success;
 }
 
@@ -225,7 +234,7 @@ int nvme_identify_namespace(void *buffer) {
         uint8_t *destination = (uint8_t *)buffer;
         for (uint32_t i = 0; i < 4096; ++i) destination[i] = source[i];
     }
-    physical_free_frame(frame);
+    if (frame != nvme_quarantined_prp) physical_free_frame(frame);
     return success;
 }
 
@@ -263,7 +272,7 @@ fail:
 }
 
 static int nvme_io(uint64_t lba, void *buffer, uint32_t count, int write) {
-    if (!active_io_ready || !buffer || count == 0 || count > 8) return 0;
+    if (nvme_disabled || !active_io_ready || !buffer || count == 0 || count > 8) return 0;
     uint64_t flags = spinlock_lock_irqsave(&nvme_lock);
     uint64_t data_frame = physical_alloc_frame();
     if (!data_frame) {
@@ -321,8 +330,9 @@ static int nvme_io(uint64_t lba, void *buffer, uint32_t count, int write) {
         uint8_t *destination = (uint8_t *)buffer;
         for (uint32_t i = 0; i < count * 512U; ++i) destination[i] = source[i];
     }
-    if (!completed) nvme_abort_controller();
-    physical_free_frame(data_frame);
+    if (!completed && !nvme_abort_controller())
+        nvme_quarantined_prp = data_frame;
+    if (data_frame != nvme_quarantined_prp) physical_free_frame(data_frame);
     spinlock_unlock_irqrestore(&nvme_lock, flags);
     return success;
 }
@@ -351,6 +361,8 @@ int nvme_initialize(void) {
     active_queue_entries = 0;
     nvme_irq_enabled = 0;
     nvme_interrupts = 0;
+    nvme_disabled = 0;
+    nvme_quarantined_prp = 0;
     spinlock_init(&nvme_lock);
     nvme_driver.name = "nvme";
     nvme_driver.bus = DEVICE_BUS_PCI;

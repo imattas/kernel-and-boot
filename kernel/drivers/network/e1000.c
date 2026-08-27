@@ -320,6 +320,7 @@ int e1000_receive(void *data, uint16_t capacity, uint16_t *length) {
             e1000_rx_ring[e1000_rx_index].errors = 0;
             e1000_rx_index = (e1000_rx_index + 1U) % E1000_RING_COUNT;
         }
+        e1000_dma_write_barrier();
         e1000_regs[E1000_RDT / 4] =
             (e1000_rx_index + E1000_RING_COUNT - 1U) % E1000_RING_COUNT;
         spinlock_unlock_irqrestore(&e1000_lock, flags);
@@ -340,6 +341,7 @@ int e1000_receive(void *data, uint16_t capacity, uint16_t *length) {
         index = (index + 1U) % E1000_RING_COUNT;
     }
     e1000_rx_index = index;
+    e1000_dma_write_barrier();
     e1000_regs[E1000_RDT / 4] =
         (index + E1000_RING_COUNT - 1U) % E1000_RING_COUNT;
     *length = (uint16_t)total;

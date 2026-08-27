@@ -523,6 +523,9 @@ that the controller cannot transmit.
 e1000 TX/RX descriptor rings are now accessed through volatile hardware-owned
 views, preventing compiler caching of DMA ownership bits in addition to the
 explicit CPU ordering barriers.
+e1000 RX descriptor recycling now publishes cleared ownership/status fields
+with a DMA write barrier before advancing RDT, covering both valid packets and
+discarded or malformed packet chains.
 RTC CMOS transactions now serialize the index/data port pair with an
 IRQ-safe lock, reject malformed BCD digits, and require two matching stable
 samples so SMP callers cannot observe a torn calendar value across rollover.

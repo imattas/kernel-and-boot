@@ -1006,8 +1006,8 @@ Ext4 growth now also supports a single-indirect block table, including table
 allocation, pointer updates, zero-filled data blocks, and readback across the
 indirect boundary.
 Ext4 growth now creates double-indirect and second-level tables as needed;
-deeper-tree shrink reclamation remains guarded until its metadata walk is
-implemented.
+zero-length truncation recursively releases direct and deep indirect metadata
+trees, while partial deep-tree shrink remains guarded.
 XFS local-format regular files now support bounded append growth within the
 inode payload and zero-length truncation with inline data clearing; extent
 allocation remains a separate XFS metadata milestone.
@@ -1016,6 +1016,8 @@ inode item through the checksum-protected tree-node path.
 Btrfs inline extents now support bounded growth when the leaf node has
 verified non-overlapping item capacity, including zero-fill, inline length,
 and inode-size updates with regenerated node checksums.
+Btrfs disk-extent allocation is temporarily deferred while the remaining
+filesystem and kernel completion work proceeds.
 validates the primary and backup boot-region checksums, supports bounded
 directory-relative lookup and reads, validates directory entry-set checksums,
 and compares validated UTF-8 names with their on-disk UTF-16 names. Ext4 now has

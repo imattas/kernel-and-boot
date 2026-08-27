@@ -208,6 +208,19 @@ static int ext4_alloc_block(ext4_fs_t *fs, uint64_t *block) {
     return 0;
 }
 
+static int ext4_release_tree(ext4_fs_t *fs, uint32_t block, uint32_t depth) {
+    uint8_t table[4096];
+    uint64_t pointers = fs->block_size / 4U;
+    if (!block) return 0;
+    if (depth == 0) return ext4_set_block_used(fs, block, 0);
+    if (!read_block(fs, block, table)) return 0;
+    for (uint64_t i = 0; i < pointers; ++i) {
+        uint32_t child = load32(&table[i * 4U]);
+        if (child && !ext4_release_tree(fs, child, depth - 1U)) return 0;
+    }
+    return ext4_set_block_used(fs, block, 0);
+}
+
 static int ext4_resize_blocks(ext4_fs_t *fs, uint32_t inode_number,
                               uint8_t *inode, uint64_t new_size) {
     uint64_t old_size = inode_size_value(inode);
@@ -218,7 +231,7 @@ static int ext4_resize_blocks(ext4_fs_t *fs, uint32_t inode_number,
     uint64_t triple_limit = double_limit + pointers * pointers * pointers;
     if (new_blocks > triple_limit ||
         (new_size > UINT32_MAX && !fs->has_64bit)) return 0;
-    if (new_blocks < old_blocks && old_blocks > 12U + pointers) return 0;
+    if (new_blocks < old_blocks && old_blocks > 12U + pointers && new_blocks != 0) return 0;
     uint32_t indirect = load32(&inode[88]);
     uint32_t double_indirect = load32(&inode[92]);
     uint32_t triple_indirect = load32(&inode[96]);
@@ -298,6 +311,18 @@ static int ext4_resize_blocks(ext4_fs_t *fs, uint32_t inode_number,
             }
         }
     } else if (new_blocks < old_blocks) {
+        if (new_blocks == 0 && old_blocks > 12U + pointers) {
+            for (uint32_t i = 0; i < 12U; ++i) {
+                uint32_t block = load32(&inode[40U + i * 4U]);
+                if (block && !ext4_set_block_used(fs, block, 0)) return 0;
+                store32(&inode[40U + i * 4U], 0);
+            }
+            if (indirect && !ext4_release_tree(fs, indirect, 1U)) return 0;
+            if (double_indirect && !ext4_release_tree(fs, double_indirect, 2U)) return 0;
+            if (triple_indirect && !ext4_release_tree(fs, triple_indirect, 3U)) return 0;
+            store32(&inode[88], 0); store32(&inode[92], 0); store32(&inode[96], 0);
+            goto resize_inode;
+        }
         if (indirect && !read_block(fs, indirect, table)) return 0;
         for (uint64_t i = new_blocks; i < old_blocks; ++i) {
             uint64_t block = i < 12U ? load32(&inode[40 + i * 4U]) :
@@ -312,6 +337,7 @@ static int ext4_resize_blocks(ext4_fs_t *fs, uint32_t inode_number,
             store32(&inode[88], 0);
         }
     }
+resize_inode:
     store32(&inode[4], (uint32_t)new_size);
     store32(&inode[108], (uint32_t)(new_size >> 32));
     return write_inode(fs, inode_number, inode);

@@ -1027,8 +1027,8 @@ truncation recursively trims direct, single-, double-, and triple-indirect
 trees, releases empty metadata tables, and updates the inode size without
 leaving partial deep-tree shrink guarded.
 XFS local-format regular files now support bounded append growth within the
-inode payload and zero-length truncation with inline data clearing; extent
-allocation remains a separate XFS metadata milestone.
+inode payload and zero-length truncation with inline data clearing. Extent-file
+allocation is tracked through the AG free-space milestone below.
 XFS extent files now accept writes to preallocated unwritten extents, treating
 untouched bytes as zero, converting written extents to initialized state, and
 allowing file-size growth only within verified allocated extent coverage.
@@ -1041,7 +1041,7 @@ block, and growth validation searches the complete extent list rather than
 only the first record.
 XFS local-format directories now support bounded persistent entry insertion
 and removal while preserving the inline directory record layout; AG free-space
-allocation remains the next XFS metadata milestone.
+allocation and release are tracked through the metadata milestone below.
 XFS now allocates from a validated single-level AG free-space BNO tree, updating
 AGF free-block and longest-run metadata and rolling back the tree if the AGF
 write fails. Matching extent release now rejects overlap, inserts in order, and

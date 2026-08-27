@@ -496,6 +496,8 @@ ACPI now validates page-aligned LAPIC/IOAPIC MMIO bases and rejects overlapping
 IOAPIC GSI ranges before publishing interrupt-routing state.
 ACPI intake now bounds RSDP, XSDT, and referenced table lengths and rejects
 unsupported or overflowing table addresses before dereferencing them.
+ACPI table ranges now also remain wholly below the 4-GiB identity-map limit;
+32-bit addresses whose lengths cross that boundary are rejected.
 PCI now programs a validated single-entry MSI-X table when available, with
 MSI and ACPI IOAPIC fallback retained for devices without usable MSI-X.
 PCI MSI-X table validation now rejects I/O BARs and uses overflow-safe resource

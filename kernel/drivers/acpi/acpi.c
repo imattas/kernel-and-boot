@@ -47,7 +47,7 @@ static void io_write8(uint16_t port, uint8_t value) {
 static int table_range_valid(uint64_t address, uint32_t length) {
     return address != 0 && address <= UINT32_MAX && length != 0 &&
            length <= ACPI_MAX_TABLE_LENGTH &&
-           address <= UINT64_MAX - (uint64_t)length;
+           address <= UINT32_MAX - (uint64_t)length + 1U;
 }
 
 static int mmio_base_valid(uint64_t address) {

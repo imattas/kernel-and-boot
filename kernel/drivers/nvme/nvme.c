@@ -46,6 +46,8 @@ static device_driver_t nvme_driver;
 static int nvme_irq_enabled;
 static volatile uint32_t nvme_interrupts;
 static volatile uint32_t nvme_completion_pending;
+static volatile uint32_t nvme_errors;
+static volatile uint16_t nvme_last_status;
 static int nvme_disabled;
 static uint64_t nvme_quarantined_prp;
 static uint64_t nvme_quarantined_prp_list;
@@ -228,9 +230,11 @@ static int nvme_submit_admin_words(uint8_t opcode, uint32_t namespace_id,
         uint16_t status = completion->status;
         if ((status & 1U) != active_cq_phase) continue;
         if (completion->command_id != command_id) continue;
+        nvme_last_status = status;
         *result = completion->result;
         __atomic_store_n(&nvme_completion_pending, 0U, __ATOMIC_RELEASE);
         int success = (status >> 1) == 0;
+        if (!success) ++nvme_errors;
         ++active_cq_head;
         if (active_cq_head == active_queue_entries) {
             active_cq_head = 0;
@@ -385,7 +389,9 @@ static int nvme_io(uint64_t lba, void *buffer, uint32_t count, int write) {
         uint16_t status = completion->status;
         if ((status & 1U) != active_io_cq_phase ||
             completion->command_id != command_id) continue;
+        nvme_last_status = status;
         success = (status >> 1) == 0;
+        if (!success) ++nvme_errors;
         __atomic_store_n(&nvme_completion_pending, 0U, __ATOMIC_RELEASE);
         completed = 1;
         ++active_io_cq_head;
@@ -456,7 +462,9 @@ static int nvme_flush(void) {
         uint16_t status = completion->status;
         if ((status & 1U) != active_io_cq_phase ||
             completion->command_id != command_id) continue;
+        nvme_last_status = status;
         success = (status >> 1) == 0;
+        if (!success) ++nvme_errors;
         __atomic_store_n(&nvme_completion_pending, 0U, __ATOMIC_RELEASE);
         completed = 1;
         ++active_io_cq_head;
@@ -502,6 +510,8 @@ int nvme_initialize(void) {
     nvme_irq_enabled = 0;
     nvme_interrupts = 0;
     nvme_completion_pending = 0;
+    nvme_errors = 0;
+    nvme_last_status = 0;
     nvme_disabled = 0;
     nvme_quarantined_prp = 0;
     active_namespace_sectors = 0;
@@ -516,3 +526,5 @@ int nvme_initialize(void) {
 uint32_t nvme_controller_count(void) { return controllers; }
 int nvme_interrupt_enabled(void) { return nvme_irq_enabled; }
 uint32_t nvme_interrupt_count(void) { return nvme_interrupts; }
+uint32_t nvme_error_count(void) { return nvme_errors; }
+uint16_t nvme_last_completion_status(void) { return nvme_last_status; }

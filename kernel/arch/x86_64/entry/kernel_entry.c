@@ -643,6 +643,10 @@ void kernel_main(void *boot_info) {
             }
         serial_write("NVMe multi-sector I/O ready\r\n");
     }
+    if (nvme_controller_count() != 0 && nvme_error_count() != 0) {
+        serial_write("NVMe completion error accounting failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
     if (!e1000_initialize()) {
         serial_write("e1000 initialization failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");

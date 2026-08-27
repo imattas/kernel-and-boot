@@ -1089,6 +1089,9 @@ metadata reaches a transfer driver.
 NVMe interrupt completion state is now published with atomic ordering, and
 interrupt accounting no longer races with SMP readers; command waiters clear
 the pending completion marker when consuming a CQ entry.
+NVMe admin, I/O, and flush completions now retain the last device status and
+count non-success completions, with the boot storage gate asserting a clean
+completion-error count after its read/write coverage.
 PCI bridge enumeration now walks each validated secondary-to-subordinate bus
 range with the existing cycle guard, instead of probing only the first child
 bus and silently missing devices behind deeper bridge topologies.

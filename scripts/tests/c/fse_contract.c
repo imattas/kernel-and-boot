@@ -37,5 +37,11 @@ int main(void) {
     assert(btrfs_fse_read_header(&table, (const uint8_t[]){0xf0, 0x03}, 2, 5,
                                  &consumed));
     assert(consumed == 2 && table.size == 32);
+    assert(btrfs_fse_select_sequence_table(&table, 0, 0, 0, 0, 0, &consumed) &&
+           consumed == 0 && table.size == 64);
+    assert(btrfs_fse_select_sequence_table(&table, 0, 0, 1, (const uint8_t[]){7}, 1, &consumed) &&
+           consumed == 1 && table.size == 1 && table.symbols[0] == 7);
+    assert(btrfs_fse_select_sequence_table(&table, &table, 0, 3, 0, 0, &consumed) &&
+           consumed == 0 && table.size == 1);
     return 0;
 }

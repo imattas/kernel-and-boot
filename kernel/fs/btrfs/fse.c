@@ -28,6 +28,31 @@ int btrfs_fse_build_rle(btrfs_fse_table_t *table, uint8_t symbol) {
     return 1;
 }
 
+int btrfs_fse_select_sequence_table(btrfs_fse_table_t *table,
+                                    const btrfs_fse_table_t *previous,
+                                    uint32_t part, uint8_t mode,
+                                    const uint8_t *stream, uint32_t stream_size,
+                                    uint32_t *consumed) {
+    if (!table || !consumed) return 0;
+    if (mode == 0U) {
+        *consumed = 0; return btrfs_fse_build_predefined(table, part);
+    }
+    if (mode == 1U) {
+        if (!stream || !stream_size) return 0;
+        *consumed = 1; return btrfs_fse_build_rle(table, stream[0]);
+    }
+    if (mode == 2U) {
+        if (!stream || !stream_size || !btrfs_fse_read_header(table, stream,
+                                                                stream_size, part == 1U ? 8U : 9U,
+                                                                consumed)) return 0;
+        return 1;
+    }
+    if (mode == 3U && previous && previous->size) {
+        *table = *previous; *consumed = 0; return 1;
+    }
+    return 0;
+}
+
 static uint32_t stream_bits(const uint8_t *source, uint32_t bits, int64_t *offset) {
     int64_t start = *offset - (int64_t)bits;
     uint32_t result = 0, shift = 0;

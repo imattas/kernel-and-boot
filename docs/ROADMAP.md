@@ -263,6 +263,9 @@ Driver enumeration and hardware
 coverage remain incomplete. The QEMU gate now supplies an emulated e1000 NIC
 so its controller path and bounded TX/RX descriptor operations can be exercised;
 the boot probe submits a real test frame to the TX ring.
+UHCI interrupt delivery remains on the shared legacy dispatcher because QEMU
+can place UHCI and e1000 on one legacy GSI; the dispatcher explicitly services
+both device handlers before issuing APIC EOI.
 The e1000 path now has independent build/link ownership, enables bounded
 RX/TX completion causes, and exposes a polling service that acknowledges
 causes and reclaims completed TX entries. TX/RX ring state is serialized with

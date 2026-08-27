@@ -343,6 +343,9 @@ invalid frame sizes without allowing overflow.
 The e1000 network adapter now validates Ethernet frames at the protocol
 boundary before transmission and provides bounded polling that transfers
 completed hardware RX frames into the packet queue.
+The e1000 probe now validates the hardware Receive Address registers and
+publishes the controller MAC, which the Ethernet path uses instead of a
+fabricated source address.
 The e1000 ISR now records delivery, and the post-interrupt-enable QEMU probe
 transmits a frame and requires an observed interrupt before continuing.
 The e1000 ISR now preserves cleared interrupt causes for the polling/service

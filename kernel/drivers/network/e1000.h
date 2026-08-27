@@ -4,6 +4,7 @@
 int e1000_initialize(void);
 uint32_t e1000_controller_count(void);
 int e1000_link_up(void);
+int e1000_mac_address(uint8_t address[6]);
 int e1000_interrupt_enabled(void);
 uint32_t e1000_interrupt_count(void);
 uint32_t e1000_tx_error_count(void);

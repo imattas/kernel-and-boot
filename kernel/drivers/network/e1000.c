@@ -25,6 +25,9 @@
 #define E1000_RDLEN 0x2808
 #define E1000_RDH 0x2810
 #define E1000_RDT 0x2818
+#define E1000_RAL 0x5400
+#define E1000_RAH 0x5404
+#define E1000_RAH_AV (1U << 31)
 #define E1000_CTRL_RST (1U << 26)
 #define E1000_CTRL_ASDE (1U << 5)
 #define E1000_TCTL_EN (1U << 1)
@@ -66,6 +69,7 @@ static uint32_t e1000_tx_pending;
 static uint32_t e1000_rx_index;
 static spinlock_t e1000_lock;
 static int e1000_msi_enabled;
+static uint8_t e1000_mac[6];
 static volatile uint32_t e1000_interrupts;
 static volatile uint32_t e1000_pending_causes;
 static volatile uint32_t e1000_tx_errors;
@@ -100,6 +104,18 @@ static int e1000_probe(device_t *device) {
     if (!tx_frame || !rx_frame) goto fail;
     e1000_tx_desc_t *tx = (e1000_tx_desc_t *)(uintptr_t)tx_frame;
     e1000_rx_desc_t *rx = (e1000_rx_desc_t *)(uintptr_t)rx_frame;
+    uint32_t receive_address_low = regs[E1000_RAL / 4];
+    uint32_t receive_address_high = regs[E1000_RAH / 4];
+    if ((receive_address_high & E1000_RAH_AV) == 0 ||
+        (receive_address_low & 1U) != 0 ||
+        (receive_address_low == 0 &&
+         (receive_address_high & 0xffffU) == 0)) goto fail;
+    e1000_mac[0] = (uint8_t)receive_address_low;
+    e1000_mac[1] = (uint8_t)(receive_address_low >> 8);
+    e1000_mac[2] = (uint8_t)(receive_address_low >> 16);
+    e1000_mac[3] = (uint8_t)(receive_address_low >> 24);
+    e1000_mac[4] = (uint8_t)receive_address_high;
+    e1000_mac[5] = (uint8_t)(receive_address_high >> 8);
     for (uint32_t i = 0; i < 64; ++i) {
         e1000_tx_buffers[i] = physical_alloc_frame();
         if (!e1000_tx_buffers[i]) goto fail;
@@ -150,6 +166,7 @@ int e1000_initialize(void) {
     e1000_tx_errors = 0;
     e1000_link_events = 0;
     e1000_rx_overruns = 0;
+    for (uint32_t i = 0; i < 6; ++i) e1000_mac[i] = 0;
     spinlock_init(&e1000_lock);
     for (uint32_t i = 0; i < E1000_RING_COUNT; ++i) {
         e1000_rx_buffers[i] = 0;
@@ -162,6 +179,13 @@ int e1000_initialize(void) {
 uint32_t e1000_controller_count(void) { return controllers; }
 int e1000_link_up(void) {
     return e1000_regs && (e1000_regs[E1000_STATUS / 4] & E1000_STATUS_LINK_UP) != 0;
+}
+int e1000_mac_address(uint8_t address[6]) {
+    if (!address || !e1000_regs || e1000_controller_count() == 0) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&e1000_lock);
+    for (uint32_t i = 0; i < 6; ++i) address[i] = e1000_mac[i];
+    spinlock_unlock_irqrestore(&e1000_lock, flags);
+    return 1;
 }
 int e1000_interrupt_enabled(void) { return e1000_msi_enabled; }
 uint32_t e1000_interrupt_count(void) { return e1000_interrupts; }

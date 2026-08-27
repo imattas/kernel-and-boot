@@ -471,13 +471,18 @@ void kernel_main(void *boot_info) {
     serial_write_hex_line("", e1000_controller_count());
     static const uint8_t ethernet_probe_destination[6] =
         {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
-    static const uint8_t ethernet_probe_source[6] =
+    static uint8_t ethernet_probe_source[6] =
         {0x02, 0x00, 0x00, 0x00, 0x00, 0x01};
     static const uint8_t ethernet_probe_payload[4] =
         {0xde, 0xad, 0xbe, 0xef};
     static uint8_t ethernet_probe_frame[ETHERNET_MAX_FRAME_SIZE];
     uint16_t ethernet_probe_length = 0;
     ethernet_frame_view_t ethernet_probe_view;
+    if (e1000_controller_count() != 0 &&
+        !e1000_mac_address(ethernet_probe_source)) {
+        serial_write("e1000 MAC failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
     if (!ethernet_frame_build(ethernet_probe_frame,
                               sizeof(ethernet_probe_frame),
                               ethernet_probe_destination,

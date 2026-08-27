@@ -319,6 +319,9 @@ The first bounded Ethernet-II layer now constructs and parses canonical
 14-byte-header frames, enforces the 1500-byte payload and 1518-byte frame
 limits, pads short frames to the hardware minimum, and rejects non-EtherType
 length fields before higher network protocols consume a frame.
+The ARP packet codec now validates Ethernet/IPv4 hardware and protocol sizes,
+operation codes, and the fixed 28-byte layout while constructing bounded
+requests and replies for the Ethernet layer.
 The e1000 ISR now records delivery, and the post-interrupt-enable QEMU probe
 transmits a frame and requires an observed interrupt before continuing.
 The e1000 ISR now preserves cleared interrupt causes for the polling/service

@@ -33,6 +33,7 @@
 #include "../../../drivers/nvme/nvme.h"
 #include "../../../drivers/network/e1000.h"
 #include "../../../drivers/network/ethernet.h"
+#include "../../../drivers/network/arp.h"
 #include "../../../time/clock.h"
 #include "../../../debug/assert.h"
 #include "../../../core/task/context.h"
@@ -495,6 +496,31 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("Ethernet frame ready\r\n");
+    static const uint8_t arp_probe_sender_hardware[6] =
+        {0x02, 0x00, 0x00, 0x00, 0x00, 0x01};
+    static const uint8_t arp_probe_sender_protocol[4] = {192, 168, 0, 2};
+    static const uint8_t arp_probe_target_hardware[6] = {0};
+    static const uint8_t arp_probe_target_protocol[4] = {192, 168, 0, 1};
+    static uint8_t arp_probe_packet[ARP_PACKET_SIZE];
+    uint16_t arp_probe_length = 0;
+    arp_packet_view_t arp_probe_view;
+    if (!arp_packet_build(arp_probe_packet, sizeof(arp_probe_packet),
+                          ARP_OPERATION_REQUEST, arp_probe_sender_hardware,
+                          arp_probe_sender_protocol,
+                          arp_probe_target_hardware,
+                          arp_probe_target_protocol, &arp_probe_length) ||
+        arp_probe_length != ARP_PACKET_SIZE ||
+        !arp_packet_parse(arp_probe_packet, arp_probe_length,
+                          &arp_probe_view) ||
+        arp_probe_view.operation != ARP_OPERATION_REQUEST ||
+        arp_probe_view.sender_protocol[0] != 192 ||
+        arp_probe_view.target_protocol[3] != 1 ||
+        arp_packet_parse(arp_probe_packet, ARP_PACKET_SIZE - 1,
+                         &arp_probe_view)) {
+        serial_write("ARP packet failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("ARP packet ready\r\n");
     if (e1000_controller_count() != 0 &&
         !e1000_transmit(network_probe_packet, sizeof(network_probe_packet))) {
         serial_write("e1000 transmit failure\r\n");

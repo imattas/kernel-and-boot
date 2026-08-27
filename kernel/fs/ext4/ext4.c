@@ -21,6 +21,13 @@ static int read_block(const ext4_fs_t *fs, uint64_t block, void *buffer) {
                         fs->block_size / EXT4_SECTOR_SIZE, buffer);
 }
 
+static int write_block(const ext4_fs_t *fs, uint64_t block, const void *buffer) {
+    uint32_t sectors = fs ? fs->block_size / EXT4_SECTOR_SIZE : 0;
+    return fs && buffer && sectors != 0 && block < fs->block_count &&
+           block <= UINT64_MAX / sectors &&
+           storage_write(fs->device, block * sectors, sectors, buffer);
+}
+
 int ext4_mount(ext4_fs_t *fs, uint32_t device) {
     if (!fs || !storage_device_at(device) ||
         storage_device_at(device)->block_size != EXT4_SECTOR_SIZE) return 0;
@@ -242,6 +249,34 @@ int ext4_read_file(ext4_fs_t *fs, uint32_t inode_number, uint64_t offset,
             for (uint32_t i = 0; i < chunk; ++i) destination[i] = block[in_block + i];
         }
         destination += chunk; remaining -= chunk; ++logical; in_block = 0;
+    }
+    return 1;
+}
+
+int ext4_write_file(ext4_fs_t *fs, uint32_t inode_number, uint64_t offset,
+                    const void *buffer, uint32_t size) {
+    if (!fs || !fs->mounted || !buffer || size == 0) return 0;
+    uint8_t inode[4096];
+    if (!read_inode(fs, inode_number, inode)) return 0;
+    uint64_t file_size = inode_size_value(inode);
+    if (offset > file_size || (uint64_t)size > file_size - offset) return 0;
+    uint8_t block[4096];
+    const uint8_t *source = (const uint8_t *)buffer;
+    uint64_t logical = offset / fs->block_size;
+    uint32_t in_block = (uint32_t)(offset % fs->block_size);
+    uint32_t remaining = size;
+    while (remaining != 0) {
+        if (logical > UINT32_MAX) return 0;
+        uint64_t physical = 0;
+        uint8_t hole = 0;
+        if (!inode_data_block(fs, inode, (uint32_t)logical, &physical, &hole) ||
+            hole || !read_block(fs, physical, block)) return 0;
+        uint32_t chunk = fs->block_size - in_block;
+        if (chunk > remaining) chunk = remaining;
+        for (uint32_t i = 0; i < chunk; ++i)
+            block[in_block + i] = source[i];
+        if (!write_block(fs, physical, block)) return 0;
+        source += chunk; remaining -= chunk; ++logical; in_block = 0;
     }
     return 1;
 }

@@ -31,6 +31,11 @@ int main(void) {
     ext4_fs_t fs; assert(ext4_mount(&fs, 0)); uint32_t inode = 0;
     assert(ext4_lookup(&fs, 2, "hello", &inode) && inode == 3);
     char output[6] = {0}; assert(ext4_read_file(&fs, inode, 0, output, 5)); assert(memcmp(output, "world", 5) == 0);
+    assert(ext4_write_file(&fs, inode, 1, "a", 1));
+    memset(output, 0, sizeof(output));
+    assert(ext4_read_file(&fs, inode, 0, output, 5));
+    assert(memcmp(output, "warld", 5) == 0);
+    assert(ext4_write_file(&fs, inode, 1, "o", 1));
     memset(output, 0, sizeof(output)); assert(ext4_read_file(&fs, 4, 1024U * 12U, output, 5)); assert(memcmp(output, "indir", 5) == 0);
     memset(output, 0, sizeof(output)); assert(ext4_read_file(&fs, 5, 0, output, 4)); assert(memcmp(output, "deep", 4) == 0);
     uint64_t group_size = 0;

@@ -1,13 +1,24 @@
 #include "ext4_vfs.h"
 #include "../../mm/heap/heap.h"
 
-typedef struct { ext4_fs_t *fs; uint32_t inode; uint64_t size; } ext4_vfs_file_t;
+typedef struct { ext4_fs_t *fs; uint32_t inode; uint64_t size; spinlock_t lock; } ext4_vfs_file_t;
 static void ext4_vfs_destroy(void *private_data) { kfree(private_data); }
 static int ext4_vfs_read(vfs_node_t *node, uint64_t offset,
                          void *buffer, uint32_t size) {
     ext4_vfs_file_t *file = node ? (ext4_vfs_file_t *)node->private_data : 0;
     if (!file || offset > file->size || size > file->size - offset) return 0;
     return ext4_read_file(file->fs, file->inode, offset, buffer, size) ? (int)size : 0;
+}
+static int ext4_vfs_write(vfs_node_t *node, uint64_t offset,
+                          const void *buffer, uint32_t size) {
+    ext4_vfs_file_t *file = node ? (ext4_vfs_file_t *)node->private_data : 0;
+    if (!file || offset > file->size || (uint64_t)size > file->size - offset)
+        return 0;
+    uint64_t flags = spinlock_lock_irqsave(&file->lock);
+    int result = ext4_write_file(file->fs, file->inode, offset, buffer, size) ?
+                 (int)size : 0;
+    spinlock_unlock_irqrestore(&file->lock, flags);
+    return result;
 }
 int ext4_vfs_attach_file(ext4_fs_t *fs, vfs_node_t *root,
                          const char *filesystem_name, const char *name) {
@@ -18,9 +29,11 @@ int ext4_vfs_attach_file(ext4_fs_t *fs, vfs_node_t *root,
     ext4_vfs_file_t *file = (ext4_vfs_file_t *)kmalloc(sizeof(*file));
     if (!file) return 0;
     file->fs = fs; file->inode = inode_number;
+    spinlock_init(&file->lock);
     if (!ext4_inode_size(fs, inode_number, &file->size)) { kfree(file); return 0; }
-    vfs_node_t *node = vfs_node_create(name, VFS_NODE_REGULAR, 0, 0, 0444);
+    vfs_node_t *node = vfs_node_create(name, VFS_NODE_REGULAR, 0, 0, 0644);
     if (!node || !vfs_node_set_read(node, ext4_vfs_read, file) ||
+        !vfs_node_set_write(node, ext4_vfs_write, file) ||
         !vfs_node_set_private_destructor(node, ext4_vfs_destroy) ||
         !vfs_node_add_child(root, node)) {
         if (node) {

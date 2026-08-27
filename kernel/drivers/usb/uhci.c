@@ -40,6 +40,7 @@ static uint64_t controller_frame_list;
 static device_driver_t uhci_driver;
 static int uhci_irq_enabled;
 static volatile uint32_t uhci_interrupts;
+static int uhci_low_speed;
 
 typedef struct {
     uint32_t link;
@@ -66,7 +67,8 @@ static int uhci_td_complete(const uhci_td_t *td) {
 }
 
 static uint32_t uhci_td_status(void) {
-    return (3U << 27) | UHCI_TD_LOW_SPEED | UHCI_TD_ACTIVE;
+    return (3U << 27) | (uhci_low_speed ? UHCI_TD_LOW_SPEED : 0) |
+           UHCI_TD_ACTIVE;
 }
 
 static int uhci_set_running(int running) {
@@ -161,6 +163,7 @@ static int uhci_probe(device_t *device) {
         uint16_t status;
         __asm__ volatile ("inw %1, %0" : "=a"(status) : "Nd"(port_address));
         if ((status & UHCI_PORT_CONNECT) == 0) continue;
+        if (root_ports == 0) uhci_low_speed = (status & (1U << 8)) != 0;
         __asm__ volatile ("outw %0, %1" :: "a"((uint16_t)UHCI_PORT_RESET), "Nd"(port_address));
         for (volatile uint32_t delay = 0; delay < 10000; ++delay) __asm__ volatile ("pause");
         __asm__ volatile ("outw %0, %1" :: "a"((uint16_t)(UHCI_PORT_RESET | UHCI_PORT_CONNECT)),
@@ -337,6 +340,7 @@ int uhci_initialize(void) {
     root_ports = 0;
     controller_base = 0;
     controller_frame_list = 0;
+    uhci_low_speed = 0;
     uhci_irq_enabled = 0;
     uhci_interrupts = 0;
     uhci_driver.name = "uhci";

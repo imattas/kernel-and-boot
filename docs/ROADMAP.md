@@ -296,7 +296,7 @@ enables completion/error causes when ACPI routing is available. The current
 QEMU synchronous HID transfer does not expose a completion cause, so UHCI
 interrupt delivery remains unverified and polling remains the tested path.
 UHCI TD status handling now uses the controller’s low-speed and error-bit
-definitions; the QEMU gate performs a real USB keyboard device-descriptor
+definitions, with low-speed selected from the connected root-port status; the QEMU gate performs a real USB keyboard device-descriptor
 control transfer and validates the returned descriptor.
 The UHCI path now enumerates the connected device through SET_ADDRESS,
 post-address descriptor/configuration reads, and SET_CONFIGURATION; QEMU

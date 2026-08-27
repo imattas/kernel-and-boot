@@ -9,7 +9,8 @@ void input_queue_initialize(input_queue_t *queue) {
 }
 
 int input_queue_push(input_queue_t *queue, const input_event_t *event) {
-    if (!queue || !event || event->type > INPUT_EVENT_AXIS) return 0;
+    if (!queue || !event || event->type < INPUT_EVENT_KEY ||
+        event->type > INPUT_EVENT_AXIS) return 0;
     uint64_t flags = spinlock_lock_irqsave(&queue->lock);
     if (queue->count == INPUT_EVENT_CAPACITY) {
         spinlock_unlock_irqrestore(&queue->lock, flags);

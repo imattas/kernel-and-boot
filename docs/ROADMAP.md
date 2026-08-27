@@ -671,6 +671,8 @@ NVMe I/O now enforces the namespace size reported by IDENTIFY before PRP
 allocation and command submission.
 PS/2 mouse packets now have a validated decoder that rejects bad sync and
 overflow bits and emits button, X-axis, and Y-axis input events.
+The input queue now rejects event-type values outside the enum range,
+including negative/corrupt values, with a boot-time regression probe.
 Keyboard polling now checks the controller source bit, so a keyboard IRQ path
 cannot consume mouse data from the shared output buffer; mouse status is read
 once per poll and packet state is reset when mouse scanning is enabled.

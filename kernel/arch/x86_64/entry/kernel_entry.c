@@ -1448,9 +1448,12 @@ void kernel_main(void *boot_info) {
     input_event_t input_event = {
         .type = INPUT_EVENT_KEY, .code = 30, .value = 1, .timestamp = 7
     };
+    input_event_t invalid_input_event = {0};
+    invalid_input_event.type = (input_event_type_t)-1;
     input_event_t input_out;
     input_queue_initialize(&input_queue);
-    if (!input_queue_push(&input_queue, &input_event)) {
+    if (input_queue_push(&input_queue, &invalid_input_event) ||
+        !input_queue_push(&input_queue, &input_event)) {
         serial_write("input queue setup failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }

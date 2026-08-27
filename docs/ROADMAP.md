@@ -1020,6 +1020,9 @@ protected.
 Btrfs inline regular-file data now also supports bounded in-place updates with
 tree-node checksum regeneration; allocation, compression, and size-changing
 metadata operations remain separate.
+Btrfs inline regular files now support bounded nonzero shrink/truncation by
+updating the inode item in its checksum-protected tree node; the VFS adapter
+updates its cached size while extent allocation/freeing remains separate.
 Btrfs VFS file attachment now accepts an explicit on-disk directory inode,
 allowing validated files below the filesystem root to be exposed through the
 same adapter while preserving the inode permission bits.

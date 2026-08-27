@@ -51,5 +51,7 @@ int btrfs_read_file(btrfs_fs_t *fs, uint64_t tree_bytenr, uint64_t inode,
                     uint64_t offset, void *buffer, uint32_t size);
 int btrfs_write_file(btrfs_fs_t *fs, uint64_t tree_bytenr, uint64_t inode,
                      uint64_t offset, const void *buffer, uint32_t size);
+int btrfs_truncate_file(btrfs_fs_t *fs, uint64_t tree_bytenr, uint64_t inode,
+                        uint64_t size);
 
 #endif

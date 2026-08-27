@@ -23,6 +23,15 @@ static int btrfs_vfs_write(vfs_node_t *node, uint64_t offset,
     spinlock_unlock_irqrestore(&file->lock, flags);
     return result;
 }
+static int btrfs_vfs_truncate(vfs_node_t *node, uint32_t size) {
+    btrfs_vfs_file_t *file = node ? (btrfs_vfs_file_t *)node->private_data : 0;
+    if (!file || size == 0 || (uint64_t)size >= file->size) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&file->lock);
+    int result = btrfs_truncate_file(file->fs, file->tree, file->inode, size);
+    if (result) file->size = size;
+    spinlock_unlock_irqrestore(&file->lock, flags);
+    return result;
+}
 
 int btrfs_vfs_attach_file_in_directory(btrfs_fs_t *fs, vfs_node_t *root,
                                        uint64_t directory,
@@ -42,6 +51,7 @@ int btrfs_vfs_attach_file_in_directory(btrfs_fs_t *fs, vfs_node_t *root,
                                        mode & 0777U);
     if (!node || !vfs_node_set_read(node, btrfs_vfs_read, file) ||
         !vfs_node_set_write(node, btrfs_vfs_write, file) ||
+        !vfs_node_set_truncate(node, btrfs_vfs_truncate) ||
         !vfs_node_set_private_destructor(node, btrfs_vfs_destroy) ||
         !vfs_node_add_child(root, node)) {
         if (node) {

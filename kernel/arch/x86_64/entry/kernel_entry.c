@@ -41,6 +41,7 @@
 #include "../../../drivers/network/route.h"
 #include "../../../drivers/network/packet_queue.h"
 #include "../../../drivers/network/network.h"
+#include "../../../drivers/network/reassembly.h"
 #include "../../../time/clock.h"
 #include "../../../debug/assert.h"
 #include "../../../core/task/context.h"
@@ -730,6 +731,42 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("network frame decode ready\r\n");
+    static ipv4_reassembly_table_t reassembly_probe_table;
+    static const uint8_t reassembly_probe_data[16] =
+        {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+    static uint8_t reassembly_probe_output[16];
+    uint16_t reassembly_probe_length = 0;
+    ipv4_reassembly_initialize(&reassembly_probe_table);
+    if (ipv4_reassembly_add(&reassembly_probe_table, 0x2222,
+                            ipv4_probe_source, ipv4_probe_destination, 17,
+                            8, 0, reassembly_probe_data + 8, 8, 10, 100,
+                            reassembly_probe_output,
+                            sizeof(reassembly_probe_output),
+                            &reassembly_probe_length) ||
+        !ipv4_reassembly_add(&reassembly_probe_table, 0x2222,
+                             ipv4_probe_source, ipv4_probe_destination, 17,
+                             0, 1, reassembly_probe_data, 8, 20, 100,
+                             reassembly_probe_output,
+                             sizeof(reassembly_probe_output),
+                             &reassembly_probe_length) ||
+        reassembly_probe_length != sizeof(reassembly_probe_data) ||
+        reassembly_probe_output[15] != 15 ||
+        ipv4_reassembly_add(&reassembly_probe_table, 0x3333,
+                            ipv4_probe_source, ipv4_probe_destination, 17,
+                            0, 1, reassembly_probe_data, 8, 30, 100,
+                            reassembly_probe_output,
+                            sizeof(reassembly_probe_output),
+                            &reassembly_probe_length) ||
+        ipv4_reassembly_add(&reassembly_probe_table, 0x3333,
+                            ipv4_probe_source, ipv4_probe_destination, 17,
+                            4, 0, reassembly_probe_data + 4, 8, 31, 100,
+                            reassembly_probe_output,
+                            sizeof(reassembly_probe_output),
+                            &reassembly_probe_length)) {
+        serial_write("IPv4 reassembly failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("IPv4 reassembly ready\r\n");
     if (e1000_controller_count() != 0)
         serial_write(e1000_link_up() ? "e1000 link ready\r\n" :
                      "e1000 link down\r\n");

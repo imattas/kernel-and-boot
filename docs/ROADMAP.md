@@ -349,6 +349,9 @@ fabricated source address.
 The network adapter now exposes a typed decoder that validates and dispatches
 Ethernet frames through ARP, IPv4, UDP, and ICMP layers without allowing
 malformed nested payloads to reach protocol consumers.
+Bounded IPv4 fragment reassembly now accepts out-of-order fragments, rejects
+overlap and inconsistent extents, expires stale slots, and delivers only a
+complete payload from its SMP-safe four-slot table.
 The e1000 ISR now records delivery, and the post-interrupt-enable QEMU probe
 transmits a frame and requires an observed interrupt before continuing.
 The e1000 ISR now preserves cleared interrupt causes for the polling/service

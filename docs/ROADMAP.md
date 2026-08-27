@@ -346,6 +346,9 @@ completed hardware RX frames into the packet queue.
 The e1000 probe now validates the hardware Receive Address registers and
 publishes the controller MAC, which the Ethernet path uses instead of a
 fabricated source address.
+The network adapter now exposes a typed decoder that validates and dispatches
+Ethernet frames through ARP, IPv4, UDP, and ICMP layers without allowing
+malformed nested payloads to reach protocol consumers.
 The e1000 ISR now records delivery, and the post-interrupt-enable QEMU probe
 transmits a frame and requires an observed interrupt before continuing.
 The e1000 ISR now preserves cleared interrupt causes for the polling/service

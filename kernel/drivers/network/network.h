@@ -3,8 +3,31 @@
 
 #include <stdint.h>
 #include "packet_queue.h"
+#include "arp.h"
+#include "ipv4.h"
+#include "udp.h"
+#include "icmp.h"
+
+typedef enum {
+    NETWORK_FRAME_ETHERNET,
+    NETWORK_FRAME_ARP,
+    NETWORK_FRAME_IPV4,
+    NETWORK_FRAME_UDP,
+    NETWORK_FRAME_ICMP
+} network_frame_kind_t;
+
+typedef struct {
+    network_frame_kind_t kind;
+    ethernet_frame_view_t ethernet;
+    arp_packet_view_t arp;
+    ipv4_packet_view_t ipv4;
+    udp_packet_view_t udp;
+    icmp_echo_view_t icmp;
+} network_frame_view_t;
 
 int network_e1000_transmit(const void *frame, uint16_t length);
 uint32_t network_e1000_poll(network_packet_queue_t *queue, uint32_t budget);
+int network_decode_frame(const void *frame, uint16_t length,
+                         network_frame_view_t *view);
 
 #endif

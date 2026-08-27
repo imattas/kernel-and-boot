@@ -446,7 +446,7 @@ $(KERNEL_PACKET_QUEUE_OBJ): kernel/drivers/network/packet_queue.c kernel/drivers
 	$(CC) -target x86_64-pc-none-elf -std=c11 -ffreestanding -fno-builtin -fno-stack-protector -fPIE -fno-plt \
 		-mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@
 
-$(KERNEL_NETWORK_OBJ): kernel/drivers/network/network.c kernel/drivers/network/network.h kernel/drivers/network/e1000.h kernel/drivers/network/packet_queue.h kernel/drivers/network/ethernet.h | $(BUILD_DIR)/kernel
+$(KERNEL_NETWORK_OBJ): kernel/drivers/network/network.c kernel/drivers/network/network.h kernel/drivers/network/e1000.h kernel/drivers/network/packet_queue.h kernel/drivers/network/ethernet.h kernel/drivers/network/arp.h kernel/drivers/network/ipv4.h kernel/drivers/network/udp.h kernel/drivers/network/icmp.h | $(BUILD_DIR)/kernel
 	$(CC) -target x86_64-pc-none-elf -std=c11 -ffreestanding -fno-builtin -fno-stack-protector -fPIE -fno-plt \
 		-mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@
 

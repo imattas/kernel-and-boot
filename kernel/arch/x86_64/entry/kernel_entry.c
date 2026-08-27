@@ -693,6 +693,43 @@ void kernel_main(void *boot_info) {
         serial_write("network interface ready\r\n");
         serial_write("e1000 network I/O ready\r\n");
     }
+    static const uint8_t network_dispatch_payload[3] = {0xa1, 0xb2, 0xc3};
+    static uint8_t network_dispatch_udp[UDP_HEADER_SIZE +
+                                        sizeof(network_dispatch_payload)];
+    static uint8_t network_dispatch_ipv4[IPV4_MIN_HEADER_SIZE +
+                                         sizeof(network_dispatch_udp)];
+    static uint8_t network_dispatch_frame[ETHERNET_MAX_FRAME_SIZE];
+    uint16_t network_dispatch_udp_length = 0;
+    uint16_t network_dispatch_ipv4_length = 0;
+    uint16_t network_dispatch_frame_length = 0;
+    network_frame_view_t network_dispatch_view;
+    if (!udp_packet_build(network_dispatch_udp, sizeof(network_dispatch_udp),
+                          ipv4_probe_source, ipv4_probe_destination, 6000,
+                          6001, network_dispatch_payload,
+                          sizeof(network_dispatch_payload),
+                          &network_dispatch_udp_length) ||
+        !ipv4_packet_build(network_dispatch_ipv4, sizeof(network_dispatch_ipv4),
+                           ipv4_probe_source, ipv4_probe_destination, 17, 64,
+                           0x4321, network_dispatch_udp,
+                           network_dispatch_udp_length,
+                           &network_dispatch_ipv4_length) ||
+        !ethernet_frame_build(network_dispatch_frame,
+                              sizeof(network_dispatch_frame),
+                              ethernet_probe_destination,
+                              ethernet_probe_source, 0x0800,
+                              network_dispatch_ipv4,
+                              network_dispatch_ipv4_length,
+                              &network_dispatch_frame_length) ||
+        !network_decode_frame(network_dispatch_frame,
+                              network_dispatch_frame_length,
+                              &network_dispatch_view) ||
+        network_dispatch_view.kind != NETWORK_FRAME_UDP ||
+        network_dispatch_view.udp.destination_port != 6001 ||
+        network_dispatch_view.udp.payload[2] != 0xc3) {
+        serial_write("network frame decode failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("network frame decode ready\r\n");
     if (e1000_controller_count() != 0)
         serial_write(e1000_link_up() ? "e1000 link ready\r\n" :
                      "e1000 link down\r\n");

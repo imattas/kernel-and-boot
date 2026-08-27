@@ -1,6 +1,36 @@
 #include "network.h"
 #include "e1000.h"
 
+int network_decode_frame(const void *frame, uint16_t length,
+                         network_frame_view_t *view) {
+    if (!frame || !view || !ethernet_frame_parse(frame, length,
+                                                  &view->ethernet)) return 0;
+    if (view->ethernet.ether_type == 0x0806U) {
+        if (!arp_packet_parse(view->ethernet.payload,
+                              view->ethernet.payload_length, &view->arp))
+            return 0;
+        view->kind = NETWORK_FRAME_ARP;
+        return 1;
+    }
+    if (view->ethernet.ether_type != 0x0800U ||
+        !ipv4_packet_parse(view->ethernet.payload,
+                           view->ethernet.payload_length, &view->ipv4))
+        return 0;
+    if (view->ipv4.protocol == 17U) {
+        if (!udp_packet_parse(view->ipv4.payload, view->ipv4.payload_length,
+                              view->ipv4.source, view->ipv4.destination,
+                              &view->udp)) return 0;
+        view->kind = NETWORK_FRAME_UDP;
+    } else if (view->ipv4.protocol == 1U) {
+        if (!icmp_echo_parse(view->ipv4.payload, view->ipv4.payload_length,
+                             &view->icmp)) return 0;
+        view->kind = NETWORK_FRAME_ICMP;
+    } else {
+        view->kind = NETWORK_FRAME_IPV4;
+    }
+    return 1;
+}
+
 int network_e1000_transmit(const void *frame, uint16_t length) {
     ethernet_frame_view_t view;
     if (!frame || !ethernet_frame_parse(frame, length, &view)) return 0;

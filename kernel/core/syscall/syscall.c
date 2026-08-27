@@ -102,9 +102,11 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
             if (root) vfs_node_retain(root);
             if (working) vfs_node_retain(working);
             spinlock_unlock_irqrestore(&process->lock, flags);
-            vfs_node_t *base = working ? working : root;
-            int handle = base ? vfs_file_open_path_handle(&process->handles,
-                                                          base, path, (uint32_t)arg3) : 0;
+            vfs_node_t *node = root && working ?
+                vfs_lookup_path_at(root, working, path) : 0;
+            int handle = node ? vfs_file_open_handle(&process->handles,
+                                                     node, (uint32_t)arg3) : 0;
+            if (node) vfs_node_release(node);
             if (working) vfs_node_release(working);
             if (root) vfs_node_release(root);
             return handle ? (uint64_t)(uint32_t)handle : OS_SYSCALL_ERROR;
@@ -221,14 +223,14 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
             process_t *process = process_current();
             if (!process || arg2 == 0 || arg2 > OS_SYSCALL_MAX_PATH) return OS_SYSCALL_ERROR;
             char path[OS_SYSCALL_MAX_PATH + 1];
-            if (!syscall_copy_from_user(path, arg1, arg2) || path[0] != '/')
+            if (!syscall_copy_from_user(path, arg1, arg2) || path[0] == '\0')
                 return OS_SYSCALL_ERROR;
             path[arg2] = '\0';
             uint64_t flags = spinlock_lock_irqsave(&process->lock);
             vfs_node_t *root = process->root_directory;
             if (root) vfs_node_retain(root);
             spinlock_unlock_irqrestore(&process->lock, flags);
-            vfs_node_t *directory = root ? vfs_lookup_path(root, path) : 0;
+            vfs_node_t *directory = root ? vfs_lookup_path_at(root, root, path) : 0;
             if (root) vfs_node_release(root);
             int valid = directory && process_set_working_directory(process, directory);
             if (directory) vfs_node_release(directory);

@@ -2423,6 +2423,20 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("getcwd syscall ready\r\n");
+    static const char relative_dev_path[] = "dev";
+    if (!syscall_copy_to_user(0x8000002000ULL, relative_dev_path,
+                              sizeof(relative_dev_path)) ||
+        syscall_dispatch(OS_SYSCALL_CHDIR, 0x8000002000ULL,
+                         sizeof(relative_dev_path) - 1, 0) != 0 ||
+        syscall_dispatch(OS_SYSCALL_GETCWD, 0x8000005000ULL,
+                         sizeof(cwd_path), 0) != 4 ||
+        !syscall_copy_to_user(0x8000002000ULL, root_path, sizeof(root_path)) ||
+        syscall_dispatch(OS_SYSCALL_CHDIR, 0x8000002000ULL,
+                         sizeof(root_path) - 1, 0) != 0) {
+        serial_write("relative path syscall failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("relative path syscalls ready\r\n");
     if (!kernel_init_state_advance(&init_state, KERNEL_INIT_SERVICES))
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     serial_write("user mode deferred until kernel completion\r\n");

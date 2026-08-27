@@ -230,6 +230,45 @@ vfs_node_t *vfs_lookup_path(vfs_node_t *root, const char *path) {
     return current;
 }
 
+vfs_node_t *vfs_lookup_path_at(vfs_node_t *root, vfs_node_t *working,
+                               const char *path) {
+    if (!root || !working || !path || path[0] == '\0' ||
+        root->type != VFS_NODE_DIRECTORY ||
+        working->type != VFS_NODE_DIRECTORY) return 0;
+    if (path[0] == '/') return vfs_lookup_path(root, path);
+    vfs_node_t *current = working;
+    vfs_node_retain(current);
+    uint32_t index = 0;
+    while (path[index] != '\0') {
+        while (path[index] == '/') ++index;
+        if (path[index] == '\0') break;
+        char component[32];
+        uint32_t length = 0;
+        while (path[index] != '\0' && path[index] != '/') {
+            if (length + 1 >= sizeof(component)) {
+                vfs_node_release(current);
+                return 0;
+            }
+            component[length++] = path[index++];
+        }
+        component[length] = '\0';
+        vfs_node_t *next;
+        if (string_equal(component, ".")) {
+            next = current;
+            vfs_node_retain(next);
+        } else if (string_equal(component, "..")) {
+            next = current != root && current->parent ? current->parent : current;
+            vfs_node_retain(next);
+        } else {
+            next = vfs_node_lookup(current, component);
+        }
+        vfs_node_release(current);
+        if (!next) return 0;
+        current = next;
+    }
+    return current;
+}
+
 void vfs_node_retain(vfs_node_t *node) {
     if (!node) return;
     uint64_t flags = spinlock_lock_irqsave(&node->lock);

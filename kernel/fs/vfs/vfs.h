@@ -43,6 +43,8 @@ int vfs_node_add_child(vfs_node_t *parent, vfs_node_t *child);
 vfs_node_t *vfs_node_lookup(vfs_node_t *parent, const char *name);
 vfs_node_t *vfs_node_child(vfs_node_t *parent, uint32_t index);
 vfs_node_t *vfs_lookup_path(vfs_node_t *root, const char *path);
+vfs_node_t *vfs_lookup_path_at(vfs_node_t *root, vfs_node_t *working,
+                               const char *path);
 void vfs_node_retain(vfs_node_t *node);
 void vfs_node_release(vfs_node_t *node);
 int vfs_node_remove(vfs_node_t *parent, vfs_node_t *child);

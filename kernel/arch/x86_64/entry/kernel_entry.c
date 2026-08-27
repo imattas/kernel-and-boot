@@ -2369,6 +2369,25 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("IPC syscalls ready\r\n");
+    uint64_t blocking_channel_handle = syscall_dispatch(OS_SYSCALL_CHANNEL_CREATE,
+                                                         0, 0, 0);
+    char blocking_channel_result[sizeof(channel_message)] = {0};
+    if (blocking_channel_handle == OS_SYSCALL_ERROR ||
+        syscall_dispatch(OS_SYSCALL_CHANNEL_SEND_WAIT, blocking_channel_handle,
+                         0x8000003000ULL, sizeof(channel_message) - 1) !=
+            sizeof(channel_message) - 1 ||
+        syscall_dispatch(OS_SYSCALL_CHANNEL_RECEIVE_WAIT,
+                         blocking_channel_handle, 0x8000005000ULL,
+                         sizeof(blocking_channel_result) - 1) !=
+            sizeof(channel_message) - 1 ||
+        !syscall_copy_from_user(blocking_channel_result, 0x8000005000ULL,
+                                sizeof(blocking_channel_result) - 1) ||
+        blocking_channel_result[0] != 'i' || blocking_channel_result[2] != 'c' ||
+        syscall_dispatch(OS_SYSCALL_CLOSE, blocking_channel_handle, 0, 0) != 0) {
+        serial_write("blocking IPC syscall failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("blocking IPC syscalls ready\r\n");
     if (!kernel_init_state_advance(&init_state, KERNEL_INIT_SERVICES))
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     serial_write("user mode deferred until kernel completion\r\n");

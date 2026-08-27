@@ -176,26 +176,37 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
             return handle ? (uint64_t)(uint32_t)handle : OS_SYSCALL_ERROR;
         }
         case OS_SYSCALL_CHANNEL_SEND:
-        case OS_SYSCALL_CHANNEL_RECEIVE: {
+        case OS_SYSCALL_CHANNEL_RECEIVE:
+        case OS_SYSCALL_CHANNEL_SEND_WAIT:
+        case OS_SYSCALL_CHANNEL_RECEIVE_WAIT: {
             process_t *process = process_current();
             if (!process || arg3 == 0 || arg3 > OS_SYSCALL_MAX_MESSAGE) return OS_SYSCALL_ERROR;
             process_handle_ref_t ref = {0};
-            uint32_t rights = number == OS_SYSCALL_CHANNEL_SEND ?
+            uint32_t rights = (number == OS_SYSCALL_CHANNEL_SEND ||
+                               number == OS_SYSCALL_CHANNEL_SEND_WAIT) ?
                               PROCESS_HANDLE_WRITE : PROCESS_HANDLE_READ;
             if (!process_handle_get_retain(&process->handles, (uint32_t)arg1,
                                            rights, &ref)) return OS_SYSCALL_ERROR;
             uint8_t buffer[OS_SYSCALL_MAX_MESSAGE];
             int result = 0;
-            if (number == OS_SYSCALL_CHANNEL_SEND) {
+            if (number == OS_SYSCALL_CHANNEL_SEND ||
+                number == OS_SYSCALL_CHANNEL_SEND_WAIT) {
                 if (syscall_copy_from_user(buffer, arg2, arg3))
-                    result = ipc_endpoint_send((ipc_endpoint_t *)ref.object,
-                                               process->id, buffer, (uint32_t)arg3) ?
+                    result = ((number == OS_SYSCALL_CHANNEL_SEND_WAIT ?
+                               ipc_endpoint_send_wait : ipc_endpoint_send)(
+                               (ipc_endpoint_t *)ref.object, process->id, buffer,
+                               (uint32_t)arg3)) ?
                              (int)arg3 : 0;
             } else if (user_range(arg2, arg3, 1)) {
                 uint32_t received = 0;
-                if (ipc_endpoint_receive((ipc_endpoint_t *)ref.object,
-                                         process->id, buffer, (uint32_t)arg3,
-                                         &received) &&
+                int received_ok = number == OS_SYSCALL_CHANNEL_RECEIVE_WAIT ?
+                    ipc_endpoint_receive_wait((ipc_endpoint_t *)ref.object,
+                                              process->id, buffer, (uint32_t)arg3,
+                                              &received) :
+                    ipc_endpoint_receive((ipc_endpoint_t *)ref.object,
+                                          process->id, buffer, (uint32_t)arg3,
+                                          &received);
+                if (received_ok &&
                     syscall_copy_to_user(arg2, buffer, received))
                     result = (int)received;
             }

@@ -685,6 +685,8 @@ The block cache now supports whole-device invalidation for storage lifecycle
 events and boot validates refetch after invalidation.
 VFS node destruction now retries after the final child is removed, preventing
 directories released before their children from becoming permanent leaks.
+VFS now exposes retained directory-child iteration for safe enumeration by
+filesystem adapters and future userland traversal.
 UHCI and e1000 now use an explicit shared PCI interrupt dispatcher because
 legacy IRQ lines may be shared; each handler independently filters its device
 status before acknowledging its own controller.

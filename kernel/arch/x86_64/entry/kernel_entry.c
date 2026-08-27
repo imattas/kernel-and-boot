@@ -1287,6 +1287,13 @@ void kernel_main(void *boot_info) {
     vfs_node_release(vfs_etc_handle);
     vfs_node_release(vfs_root);
     serial_write("VFS core ready\r\n");
+    vfs_node_t *vfs_first_child = vfs_node_child(vfs_root, 0);
+    if (!vfs_first_child) {
+        serial_write("VFS directory iteration failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    vfs_node_release(vfs_first_child);
+    serial_write("VFS directory iteration ready\r\n");
     vfs_node_t *proc_root = procfs_create(42);
     vfs_node_t *proc_pid = proc_root ?
         vfs_lookup_path(proc_root, "/self/pid") : 0;

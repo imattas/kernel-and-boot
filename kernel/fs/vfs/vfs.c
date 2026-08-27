@@ -149,6 +149,29 @@ vfs_node_t *vfs_node_lookup(vfs_node_t *parent, const char *name) {
     return result;
 }
 
+vfs_node_t *vfs_node_child(vfs_node_t *parent, uint32_t index) {
+    if (!parent || parent->type != VFS_NODE_DIRECTORY) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&parent->lock);
+    vfs_node_t *result = 0;
+    uint32_t current = 0;
+    for (vfs_node_t *child = parent->first_child; child;
+         child = child->next_sibling) {
+        uint64_t child_flags = spinlock_lock_irqsave(&child->lock);
+        if (!child->destroying && child->references != 0) {
+            if (current == index) {
+                ++child->references;
+                result = child;
+                spinlock_unlock_irqrestore(&child->lock, child_flags);
+                break;
+            }
+            ++current;
+        }
+        spinlock_unlock_irqrestore(&child->lock, child_flags);
+    }
+    spinlock_unlock_irqrestore(&parent->lock, flags);
+    return result;
+}
+
 vfs_node_t *vfs_lookup_path(vfs_node_t *root, const char *path) {
     if (!root || !path || path[0] != '/') return 0;
     vfs_node_t *current = root;

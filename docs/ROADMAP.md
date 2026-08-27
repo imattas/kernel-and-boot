@@ -1042,6 +1042,10 @@ only the first record.
 XFS local-format directories now support bounded persistent entry insertion
 and removal while preserving the inline directory record layout; AG free-space
 allocation remains the next XFS metadata milestone.
+XFS now allocates from a validated single-level AG free-space BNO tree, updating
+AGF free-block and longest-run metadata and rolling back the tree if the AGF
+write fails. Multi-level BNO/CNT trees and full transaction logging remain later
+hardening work.
 Btrfs regular-file truncation now accepts zero-length targets, updating the
 inode item through the checksum-protected tree-node path.
 Btrfs inline extents now support bounded growth when the leaf node has

@@ -30,6 +30,7 @@ FAT32_TEST := $(TEST_DIR)/fat32_contract
 EXFAT_TEST := $(TEST_DIR)/exfat_contract
 EXT4_TEST := $(TEST_DIR)/ext4_contract
 XFS_TEST := $(TEST_DIR)/xfs_contract
+XFS_ALLOC_TEST := $(TEST_DIR)/xfs_alloc_contract
 XFS_UNWRITTEN_TEST := $(TEST_DIR)/xfs_unwritten_contract
 BTRFS_TEST := $(TEST_DIR)/btrfs_contract
 DEFLATE_TEST := $(TEST_DIR)/deflate_contract
@@ -88,7 +89,7 @@ OVMF_CODE ?= /usr/share/edk2/x64/OVMF_CODE.4m.fd
 OVMF_VARS ?= /usr/share/edk2/x64/OVMF_VARS.4m.fd
 QEMU_LOG := $(BUILD_DIR)/qemu-serial.log
 
-.PHONY: all test image qemu-test fat32-test exfat-test ext4-test xfs-test xfs-unwritten-test btrfs-test deflate-test lzo-test zstd-test fse-test cache-test run clean distclean
+.PHONY: all test image qemu-test fat32-test exfat-test ext4-test xfs-test xfs-alloc-test xfs-unwritten-test btrfs-test deflate-test lzo-test zstd-test fse-test cache-test run clean distclean
 
 all: $(CONTRACT_ELF) $(UEFI_EFI) $(KERNEL_ELF)
 
@@ -623,6 +624,9 @@ ext4-test: $(EXT4_TEST)
 xfs-test: $(XFS_TEST)
 	$(XFS_TEST)
 
+xfs-alloc-test: $(XFS_ALLOC_TEST)
+	$(XFS_ALLOC_TEST)
+
 xfs-unwritten-test: $(XFS_UNWRITTEN_TEST)
 	$(XFS_UNWRITTEN_TEST)
 
@@ -652,6 +656,9 @@ $(EXT4_TEST): scripts/tests/c/ext4_contract.c kernel/fs/ext4/ext4.c kernel/fs/ex
 
 $(XFS_TEST): scripts/tests/c/xfs_contract.c kernel/fs/xfs/xfs.c kernel/fs/xfs/xfs.h kernel/drivers/storage/storage.c kernel/drivers/storage/storage.h kernel/core/sync/spinlock.c kernel/core/sync/spinlock.h | $(TEST_DIR)
 	$(CC) -std=c11 -Wall -Wextra -Werror -I. -o $@ scripts/tests/c/xfs_contract.c kernel/fs/xfs/xfs.c kernel/drivers/storage/storage.c kernel/core/sync/spinlock.c
+
+$(XFS_ALLOC_TEST): scripts/tests/c/xfs_alloc_contract.c kernel/fs/xfs/xfs.c kernel/fs/xfs/xfs.h kernel/drivers/storage/storage.c kernel/drivers/storage/storage.h kernel/core/sync/spinlock.c kernel/core/sync/spinlock.h | $(TEST_DIR)
+	$(CC) -std=c11 -Wall -Wextra -Werror -I. -o $@ scripts/tests/c/xfs_alloc_contract.c kernel/fs/xfs/xfs.c kernel/drivers/storage/storage.c kernel/core/sync/spinlock.c
 
 $(XFS_UNWRITTEN_TEST): scripts/tests/c/xfs_unwritten_contract.c kernel/fs/xfs/xfs.c kernel/fs/xfs/xfs.h kernel/drivers/storage/storage.c kernel/drivers/storage/storage.h kernel/core/sync/spinlock.c kernel/core/sync/spinlock.h | $(TEST_DIR)
 	$(CC) -std=c11 -Wall -Wextra -Werror -I. -o $@ scripts/tests/c/xfs_unwritten_contract.c kernel/fs/xfs/xfs.c kernel/drivers/storage/storage.c kernel/core/sync/spinlock.c

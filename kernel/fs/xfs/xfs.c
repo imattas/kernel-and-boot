@@ -8,6 +8,12 @@
 #define XFS_FORMAT_LOCAL 1U
 #define XFS_FORMAT_EXTENTS 2U
 #define XFS_CORE_V2_SIZE 100U
+#define XFS_AGF_MAGIC 0x58414746U
+#define XFS_BNO_MAGIC 0x58414254U
+#define XFS_BNO_MAGIC_V3 0x58414233U
+
+static int xfs_read_block(const xfs_fs_t *fs, uint64_t block, void *buffer);
+static int xfs_write_block(const xfs_fs_t *fs, uint64_t block, const void *buffer);
 
 static uint32_t be32(const uint8_t *p) {
     return ((uint32_t)p[0] << 24) | ((uint32_t)p[1] << 16) |
@@ -32,6 +38,66 @@ static void store_be32(uint8_t *p, uint32_t value) {
 
 static void store_be16(uint8_t *p, uint16_t value) {
     p[0] = (uint8_t)(value >> 8); p[1] = (uint8_t)value;
+}
+
+int xfs_allocate_extent(xfs_fs_t *fs, uint32_t allocation_group,
+                        uint32_t blocks, uint64_t *start) {
+    uint8_t agf[4096], tree[4096], original_agf[4096], original_tree[4096];
+    if (!fs || !fs->mounted || !start || blocks == 0 || allocation_group >= fs->ag_count ||
+        fs->ag_blocks < 2U || fs->block_count < 2U) return 0;
+    uint64_t ag_base = (uint64_t)allocation_group * fs->ag_blocks;
+    if (ag_base > fs->block_count - 2U || !xfs_read_block(fs, ag_base + 1U, agf) ||
+        be32(agf) != XFS_AGF_MAGIC) return 0;
+    uint32_t root = be32(&agf[16]), level = be32(&agf[24]);
+    if (level != 1U || root == 0 || root >= fs->ag_blocks ||
+        !xfs_read_block(fs, ag_base + root, tree) ||
+        (be32(tree) != XFS_BNO_MAGIC && be32(tree) != XFS_BNO_MAGIC_V3) ||
+        be32(&tree[4]) != 0) return 0;
+    for (uint32_t byte = 0; byte < fs->block_size; ++byte) {
+        original_agf[byte] = agf[byte];
+        original_tree[byte] = tree[byte];
+    }
+    uint32_t records = be32(&tree[8]);
+    if (records == 0 || records > (fs->block_size - 16U) / 8U) return 0;
+    uint32_t selected = UINT32_MAX, selected_start = 0, selected_count = 0;
+    for (uint32_t i = 0; i < records; ++i) {
+        uint32_t record_start = be32(&tree[16U + i * 8U]);
+        uint32_t record_count = be32(&tree[20U + i * 8U]);
+        if (record_count == 0 || record_count > fs->ag_blocks ||
+            record_start > fs->ag_blocks - record_count)
+            return 0;
+        if (record_count >= blocks && (selected == UINT32_MAX || record_count < selected_count)) {
+            selected = i; selected_start = record_start; selected_count = record_count;
+        }
+    }
+    if (selected == UINT32_MAX || selected_start > fs->ag_blocks - blocks ||
+        ag_base + selected_start > UINT64_MAX - blocks ||
+        ag_base + selected_start + blocks > fs->block_count) return 0;
+    *start = ag_base + selected_start;
+    if (selected_count == blocks) {
+        for (uint32_t i = selected; i + 1U < records; ++i)
+            for (uint32_t byte = 0; byte < 8U; ++byte)
+                tree[16U + i * 8U + byte] = tree[16U + (i + 1U) * 8U + byte];
+        --records;
+    } else {
+        store_be32(&tree[16U + selected * 8U], selected_start + blocks);
+        store_be32(&tree[20U + selected * 8U], selected_count - blocks);
+    }
+    store_be32(&tree[8], records);
+    uint32_t longest = 0;
+    for (uint32_t i = 0; i < records; ++i)
+        if (be32(&tree[20U + i * 8U]) > longest) longest = be32(&tree[20U + i * 8U]);
+    uint32_t free_blocks = be32(&agf[40]);
+    if (free_blocks < blocks) return 0;
+    store_be32(&agf[40], free_blocks - blocks);
+    store_be32(&agf[44], longest);
+    if (!xfs_write_block(fs, ag_base + root, tree)) return 0;
+    if (!xfs_write_block(fs, ag_base + 1U, agf)) {
+        (void)xfs_write_block(fs, ag_base + root, original_tree);
+        (void)xfs_write_block(fs, ag_base + 1U, original_agf);
+        return 0;
+    }
+    return 1;
 }
 
 static void xfs_store_extent(uint8_t *record, uint64_t logical,

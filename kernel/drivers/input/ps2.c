@@ -1,5 +1,6 @@
 #include "ps2.h"
 #include "../../arch/x86_64/time/timer.h"
+#include "../../core/sync/spinlock.h"
 
 static input_queue_t *keyboard_queue;
 static input_queue_t *mouse_queue;
@@ -8,6 +9,7 @@ static uint8_t mouse_packet[4];
 static uint8_t mouse_packet_length;
 static uint8_t mouse_packet_size;
 static int mouse_enabled;
+static spinlock_t ps2_lock;
 
 static void out8(uint16_t port, uint8_t value) {
     __asm__ volatile ("outb %0, %1" :: "a"(value), "Nd"(port));
@@ -92,6 +94,7 @@ static int mouse_command_id(uint8_t command, uint8_t *id) {
 }
 
 int ps2_keyboard_initialize(input_queue_t *queue) {
+    spinlock_init(&ps2_lock);
     if (!queue || !wait_write()) return 0;
     out8(0x64, 0xad);
     if (!wait_write()) return 0;
@@ -138,20 +141,34 @@ int ps2_mouse_initialize(input_queue_t *queue) {
 int ps2_mouse_enabled(void) { return mouse_enabled; }
 
 int ps2_mouse_poll(input_queue_t *queue) {
+    if (!queue) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&ps2_lock);
     uint8_t status = in8(0x64);
-    if (!queue || !mouse_enabled || (status & 1U) == 0 ||
-        (status & 0x20U) == 0) return 0;
+    if (!mouse_enabled || (status & 1U) == 0 || (status & 0x20U) == 0) {
+        spinlock_unlock_irqrestore(&ps2_lock, flags);
+        return 0;
+    }
     uint8_t byte = in8(0x60);
-    if (mouse_packet_length == 0 && (byte & 0x08U) == 0) return 0;
+    if (mouse_packet_length == 0 && (byte & 0x08U) == 0) {
+        spinlock_unlock_irqrestore(&ps2_lock, flags);
+        return 0;
+    }
     mouse_packet[mouse_packet_length++] = byte;
-    if (mouse_packet_length < mouse_packet_size) return 1;
+    if (mouse_packet_length < mouse_packet_size) {
+        spinlock_unlock_irqrestore(&ps2_lock, flags);
+        return 1;
+    }
     input_event_t events[4];
     uint32_t event_count = 0;
     mouse_packet_length = 0;
     if ((mouse_packet_size == 4 &&
          !ps2_mouse_decode_wheel(mouse_packet, events, &event_count)) ||
         (mouse_packet_size == 3 &&
-         !ps2_mouse_decode(mouse_packet, events, &event_count))) return 0;
+         !ps2_mouse_decode(mouse_packet, events, &event_count))) {
+        spinlock_unlock_irqrestore(&ps2_lock, flags);
+        return 0;
+    }
+    spinlock_unlock_irqrestore(&ps2_lock, flags);
     return input_queue_push_batch(queue, events, event_count);
 }
 
@@ -190,11 +207,17 @@ int ps2_mouse_decode_wheel(const uint8_t packet[4], input_event_t events[4],
 }
 
 int ps2_keyboard_poll(input_queue_t *queue) {
+    if (!queue) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&ps2_lock);
     uint8_t status = in8(0x64);
-    if (!queue || (status & 1U) == 0 || (status & 0x20U) != 0) return 0;
+    if ((status & 1U) == 0 || (status & 0x20U) != 0) {
+        spinlock_unlock_irqrestore(&ps2_lock, flags);
+        return 0;
+    }
     uint8_t scancode = in8(0x60);
     if (scancode == 0xe0) {
         extended_scancode = 1;
+        spinlock_unlock_irqrestore(&ps2_lock, flags);
         return 1;
     }
     uint16_t code = (uint16_t)(scancode & 0x7fU);
@@ -208,5 +231,6 @@ int ps2_keyboard_poll(input_queue_t *queue) {
         .value = (scancode & 0x80) == 0,
         .timestamp = timer_ticks()
     };
+    spinlock_unlock_irqrestore(&ps2_lock, flags);
     return input_queue_push(queue, &event);
 }

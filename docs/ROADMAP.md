@@ -465,6 +465,9 @@ near capacity.
 Framebuffer initialization and pixel operations now share an IRQ-safe lock,
 so console and display callers cannot interleave writes to the firmware GOP
 surface on SMP systems.
+PS/2 keyboard and mouse polling now serialize the shared controller data and
+packet state with one IRQ-safe lock, preventing concurrent IRQ paths from
+interleaving port reads or partial packet assembly.
 USB HID keyboard and mouse events now sample one monotonic kernel tick per
 report, matching PS/2 event timestamp semantics.
 PS/2 mouse initialization now verifies the controller auxiliary-port test

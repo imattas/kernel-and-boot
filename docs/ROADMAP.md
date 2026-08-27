@@ -454,7 +454,9 @@ buffers are released, while completed device-error statuses are consumed
 without unnecessarily destroying a healthy queue.
 NVMe now has a dedicated MSI/legacy IRQ vector and ISR accounting; the QEMU
 gate requires post-`sti` namespace I/O to observe delivery when routing is
-enabled.
+enabled. The ISR uses the controller/vector ownership boundary, while the
+locked command path remains responsible for phase validation and completion
+consumption.
 NVMe timeout handling now quarantines an in-flight PRP when controller abort
 cannot confirm `CSTS.RDY=0`, preventing DMA use-after-free and rejecting later
 queue commands on the wedged controller.

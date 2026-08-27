@@ -171,6 +171,11 @@ typedef struct {
     uint16_t status;
 } __attribute__((packed)) nvme_completion_t;
 
+void nvme_interrupt_handler(void) {
+    if (!active_regs || nvme_disabled) return;
+    ++nvme_interrupts;
+}
+
 static int nvme_submit_admin_words(uint8_t opcode, uint32_t namespace_id,
                                    uint64_t prp1, const uint32_t words[6],
                                    uint32_t *result) {
@@ -396,4 +401,3 @@ int nvme_initialize(void) {
 uint32_t nvme_controller_count(void) { return controllers; }
 int nvme_interrupt_enabled(void) { return nvme_irq_enabled; }
 uint32_t nvme_interrupt_count(void) { return nvme_interrupts; }
-void nvme_interrupt_handler(void) { ++nvme_interrupts; }

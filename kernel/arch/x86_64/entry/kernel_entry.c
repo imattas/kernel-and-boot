@@ -2850,6 +2850,7 @@ void kernel_main(void *boot_info) {
                          0x8000003000ULL, sizeof(file_syscall_data) - 1) !=
             sizeof(file_syscall_data) - 1 ||
         syscall_dispatch(OS_SYSCALL_TRUNCATE, file_syscall_handle, 2, 0) != 0 ||
+        syscall_dispatch(OS_SYSCALL_SEEK, file_syscall_handle, 0, 0) != 0 ||
         syscall_dispatch(OS_SYSCALL_CLOSE, file_syscall_handle, 0, 0) != 0 ||
         (file_syscall_handle = syscall_dispatch(OS_SYSCALL_OPEN,
             0x8000002000ULL, sizeof(file_syscall_path) - 1,

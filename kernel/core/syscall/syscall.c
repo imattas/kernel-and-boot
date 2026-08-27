@@ -145,8 +145,12 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
         case OS_SYSCALL_SEEK: {
             process_t *process = process_current();
             process_handle_ref_t ref = {0};
-            if (!process || !process_handle_get_retain(&process->handles,
-                    (uint32_t)arg1, PROCESS_HANDLE_READ, &ref) ||
+            int retained = process &&
+                (process_handle_get_retain(&process->handles, (uint32_t)arg1,
+                                           PROCESS_HANDLE_READ, &ref) ||
+                 process_handle_get_retain(&process->handles, (uint32_t)arg1,
+                                           PROCESS_HANDLE_WRITE, &ref));
+            if (!retained ||
                 !vfs_file_seek((vfs_file_t *)ref.object, arg2)) {
                 process_handle_release_ref(&ref);
                 return OS_SYSCALL_ERROR;

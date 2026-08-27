@@ -810,6 +810,9 @@ pending signal available for a subsequent valid destination.
 Stateful read, readdir, and process-wait syscalls now validate writable user
 destinations before consuming file state or entering a wait, preventing an
 invalid output pointer from losing data or advancing a directory cursor.
+File seeking now accepts either read or write descriptor rights, matching the
+file-description contract for write-only handles; the QEMU syscall probe covers
+repositioning a write-only file before close.
 APIC PIT calibration now uses a bounded wait budget and retains a validated
 fallback count, preventing slow firmware emulation from blocking kernel boot.
 UEFI memory-map retries now release rejected candidate pools and validate boot

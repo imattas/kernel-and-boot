@@ -346,7 +346,9 @@ implemented and contracted, including destination-underflow rejection.
 Zstandard sequence code expansion for literal lengths, match lengths, and
 offsets is now implemented and contracted. Sequence execution now copies
 literal runs and performs validated overlapping matches; FSE symbol wiring and
-complete compressed-block sequence integration remain.
+complete compressed-block sequence integration remain. FSE states are now
+wired into one-sequence decoding with offset, match-length, and literal-length
+extra-bit consumption and optional state updates.
 
 ## Phase 10 — Userland begins after the kernel gate
 

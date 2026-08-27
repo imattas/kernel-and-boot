@@ -23,6 +23,9 @@ int main(void) {
     uint32_t literal_offset = 0, sequence_output_size = 0;
     uint8_t match[16] = {'a', 'b', 'c'};
     uint32_t match_size = 3;
+    btrfs_fse_table_t sequence_table;
+    uint32_t sequence_state = 0;
+    int64_t sequence_bits = 0;
     assert(btrfs_zstd_decompress(raw, sizeof(raw), output, sizeof(output), &size));
     assert(size == 5 && memcmp(output, "hello", 5) == 0);
     assert(btrfs_zstd_decompress(huffman, sizeof(huffman), output, sizeof(output), &size));
@@ -59,5 +62,11 @@ int main(void) {
     assert(!btrfs_zstd_execute_sequence(sequence_output, sizeof(sequence_output),
                                         &sequence_output_size, literals, sizeof(literals),
                                         &literal_offset, &values));
+    assert(btrfs_fse_build(&sequence_table, (const int16_t[]){4}, 1, 2));
+    values.literal_length = values.match_length = values.offset = 0;
+    assert(btrfs_zstd_decode_sequence(&sequence_table, &sequence_table, &sequence_table,
+                                      &sequence_state, &sequence_state, &sequence_state,
+                                      (const uint8_t[]){0x04}, &sequence_bits, 1, &values));
+    assert(values.literal_length == 0 && values.match_length == 3 && values.offset == 1);
     return 0;
 }

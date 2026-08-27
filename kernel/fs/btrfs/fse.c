@@ -162,6 +162,21 @@ int btrfs_fse_stream_update(const btrfs_fse_table_t *table, const uint8_t *strea
     return *state < table->size;
 }
 
+int btrfs_fse_stream_begin(const uint8_t *stream, uint32_t stream_size,
+                           int64_t *offset) {
+    if (!stream || !stream_size || !offset || !stream[stream_size - 1U]) return 0;
+    *offset = (int64_t)stream_size * 8 -
+              (int64_t)(8U - highest_bit(stream[stream_size - 1U]));
+    return 1;
+}
+
+int btrfs_fse_stream_read_bits(const uint8_t *stream, uint32_t bits,
+                               int64_t *offset, uint32_t *value) {
+    if (!stream || !offset || !value || bits > 16U) return 0;
+    *value = stream_bits(stream, bits, offset);
+    return 1;
+}
+
 int btrfs_fse_read_header(btrfs_fse_table_t *table, const uint8_t *stream,
                           uint32_t stream_size, uint32_t max_accuracy_log,
                           uint32_t *consumed) {

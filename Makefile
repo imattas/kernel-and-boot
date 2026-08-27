@@ -530,8 +530,8 @@ $(DEFLATE_TEST): scripts/tests/c/deflate_contract.c kernel/fs/btrfs/deflate.c ke
 $(LZO_TEST): scripts/tests/c/lzo_contract.c kernel/fs/btrfs/lzo.c kernel/fs/btrfs/lzo.h | $(TEST_DIR)
 	$(CC) -std=c11 -Wall -Wextra -Werror -I. -o $@ scripts/tests/c/lzo_contract.c kernel/fs/btrfs/lzo.c
 
-$(ZSTD_TEST): scripts/tests/c/zstd_contract.c kernel/fs/btrfs/zstd.c kernel/fs/btrfs/zstd.h | $(TEST_DIR)
-	$(CC) -std=c11 -Wall -Wextra -Werror -I. -o $@ scripts/tests/c/zstd_contract.c kernel/fs/btrfs/zstd.c
+$(ZSTD_TEST): scripts/tests/c/zstd_contract.c kernel/fs/btrfs/zstd.c kernel/fs/btrfs/zstd.h kernel/fs/btrfs/fse.c kernel/fs/btrfs/fse.h | $(TEST_DIR)
+	$(CC) -std=c11 -Wall -Wextra -Werror -I. -o $@ scripts/tests/c/zstd_contract.c kernel/fs/btrfs/zstd.c kernel/fs/btrfs/fse.c
 
 $(FSE_TEST): scripts/tests/c/fse_contract.c kernel/fs/btrfs/fse.c kernel/fs/btrfs/fse.h | $(TEST_DIR)
 	$(CC) -std=c11 -Wall -Wextra -Werror -I. -o $@ scripts/tests/c/fse_contract.c kernel/fs/btrfs/fse.c

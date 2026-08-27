@@ -28,6 +28,10 @@ int btrfs_fse_stream_peek(const btrfs_fse_table_t *table, uint32_t state,
                           uint8_t *symbol);
 int btrfs_fse_stream_update(const btrfs_fse_table_t *table, const uint8_t *stream,
                             uint32_t *state, int64_t *offset);
+int btrfs_fse_stream_begin(const uint8_t *stream, uint32_t stream_size,
+                           int64_t *offset);
+int btrfs_fse_stream_read_bits(const uint8_t *stream, uint32_t bits,
+                               int64_t *offset, uint32_t *value);
 int btrfs_fse_read_header(btrfs_fse_table_t *table, const uint8_t *stream,
                           uint32_t stream_size, uint32_t max_accuracy_log,
                           uint32_t *consumed);

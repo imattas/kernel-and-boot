@@ -2,6 +2,7 @@
 #define OS_KERNEL_FS_BTRFS_ZSTD_H
 
 #include <stdint.h>
+#include "fse.h"
 
 typedef struct {
     uint32_t count;
@@ -35,5 +36,12 @@ int btrfs_zstd_execute_sequence(uint8_t *output, uint32_t output_capacity,
                                 uint32_t *output_size, const uint8_t *literals,
                                 uint32_t literal_size, uint32_t *literal_offset,
                                 const btrfs_zstd_sequence_t *sequence);
+int btrfs_zstd_decode_sequence(const btrfs_fse_table_t *literal_table,
+                               const btrfs_fse_table_t *match_table,
+                               const btrfs_fse_table_t *offset_table,
+                               uint32_t *literal_state, uint32_t *match_state,
+                               uint32_t *offset_state, const uint8_t *stream,
+                               int64_t *bit_offset, uint8_t last,
+                               btrfs_zstd_sequence_t *sequence);
 
 #endif

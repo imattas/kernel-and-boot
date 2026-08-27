@@ -118,6 +118,37 @@ int btrfs_zstd_execute_sequence(uint8_t *output, uint32_t output_capacity,
                                  sequence->offset, sequence->match_length);
 }
 
+int btrfs_zstd_decode_sequence(const btrfs_fse_table_t *literal_table,
+                               const btrfs_fse_table_t *match_table,
+                               const btrfs_fse_table_t *offset_table,
+                               uint32_t *literal_state, uint32_t *match_state,
+                               uint32_t *offset_state, const uint8_t *stream,
+                               int64_t *bit_offset, uint8_t last,
+                               btrfs_zstd_sequence_t *sequence) {
+    static const uint8_t literal_bits[36] = {
+        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,2,2,3,3,4,6,7,8,9,10,11,12,13,14,15,16};
+    static const uint8_t match_bits[53] = {
+        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,
+        2,2,3,3,4,4,5,7,8,9,10,11,12,13,14,15,16};
+    uint8_t literal_code, match_code, offset_code;
+    uint32_t literal_extra, match_extra, offset_extra;
+    if (!literal_table || !match_table || !offset_table || !literal_state ||
+        !match_state || !offset_state || !stream || !bit_offset || !sequence ||
+        !btrfs_fse_stream_peek(literal_table, *literal_state, &literal_code) ||
+        !btrfs_fse_stream_peek(match_table, *match_state, &match_code) ||
+        !btrfs_fse_stream_peek(offset_table, *offset_state, &offset_code) ||
+        literal_code >= 36U || match_code >= 53U || offset_code > 31U ||
+        !btrfs_fse_stream_read_bits(stream, offset_code, bit_offset, &offset_extra) ||
+        !btrfs_fse_stream_read_bits(stream, match_bits[match_code], bit_offset, &match_extra) ||
+        !btrfs_fse_stream_read_bits(stream, literal_bits[literal_code], bit_offset, &literal_extra) ||
+        !btrfs_zstd_expand_sequence(literal_code, literal_extra, match_code, match_extra,
+                                     offset_code, offset_extra, sequence)) return 0;
+    if (!last && (!btrfs_fse_stream_update(literal_table, stream, literal_state, bit_offset) ||
+                  !btrfs_fse_stream_update(match_table, stream, match_state, bit_offset) ||
+                  !btrfs_fse_stream_update(offset_table, stream, offset_state, bit_offset))) return 0;
+    return 1;
+}
+
 static uint32_t zstd_stream_bits(const uint8_t *source, uint32_t bits,
                                  int64_t *offset) {
     int64_t start = *offset - (int64_t)bits;

@@ -352,6 +352,8 @@ fits inside the published ABAR size before dereferencing its MMIO registers.
 AHCI IDENTIFY now supplies the ATA device/LBA-mode field consistently with the
 DMA read/write commands, preventing firmware or devices that require the
 explicit device selection from rejecting identification.
+AHCI completion validation now rejects ATA BSY, DRQ, and ERR status bits rather
+than accepting a command solely because its CI bit cleared.
 The generic storage registry now serializes registration, enumeration, and
 backend dispatch, rejects duplicate device names, and has hosted contract-test
 build support without executing privileged interrupt-state instructions.

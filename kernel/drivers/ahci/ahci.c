@@ -29,6 +29,9 @@
 #define AHCI_PORT_IS 0x10
 #define AHCI_PORT_IE 0x14
 #define AHCI_PORT_PRDBC 0x04
+#define AHCI_ATA_STATUS_BSY 0x80U
+#define AHCI_ATA_STATUS_DRQ 0x08U
+#define AHCI_ATA_STATUS_ERR 0x01U
 #define AHCI_SIGNATURE_SATA 0x00000101U
 #define AHCI_ATA_READ_DMA_EXT 0x25U
 #define AHCI_ATA_WRITE_DMA_EXT 0x35U
@@ -156,7 +159,10 @@ static int ahci_command_ok(uint32_t task_file, uint32_t transferred,
         active_port[AHCI_PORT_IS / 4] =
             interrupt_status & AHCI_PORT_IS_ERROR_MASK;
     if (serial_error) active_port[AHCI_PORT_SERR / 4] = serial_error;
-    int success = (task_file & 0x09U) == 0 && transferred == expected &&
+    int success = (task_file & (AHCI_ATA_STATUS_BSY |
+                                AHCI_ATA_STATUS_DRQ |
+                                AHCI_ATA_STATUS_ERR)) == 0 &&
+           transferred == expected &&
            (interrupt_status & AHCI_PORT_IS_ERROR_MASK) == 0 &&
            serial_error == 0;
     if (!success) __atomic_fetch_add(&ahci_errors, 1U, __ATOMIC_RELAXED);

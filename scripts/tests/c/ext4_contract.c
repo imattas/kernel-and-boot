@@ -55,6 +55,8 @@ int main(void) {
     uint8_t leaf_growth[1024]; memset(leaf_growth, 'l', sizeof(leaf_growth));
     assert(ext4_write_file(&fs, 10, 1029, leaf_growth, sizeof(leaf_growth)));
     assert(ext4_inode_size(&fs, 10, &size) && size == 2053);
+    assert(extent_split_inode[42] == 2 && extent_split_inode[43] == 0);
+    assert(image[25 * 1024 + 2] == 2 && image[27 * 1024 + 2] == 0);
     assert(ext4_truncate_file(&fs, 10, 1024));
     assert(ext4_inode_size(&fs, 10, &size) && size == 1024);
     assert((image[3 * 1024 + 24 / 8] & (1U << (24 & 7))) == 0);

@@ -334,6 +334,7 @@ Zstandard frame parsing now has strict raw/RLE block contracts plus compressed
 blocks using direct-weight Huffman literals with zero sequences. FSE-compressed
 Huffman weights/literals and sequence execution are still pending; bounded FSE
 table construction and reverse-bitstream state decoding are now implemented and
+contracted. FSE normalized-header parsing is now also implemented and
 contracted, so
 Zstandard is not exposed through Btrfs yet.
 

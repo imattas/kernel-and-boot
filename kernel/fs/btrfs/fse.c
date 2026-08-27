@@ -20,6 +20,22 @@ static uint32_t stream_bits(const uint8_t *source, uint32_t bits, int64_t *offse
     return result;
 }
 
+static uint32_t forward_bits(const uint8_t *source, uint32_t size,
+                             uint32_t *offset, uint32_t bits, uint8_t *ok) {
+    uint32_t result = 0, shift = 0;
+    if (bits > 16U || *offset > size * 8U || bits > size * 8U - *offset) {
+        *ok = 0; return 0;
+    }
+    while (bits) {
+        uint32_t available = 8U - (*offset & 7U);
+        uint32_t count = bits < available ? bits : available;
+        result |= (((uint32_t)source[*offset >> 3] >> (*offset & 7U)) &
+                   ((1U << count) - 1U)) << shift;
+        *offset += count; bits -= count; shift += count;
+    }
+    return result;
+}
+
 int btrfs_fse_build(btrfs_fse_table_t *table, const int16_t *normalized,
                     uint32_t symbol_count, uint32_t accuracy_log) {
     uint32_t size, high_threshold, position, step, mask;
@@ -79,4 +95,52 @@ int btrfs_fse_decode(const btrfs_fse_table_t *table, const uint8_t *stream,
         if (state >= table->size) return 0;
     }
     return 1;
+}
+
+int btrfs_fse_read_header(btrfs_fse_table_t *table, const uint8_t *stream,
+                          uint32_t stream_size, uint32_t max_accuracy_log,
+                          uint32_t *consumed) {
+    int16_t normalized[256];
+    uint32_t offset = 0, accuracy, remaining, symbol = 0;
+    uint8_t ok = 1;
+    if (!table || !stream || !stream_size || !consumed || max_accuracy_log > 10U)
+        return 0;
+    accuracy = 5U + forward_bits(stream, stream_size, &offset, 4, &ok);
+    if (!ok || accuracy > max_accuracy_log) return 0;
+    remaining = 1U << accuracy;
+    while (remaining && symbol < 256U) {
+        uint32_t bits = highest_bit(remaining + 1U) + 1U;
+        uint32_t value = forward_bits(stream, stream_size, &offset, bits, &ok);
+        uint32_t lower_mask, threshold;
+        int32_t probability;
+        if (!ok) return 0;
+        lower_mask = (1U << (bits - 1U)) - 1U;
+        threshold = (1U << bits) - 1U - (remaining + 1U);
+        if ((value & lower_mask) < threshold) {
+            if (offset < 1U) return 0;
+            --offset; value &= lower_mask;
+        } else if (value > lower_mask) value -= threshold;
+        probability = (int32_t)value - 1;
+        if (probability < -1 || probability > (int32_t)remaining) return 0;
+        normalized[symbol++] = (int16_t)probability;
+        remaining -= probability < 0 ? (uint32_t)-probability : (uint32_t)probability;
+        if (probability == 0) {
+            uint32_t repeat = forward_bits(stream, stream_size, &offset, 2, &ok);
+            if (!ok) return 0;
+            for (;;) {
+                uint8_t more = (uint8_t)(repeat == 3U);
+                if (repeat > 256U - symbol) return 0;
+                while (repeat--) normalized[symbol++] = 0;
+                if (!more) break;
+                repeat = forward_bits(stream, stream_size, &offset, 2, &ok);
+                if (!ok) return 0;
+            }
+        }
+    }
+    if (remaining || symbol == 0 || symbol >= 256U || offset > UINT32_MAX - 7U)
+        return 0;
+    offset = (offset + 7U) & ~7U;
+    if (!btrfs_fse_build(table, normalized, symbol, accuracy)) return 0;
+    *consumed = offset / 8U;
+    return *consumed <= stream_size;
 }

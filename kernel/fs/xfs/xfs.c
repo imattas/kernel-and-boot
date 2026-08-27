@@ -471,6 +471,7 @@ static int xfs_allocate_real_bno(xfs_fs_t *fs, uint32_t allocation_group,
 static int xfs_free_real_bno(xfs_fs_t *fs, uint64_t start, uint32_t blocks) {
     uint8_t agf[4096], original_agf[4096], root[4096], original_root[4096];
     uint8_t leaf[4096], original_leaf[4096], scan[4096];
+    uint8_t next_leaf[4096], original_next[4096];
     if (!fs || !fs->mounted || blocks == 0 || start >= fs->block_count ||
         blocks > fs->block_count - start || fs->block_size < 512U) return 0;
     uint32_t agno = (uint32_t)(start / fs->ag_blocks);
@@ -494,6 +495,7 @@ static int xfs_free_real_bno(xfs_fs_t *fs, uint64_t start, uint32_t blocks) {
     uint32_t selected = UINT32_MAX, selected_leaf = 0;
     uint64_t total_free = 0;
     uint32_t previous_key = 0;
+    uint32_t previous_child = 0, previous_leaf_end = 0;
     for (uint32_t i = 0; i < root_records; ++i) {
         uint32_t key_start = be32(&root[16U + i * 8U]);
         uint32_t key_count = be32(&root[20U + i * 8U]);
@@ -517,12 +519,26 @@ static int xfs_free_real_bno(xfs_fs_t *fs, uint64_t start, uint32_t blocks) {
             if (relative < record_start) {
                 if (relative + blocks > record_start) return 0;
                 if (selected == UINT32_MAX) {
-                    selected = i; selected_leaf = child;
+                    if (r == 0 && i != 0 && previous_child != 0 &&
+                        previous_leaf_end == relative) {
+                        selected = i - 1U;
+                        selected_leaf = previous_child;
+                    } else {
+                        selected = i;
+                        selected_leaf = child;
+                    }
                 }
             } else if (relative < record_start + record_count) return 0;
             previous_end = record_start + record_count;
             total_free += record_count;
         }
+        if (selected == UINT32_MAX && i != 0 && previous_child != 0 &&
+            previous_leaf_end == relative) {
+            selected = i - 1U;
+            selected_leaf = previous_child;
+        }
+        previous_child = child;
+        previous_leaf_end = previous_end;
         if (selected == UINT32_MAX && i + 1U == root_records) {
             selected = i; selected_leaf = child;
         }
@@ -569,6 +585,48 @@ static int xfs_free_real_bno(xfs_fs_t *fs, uint64_t start, uint32_t blocks) {
         ++leaf_records;
     }
     store_be16(&leaf[6], (uint16_t)leaf_records);
+    uint32_t merged_next_child = 0, merged_next_records = 0;
+    if (joins_previous && selected + 1U < root_records) {
+        uint32_t next_index = selected + 1U;
+        uint32_t next_child = be32(&root[pointer_offset + next_index * 4U]);
+        if (next_child == 0 || next_child >= fs->ag_blocks ||
+            !xfs_read_block(fs, ag_base + next_child, next_leaf) ||
+            be32(next_leaf) != XFS_BNO_MAGIC_REAL || be16(&next_leaf[4]) != 0)
+            return 0;
+        for (uint32_t b = 0; b < fs->block_size; ++b)
+            original_next[b] = next_leaf[b];
+        uint32_t next_records = be16(&next_leaf[6]);
+        if (next_records == 0 ||
+            next_records > (fs->block_size - 16U) / 8U ||
+            relative > UINT32_MAX - blocks ||
+            be32(&next_leaf[16]) != relative + blocks) return 0;
+        uint32_t left_count = be32(&leaf[20U + (leaf_records - 1U) * 8U]);
+        uint32_t right_count = be32(&next_leaf[20]);
+        if (left_count > UINT32_MAX - right_count) return 0;
+        store_be32(&leaf[20U + (leaf_records - 1U) * 8U],
+                   left_count + right_count);
+        for (uint32_t r = 0; r + 1U < next_records; ++r)
+            for (uint32_t b = 0; b < 8U; ++b)
+                next_leaf[16U + r * 8U + b] =
+                    next_leaf[16U + (r + 1U) * 8U + b];
+        merged_next_records = next_records - 1U;
+        merged_next_child = next_child;
+        if (merged_next_records != 0) {
+            store_be16(&next_leaf[6], (uint16_t)merged_next_records);
+            for (uint32_t b = 0; b < 8U; ++b)
+                root[16U + next_index * 8U + b] = next_leaf[16U + b];
+        } else {
+            for (uint32_t r = next_index; r + 1U < root_records; ++r) {
+                for (uint32_t b = 0; b < 8U; ++b)
+                    root[16U + r * 8U + b] = root[16U + (r + 1U) * 8U + b];
+                for (uint32_t b = 0; b < 4U; ++b)
+                    root[pointer_offset + r * 4U + b] =
+                        root[pointer_offset + (r + 1U) * 4U + b];
+            }
+            --root_records;
+            store_be16(&root[6], (uint16_t)root_records);
+        }
+    }
     for (uint32_t i = 0; i < root_records; ++i) {
         uint32_t child = be32(&root[pointer_offset + i * 4U]);
         if (child == selected_leaf) {
@@ -584,6 +642,10 @@ static int xfs_free_real_bno(xfs_fs_t *fs, uint64_t start, uint32_t blocks) {
             for (uint32_t r = 0; r < leaf_records; ++r)
                 if (be32(&leaf[20U + r * 8U]) > longest)
                     longest = be32(&leaf[20U + r * 8U]);
+        } else if (child == merged_next_child) {
+            for (uint32_t r = 0; r < merged_next_records; ++r)
+                if (be32(&next_leaf[20U + r * 8U]) > longest)
+                    longest = be32(&next_leaf[20U + r * 8U]);
         } else {
             if (!xfs_read_block(fs, ag_base + child, scan)) return 0;
             uint32_t records = be16(&scan[6]);
@@ -595,9 +657,13 @@ static int xfs_free_real_bno(xfs_fs_t *fs, uint64_t start, uint32_t blocks) {
     store_be32(&agf[40], be32(&agf[40]) + blocks);
     store_be32(&agf[44], longest);
     if (!xfs_write_block(fs, ag_base + selected_leaf, leaf) ||
+        (merged_next_child != 0 && merged_next_records != 0 &&
+         !xfs_write_block(fs, ag_base + merged_next_child, next_leaf)) ||
         !xfs_write_block(fs, ag_base + root_block, root) ||
         !xfs_write_block(fs, ag_base + 1U, agf)) {
         (void)xfs_write_block(fs, ag_base + selected_leaf, original_leaf);
+        if (merged_next_child != 0 && merged_next_records != 0)
+            (void)xfs_write_block(fs, ag_base + merged_next_child, original_next);
         (void)xfs_write_block(fs, ag_base + root_block, original_root);
         (void)xfs_write_block(fs, ag_base + 1U, original_agf);
         return 0;

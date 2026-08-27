@@ -42,6 +42,7 @@
 #include "../../../drivers/network/packet_queue.h"
 #include "../../../drivers/network/network.h"
 #include "../../../drivers/network/reassembly.h"
+#include "../../../drivers/network/udp_endpoint.h"
 #include "../../../time/clock.h"
 #include "../../../debug/assert.h"
 #include "../../../core/task/context.h"
@@ -767,6 +768,57 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("IPv4 reassembly ready\r\n");
+    static udp_endpoint_table_t udp_endpoint_probe_table;
+    static const uint8_t udp_endpoint_local[4] = {10, 0, 0, 2};
+    static const uint8_t udp_endpoint_other[4] = {10, 0, 0, 3};
+    static const uint8_t udp_endpoint_wildcard[4] = {0, 0, 0, 0};
+    static const uint8_t udp_endpoint_payload[3] = {0x31, 0x32, 0x33};
+    static uint8_t udp_endpoint_output[UDP_ENDPOINT_PAYLOAD_MAX];
+    uint8_t udp_endpoint_source[4] = {0};
+    uint16_t udp_endpoint_source_port = 0;
+    uint16_t udp_endpoint_output_length = 0;
+    udp_endpoint_handle_t udp_endpoint_exact = 0;
+    udp_endpoint_handle_t udp_endpoint_any = 0;
+    udp_endpoint_table_initialize(&udp_endpoint_probe_table);
+    if (!udp_endpoint_bind(&udp_endpoint_probe_table, udp_endpoint_local, 7000,
+                           &udp_endpoint_exact) ||
+        !udp_endpoint_bind(&udp_endpoint_probe_table, udp_endpoint_wildcard,
+                           7001, &udp_endpoint_any) ||
+        !udp_endpoint_deliver(&udp_endpoint_probe_table, udp_endpoint_local,
+                              7000, udp_endpoint_other, 8000,
+                              udp_endpoint_payload,
+                              sizeof(udp_endpoint_payload)) ||
+        !udp_endpoint_deliver(&udp_endpoint_probe_table, udp_endpoint_other,
+                              7001, udp_endpoint_local, 8001,
+                              udp_endpoint_payload,
+                              sizeof(udp_endpoint_payload)) ||
+        udp_endpoint_deliver(&udp_endpoint_probe_table, udp_endpoint_other,
+                             7002, udp_endpoint_local, 8001,
+                             udp_endpoint_payload,
+                             sizeof(udp_endpoint_payload)) ||
+        !udp_endpoint_receive(&udp_endpoint_probe_table, udp_endpoint_exact,
+                              udp_endpoint_source, &udp_endpoint_source_port,
+                              udp_endpoint_output,
+                              sizeof(udp_endpoint_output),
+                              &udp_endpoint_output_length) ||
+        udp_endpoint_source_port != 8000 || udp_endpoint_output_length != 3 ||
+        udp_endpoint_output[2] != 0x33 ||
+        !udp_endpoint_receive(&udp_endpoint_probe_table, udp_endpoint_any,
+                              udp_endpoint_source, &udp_endpoint_source_port,
+                              udp_endpoint_output,
+                              sizeof(udp_endpoint_output),
+                              &udp_endpoint_output_length) ||
+        udp_endpoint_source_port != 8001 ||
+        !udp_endpoint_unbind(&udp_endpoint_probe_table, udp_endpoint_exact) ||
+        udp_endpoint_receive(&udp_endpoint_probe_table, udp_endpoint_exact,
+                             udp_endpoint_source, &udp_endpoint_source_port,
+                             udp_endpoint_output,
+                             sizeof(udp_endpoint_output),
+                             &udp_endpoint_output_length)) {
+        serial_write("UDP endpoint failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("UDP endpoint ready\r\n");
     if (e1000_controller_count() != 0)
         serial_write(e1000_link_up() ? "e1000 link ready\r\n" :
                      "e1000 link down\r\n");

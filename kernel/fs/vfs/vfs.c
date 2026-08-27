@@ -29,6 +29,20 @@ static int string_equal(const char *left, const char *right) {
     return left[i] == right[i];
 }
 
+/* Return a referenced parent while the child relationship is stable.  The
+   parent cannot be destroyed while it still owns this child, so its
+   reference may be acquired atomically without taking the parent lock and
+   inverting the tree lock order used by attach/remove. */
+static vfs_node_t *parent_reference(vfs_node_t *root, vfs_node_t *current) {
+    if (!root || !current) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&current->lock);
+    vfs_node_t *parent = current != root && current->parent ?
+        current->parent : current;
+    __atomic_add_fetch(&parent->references, 1, __ATOMIC_RELAXED);
+    spinlock_unlock_irqrestore(&current->lock, flags);
+    return parent;
+}
+
 vfs_node_t *vfs_node_create(const char *name, vfs_node_type_t type,
                             uint64_t owner_uid, uint64_t owner_gid,
                             uint32_t mode) {
@@ -251,8 +265,7 @@ vfs_node_t *vfs_lookup_path(vfs_node_t *root, const char *path) {
             next = current;
             vfs_node_retain(next);
         } else if (string_equal(component, "..")) {
-            next = current != root && current->parent ? current->parent : current;
-            vfs_node_retain(next);
+            next = parent_reference(root, current);
         } else {
             next = vfs_node_lookup(current, component);
         }
@@ -290,8 +303,7 @@ vfs_node_t *vfs_lookup_path_at(vfs_node_t *root, vfs_node_t *working,
             next = current;
             vfs_node_retain(next);
         } else if (string_equal(component, "..")) {
-            next = current != root && current->parent ? current->parent : current;
-            vfs_node_retain(next);
+            next = parent_reference(root, current);
         } else {
             next = vfs_node_lookup(current, component);
         }
@@ -333,8 +345,7 @@ vfs_node_t *vfs_lookup_path_at_access(vfs_node_t *root, vfs_node_t *working,
             next = current;
             vfs_node_retain(next);
         } else if (string_equal(component, "..")) {
-            next = current != root && current->parent ? current->parent : current;
-            vfs_node_retain(next);
+            next = parent_reference(root, current);
         } else {
             next = vfs_node_lookup(current, component);
         }

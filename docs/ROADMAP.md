@@ -1053,7 +1053,9 @@ detach from producing a stale parent pointer.
 VFS child attach and removal now use a canonical node lock order, while child
 lookups rely on the parent structural lock, preventing parent/child lock
 inversion during concurrent tree mutation; lookup reference acquisition remains
-atomic against independent node release operations.
+atomic against independent node release operations. Relative `..` traversal
+also snapshots the parent under the child lock before acquiring its reference,
+closing the stale-parent window during concurrent detach.
 VFS nodes now expose bounded write callbacks alongside reads, with boot-time
 write-path validation.
 Physical frame allocation now zero-fills reclaimed pages, with boot-time

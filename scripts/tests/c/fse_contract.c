@@ -20,6 +20,11 @@ int main(void) {
     assert(btrfs_fse_build(&table, rare_symbol, 2, 2));
     assert(!btrfs_fse_build(&table, four_symbols, 4, 11));
     assert(!btrfs_fse_build(&table, (const int16_t[]){1, 1}, 2, 2));
+    assert(btrfs_fse_build_predefined(&table, 0) && table.size == 64);
+    assert(btrfs_fse_build_predefined(&table, 1) && table.size == 32);
+    assert(btrfs_fse_build_predefined(&table, 2) && table.size == 64);
+    assert(!btrfs_fse_build_predefined(&table, 3));
+    assert(btrfs_fse_build_rle(&table, 7) && table.size == 1 && table.symbols[0] == 7);
     assert(btrfs_fse_build(&table, (const int16_t[]){4}, 1, 2));
     assert(btrfs_fse_decode(&table, (const uint8_t[]){0x04}, 1, decoded, 4));
     assert(decoded[0] == 0 && decoded[3] == 0);

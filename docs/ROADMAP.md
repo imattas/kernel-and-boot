@@ -339,6 +339,8 @@ normalized-header parsing is now also implemented and
 contracted, and the reusable initialized/peek/update stream API is now
 implemented and contracted, so
 Zstandard is not exposed through Btrfs yet.
+The predefined LL/offset/ML distributions and RLE sequence-table mode are now
+implemented and contracted.
 Zstandard sequence-section count/mode header parsing is now implemented and
 contracted; FSE symbol tables and literal/match sequence execution remain
 before Btrfs exposure. The bounded overlap-safe match-copy primitive is now

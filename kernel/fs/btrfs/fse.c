@@ -6,6 +6,28 @@ static uint32_t highest_bit(uint32_t value) {
     return bit;
 }
 
+int btrfs_fse_build_predefined(btrfs_fse_table_t *table, uint32_t part) {
+    static const int16_t literal_length[] = {
+        4,3,2,2,2,2,2,2,2,2,2,2,2,1,1,1,2,2,2,2,2,2,2,2,2,3,2,1,1,1,1,1,-1,-1,-1,-1};
+    static const int16_t offset[] = {
+        1,1,1,1,1,1,2,2,2,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,-1,-1,-1,-1,-1};
+    static const int16_t match_length[] = {
+        1,4,3,2,2,2,2,2,2,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+        1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,-1,-1,-1,-1,-1,-1,-1};
+    if (!table) return 0;
+    if (part == 0) return btrfs_fse_build(table, literal_length, 36, 6);
+    if (part == 1) return btrfs_fse_build(table, offset, 29, 5);
+    if (part == 2) return btrfs_fse_build(table, match_length, 53, 6);
+    return 0;
+}
+
+int btrfs_fse_build_rle(btrfs_fse_table_t *table, uint8_t symbol) {
+    if (!table) return 0;
+    table->symbols[0] = symbol; table->bits[0] = 0; table->new_state[0] = 0;
+    table->size = 1; table->accuracy_log = 0;
+    return 1;
+}
+
 static uint32_t stream_bits(const uint8_t *source, uint32_t bits, int64_t *offset) {
     int64_t start = *offset - (int64_t)bits;
     uint32_t result = 0, shift = 0;

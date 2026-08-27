@@ -54,6 +54,7 @@ int main(void) {
     put16(&subdir[162], 'c'); put16(&subdir[164], 'a'); put16(&subdir[166], 'f'); put16(&subdir[168], 0x00e9);
     put16(&root[98], entry_checksum(root, 3, 2)); put16(&subdir[2], entry_checksum(subdir, 0, 2));
     put16(&subdir[98], entry_checksum(subdir, 3, 2));
+    assert(exfat_lookup(&fs, "DIR", &cluster, &size, &no_fat) && size == 0);
     put32(&image[24 * 512 + 4 * 4], 0xfffffff8U);
     put32(&image[24 * 512 + 7 * 4], 0xfffffff8U); memcpy(&image[30 * 512], "utf8", 4);
     assert(exfat_lookup_in_directory(&fs, 4, "hello.txt", &cluster, &size, &no_fat) &&

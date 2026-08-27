@@ -180,7 +180,8 @@ int exfat_lookup_in_directory(exfat_fs_t *fs, uint32_t directory_cluster,
             if (written != name_length || !utf16_name_equal(candidate, written, name)) continue;
             *first_cluster = load32(&stream[20]); *size = load64(&stream[24]);
             *no_fat_chain = (stream[1] & 2U) != 0;
-            return cluster_valid(fs, *first_cluster) && *size != 0;
+            /* Empty regular files may legally have no allocated cluster. */
+            return cluster_valid(fs, *first_cluster) || *size == 0;
         }
         uint32_t next = 0;
         if (!fat_next(fs, cluster, &next) || next >= EXFAT_END || next == EXFAT_BAD || !cluster_valid(fs, next)) return 0;

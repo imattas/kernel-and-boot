@@ -504,6 +504,8 @@ thread startup and teardown never touch an uninitialized ready queue.
 The kernel Makefile now explicitly tracks the wait-queue header for
 process-thread compilation, preventing stale object layouts after task ABI
 changes.
+The FAT32 contract target now links its required spinlock implementation,
+keeping the host-side cache-concurrency test independently reproducible.
 ACPI IOAPIC discovery now retains bounded multi-IOAPIC GSI ranges and routes
 each legacy PCI IRQ through the controller that owns its GSI.
 ACPI IOAPIC discovery now derives each controller’s actual redirection range
@@ -680,6 +682,8 @@ FAT32 and exFAT have read-only parsers and VFS file adapters. exFAT now
 FAT32 mount validation now uses 64-bit geometry arithmetic, verifies the image
 fits its registered block device, and rejects FAT tables too small for the
 published cluster count.
+FAT32 FAT-cache and cluster-chain traversal now use a per-filesystem IRQ-safe
+lock, preventing concurrent readers from mixing cached FAT sectors.
 ExFAT mount validation now rejects invalid shift fields before evaluation and
 requires the FAT region to contain entries for every declared cluster.
 validates the primary and backup boot-region checksums, supports bounded

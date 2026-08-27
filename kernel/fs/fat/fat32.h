@@ -2,6 +2,7 @@
 #define OS_KERNEL_FS_FAT32_H
 
 #include <stdint.h>
+#include "../../core/sync/spinlock.h"
 
 #define FAT32_SECTOR_SIZE 512U
 #define FAT32_MAX_SECTORS_PER_CLUSTER 128U
@@ -21,6 +22,7 @@ typedef struct {
     uint8_t fat_sector[FAT32_SECTOR_SIZE];
     uint32_t fat_sector_number;
     uint8_t fat_sector_valid;
+    spinlock_t fat_lock;
     uint8_t mounted;
 } fat32_fs_t;
 

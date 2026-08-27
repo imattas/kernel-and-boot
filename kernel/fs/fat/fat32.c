@@ -76,7 +76,7 @@ static int fat_load_sector(fat32_fs_t *fs, uint32_t sector) {
     return 1;
 }
 
-static int fat_next(fat32_fs_t *fs, uint32_t cluster, uint32_t *next) {
+static int fat_next_locked(fat32_fs_t *fs, uint32_t cluster, uint32_t *next) {
     uint32_t byte_offset = cluster * 4U;
     uint32_t sector = byte_offset / FAT32_SECTOR_SIZE;
     uint32_t offset = byte_offset % FAT32_SECTOR_SIZE;
@@ -91,6 +91,14 @@ static int fat_next(fat32_fs_t *fs, uint32_t cluster, uint32_t *next) {
     }
     *next = load32(bytes) & 0x0fffffffU;
     return 1;
+}
+
+static int fat_next(fat32_fs_t *fs, uint32_t cluster, uint32_t *next) {
+    if (!fs || !next) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&fs->fat_lock);
+    int result = fat_next_locked(fs, cluster, next);
+    spinlock_unlock_irqrestore(&fs->fat_lock, flags);
+    return result;
 }
 
 int fat32_mount(fat32_fs_t *fs, uint32_t device) {
@@ -128,6 +136,7 @@ int fat32_mount(fat32_fs_t *fs, uint32_t device) {
     fs->data_clusters = (uint32_t)data_clusters;
     fs->fat_sector_number = 0;
     fs->fat_sector_valid = 0;
+    spinlock_init(&fs->fat_lock);
     fs->mounted = cluster_valid(fs, fs->root_cluster);
     return fs->mounted;
 }

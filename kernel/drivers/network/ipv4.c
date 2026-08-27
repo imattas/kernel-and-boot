@@ -61,13 +61,20 @@ int ipv4_packet_parse(const void *packet, uint16_t packet_length,
         return 0;
     uint16_t total = load_be16(bytes + 2);
     uint16_t fragments = load_be16(bytes + 6);
+    uint32_t fragment_offset = (uint32_t)(fragments & 0x1fffU) * 8U;
     if (total < header_length || total > packet_length ||
-        (fragments & 0x3fffU) != 0 || ipv4_checksum(bytes, header_length) != 0)
+        fragment_offset > IPV4_MAX_PACKET_SIZE - header_length ||
+        fragment_offset > IPV4_MAX_PACKET_SIZE - total + header_length ||
+        ((fragments & 0x2000U) != 0 && (total - header_length) == 0) ||
+        ((fragments & 0x2000U) != 0 && ((total - header_length) & 7U) != 0) ||
+        ipv4_checksum(bytes, header_length) != 0)
         return 0;
     view->ihl = (uint8_t)(header_length / 4U);
     view->ttl = bytes[8];
     view->protocol = bytes[9];
     view->identification = load_be16(bytes + 4);
+    view->fragment_offset = (uint16_t)fragment_offset;
+    view->more_fragments = (uint8_t)((fragments & 0x2000U) != 0);
     view->source = bytes + 12;
     view->destination = bytes + 16;
     view->payload = bytes + header_length;

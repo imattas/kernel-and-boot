@@ -12,6 +12,8 @@ typedef struct {
     uint8_t ttl;
     uint8_t protocol;
     uint16_t identification;
+    uint16_t fragment_offset;
+    uint8_t more_fragments;
     const uint8_t *source;
     const uint8_t *destination;
     const uint8_t *payload;

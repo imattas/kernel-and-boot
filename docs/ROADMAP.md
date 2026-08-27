@@ -374,6 +374,11 @@ e1000 adapter boundary.
 The network service loop now forwards validated UDP frames from the hardware
 packet queue into bound endpoint tables, and the QEMU boot probe exercises that
 end-to-end queue-to-endpoint delivery path.
+The network service now consumes fragmented IPv4 packets through the bounded
+reassembly table, rebuilds a validated packet only after complete delivery,
+and keeps incomplete or malformed fragment sets out of protocol consumers.
+The QEMU boot probe now feeds an out-of-order two-fragment UDP datagram through
+the service and verifies endpoint delivery after reassembly.
 The e1000 ISR now records delivery, and the post-interrupt-enable QEMU probe
 transmits a frame and requires an observed interrupt before continuing.
 The e1000 ISR now preserves cleared interrupt causes for the polling/service

@@ -1,6 +1,41 @@
 #include "network.h"
 #include "e1000.h"
 
+static int prepare_network_frame(uint8_t *frame, uint16_t *length,
+                                 ipv4_reassembly_table_t *reassembly,
+                                 void *reassembly_output,
+                                 uint16_t reassembly_capacity, uint64_t now) {
+    ethernet_frame_view_t ethernet;
+    ipv4_packet_view_t ipv4;
+    if (!ethernet_frame_parse(frame, *length, &ethernet) ||
+        ethernet.ether_type != 0x0800U ||
+        !ipv4_packet_parse(ethernet.payload, ethernet.payload_length, &ipv4))
+        return 1;
+    if (ipv4.fragment_offset == 0 && !ipv4.more_fragments) return 1;
+    if (!reassembly || !reassembly_output) return 0;
+    uint16_t payload_length = 0;
+    if (!ipv4_reassembly_add(reassembly, ipv4.identification, ipv4.source,
+                             ipv4.destination, ipv4.protocol,
+                             ipv4.fragment_offset, ipv4.more_fragments,
+                             ipv4.payload, ipv4.payload_length, now, 1000,
+                             reassembly_output, reassembly_capacity,
+                             &payload_length)) return 0;
+    uint8_t rebuilt_ip[ETHERNET_MAX_PAYLOAD_SIZE];
+    uint8_t rebuilt_frame[ETHERNET_MAX_FRAME_SIZE];
+    uint16_t rebuilt_ip_length = 0, rebuilt_frame_length = 0;
+    if (!ipv4_packet_build(rebuilt_ip, sizeof(rebuilt_ip), ipv4.source,
+                           ipv4.destination, ipv4.protocol, ipv4.ttl,
+                           ipv4.identification, reassembly_output,
+                           payload_length, &rebuilt_ip_length) ||
+        !ethernet_frame_build(rebuilt_frame, sizeof(rebuilt_frame),
+                              ethernet.destination, ethernet.source, 0x0800U,
+                              rebuilt_ip, rebuilt_ip_length,
+                              &rebuilt_frame_length)) return 0;
+    for (uint16_t i = 0; i < rebuilt_frame_length; ++i) frame[i] = rebuilt_frame[i];
+    *length = rebuilt_frame_length;
+    return 1;
+}
+
 int network_decode_frame(const void *frame, uint16_t length,
                          network_frame_view_t *view) {
     if (!frame || !view || !ethernet_frame_parse(frame, length,
@@ -92,7 +127,9 @@ uint32_t network_service(network_packet_queue_t *queue,
                          const uint8_t local_hardware[ETHERNET_ADDRESS_SIZE],
                          const uint8_t local_protocol[4], arp_cache_t *cache,
                          udp_endpoint_table_t *udp_table, uint64_t now,
-                         uint32_t budget) {
+                         uint32_t budget, ipv4_reassembly_table_t *reassembly,
+                         void *reassembly_output,
+                         uint16_t reassembly_capacity) {
     if (!queue || !local_hardware || !local_protocol || !cache ||
         budget == 0) return 0;
     (void)network_e1000_poll(queue, budget);
@@ -103,7 +140,9 @@ uint32_t network_service(network_packet_queue_t *queue,
         if (!network_packet_queue_pop(queue, frame, sizeof(frame), &length))
             break;
         network_frame_view_t view;
-        if (!network_decode_frame(frame, length, &view)) {
+        if (!prepare_network_frame(frame, &length, reassembly,
+                                   reassembly_output, reassembly_capacity, now) ||
+            !network_decode_frame(frame, length, &view)) {
             ++serviced;
             continue;
         }

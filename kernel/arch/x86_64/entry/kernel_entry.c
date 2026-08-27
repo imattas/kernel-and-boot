@@ -957,8 +957,11 @@ void kernel_main(void *boot_info) {
     serial_write("network UDP delivery ready\r\n");
     static network_packet_queue_t network_service_probe_queue;
     static arp_cache_t network_service_probe_cache;
+    static ipv4_reassembly_table_t network_reassembly_probe_table;
+    static uint8_t network_reassembly_probe_output[IPV4_REASSEMBLY_MAX_PAYLOAD];
     network_packet_queue_initialize(&network_service_probe_queue);
     arp_cache_initialize(&network_service_probe_cache);
+    ipv4_reassembly_initialize(&network_reassembly_probe_table);
     udp_endpoint_table_initialize(&udp_endpoint_probe_table);
     if (!udp_endpoint_bind(&udp_endpoint_probe_table, ipv4_probe_destination,
                            6001, &udp_endpoint_any) ||
@@ -970,7 +973,10 @@ void kernel_main(void *boot_info) {
     }
     if (network_service(&network_service_probe_queue, ethernet_probe_source,
                         ipv4_probe_destination, &network_service_probe_cache,
-                        &udp_endpoint_probe_table, 1, 4) != 1 ||
+                        &udp_endpoint_probe_table, 1, 4,
+                        &network_reassembly_probe_table,
+                        network_reassembly_probe_output,
+                        sizeof(network_reassembly_probe_output)) != 1 ||
         network_packet_queue_count(&network_service_probe_queue) != 0 ||
         !udp_endpoint_receive(&udp_endpoint_probe_table, udp_endpoint_any,
                               udp_endpoint_source, &udp_endpoint_source_port,
@@ -982,6 +988,67 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("network service ready\r\n");
+    static uint8_t fragment_one_ip[IPV4_MIN_HEADER_SIZE + 8];
+    static uint8_t fragment_two_ip[IPV4_MIN_HEADER_SIZE + sizeof(network_dispatch_udp) - 8];
+    static uint8_t fragment_one_frame[ETHERNET_MAX_FRAME_SIZE];
+    static uint8_t fragment_two_frame[ETHERNET_MAX_FRAME_SIZE];
+    uint16_t fragment_one_ip_length = 0, fragment_two_ip_length = 0;
+    uint16_t fragment_one_frame_length = 0, fragment_two_frame_length = 0;
+    if (!ipv4_packet_build(fragment_one_ip, sizeof(fragment_one_ip),
+                           ipv4_probe_source, ipv4_probe_destination, 17, 64,
+                           0x4321, network_dispatch_udp, 8,
+                           &fragment_one_ip_length) ||
+        !ipv4_packet_build(fragment_two_ip, sizeof(fragment_two_ip),
+                           ipv4_probe_source, ipv4_probe_destination, 17, 64,
+                           0x4321, network_dispatch_udp + 8,
+                           sizeof(network_dispatch_udp) - 8,
+                           &fragment_two_ip_length)) {
+        serial_write("network fragment setup failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    fragment_one_ip[6] = 0x20; fragment_one_ip[7] = 0;
+    fragment_two_ip[6] = 0; fragment_two_ip[7] = 1;
+    for (uint32_t fragment = 0; fragment < 2; ++fragment) {
+        uint8_t *ip = fragment == 0 ? fragment_one_ip : fragment_two_ip;
+        ip[10] = 0; ip[11] = 0;
+        uint16_t checksum = ipv4_checksum(ip, IPV4_MIN_HEADER_SIZE);
+        ip[10] = (uint8_t)(checksum >> 8); ip[11] = (uint8_t)checksum;
+    }
+    if (!ethernet_frame_build(fragment_one_frame, sizeof(fragment_one_frame),
+                              ethernet_probe_destination, ethernet_probe_source,
+                              0x0800, fragment_one_ip, fragment_one_ip_length,
+                              &fragment_one_frame_length) ||
+        !ethernet_frame_build(fragment_two_frame, sizeof(fragment_two_frame),
+                              ethernet_probe_destination, ethernet_probe_source,
+                              0x0800, fragment_two_ip, fragment_two_ip_length,
+                              &fragment_two_frame_length)) {
+        serial_write("network fragment frame failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    network_packet_queue_initialize(&network_service_probe_queue);
+    ipv4_reassembly_initialize(&network_reassembly_probe_table);
+    udp_endpoint_table_initialize(&udp_endpoint_probe_table);
+    if (!udp_endpoint_bind(&udp_endpoint_probe_table, ipv4_probe_destination,
+                           6001, &udp_endpoint_any) ||
+        !network_packet_queue_push(&network_service_probe_queue,
+                                   fragment_two_frame, fragment_two_frame_length) ||
+        !network_packet_queue_push(&network_service_probe_queue,
+                                   fragment_one_frame, fragment_one_frame_length) ||
+        network_service(&network_service_probe_queue, ethernet_probe_source,
+                        ipv4_probe_destination, &network_service_probe_cache,
+                        &udp_endpoint_probe_table, 2, 4,
+                        &network_reassembly_probe_table,
+                        network_reassembly_probe_output,
+                        sizeof(network_reassembly_probe_output)) != 2 ||
+        !udp_endpoint_receive(&udp_endpoint_probe_table, udp_endpoint_any,
+                              udp_endpoint_source, &udp_endpoint_source_port,
+                              udp_endpoint_output, sizeof(udp_endpoint_output),
+                              &udp_endpoint_output_length) ||
+        udp_endpoint_output_length != 3 || udp_endpoint_output[0] != 0xa1) {
+        serial_write("network fragment delivery failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("network fragment reassembly ready\r\n");
     if (e1000_controller_count() != 0)
         serial_write(e1000_link_up() ? "e1000 link ready\r\n" :
                      "e1000 link down\r\n");

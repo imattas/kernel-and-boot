@@ -9,6 +9,7 @@
 #include "udp.h"
 #include "icmp.h"
 #include "udp_endpoint.h"
+#include "reassembly.h"
 
 typedef enum {
     NETWORK_FRAME_ETHERNET,
@@ -42,7 +43,9 @@ uint32_t network_service(network_packet_queue_t *queue,
                          const uint8_t local_hardware[ETHERNET_ADDRESS_SIZE],
                          const uint8_t local_protocol[4], arp_cache_t *cache,
                          udp_endpoint_table_t *udp_table, uint64_t now,
-                         uint32_t budget);
+                         uint32_t budget, ipv4_reassembly_table_t *reassembly,
+                         void *reassembly_output,
+                         uint16_t reassembly_capacity);
 int network_deliver_frame(const void *frame, uint16_t length,
                           udp_endpoint_table_t *udp_table);
 

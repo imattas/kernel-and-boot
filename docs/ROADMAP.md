@@ -237,6 +237,8 @@ read/write rights, and can be installed as owned process handles with safe close
 and retained-reference behavior.
 Path-based descriptor opening now resolves a retained VFS node before creating
 the owned file handle, releasing the lookup reference on every path.
+Directory descriptors now support serialized retained-child iteration through a
+bounded `readdir` contract while regular-file reads remain type-safe.
 The process registry now serializes duplicate-ID checks, insertion, lookup,
 and removal across concurrent lifecycle operations.
 The bootable `dist/os.img` is now a standards-compliant FAT32 superfloppy

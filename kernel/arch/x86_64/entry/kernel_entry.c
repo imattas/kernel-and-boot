@@ -1554,25 +1554,32 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     vfs_file_t *proc_file = vfs_file_open(proc_pid, VFS_FILE_READ);
+    vfs_file_t *proc_directory = vfs_file_open(proc_root, VFS_FILE_READ);
     process_handle_table_t file_handles;
     process_handle_ref_t file_ref = {0};
     process_handle_table_initialize(&file_handles);
     int file_handle = vfs_file_open_path_handle(&file_handles, proc_root,
                                                 "/self/pid", VFS_FILE_READ);
     char file_pid_text[4] = {0};
+    vfs_dirent_t directory_entry = {0};
     if (!proc_file || vfs_file_read(proc_file, file_pid_text, 3) != 3 ||
         file_pid_text[0] != '4' || file_pid_text[1] != '2' ||
         file_pid_text[2] != '\n' || vfs_file_offset(proc_file) != 3 ||
         !vfs_file_seek(proc_file, 0) || vfs_file_write(proc_file, file_pid_text, 1) ||
+        !proc_directory || !vfs_file_readdir(proc_directory, &directory_entry) ||
+        directory_entry.type != VFS_NODE_DIRECTORY || directory_entry.name[0] != 's' ||
+        vfs_file_readdir(proc_directory, &directory_entry) ||
         !file_handle || !process_handle_get_retain(&file_handles,
             (uint32_t)file_handle, PROCESS_HANDLE_READ, &file_ref) ||
         !process_handle_close(&file_handles, (uint32_t)file_handle)) {
         if (proc_file) vfs_file_release(proc_file);
+        if (proc_directory) vfs_file_release(proc_directory);
         serial_write("VFS file description failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     process_handle_release_ref(&file_ref);
     vfs_file_release(proc_file);
+    vfs_file_release(proc_directory);
     serial_write("VFS file descriptions ready\r\n");
     vfs_node_t *proc_self = vfs_node_lookup(proc_root, "self");
     if (!proc_self || !vfs_node_remove(proc_self, proc_pid) ||

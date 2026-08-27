@@ -10,8 +10,8 @@ struct vfs_file {
 };
 
 vfs_file_t *vfs_file_open(vfs_node_t *node, uint32_t flags) {
-    if (!node || node->type == VFS_NODE_DIRECTORY ||
-        flags == 0 || (flags & ~(VFS_FILE_READ | VFS_FILE_WRITE)) != 0)
+    if (!node || flags == 0 || (flags & ~(VFS_FILE_READ | VFS_FILE_WRITE)) != 0 ||
+        (node->type == VFS_NODE_DIRECTORY && flags != VFS_FILE_READ))
         return 0;
     vfs_file_t *file = (vfs_file_t *)kmalloc(sizeof(*file));
     if (!file) return 0;
@@ -99,6 +99,27 @@ int vfs_file_write(vfs_file_t *file, const void *buffer, uint32_t size) {
     else if (result < 0 || (uint32_t)result > size) result = 0;
     spinlock_unlock_irqrestore(&file->lock, flags);
     return result;
+}
+
+int vfs_file_readdir(vfs_file_t *file, vfs_dirent_t *entry) {
+    if (!file || !entry) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&file->lock);
+    if (!(file->flags & VFS_FILE_READ) || !file->node ||
+        file->node->type != VFS_NODE_DIRECTORY || file->offset > UINT32_MAX) {
+        spinlock_unlock_irqrestore(&file->lock, flags);
+        return 0;
+    }
+    vfs_node_t *child = vfs_node_child(file->node, (uint32_t)file->offset);
+    if (!child) {
+        spinlock_unlock_irqrestore(&file->lock, flags);
+        return 0;
+    }
+    for (uint32_t i = 0; i < sizeof(entry->name); ++i) entry->name[i] = child->name[i];
+    entry->type = child->type;
+    ++file->offset;
+    vfs_node_release(child);
+    spinlock_unlock_irqrestore(&file->lock, flags);
+    return 1;
 }
 
 int vfs_file_seek(vfs_file_t *file, uint64_t offset) {

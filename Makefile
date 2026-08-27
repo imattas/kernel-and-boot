@@ -603,7 +603,7 @@ run: $(IMAGE)
 	cp "$(OVMF_VARS)" $(BUILD_DIR)/OVMF_VARS.4m.fd
 	cp "$(IMAGE)" $(BUILD_DIR)/ahci-test.img
 	cp "$(IMAGE)" $(BUILD_DIR)/nvme-test.img
-	qemu-system-x86_64 -machine pc -smp 2 -m 128M \
+	exec qemu-system-x86_64 -machine pc -smp 2 -m 128M \
 		-drive if=pflash,format=raw,readonly=on,file="$(OVMF_CODE)" \
 		-drive if=pflash,format=raw,file=$(BUILD_DIR)/OVMF_VARS.4m.fd \
 		-drive format=raw,file=$(IMAGE) -serial stdio \
@@ -614,7 +614,8 @@ run: $(IMAGE)
 		-drive if=none,id=ahcidisk,format=raw,file=$(BUILD_DIR)/ahci-test.img \
 		-device ide-hd,drive=ahcidisk,bus=ahci.1 \
 		-device nvme,drive=nvmedisk,serial=OSNVME01 \
-		-drive if=none,id=nvmedisk,format=raw,file=$(BUILD_DIR)/nvme-test.img
+		-drive if=none,id=nvmedisk,format=raw,file=$(BUILD_DIR)/nvme-test.img \
+		-no-reboot -no-shutdown
 
 clean:
 	rm -rf $(BUILD_DIR)

@@ -9,6 +9,8 @@ uint32_t acpi_cpu_apic_id(uint32_t index);
 uint64_t acpi_lapic_base(void);
 uint64_t acpi_ioapic_base(void);
 uint32_t acpi_ioapic_gsi_base(void);
+uint64_t acpi_ioapic_base_for_gsi(uint32_t gsi);
+uint32_t acpi_ioapic_gsi_base_for_gsi(uint32_t gsi);
 uint32_t acpi_irq_to_gsi(uint8_t irq);
 uint16_t acpi_irq_flags(uint8_t irq);
 

@@ -300,6 +300,8 @@ PCI enumeration now enables memory/I/O space and bus mastering before BAR
 drivers probe, making DMA activation an explicit kernel-owned contract.
 The device model now rejects duplicate PCI bus/slot/function identities and
 duplicate driver names before binding.
+ACPI IOAPIC discovery now retains bounded multi-IOAPIC GSI ranges and routes
+each legacy PCI IRQ through the controller that owns its GSI.
 NVMe namespace I/O now supports bounded multi-sector transfers within one DMA
 page and is covered by a real two-sector write/read-back QEMU check. Admin and
 namespace queue state is serialized with an interrupt-safe lock; timed-out

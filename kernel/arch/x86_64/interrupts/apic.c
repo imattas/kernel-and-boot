@@ -145,14 +145,14 @@ int arch_apic_timer_initialize(void) {
 }
 
 int arch_ioapic_route_irq(uint8_t irq, uint8_t vector) {
-    uint64_t base = acpi_ioapic_base();
     uint32_t gsi = acpi_irq_to_gsi(irq);
+    uint64_t base = acpi_ioapic_base_for_gsi(gsi);
     if (!base || gsi == 0xffffffffU || vector < 0x20 || vector > 0xfe)
         return 0;
     volatile uint32_t *ioapic = (volatile uint32_t *)(uintptr_t)base;
     ioapic[0] = 1;
     uint32_t max_redirection = (ioapic[4] >> 16) & 0xffU;
-    uint32_t gsi_base = acpi_ioapic_gsi_base();
+    uint32_t gsi_base = acpi_ioapic_gsi_base_for_gsi(gsi);
     if (gsi < gsi_base || gsi - gsi_base > max_redirection) return 0;
     uint32_t index = 0x10U + (gsi - gsi_base) * 2U;
     uint32_t low = vector | (1U << 16);

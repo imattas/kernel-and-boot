@@ -737,6 +737,8 @@ the directory size/first-cluster fields, and rolls back new chain state when
 metadata or data writes fail; arbitrary hole-punching and shrink remain later.
 The FAT32 VFS adapter now exposes both bounded in-place writes and append
 growth, serializing per-file size updates around the filesystem write path.
+The FAT32 contract now exercises append growth through `vfs_node_write()` and
+reads the appended bytes back through the VFS adapter.
 FAT32 in-place writes now serialize the complete read-modify-write operation
 with a filesystem write lock, preventing concurrent writers from interleaving
 sector updates.

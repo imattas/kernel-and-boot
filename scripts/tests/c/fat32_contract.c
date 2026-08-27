@@ -4,6 +4,7 @@
 #include <string.h>
 #include "../../../kernel/drivers/storage/storage.h"
 #include "../../../kernel/fs/fat/fat32.h"
+#include "../../../kernel/fs/fat/fat32_vfs.h"
 
 #define TOTAL_SECTORS 66072U
 #define FAT_START 32U
@@ -14,6 +15,8 @@
 
 static uint8_t *image;
 static storage_device_t device;
+void *kmalloc(uint64_t size) { return malloc((size_t)size); }
+void kfree(void *pointer) { free(pointer); }
 
 static void store16(uint8_t *p, uint16_t value) { p[0] = value; p[1] = value >> 8; }
 static void store32(uint8_t *p, uint32_t value) {
@@ -105,6 +108,16 @@ int main(void) {
         !fat32_read_file(&fs, name, 700, output, sizeof(appended)) ||
         memcmp(output, appended, sizeof(appended)) != 0)
         return fail("append growth failed");
+    vfs_node_t *vfs_root = vfs_node_create("fat", VFS_NODE_DIRECTORY, 0, 0, 0555);
+    if (!vfs_root || !fat32_vfs_attach_file(&fs, vfs_root, name, "chain.bin"))
+        return fail("VFS attach failed");
+    vfs_node_t *vfs_file = vfs_lookup_path(vfs_root, "/chain.bin");
+    const uint8_t vfs_append[] = "vfs";
+    if (!vfs_file || vfs_node_write(vfs_file, 1100, vfs_append, 3) != 3 ||
+        !vfs_node_read(vfs_file, 1100, output, 3) ||
+        memcmp(output, vfs_append, 3) != 0)
+        return fail("VFS append failed");
+    vfs_node_release(vfs_file);
     const char directory_name[11] = {'S','U','B','D','I','R',' ',' ',' ',' ',' '};
     const char nested_name[11] = {'N','E','S','T','E','D',' ',' ','T','X','T'};
     if (!fat32_lookup_in_directory(&fs, 2, directory_name, &cluster, &size, &is_directory) ||

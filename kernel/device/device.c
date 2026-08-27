@@ -66,7 +66,8 @@ const device_t *device_at(uint32_t index) {
 int device_driver_register(const device_driver_t *driver) {
     if (!driver) return 0;
     uint64_t flags = spinlock_lock_irqsave(&registry_lock);
-    if (!driver || !driver->name || !driver->match || !driver->probe ||
+    if (!driver || !driver->name || !driver->name[0] ||
+        driver->bus != DEVICE_BUS_PCI || !driver->match || !driver->probe ||
         driver_count >= DEVICE_DRIVER_CAPACITY) {
         spinlock_unlock_irqrestore(&registry_lock, flags);
         return 0;

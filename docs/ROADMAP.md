@@ -427,6 +427,9 @@ duplicate driver names before binding.
 Device publication now accepts only supported PCI devices and clears any
 caller-supplied driver/resource-owner state before exposing the device to the
 binding layer.
+Driver registration now rejects empty names and unsupported bus identifiers,
+keeping the published driver table compatible with the device model’s actual
+binding domain.
 Device registration, driver registration, enumeration, and binding now use
 dedicated IRQ-safe synchronization, while probe callbacks do not hold the
 resource ownership lock.

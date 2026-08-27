@@ -1098,6 +1098,9 @@ are released, empty leaf metadata is removed, and the root index is cleared.
 Ext4 depth-2 extent trees now support bounded growth and shrink through
 validated root, intermediate-index, and leaf nodes, including persistent leaf
 updates and release of detached metadata.
+Ext4 depth-3 extent files now support bounded growth through validated root,
+upper-index, intermediate-index, and leaf nodes, persisting newly appended leaf
+records while preserving the existing metadata chain.
 Ext4 extent-root truncation now bounds and releases detached leaf blocks,
 removes empty extent records, and zeroes the retained partial block before
 persisting the reduced inode size.

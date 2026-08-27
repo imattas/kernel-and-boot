@@ -357,8 +357,8 @@ contracted; checksum verification now uses the format's XXH64 low-32-bit value
 and is covered by both a generated compressed frame and a checksum rejection
 case. A generated FSE-weight literal vector now exercises the complete
 compressed-literal, sequence, match-history, and checksum path. Four-stream
-literal blocks and their size formats remain before the Zstandard portion of
-the filesystem milestone is complete.
+literal blocks and all compressed-literal size formats are now decoded with
+bounded jump-table and per-stream output validation.
 The bounded overlap-safe match-copy primitive is now
 implemented and contracted, including destination-underflow rejection.
 Zstandard sequence code expansion for literal lengths, match lengths, and

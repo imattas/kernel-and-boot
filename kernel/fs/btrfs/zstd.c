@@ -400,6 +400,37 @@ static int zstd_huffman_decode(const uint8_t *source, uint32_t source_size,
     return produced == expected_size && offset == -(int64_t)max_bits;
 }
 
+static int zstd_huffman_decode_streams(const uint8_t *source, uint32_t size,
+                                       uint8_t *output, uint32_t capacity,
+                                       uint32_t regenerated, uint8_t streams,
+                                       const uint8_t *weights, uint32_t weight_count) {
+    uint32_t output_offset = 0;
+    if (!source || !size || !output || streams != 4U) return 0;
+    if (size < 6U) return 0;
+    uint32_t stream_sizes[4] = {
+        (uint32_t)source[0] | ((uint32_t)source[1] << 8),
+        (uint32_t)source[2] | ((uint32_t)source[3] << 8),
+        (uint32_t)source[4] | ((uint32_t)source[5] << 8), 0
+    };
+    if (stream_sizes[0] > size - 6U || stream_sizes[1] > size - 6U - stream_sizes[0] ||
+        stream_sizes[2] > size - 6U - stream_sizes[0] - stream_sizes[1]) return 0;
+    stream_sizes[3] = size - 6U - stream_sizes[0] - stream_sizes[1] - stream_sizes[2];
+    uint32_t stream_output = (regenerated + 3U) / 4U;
+    uint32_t stream_offset = 6U;
+    for (uint32_t i = 0; i < 4U; ++i) {
+        uint32_t expected = i == 3U ? regenerated - output_offset : stream_output;
+        if (!stream_sizes[i] || expected > capacity - output_offset ||
+            !zstd_huffman_decode(source + stream_offset, stream_sizes[i], weights,
+                                 weight_count, output + output_offset,
+                                 capacity - output_offset, expected)) {
+            return 0;
+        }
+        stream_offset += stream_sizes[i];
+        output_offset += expected;
+    }
+    return output_offset == regenerated;
+}
+
 static int decode_compressed_literals(const uint8_t *input, uint32_t size,
                                       uint8_t *output, uint32_t capacity,
                                       uint32_t *decoded_size, uint32_t *section_size) {
@@ -409,23 +440,26 @@ static int decode_compressed_literals(const uint8_t *input, uint32_t size,
     if ((header & 3U) > 2U) return 0;
     format = (header >> 2) & 3U;
     if ((header & 3U) == 2U) {
-        uint32_t packed, compressed, tree_header, count, tree_bytes;
-        uint8_t weights[255];
-        if (format != 0U || size < 4U) return 0;
-        packed = (uint32_t)input[0] | ((uint32_t)input[1] << 8) |
-                 ((uint32_t)input[2] << 16);
-        regenerated = (packed >> 4) & 0x3ffU;
-        compressed = (packed >> 14) & 0x3ffU;
-        if (!regenerated || !compressed || regenerated > capacity || compressed > size - 3U)
+        uint64_t packed = 0;
+        uint32_t compressed, tree_header, count, tree_bytes, stream_size;
+        uint8_t weights[256];
+        header_size = format <= 1U ? 3U : format == 2U ? 4U : 5U;
+        if (size < header_size + 1U) return 0;
+        for (uint32_t i = 0; i < header_size; ++i) packed |= (uint64_t)input[i] << (i * 8U);
+        uint32_t width = format <= 1U ? 10U : format == 2U ? 14U : 18U;
+        regenerated = (uint32_t)((packed >> 4U) & ((1ULL << width) - 1ULL));
+        compressed = (uint32_t)((packed >> (4U + width)) & ((1ULL << width) - 1ULL));
+        if (!regenerated || !compressed || regenerated > capacity ||
+            compressed > size - header_size)
             return 0;
-        tree_header = input[3];
+        tree_header = input[header_size];
         if (tree_header < 128U) {
             btrfs_fse_table_t table; uint32_t fse_header = 0, weight_count = 0;
             if (!tree_header || tree_header > compressed - 1U ||
-                !btrfs_fse_read_header(&table, input + 4U, tree_header, 6U, &fse_header) ||
+                !btrfs_fse_read_header(&table, input + header_size + 1U, tree_header, 7U, &fse_header) ||
                 fse_header >= tree_header ||
-                !btrfs_fse_decode_interleaved2(&table, input + 4U + fse_header,
-                                               tree_header - fse_header, weights, 255U,
+                !btrfs_fse_decode_interleaved2(&table, input + header_size + 1U + fse_header,
+                                               tree_header - fse_header, weights, 256U,
                                                &weight_count) || !weight_count) return 0;
             count = weight_count; tree_bytes = tree_header;
         } else {
@@ -433,13 +467,19 @@ static int decode_compressed_literals(const uint8_t *input, uint32_t size,
             tree_bytes = (count + 1U) / 2U;
             if (count >= 256U || tree_bytes > compressed - 1U) return 0;
             for (uint32_t i = 0; i < count; ++i)
-                weights[i] = (uint8_t)(i & 1U ? input[4U + i / 2U] & 0x0fU :
-                                       input[4U + i / 2U] >> 4);
+                weights[i] = (uint8_t)(i & 1U ? input[header_size + 1U + i / 2U] & 0x0fU :
+                                       input[header_size + 1U + i / 2U] >> 4);
         }
-        if (!zstd_huffman_decode(input + 4U + tree_bytes,
-                                 compressed - 1U - tree_bytes, weights,
-                                 count, output, capacity, regenerated)) return 0;
-        *decoded_size = regenerated; *section_size = 3U + compressed;
+        const uint8_t *stream = input + header_size + 1U + tree_bytes;
+        stream_size = compressed - 1U - tree_bytes;
+            if (format == 0U) {
+            if (!zstd_huffman_decode(stream, stream_size, weights, count,
+                                     output, capacity, regenerated)) return 0;
+        } else {
+            if (!zstd_huffman_decode_streams(stream, stream_size, output, capacity,
+                                             regenerated, 4U, weights, count)) return 0;
+        }
+        *decoded_size = regenerated; *section_size = header_size + compressed;
         return 1;
     }
     if (format == 0U || format == 2U) {

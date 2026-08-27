@@ -39,6 +39,12 @@ int storage_write(uint32_t index, uint64_t lba, uint32_t count, const void *buff
 static void set_fat(uint32_t cluster, uint32_t value) {
     store32(image + FAT_START * 512U + cluster * 4U, value);
 }
+static uint8_t short_checksum(const char name[11]) {
+    uint8_t checksum = 0;
+    for (uint32_t i = 0; i < 11; ++i)
+        checksum = (uint8_t)(((checksum & 1U) ? 0x80U : 0U) + (checksum >> 1) + (uint8_t)name[i]);
+    return checksum;
+}
 
 static int fail(const char *message) { fprintf(stderr, "fat32 contract: %s\n", message); return 1; }
 
@@ -51,12 +57,23 @@ int main(void) {
     store16(boot + 42, 0); store32(boot + 44, 2); boot[510] = 0x55; boot[511] = 0xaa;
     set_fat(0, 0x0ffffff8); set_fat(1, 0x0fffffff); set_fat(2, 0x0fffffff);
     set_fat(3, 4); set_fat(4, 0x0fffffff);
-    set_fat(5, 0x0fffffff); set_fat(6, 0x0fffffff);
+    set_fat(5, 0x0fffffff); set_fat(6, 0x0fffffff); set_fat(7, 0x0fffffff);
     uint8_t *root = image + DATA_START * 512U;
     memcpy(root, "CHAIN   BIN", 11); root[11] = 0x20; store16(root + 26, 3);
     store32(root + 28, 700);
     memcpy(root + 32, "SUBDIR     ", 11); root[43] = 0x10; store16(root + 32 + 26, 5);
-    root[64] = 0;
+    const char long_short[11] = {'L','O','N','G','N','A','~','1','T','X','T'};
+    root[64] = 0x41; root[75] = 0x0f; root[77] = short_checksum(long_short);
+    const char *long_name = "LongName.txt";
+    for (uint32_t i = 0; i < 13; ++i) {
+        uint16_t value = i < 12 ? (uint8_t)long_name[i] : 0;
+        if (i < 5) store16(&root[65 + i * 2], value);
+        else if (i < 11) store16(&root[78 + (i - 5) * 2], value);
+        else store16(&root[92 + (i - 11) * 2], value);
+    }
+    memcpy(root + 96, long_short, 11); root[107] = 0x20; store16(root + 96 + 26, 7);
+    store32(root + 96 + 28, 4); root[128] = 0;
+    memcpy(image + (DATA_START + 5) * 512U, "long", 4);
     uint8_t *subdir = image + (DATA_START + 3) * 512U;
     memcpy(subdir, "NESTED  TXT", 11); subdir[11] = 0x20; store16(subdir + 26, 6);
     store32(subdir + 28, 5); subdir[32] = 0;
@@ -82,6 +99,11 @@ int main(void) {
         !is_directory || cluster != 5 || size != 0 ||
         !fat32_read_file_in_directory(&fs, cluster, nested_name, 0, output, 5) ||
         memcmp(output, "child", 5) != 0) return fail("subdirectory traversal failed");
+    memset(output, 0, sizeof(output));
+    if (!fat32_lookup_name_in_directory(&fs, 2, "LongName.txt", &cluster, &size, &is_directory) ||
+        cluster != 7 || size != 4 || is_directory) return fail("long filename lookup failed");
+    if (!fat32_read_named_file_in_directory(&fs, 2, "LongName.txt", 0, output, 4) ||
+        memcmp(output, "long", 4) != 0) return fail("long filename read failed");
     set_fat(3, 0x0ffffff7);
     fs.fat_sector_valid = 0;
     if (fat32_read_file(&fs, name, 0, output, sizeof(output))) return fail("bad cluster accepted");

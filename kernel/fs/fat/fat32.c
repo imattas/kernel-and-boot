@@ -17,6 +17,56 @@ static int cluster_valid(const fat32_fs_t *fs, uint32_t cluster) {
     return fs && cluster >= 2 && cluster < fs->data_clusters + 2;
 }
 
+static int utf8_next(const char **text, uint32_t *codepoint) {
+    const uint8_t *p = (const uint8_t *)*text; uint32_t value, length;
+    if (!p[0]) return 0;
+    if (p[0] < 0x80) { value = p[0]; length = 1; }
+    else if (p[0] >= 0xc2 && p[0] <= 0xdf) { value = p[0] & 0x1fU; length = 2; }
+    else if (p[0] >= 0xe0 && p[0] <= 0xef) { value = p[0] & 0x0fU; length = 3; }
+    else if (p[0] >= 0xf0 && p[0] <= 0xf4) { value = p[0] & 7U; length = 4; }
+    else return 0;
+    for (uint32_t i = 1; i < length; ++i) {
+        if ((p[i] & 0xc0U) != 0x80U) return 0;
+        value = (value << 6) | (p[i] & 0x3fU);
+    }
+    if ((length == 2 && value < 0x80U) || (length == 3 && value < 0x800U) ||
+        (length == 4 && value < 0x10000U) || value > 0x10ffffU ||
+        (value >= 0xd800U && value <= 0xdfffU)) return 0;
+    *text += length; *codepoint = value; return 1;
+}
+
+static int lfn_equal(const uint16_t *units, uint32_t count, const char *name) {
+    const char *cursor = name;
+    for (uint32_t i = 0; i < count; ++i) {
+        uint32_t value;
+        if (!utf8_next(&cursor, &value)) return 0;
+        if (value <= 0xffffU) {
+            uint16_t unit = units[i], wanted = (uint16_t)value;
+            if (unit >= 'a' && unit <= 'z') unit = (uint16_t)(unit - 'a' + 'A');
+            if (wanted >= 'a' && wanted <= 'z') wanted = (uint16_t)(wanted - 'a' + 'A');
+            if (unit != wanted) return 0;
+        } else {
+            uint16_t high = (uint16_t)(0xd800U + ((value - 0x10000U) >> 10));
+            uint16_t low = (uint16_t)(0xdc00U + ((value - 0x10000U) & 0x3ffU));
+            if (i + 1U >= count || units[i] != high || units[++i] != low) return 0;
+        }
+    }
+    return *cursor == 0;
+}
+
+static uint8_t lfn_checksum(const uint8_t short_name[11]) {
+    uint8_t checksum = 0;
+    for (uint32_t i = 0; i < 11; ++i)
+        checksum = (uint8_t)(((checksum & 1U) ? 0x80U : 0U) + (checksum >> 1) + short_name[i]);
+    return checksum;
+}
+
+static void lfn_units(const uint8_t *entry, uint16_t *units, uint32_t base) {
+    for (uint32_t i = 0; i < 5; ++i) units[base + i] = load16(&entry[1 + i * 2U]);
+    for (uint32_t i = 0; i < 6; ++i) units[base + 5U + i] = load16(&entry[14 + i * 2U]);
+    for (uint32_t i = 0; i < 2; ++i) units[base + 11U + i] = load16(&entry[28 + i * 2U]);
+}
+
 static int fat_load_sector(fat32_fs_t *fs, uint32_t sector) {
     if (!fs || sector >= fs->sectors_per_fat) return 0;
     if (fs->fat_sector_valid && fs->fat_sector_number == sector) return 1;
@@ -123,6 +173,51 @@ int fat32_lookup(fat32_fs_t *fs, const char short_name[11],
                                      first_cluster, size, &is_directory) && !is_directory;
 }
 
+int fat32_lookup_name_in_directory(fat32_fs_t *fs, uint32_t directory_cluster,
+                                   const char *name, uint32_t *first_cluster,
+                                   uint32_t *size, uint8_t *is_directory) {
+    uint16_t units[260] = {0}; uint32_t slots = 0, expected = 0; uint8_t checksum = 0, valid = 0;
+    uint8_t directory[FAT32_MAX_SECTORS_PER_CLUSTER * FAT32_SECTOR_SIZE];
+    if (!fs || !fs->mounted || !cluster_valid(fs, directory_cluster) || !name || !name[0] ||
+        !first_cluster || !size || !is_directory) return 0;
+    uint32_t cluster = directory_cluster;
+    for (uint32_t hops = 0; hops < fs->data_clusters; ++hops) {
+        if (!fat32_read_cluster(fs, cluster, directory)) return 0;
+        for (uint32_t offset = 0; offset < fs->sectors_per_cluster * FAT32_SECTOR_SIZE; offset += 32U) {
+            const uint8_t *entry = &directory[offset]; uint8_t first = entry[0];
+            uint8_t attributes = entry[11];
+            if (first == 0x00) return 0;
+            if (first == 0xe5) { valid = 0; continue; }
+            if (attributes == 0x0f) {
+                uint8_t order = first & 0x1fU;
+                if (order == 0 || order > 20U || (first & 0x40U)) {
+                    valid = (uint8_t)((first & 0x40U) != 0 && order != 0 && order <= 20U);
+                    expected = order; slots = order; checksum = entry[13];
+                } else if (!valid || order != expected || entry[13] != checksum) valid = 0;
+                if (valid) { lfn_units(entry, units, (order - 1U) * 13U); expected = order - 1U; }
+                continue;
+            }
+            if ((attributes & 0x08) != 0) { valid = 0; continue; }
+            uint8_t short_name[11]; for (uint32_t i = 0; i < 11; ++i) short_name[i] = entry[i];
+            if (valid && expected == 0 && lfn_checksum(short_name) == checksum) {
+                uint32_t count = slots * 13U;
+                while (count && (units[count - 1U] == 0x0000U || units[count - 1U] == 0xffffU)) --count;
+                if (count && lfn_equal(units, count, name)) {
+                    *first_cluster = ((load32(&entry[20]) & 0x0fffU) << 16) | load16(&entry[26]);
+                    *size = load32(&entry[28]); *is_directory = (uint8_t)((attributes & 0x10) != 0);
+                    return cluster_valid(fs, *first_cluster) || (!*is_directory && *size == 0);
+                }
+            }
+            valid = 0;
+        }
+        uint32_t next;
+        if (!fat_next(fs, cluster, &next) || next >= 0x0ffffff8U) return 0;
+        if (next == 0x0ffffff7U || !cluster_valid(fs, next)) return 0;
+        cluster = next;
+    }
+    return 0;
+}
+
 static int fat32_read_file_cluster(fat32_fs_t *fs, uint32_t cluster, uint32_t file_size,
                                    uint32_t offset, void *buffer, uint32_t size) {
     if (!fs || !fs->mounted || !buffer || !cluster_valid(fs, cluster) ||
@@ -171,5 +266,14 @@ int fat32_read_file_in_directory(fat32_fs_t *fs, uint32_t directory_cluster,
     uint32_t cluster, file_size; uint8_t is_directory = 0;
     if (!fat32_lookup_in_directory(fs, directory_cluster, short_name, &cluster,
                                    &file_size, &is_directory) || is_directory) return 0;
+    return fat32_read_file_cluster(fs, cluster, file_size, offset, buffer, size);
+}
+
+int fat32_read_named_file_in_directory(fat32_fs_t *fs, uint32_t directory_cluster,
+                                       const char *name, uint32_t offset,
+                                       void *buffer, uint32_t size) {
+    uint32_t cluster, file_size; uint8_t is_directory = 0;
+    if (!fat32_lookup_name_in_directory(fs, directory_cluster, name, &cluster,
+                                        &file_size, &is_directory) || is_directory) return 0;
     return fat32_read_file_cluster(fs, cluster, file_size, offset, buffer, size);
 }

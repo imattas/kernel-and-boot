@@ -21,7 +21,7 @@ int main(void) {
                          0x22, 0xc0, 0x00, 0x80, 0x10, 0x05, 0x00};
     uint8_t long_size[] = {0x28, 0xb5, 0x2f, 0xfd, 0x21, 0x00, 0x05, 0x00,
                            0x2b, 0x08, 0x00, 'A'};
-    uint8_t output[4096] = {0};
+    uint8_t output[300000] = {0};
     uint32_t size = 0;
     btrfs_zstd_sequence_header_t sequence;
     btrfs_fse_table_t sequence_tables[3];
@@ -124,7 +124,7 @@ int main(void) {
     assert(compressed_file && raw_file);
     fseek(compressed_file, 0, SEEK_END); long compressed_length = ftell(compressed_file); rewind(compressed_file);
     fseek(raw_file, 0, SEEK_END); long raw_length = ftell(raw_file); rewind(raw_file);
-    assert(compressed_length > 0 && compressed_length < 65536 && raw_length == 4096);
+    assert(compressed_length > 0 && compressed_length < 200000 && raw_length == 300000);
     uint8_t *compressed_bytes = malloc((size_t)compressed_length);
     uint8_t *raw_bytes = malloc((size_t)raw_length);
     assert(compressed_bytes && raw_bytes);

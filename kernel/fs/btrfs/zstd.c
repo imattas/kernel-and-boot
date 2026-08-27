@@ -284,15 +284,19 @@ int btrfs_zstd_decode_sequence(const btrfs_fse_table_t *literal_table,
         !btrfs_fse_stream_peek(literal_table, *literal_state, &literal_code) ||
         !btrfs_fse_stream_peek(match_table, *match_state, &match_code) ||
         !btrfs_fse_stream_peek(offset_table, *offset_state, &offset_code) ||
-        literal_code >= 36U || match_code >= 53U || offset_code > 31U ||
-        !btrfs_fse_stream_read_bits(stream, offset_code, bit_offset, &offset_extra) ||
+        literal_code >= 36U || match_code >= 53U || offset_code > 31U) return 0;
+    if (!btrfs_fse_stream_read_bits(stream, offset_code, bit_offset, &offset_extra) ||
         !btrfs_fse_stream_read_bits(stream, match_bits[match_code], bit_offset, &match_extra) ||
-        !btrfs_fse_stream_read_bits(stream, literal_bits[literal_code], bit_offset, &literal_extra) ||
-        !btrfs_zstd_expand_sequence(literal_code, literal_extra, match_code, match_extra,
-                                     offset_code, offset_extra, sequence)) return 0;
+        !btrfs_fse_stream_read_bits(stream, literal_bits[literal_code], bit_offset, &literal_extra)) return 0;
+    if (!btrfs_zstd_expand_sequence(literal_code, literal_extra, match_code, match_extra,
+                                    offset_code, offset_extra, sequence)) {
+        return 0;
+    }
     if (!last && (!btrfs_fse_stream_update(literal_table, stream, literal_state, bit_offset) ||
                   !btrfs_fse_stream_update(match_table, stream, match_state, bit_offset) ||
-                  !btrfs_fse_stream_update(offset_table, stream, offset_state, bit_offset))) return 0;
+                  !btrfs_fse_stream_update(offset_table, stream, offset_state, bit_offset))) {
+        return 0;
+    }
     return 1;
 }
 
@@ -433,13 +437,19 @@ static int zstd_huffman_decode_streams(const uint8_t *source, uint32_t size,
 
 static int decode_compressed_literals(const uint8_t *input, uint32_t size,
                                       uint8_t *output, uint32_t capacity,
-                                      uint32_t *decoded_size, uint32_t *section_size) {
+                                      uint32_t *decoded_size, uint32_t *section_size,
+                                      const uint8_t *previous_weights,
+                                      uint32_t previous_count,
+                                      uint8_t *updated_weights,
+                                      uint32_t *updated_count) {
     uint32_t header, format, regenerated, header_size;
-    if (!input || size < 2 || !output || !decoded_size || !section_size) return 0;
+    if (!input || size < 2 || !output || !decoded_size || !section_size ||
+        !updated_weights || !updated_count) return 0;
+    *updated_count = 0;
     header = input[0];
-    if ((header & 3U) > 2U) return 0;
+    if ((header & 3U) > 3U) return 0;
     format = (header >> 2) & 3U;
-    if ((header & 3U) == 2U) {
+    if ((header & 3U) == 2U || (header & 3U) == 3U) {
         uint64_t packed = 0;
         uint32_t compressed, tree_header, count, tree_bytes, stream_size;
         uint8_t weights[256];
@@ -452,8 +462,15 @@ static int decode_compressed_literals(const uint8_t *input, uint32_t size,
         if (!regenerated || !compressed || regenerated > capacity ||
             compressed > size - header_size)
             return 0;
-        tree_header = input[header_size];
-        if (tree_header < 128U) {
+        if ((header & 3U) == 3U) {
+            if (!previous_weights || !previous_count || previous_count > 255U) return 0;
+            count = previous_count;
+            tree_bytes = 0;
+            for (uint32_t i = 0; i < count; ++i) weights[i] = previous_weights[i];
+        } else {
+            tree_header = input[header_size];
+        }
+        if ((header & 3U) == 2U && tree_header < 128U) {
             btrfs_fse_table_t table; uint32_t fse_header = 0, weight_count = 0;
             if (!tree_header || tree_header > compressed - 1U ||
                 !btrfs_fse_read_header(&table, input + header_size + 1U, tree_header, 7U, &fse_header) ||
@@ -462,7 +479,7 @@ static int decode_compressed_literals(const uint8_t *input, uint32_t size,
                                                tree_header - fse_header, weights, 256U,
                                                &weight_count) || !weight_count) return 0;
             count = weight_count; tree_bytes = tree_header;
-        } else {
+        } else if ((header & 3U) == 2U) {
             count = tree_header - 127U;
             tree_bytes = (count + 1U) / 2U;
             if (count >= 256U || tree_bytes > compressed - 1U) return 0;
@@ -470,14 +487,19 @@ static int decode_compressed_literals(const uint8_t *input, uint32_t size,
                 weights[i] = (uint8_t)(i & 1U ? input[header_size + 1U + i / 2U] & 0x0fU :
                                        input[header_size + 1U + i / 2U] >> 4);
         }
-        const uint8_t *stream = input + header_size + 1U + tree_bytes;
-        stream_size = compressed - 1U - tree_bytes;
+        const uint8_t *stream = input + header_size +
+                                 ((header & 3U) == 3U ? 0U : 1U) + tree_bytes;
+        stream_size = compressed - ((header & 3U) == 3U ? 0U : 1U) - tree_bytes;
             if (format == 0U) {
             if (!zstd_huffman_decode(stream, stream_size, weights, count,
                                      output, capacity, regenerated)) return 0;
         } else {
             if (!zstd_huffman_decode_streams(stream, stream_size, output, capacity,
                                              regenerated, 4U, weights, count)) return 0;
+        }
+        if ((header & 3U) == 2U) {
+            for (uint32_t i = 0; i < count; ++i) updated_weights[i] = weights[i];
+            *updated_count = count;
         }
         *decoded_size = regenerated; *section_size = header_size + compressed;
         return 1;
@@ -506,21 +528,39 @@ static int decode_compressed_literals(const uint8_t *input, uint32_t size,
 
 static int decode_compressed_block(const uint8_t *input, uint32_t size,
                                    uint8_t *output, uint32_t capacity,
-                                   uint32_t *decoded_size, uint32_t recent[3]) {
+                                   uint32_t initial_output_size, uint32_t *decoded_size,
+                                   uint32_t recent[3],
+                                   uint8_t previous_weights[256],
+                                   uint32_t *previous_count,
+                                   btrfs_fse_table_t previous_tables[3]) {
     uint32_t literals_size, literals_decoded, sequences;
     uint8_t *literals = 0;
+    uint8_t updated_weights[256];
+    uint32_t updated_count = 0;
     if (!input || !size || !output || !decoded_size ||
+        initial_output_size > capacity || !previous_count ||
+        !previous_tables ||
         !(literals = (uint8_t *)kmalloc(capacity)) ||
         !decode_compressed_literals(input, size, literals, capacity, &literals_decoded,
-                                    &literals_size)) return 0;
+                                    &literals_size, previous_weights, *previous_count,
+                                    updated_weights, &updated_count)) return 0;
     if (literals_size >= size) { kfree(literals); return 0; }
     sequences = input[literals_size];
     if (!sequences) {
         if (literals_size + 1U != size || literals_decoded > capacity) {
             kfree(literals); return 0;
         }
-        for (uint32_t i = 0; i < literals_decoded; ++i) output[i] = literals[i];
-        *decoded_size = literals_decoded; kfree(literals); return 1;
+        if (literals_decoded > capacity - initial_output_size) {
+            kfree(literals); return 0;
+        }
+        for (uint32_t i = 0; i < literals_decoded; ++i)
+            output[initial_output_size + i] = literals[i];
+        *decoded_size = literals_decoded;
+        if (updated_count) {
+            for (uint32_t i = 0; i < updated_count; ++i) previous_weights[i] = updated_weights[i];
+            *previous_count = updated_count;
+        }
+        kfree(literals); return 1;
     }
     btrfs_zstd_sequence_header_t header;
     btrfs_fse_table_t tables[3];
@@ -529,7 +569,7 @@ static int decode_compressed_block(const uint8_t *input, uint32_t size,
         kfree(literals); return 0;
     }
     if (!btrfs_zstd_prepare_sequence_tables(&input[literals_size], size - literals_size,
-                                            &header, 0, tables, &table_end) ||
+                                            &header, previous_tables, tables, &table_end) ||
         table_end > size - literals_size || table_end == size - literals_size) {
         kfree(literals); return 0;
     }
@@ -552,12 +592,17 @@ static int decode_compressed_block(const uint8_t *input, uint32_t size,
                                      count, decoded, count) || offset != 0) {
         kfree(decoded); kfree(literals); return 0;
     }
-    uint32_t output_size = 0;
+    uint32_t output_size = initial_output_size;
     if (!zstd_execute_sequences_with_offsets(output, capacity, &output_size, literals,
                                              literals_decoded, decoded, count, recent)) {
         kfree(decoded); kfree(literals); return 0;
     }
-    *decoded_size = output_size;
+    *decoded_size = output_size - initial_output_size;
+    if (updated_count) {
+        for (uint32_t i = 0; i < updated_count; ++i) previous_weights[i] = updated_weights[i];
+        *previous_count = updated_count;
+    }
+    for (uint32_t i = 0; i < 3U; ++i) previous_tables[i] = tables[i];
     kfree(decoded); kfree(literals); return 1;
 }
 
@@ -569,6 +614,9 @@ int btrfs_zstd_decompress(const uint8_t *input, uint32_t input_size,
     uint32_t header_size, dict_size;
     uint8_t single_segment, checksum;
     uint32_t recent[3] = {1, 4, 8};
+    uint8_t previous_weights[256];
+    uint32_t previous_count = 0;
+    btrfs_fse_table_t previous_tables[3] = {0};
     if (!input || !output || !output_size || input_size < 6 || !output_capacity ||
         le32(input) != 0xfd2fb528U) return 0;
     descriptor = input[4];
@@ -609,9 +657,10 @@ int btrfs_zstd_decompress(const uint8_t *input, uint32_t input_size,
             for (uint32_t i = 0; i < block_size; ++i) output[output_position + i] = input[position];
         } else if (block_type == 2U) {
             uint32_t decoded_block = 0;
-            if (!decode_compressed_block(&input[position], block_size, output + output_position,
-                                         output_capacity - output_position, &decoded_block,
-                                         recent)) return 0;
+            if (!decode_compressed_block(&input[position], block_size, output,
+                                         output_capacity, output_position, &decoded_block,
+                                         recent, previous_weights, &previous_count,
+                                         previous_tables)) return 0;
             block_size = decoded_block;
         }
         output_position += block_size;
@@ -623,7 +672,9 @@ int btrfs_zstd_decompress(const uint8_t *input, uint32_t input_size,
         if (le32(&input[position]) != zstd_xxhash32(output, output_position)) return 0;
         position += 4U;
     }
-    if (position != input_size || (content_size && content_size != output_position)) return 0;
+    if (position != input_size || (content_size && content_size != output_position)) {
+        return 0;
+    }
     *output_size = output_position;
     return 1;
 }

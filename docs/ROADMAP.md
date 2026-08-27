@@ -359,6 +359,11 @@ case. A generated FSE-weight literal vector now exercises the complete
 compressed-literal, sequence, match-history, and checksum path. Four-stream
 literal blocks and all compressed-literal size formats are now decoded with
 bounded jump-table and per-stream output validation.
+Treeless literals now reuse validated Huffman weights across compressed blocks;
+sequence FSE tables and repeat-offset history also persist across blocks, and
+cross-block matches are bounded against the cumulative frame output. The
+generated multi-block contract covers this path, including offset extra-bit
+widths beyond 16 bits.
 The bounded overlap-safe match-copy primitive is now
 implemented and contracted, including destination-underflow rejection.
 Zstandard sequence code expansion for literal lengths, match lengths, and

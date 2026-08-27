@@ -227,7 +227,7 @@ int btrfs_fse_stream_begin(const uint8_t *stream, uint32_t stream_size,
 
 int btrfs_fse_stream_read_bits(const uint8_t *stream, uint32_t bits,
                                int64_t *offset, uint32_t *value) {
-    if (!stream || !offset || !value || bits > 16U) return 0;
+    if (!stream || !offset || !value || bits > 32U) return 0;
     *value = stream_bits(stream, bits, offset);
     return 1;
 }

@@ -26,7 +26,8 @@ static uint8_t in8(uint16_t port) {
 }
 
 static uint8_t cmos_read(uint8_t index) {
-    out8(CMOS_INDEX, (uint8_t)(0x80U | index));
+    uint8_t nmi_state = in8(CMOS_INDEX) & 0x80U;
+    out8(CMOS_INDEX, (uint8_t)(nmi_state | index));
     return in8(CMOS_DATA);
 }
 
@@ -36,10 +37,17 @@ static uint8_t decode(uint8_t value, uint8_t status_b) {
 }
 
 static int valid(const rtc_datetime_t *value) {
+    static const uint8_t days[] = {31, 28, 31, 30, 31, 30,
+                                   31, 31, 30, 31, 30, 31};
+    uint8_t month_days;
     return value && value->year >= 1970 && value->year <= 9999 &&
            value->month >= 1 && value->month <= 12 && value->day >= 1 &&
-           value->day <= 31 && value->hour <= 23 && value->minute <= 59 &&
-           value->second <= 59;
+           value->hour <= 23 && value->minute <= 59 && value->second <= 59 &&
+           (month_days = days[value->month - 1] +
+                         (value->month == 2 &&
+                          (value->year % 4 == 0 &&
+                           (value->year % 100 != 0 || value->year % 400 == 0)))) &&
+           value->day <= month_days;
 }
 
 int rtc_read_datetime(rtc_datetime_t *datetime) {

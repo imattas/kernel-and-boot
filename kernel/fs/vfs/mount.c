@@ -107,8 +107,12 @@ static vfs_node_t *mounted_mountpoint(vfs_mount_table_t *table,
         if (table->mounts[i].active && table->mounts[i].root == node) {
             vfs_node_t *mountpoint = table->mounts[i].mountpoint;
             /* .. from a mounted root returns to the mountpoint's parent. */
+            uint64_t node_flags = spinlock_lock_irqsave(&mountpoint->lock);
             result = mountpoint->parent ? mountpoint->parent : mountpoint;
-            vfs_node_retain(result);
+            /* The child lock keeps the parent relationship from being
+               detached while the parent reference is acquired. */
+            __atomic_add_fetch(&result->references, 1, __ATOMIC_RELAXED);
+            spinlock_unlock_irqrestore(&mountpoint->lock, node_flags);
             break;
         }
     }

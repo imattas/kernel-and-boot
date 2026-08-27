@@ -879,6 +879,9 @@ VFS removal now unlocks both nodes when a non-child is supplied, with a boot
 regression probe covering that failure path before later traversal operations.
 VFS mount validation now rejects self-mounts and mounts whose root contains the
 mountpoint, preventing cyclic mounted-path traversal.
+Mounted `..` traversal now snapshots the mountpoint parent under the node lock
+and acquires its reference before releasing that lock, preventing a concurrent
+detach from producing a stale parent pointer.
 VFS child attach and removal now use a canonical node lock order, while child
 lookups rely on the parent structural lock, preventing parent/child lock
 inversion during concurrent tree mutation; lookup reference acquisition remains

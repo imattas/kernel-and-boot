@@ -341,6 +341,9 @@ PCI enumeration now enables memory/I/O space and bus mastering before BAR
 drivers probe, making DMA activation an explicit kernel-owned contract.
 The device model now rejects duplicate PCI bus/slot/function identities and
 duplicate driver names before binding.
+Device registration, driver registration, enumeration, and binding now use
+dedicated IRQ-safe synchronization, while probe callbacks do not hold the
+resource ownership lock.
 Device resource claim, release, and ownership queries now serialize through an
 IRQ-safe ownership lock, preventing concurrent driver probes from claiming the
 same BAR.

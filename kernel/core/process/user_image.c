@@ -54,6 +54,13 @@ static uint64_t page_down(uint64_t value) { return value & ~(PAGE_SIZE - 1); }
 static uint64_t page_up(uint64_t value) {
     return (value + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
 }
+static int valid_alignment(uint64_t alignment, uint64_t offset,
+                           uint64_t virtual_address) {
+    if (alignment <= 1) return 1;
+    return (alignment & (alignment - 1)) == 0 &&
+           (offset & (alignment - 1)) ==
+           (virtual_address & (alignment - 1));
+}
 
 static int loaded_page_index(const user_image_t *loaded, uint64_t virtual_page) {
     for (uint32_t index = 0; index < loaded->page_count; ++index)
@@ -98,6 +105,8 @@ int user_image_load(address_space_t *space, const void *image, uint64_t image_si
             program->virtual_address < USER_BASE ||
             program->virtual_address + program->memory_size < program->virtual_address ||
             program->virtual_address + program->memory_size >= (1ULL << 48) ||
+            !valid_alignment(program->alignment, program->offset,
+                             program->virtual_address) ||
             !range_inside(program->offset, program->file_size, image_size)) {
             release_pages(space, loaded);
             return 0;

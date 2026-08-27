@@ -232,14 +232,14 @@ static void build_user_image_probe(void) {
     probe32(&user_image_probe[64], 1); probe32(&user_image_probe[68], 5);
     probe64(&user_image_probe[72], 120); probe64(&user_image_probe[80], 0x8000001000ULL);
     probe64(&user_image_probe[88], 0x8000001000ULL); probe64(&user_image_probe[96], 8);
-    probe64(&user_image_probe[104], 4096); probe64(&user_image_probe[112], 4096);
+    probe64(&user_image_probe[104], 4096); probe64(&user_image_probe[112], 1);
     user_image_probe[120] = 0xb8; user_image_probe[121] = 0; user_image_probe[122] = 0;
     user_image_probe[123] = 0; user_image_probe[124] = 0; user_image_probe[125] = 0xcd;
     user_image_probe[126] = 0x80; user_image_probe[127] = 0xf4;
     probe32(&user_image_probe[176], 1); probe32(&user_image_probe[180], 4);
     probe64(&user_image_probe[184], 232); probe64(&user_image_probe[192], 0x8000001800ULL);
     probe64(&user_image_probe[200], 0x8000001800ULL); probe64(&user_image_probe[208], 4);
-    probe64(&user_image_probe[216], 16); probe64(&user_image_probe[224], 4096);
+    probe64(&user_image_probe[216], 16); probe64(&user_image_probe[224], 1);
     user_image_probe[232] = 0x90; user_image_probe[233] = 0x90;
     user_image_probe[234] = 0x90; user_image_probe[235] = 0x90;
 }
@@ -344,14 +344,20 @@ void kernel_main(void *boot_info) {
     user_image_t rejected_image;
     user_image_t loaded_image;
     uint8_t invalid_image[sizeof(user_image_probe)];
+    uint8_t invalid_alignment_image[sizeof(user_image_probe)];
     build_user_image_probe();
     for (uint32_t i = 0; i < sizeof(invalid_image); ++i)
         invalid_image[i] = user_image_probe[i];
     probe32(&invalid_image[68], 0x85);
+    for (uint32_t i = 0; i < sizeof(invalid_alignment_image); ++i)
+        invalid_alignment_image[i] = user_image_probe[i];
+    probe64(&invalid_alignment_image[112], 3);
     if (!address_space_create(&process_space) ||
         user_image_load(&process_space, 0, 0, &rejected_image) ||
         user_image_load(&process_space, invalid_image, sizeof(invalid_image),
                         &rejected_image) ||
+        user_image_load(&process_space, invalid_alignment_image,
+                        sizeof(invalid_alignment_image), &rejected_image) ||
         !user_image_load(&process_space, user_image_probe, sizeof(user_image_probe), &loaded_image) ||
         loaded_image.entry != 0x8000001000ULL || loaded_image.page_count != 1 ||
         address_space_user_range_valid(&process_space, 0x8000001000ULL, 1, 1) ||

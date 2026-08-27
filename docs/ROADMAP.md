@@ -259,6 +259,9 @@ backend dispatch, rejects duplicate device names, and has hosted contract-test
 build support without executing privileged interrupt-state instructions.
 The ATA PIO fallback now selects validated LBA48 task-file commands when the
 device advertises 48-bit addressing, while retaining the bounded LBA28 path.
+ATA PIO task-file access and shared IDENTIFY metadata are now serialized with
+an IRQ-safe driver lock, preventing concurrent SMP callers from interleaving
+register programming or observing partial geometry state.
 Driver enumeration and hardware
 coverage remain incomplete. The QEMU gate now supplies an emulated e1000 NIC
 so its controller path and bounded TX/RX descriptor operations can be exercised;

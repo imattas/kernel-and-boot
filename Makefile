@@ -432,7 +432,7 @@ $(KERNEL_STORAGE_OBJ): kernel/drivers/storage/storage.c kernel/drivers/storage/s
 	$(CC) -target x86_64-pc-none-elf -std=c11 -ffreestanding -fno-builtin -fno-stack-protector -fPIE -fno-plt \
 		-mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@
 
-$(KERNEL_ATA_OBJ): kernel/drivers/storage/ata.c kernel/drivers/storage/ata.h kernel/drivers/storage/storage.h kernel/device/device.h | $(BUILD_DIR)/kernel
+$(KERNEL_ATA_OBJ): kernel/drivers/storage/ata.c kernel/drivers/storage/ata.h kernel/drivers/storage/storage.h kernel/device/device.h kernel/core/sync/spinlock.h | $(BUILD_DIR)/kernel
 	$(CC) -target x86_64-pc-none-elf -std=c11 -ffreestanding -fno-builtin -fno-stack-protector -fPIE -fno-plt \
 		-mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@
 

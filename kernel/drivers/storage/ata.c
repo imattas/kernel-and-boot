@@ -1,12 +1,14 @@
 #include "storage.h"
 #include "../../device/device.h"
 #include "../../core/printk/serial.h"
+#include "../../core/sync/spinlock.h"
 
 static uint16_t io_base = 0x1f0;
 static uint16_t control_base = 0x3f6;
 static uint64_t sector_count;
 static int lba48_supported;
 static device_driver_t ata_driver;
+static spinlock_t ata_lock;
 
 static void out8(uint16_t port, uint8_t value) {
     __asm__ volatile ("outb %0, %1" :: "a"(value), "Nd"(port));
@@ -85,7 +87,7 @@ static void ata_issue(uint64_t lba, uint32_t count, uint8_t command) {
     out8(io_base + 7, command);
 }
 
-static int ata_read(uint64_t lba, uint32_t count, void *buffer) {
+static int ata_read_locked(uint64_t lba, uint32_t count, void *buffer) {
     if (!buffer || (!lba48_supported && lba > 0x0fffffffULL) || count == 0 || count > 256 ||
         lba >= sector_count || count > sector_count - lba) return 0;
     uint8_t *output = (uint8_t *)buffer;
@@ -102,7 +104,7 @@ static int ata_read(uint64_t lba, uint32_t count, void *buffer) {
     return 1;
 }
 
-static int ata_write(uint64_t lba, uint32_t count, const void *buffer) {
+static int ata_write_locked(uint64_t lba, uint32_t count, const void *buffer) {
     if ((!lba48_supported && lba > 0x0fffffffULL) || count == 0 || count > 256 ||
         lba >= sector_count || count > sector_count - lba || !buffer) return 0;
     const uint8_t *input = (const uint8_t *)buffer;
@@ -116,6 +118,20 @@ static int ata_write(uint64_t lba, uint32_t count, const void *buffer) {
         if (!wait_status(0x80, 0)) return 0;
     }
     return 1;
+}
+
+static int ata_read(uint64_t lba, uint32_t count, void *buffer) {
+    uint64_t flags = spinlock_lock_irqsave(&ata_lock);
+    int result = ata_read_locked(lba, count, buffer);
+    spinlock_unlock_irqrestore(&ata_lock, flags);
+    return result;
+}
+
+static int ata_write(uint64_t lba, uint32_t count, const void *buffer) {
+    uint64_t flags = spinlock_lock_irqsave(&ata_lock);
+    int result = ata_write_locked(lba, count, buffer);
+    spinlock_unlock_irqrestore(&ata_lock, flags);
+    return result;
 }
 
 static int ata_match(const device_t *device) {
@@ -139,7 +155,10 @@ static int ata_probe(device_t *device) {
     if ((device->resources[1].flags & 1u) != 0 &&
         device->resources[1].address != 0)
         control_base = (uint16_t)((device->resources[1].address + 2) & 0xfffcu);
-    if (!identify()) {
+    uint64_t flags = spinlock_lock_irqsave(&ata_lock);
+    int identified = identify();
+    spinlock_unlock_irqrestore(&ata_lock, flags);
+    if (!identified) {
         if (claimed_io) device_release_resource(device, 0, &ata_driver);
         if (claimed_control) device_release_resource(device, 1, &ata_driver);
         return 0;
@@ -160,6 +179,7 @@ static int ata_probe(device_t *device) {
 
 int ata_initialize(void) {
     lba48_supported = 0;
+    spinlock_init(&ata_lock);
     ata_driver.name = "ata-pio";
     ata_driver.bus = DEVICE_BUS_PCI;
     ata_driver.match = ata_match;

@@ -36,6 +36,14 @@
 
 extern void arch_pci_shared_irq_stub(void);
 
+static void uhci_dma_write_barrier(void) {
+    __asm__ volatile ("sfence" ::: "memory");
+}
+
+static void uhci_dma_read_barrier(void) {
+    __asm__ volatile ("lfence" ::: "memory");
+}
+
 static uint32_t controllers;
 static uint32_t root_ports;
 static uint16_t controller_base;
@@ -101,6 +109,7 @@ static uint32_t uhci_td_status(int interrupt_on_complete) {
 
 static int uhci_set_running(int running) {
     uint16_t command = running ? (UHCI_CMD_RUN | UHCI_CMD_CONFIGURE) : 0;
+    uhci_dma_write_barrier();
     __asm__ volatile ("outw %0, %1" :: "a"(command),
                       "Nd"((uint16_t)(controller_base + UHCI_USBCMD)));
     if (!running) {
@@ -273,6 +282,7 @@ static int uhci_control_transfer_locked(uint8_t address, uint8_t endpoint,
     }
     int complete = 0;
     for (uint32_t wait = 0; wait < 1000000; ++wait) {
+        uhci_dma_read_barrier();
         if ((status_td->status & UHCI_TD_ACTIVE) == 0) {
             complete = uhci_td_complete(&td[0]) && uhci_td_complete(status_td);
             for (uint32_t i = 0; complete && i < data_count; ++i)
@@ -368,6 +378,7 @@ static int uhci_data_transfer_locked(uint8_t address, uint8_t endpoint, void *da
     }
     int complete = 0;
     for (uint32_t wait = 0; wait < 1000000; ++wait) {
+        uhci_dma_read_barrier();
         if ((td[packet_count - 1U].status & UHCI_TD_ACTIVE) == 0) {
             complete = 1;
             for (uint32_t i = 0; i < packet_count; ++i)
@@ -485,6 +496,7 @@ fail:
 static int uhci_interrupt_poll_locked(void) {
     if (!uhci_async_pending) return 0;
     uhci_td_t *td = (uhci_td_t *)(uintptr_t)uhci_async_td_frame;
+    uhci_dma_read_barrier();
     uint32_t last_td_status = td[uhci_async_packet_count - 1U].status;
     __atomic_store_n(&uhci_last_td_status_value, last_td_status,
                      __ATOMIC_RELEASE);

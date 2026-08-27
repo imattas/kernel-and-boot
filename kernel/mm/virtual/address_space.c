@@ -2,7 +2,6 @@
 #include "address_space.h"
 #include "../physical/frame.h"
 #include "../../arch/x86_64/memory/paging.h"
-#include "../../arch/x86_64/memory/paging.c"
 
 #define PAGE_SIZE 0x1000ULL
 #define HUGE_PAGE_SIZE 0x200000ULL

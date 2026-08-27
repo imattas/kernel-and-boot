@@ -54,6 +54,7 @@ KERNEL_EXCEPTIONS_OBJ := $(BUILD_DIR)/kernel/exceptions.o
 KERNEL_PANIC_OBJ := $(BUILD_DIR)/kernel/panic.o
 KERNEL_PHYSICAL_OBJ := $(BUILD_DIR)/kernel/physical.o
 KERNEL_VIRTUAL_OBJ := $(BUILD_DIR)/kernel/virtual.o
+KERNEL_PAGING_OBJ := $(BUILD_DIR)/kernel/paging.o
 KERNEL_HEAP_OBJ := $(BUILD_DIR)/kernel/heap.o
 KERNEL_IRQ_OBJ := $(BUILD_DIR)/kernel/irq.o
 KERNEL_APIC_OBJ := $(BUILD_DIR)/kernel/apic.o
@@ -160,9 +161,17 @@ $(KERNEL_PHYSICAL_OBJ): kernel/mm/physical/frame.c kernel/mm/physical/frame.h bo
 	$(CC) -target x86_64-pc-none-elf -std=c11 -ffreestanding -fno-builtin -fno-stack-protector -fPIE -fno-plt \
 		-mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@
 
-$(KERNEL_VIRTUAL_OBJ): kernel/mm/virtual/address_space.c kernel/mm/virtual/address_space.h kernel/arch/x86_64/memory/paging.c kernel/arch/x86_64/memory/paging.h | $(BUILD_DIR)/kernel
+$(KERNEL_VIRTUAL_OBJ): kernel/mm/virtual/address_space.c kernel/mm/virtual/address_space.h kernel/arch/x86_64/memory/paging.h | $(BUILD_DIR)/kernel
 	$(CC) -target x86_64-pc-none-elf -std=c11 -ffreestanding -fno-builtin -fno-stack-protector -fPIE -fno-plt \
 		-mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@
+
+$(KERNEL_PAGING_OBJ): kernel/arch/x86_64/memory/paging.c kernel/arch/x86_64/memory/paging.h | $(BUILD_DIR)/kernel
+	$(CC) -target x86_64-pc-none-elf -std=c11 -ffreestanding -fno-builtin -fno-stack-protector -fPIE -fno-plt \
+		-mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@
+
+# Keep the source rule above tied to address_space.c while adding the
+# architecture paging object to the final kernel dependency/link expansion.
+KERNEL_VIRTUAL_OBJ := $(KERNEL_VIRTUAL_OBJ) $(KERNEL_PAGING_OBJ)
 
 $(KERNEL_HEAP_OBJ): kernel/mm/heap/heap.c kernel/mm/heap/heap.h kernel/mm/physical/frame.h kernel/mm/virtual/address_space.h | $(BUILD_DIR)/kernel
 	$(CC) -target x86_64-pc-none-elf -std=c11 -ffreestanding -fno-builtin -fno-stack-protector -fPIE -fno-plt \

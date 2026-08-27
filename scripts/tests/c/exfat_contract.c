@@ -49,6 +49,13 @@ int main(void) {
     assert(exfat_read_file(&fs, "HELLO.TXT", 0, output, 5));
     assert(memcmp(output, "hillo", 5) == 0);
     assert(exfat_write_file(&fs, "HELLO.TXT", 1, "e", 1));
+    uint8_t growth[600]; memset(growth, 'x', sizeof(growth));
+    assert(exfat_write_file(&fs, "HELLO.TXT", 5, growth, sizeof(growth)));
+    assert(exfat_lookup(&fs, "HELLO.TXT", &cluster, &size, &no_fat) &&
+           cluster == 3 && size == 605 && !no_fat);
+    uint8_t grown[600]; memset(grown, 0, sizeof(grown));
+    assert(exfat_read_file(&fs, "HELLO.TXT", 5, grown, sizeof(grown)) &&
+           memcmp(grown, growth, sizeof(growth)) == 0);
     assert(exfat_truncate_file_in_directory(&fs, fs.root_cluster,
                                             "HELLO.TXT", 3));
     assert(exfat_lookup(&fs, "HELLO.TXT", &cluster, &size, &no_fat) &&
@@ -56,6 +63,10 @@ int main(void) {
     memset(output, 0, sizeof(output));
     assert(exfat_read_file(&fs, "HELLO.TXT", 0, output, 3) &&
            memcmp(output, "hello", 3) == 0);
+    assert(exfat_truncate_file_in_directory(&fs, fs.root_cluster,
+                                            "HELLO.TXT", 0));
+    assert(exfat_lookup(&fs, "HELLO.TXT", &cluster, &size, &no_fat) &&
+           cluster == 0 && size == 0);
     root[96] = 0x85; root[97] = 2; root[128] = 0xc0; root[129] = 2; root[131] = 3; put32(&root[148], 4); put64(&root[152], 0);
     root[160] = 0xc1; put16(&root[162], 'D'); put16(&root[164], 'I'); put16(&root[166], 'R');
     uint8_t *subdir = &image[27 * 512]; subdir[0] = 0x85; subdir[1] = 2;

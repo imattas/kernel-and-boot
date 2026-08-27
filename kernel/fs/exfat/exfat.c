@@ -153,6 +153,76 @@ static uint16_t entry_set_checksum(const uint8_t *directory, uint32_t index,
     return (uint16_t)checksum;
 }
 
+static int exfat_write_fat(exfat_fs_t *fs, uint32_t cluster, uint32_t value) {
+    uint8_t sector[EXFAT_SECTOR_SIZE];
+    uint64_t offset = (uint64_t)cluster * 4U;
+    uint64_t lba = fs->fat_start + offset / EXFAT_SECTOR_SIZE;
+    uint32_t in_sector = (uint32_t)(offset % EXFAT_SECTOR_SIZE);
+    if (!fs || !cluster_valid(fs, cluster) || in_sector > 508U ||
+        lba >= (uint64_t)fs->fat_start + fs->fat_sectors ||
+        !read_sector(fs, lba, sector)) return 0;
+    store32(&sector[in_sector], value);
+    return storage_write(fs->device, lba, 1, sector);
+}
+
+static int exfat_find_free(exfat_fs_t *fs, uint32_t *cluster) {
+    uint32_t value;
+    if (!fs || !cluster) return 0;
+    for (uint32_t candidate = 2; candidate < fs->cluster_count + 2U; ++candidate)
+        if (fat_next(fs, candidate, &value) && value == 0) {
+            *cluster = candidate;
+            return 1;
+        }
+    return 0;
+}
+
+static int exfat_zero_cluster(exfat_fs_t *fs, uint32_t cluster) {
+    uint8_t zero[EXFAT_MAX_CLUSTER_BYTES] = {0};
+    uint64_t lba;
+    if (!fs || !cluster_valid(fs, cluster)) return 0;
+    lba = fs->heap_start + (uint64_t)(cluster - 2U) * fs->sectors_per_cluster;
+    return storage_write(fs->device, lba, fs->sectors_per_cluster, zero);
+}
+
+static int exfat_locate_entry(exfat_fs_t *fs, uint32_t directory_cluster,
+                              const char *name, uint8_t *directory,
+                              uint32_t *index, uint32_t *secondary_count,
+                              uint32_t *entry_cluster) {
+    uint32_t cluster = directory_cluster;
+    if (!fs || !directory || !index || !secondary_count || !entry_cluster ||
+        !name || !name[0]) return 0;
+    for (uint32_t visited = 0; visited < fs->cluster_count; ++visited) {
+        if (!exfat_read_cluster(fs, cluster, directory)) return 0;
+        uint32_t entries = fs->sectors_per_cluster * EXFAT_SECTOR_SIZE / 32U;
+        for (uint32_t i = 0; i < entries; ++i) {
+            uint8_t *entry = &directory[i * 32U];
+            if (entry[0] == 0) return 0;
+            if (entry[0] != 0x85) continue;
+            uint32_t count = entry[1], length = 0, written = 0;
+            if (count < 2 || i + count >= entries ||
+                load16(&entry[2]) != entry_set_checksum(directory, i, count)) continue;
+            uint8_t *stream = &directory[(i + 1U) * 32U];
+            if (stream[0] != 0xc0 || (length = stream[3]) == 0 || length >= 256U) continue;
+            uint16_t units[256] = {0};
+            for (uint32_t s = 2; s <= count && written < length; ++s) {
+                uint8_t *name_entry = &directory[(i + s) * 32U];
+                if (name_entry[0] != 0xc1) { written = 0; break; }
+                for (uint32_t c = 0; c < 15 && written < length; ++c)
+                    units[written++] = load16(&name_entry[2 + c * 2U]);
+            }
+            if (written == length && utf16_name_equal(units, written, name)) {
+                *index = i; *secondary_count = count; *entry_cluster = cluster;
+                return 1;
+            }
+        }
+        uint32_t next = 0;
+        if (!fat_next(fs, cluster, &next) || next >= EXFAT_END ||
+            next == EXFAT_BAD || !cluster_valid(fs, next)) return 0;
+        cluster = next;
+    }
+    return 0;
+}
+
 int exfat_lookup_in_directory(exfat_fs_t *fs, uint32_t directory_cluster,
                               const char *name, uint32_t *first_cluster,
                               uint64_t *size, uint8_t *no_fat_chain) {
@@ -245,6 +315,84 @@ int exfat_read_file(exfat_fs_t *fs, const char *name, uint64_t offset,
                                    offset, buffer, size);
 }
 
+static int exfat_resize_file(exfat_fs_t *fs, uint32_t directory_cluster,
+                             const char *name, uint64_t new_size) {
+    uint8_t directory[EXFAT_MAX_CLUSTER_BYTES];
+    uint32_t index, secondary_count, entry_cluster;
+    if (!fs || !fs->mounted || !exfat_locate_entry(fs, directory_cluster, name,
+                                                   directory, &index,
+                                                   &secondary_count,
+                                                   &entry_cluster)) return 0;
+    uint8_t *stream = &directory[(index + 1U) * 32U];
+    uint64_t old_size = load64(&stream[24]);
+    uint32_t cluster_bytes = fs->sectors_per_cluster * EXFAT_SECTOR_SIZE;
+    uint64_t old_count = (old_size + cluster_bytes - 1U) / cluster_bytes;
+    uint64_t new_count = (new_size + cluster_bytes - 1U) / cluster_bytes;
+    if (new_count > fs->cluster_count || new_size > UINT64_MAX - cluster_bytes)
+        return 0;
+    uint32_t first = load32(&stream[20]), tail = 0, next = 0;
+    if (old_count != 0 && !cluster_valid(fs, first)) return 0;
+    if (old_count != 0) {
+        tail = first;
+        for (uint64_t n = 1; n < old_count; ++n) {
+            if ((stream[1] & 2U) != 0) next = tail + 1U;
+            else if (!fat_next(fs, tail, &next)) return 0;
+            if (!cluster_valid(fs, next)) return 0;
+            tail = next;
+        }
+    }
+    if (new_count > old_count) {
+        uint32_t previous = tail;
+        for (uint64_t n = old_count; n < new_count; ++n) {
+            uint32_t allocated;
+            if (!exfat_find_free(fs, &allocated) || !exfat_zero_cluster(fs, allocated)) return 0;
+            if (previous != 0 && !exfat_write_fat(fs, previous, allocated)) return 0;
+            if (!exfat_write_fat(fs, allocated, EXFAT_END)) return 0;
+            if (first == 0) first = allocated;
+            previous = allocated;
+        }
+        stream[1] &= (uint8_t)~2U;
+    } else if (new_count < old_count) {
+        if (new_count == 0) {
+            uint32_t current = first;
+            for (uint64_t n = 0; n < old_count; ++n) {
+                if (stream[1] & 2U) next = current + 1U;
+                else if (!fat_next(fs, current, &next)) return 0;
+                if (!exfat_write_fat(fs, current, 0)) return 0;
+                if (!cluster_valid(fs, next)) break;
+                current = next;
+            }
+            first = 0;
+        } else {
+            uint32_t retained = first;
+            for (uint64_t n = 1; n < new_count; ++n) {
+                if (stream[1] & 2U) next = retained + 1U;
+                else if (!fat_next(fs, retained, &next)) return 0;
+                retained = next;
+            }
+            if (stream[1] & 2U) next = retained + 1U;
+            else if (!fat_next(fs, retained, &next)) return 0;
+            if (!exfat_write_fat(fs, retained, EXFAT_END)) return 0;
+            for (uint64_t n = new_count; n < old_count; ++n) {
+                uint32_t current = next;
+                if (!exfat_write_fat(fs, current, 0)) return 0;
+                if (stream[1] & 2U) next = current + 1U;
+                else if (!fat_next(fs, current, &next)) break;
+                if (!cluster_valid(fs, next)) break;
+            }
+            stream[1] &= (uint8_t)~2U;
+        }
+    }
+    store32(&stream[20], first);
+    store64(&stream[8], new_size);
+    store64(&stream[24], new_size);
+    uint16_t checksum = entry_set_checksum(directory, index, secondary_count);
+    directory[index * 32U + 2] = (uint8_t)checksum;
+    directory[index * 32U + 3] = (uint8_t)(checksum >> 8);
+    uint64_t lba = fs->heap_start + (uint64_t)(entry_cluster - 2U) * fs->sectors_per_cluster;
+    return storage_write(fs->device, lba, fs->sectors_per_cluster, directory);
+}
+
 int exfat_read_file_in_directory(exfat_fs_t *fs, uint32_t directory_cluster,
                                  const char *name, uint64_t offset,
                                  void *buffer, uint32_t size) {
@@ -269,8 +417,13 @@ int exfat_write_file_in_directory(exfat_fs_t *fs, uint32_t directory_cluster,
     uint8_t no_fat_chain = 0;
     if (!exfat_lookup_in_directory(fs, directory_cluster, name, &cluster,
                                    &file_size, &no_fat_chain) ||
-        !buffer || size == 0 || offset > file_size ||
-        (uint64_t)size > file_size - offset || !cluster_valid(fs, cluster))
+        !buffer || size == 0 || offset > UINT64_MAX - size ||
+        !exfat_resize_file(fs, directory_cluster, name,
+                           file_size > offset + size ? file_size : offset + size) ||
+        !exfat_lookup_in_directory(fs, directory_cluster, name, &cluster,
+                                   &file_size, &no_fat_chain) ||
+        offset > file_size || (uint64_t)size > file_size - offset ||
+        !cluster_valid(fs, cluster))
         return 0;
     uint32_t cluster_bytes = fs->sectors_per_cluster * EXFAT_SECTOR_SIZE;
     uint64_t cluster_index = offset / cluster_bytes;
@@ -317,54 +470,5 @@ int exfat_write_file_in_directory(exfat_fs_t *fs, uint32_t directory_cluster,
 
 int exfat_truncate_file_in_directory(exfat_fs_t *fs, uint32_t directory_cluster,
                                      const char *name, uint64_t size) {
-    if (!fs || !fs->mounted || !cluster_valid(fs, directory_cluster) ||
-        !name || !name[0] || size == 0) return 0;
-    uint8_t directory[EXFAT_MAX_CLUSTER_BYTES];
-    uint32_t cluster = directory_cluster;
-    for (uint32_t visited = 0; visited < fs->cluster_count; ++visited) {
-        if (!exfat_read_cluster(fs, cluster, directory)) return 0;
-        uint32_t entries = fs->sectors_per_cluster * EXFAT_SECTOR_SIZE / 32U;
-        for (uint32_t index = 0; index < entries; ++index) {
-            uint8_t *entry = &directory[index * 32U];
-            if (entry[0] == 0x00) return 0;
-            if (entry[0] != 0x85) continue;
-            uint32_t secondary_count = entry[1];
-            if (secondary_count < 2 || index + secondary_count >= entries ||
-                load16(&entry[2]) != entry_set_checksum(directory, index,
-                                                         secondary_count)) continue;
-            uint8_t *stream = &directory[(index + 1U) * 32U];
-            if (stream[0] != 0xc0) continue;
-            uint16_t candidate[256] = {0};
-            uint32_t name_length = stream[3], written = 0;
-            if (name_length == 0 || name_length >= sizeof(candidate)) continue;
-            for (uint32_t secondary = 2;
-                 secondary <= secondary_count && written < name_length;
-                 ++secondary) {
-                uint8_t *name_entry = &directory[(index + secondary) * 32U];
-                if (name_entry[0] != 0xc1) { written = 0; break; }
-                for (uint32_t character = 0; character < 15 &&
-                     written < name_length; ++character)
-                    candidate[written++] = load16(&name_entry[2 + character * 2U]);
-            }
-            if (written != name_length || !utf16_name_equal(candidate, written, name))
-                continue;
-            uint64_t old_size = load64(&stream[24]);
-            if (size >= old_size || !cluster_valid(fs, load32(&stream[20]))) return 0;
-            store64(&stream[8], size);
-            store64(&stream[24], size);
-            uint16_t checksum = entry_set_checksum(directory, index,
-                                                   secondary_count);
-            entry[2] = (uint8_t)checksum;
-            entry[3] = (uint8_t)(checksum >> 8);
-            uint64_t sector = fs->heap_start +
-                (uint64_t)(cluster - 2U) * fs->sectors_per_cluster;
-            return storage_write(fs->device, sector, fs->sectors_per_cluster,
-                                 directory);
-        }
-        uint32_t next = 0;
-        if (!fat_next(fs, cluster, &next) || next >= EXFAT_END ||
-            next == EXFAT_BAD || !cluster_valid(fs, next)) return 0;
-        cluster = next;
-    }
-    return 0;
+    return exfat_resize_file(fs, directory_cluster, name, size);
 }

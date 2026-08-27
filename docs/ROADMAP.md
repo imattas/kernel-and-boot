@@ -959,8 +959,10 @@ evidence, but individual milestone evidence does not by itself pass this gate.
 
 ## Filesystem milestone before drivers
 
-FAT32 and exFAT have filesystem parsers and VFS file adapters. ExFAT remains
-bounded-write capable for existing file extents, while FAT32 supports bounded in-place writes to existing file
+FAT32 and exFAT have filesystem parsers and VFS file adapters. ExFAT now
+supports bounded allocation growth, conversion of contiguous files to FAT-linked
+chains, zero-fill of new clusters, and release of detached clusters on shrink,
+while FAT32 supports bounded in-place writes to existing file
 extents, including sector and cluster crossings, through its VFS adapter;
 FAT32 append growth now allocates free clusters, mirrors FAT updates, updates
 the directory size/first-cluster fields, and rolls back new chain state when
@@ -985,12 +987,10 @@ lock, preventing concurrent readers from mixing cached FAT sectors.
 ExFAT mount validation now rejects invalid shift fields before evaluation and
 requires the FAT region to contain entries for every declared cluster.
 ExFAT VFS regular files now support bounded sector read-modify-write updates
-within existing contiguous or FAT-linked extents; allocation, append, and
-truncate remain separate metadata operations.
-ExFAT now supports bounded nonzero shrink/truncation for existing allocated
-files, updating valid/data lengths and the directory-entry checksum atomically
-at the directory-cluster write boundary; allocation and zero-length shrink
-remain separate metadata work.
+within existing contiguous or FAT-linked extents, append growth, and truncation
+through the same directory metadata/checksum boundary.
+ExFAT growth now allocates and zeroes new clusters, converts no-FAT-chain files
+to explicit FAT chains, and zero-length truncation releases the complete chain.
 The exFAT contract now exercises an actual write followed by a readback on the
 synthetic filesystem image.
 FAT32, exFAT, ext4, XFS, and Btrfs VFS file adapters now serialize direct node

@@ -144,7 +144,7 @@ deliberately excluded from this phase.
 Process destruction now owns teardown of all non-running process threads,
 including removal of scheduler-queued tasks, and is covered by the QEMU
 lifecycle probe.
-The kernel now maintains a bounded process registry with duplicate-ID
+The kernel now maintains atomic pending/blocked signal transitions and a bounded process registry with duplicate-ID
 rejection, lookup, removal on reap, and a targeted signal-send syscall ABI.
 The QEMU syscall probe exercises the target lookup and signal delivery path.
 Process termination now reclaims all non-running owned threads while refusing

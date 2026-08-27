@@ -129,25 +129,32 @@ process_t *process_current(void) {
 int process_send_signal(process_t *process, uint32_t signal) {
     if (!process || process->state == PROCESS_EXITED || signal == 0 ||
         signal > PROCESS_SIGNAL_MAX) return 0;
-    process->pending_signals |= 1U << (signal - 1U);
+    __atomic_fetch_or(&process->pending_signals, 1U << (signal - 1U), __ATOMIC_RELEASE);
     return 1;
 }
 
 int process_set_signal_mask(process_t *process, uint32_t mask) {
     if (!process || process->state == PROCESS_EXITED) return 0;
-    process->blocked_signals = mask;
+    __atomic_store_n(&process->blocked_signals, mask, __ATOMIC_RELEASE);
     return 1;
 }
 
 int process_take_signal(process_t *process, uint32_t *signal) {
     if (!process || !signal) return 0;
-    uint32_t available = process->pending_signals & ~process->blocked_signals;
-    if (!available) return 0;
-    uint32_t bit = 0;
-    while ((available & (1U << bit)) == 0) ++bit;
-    process->pending_signals &= ~(1U << bit);
-    *signal = bit + 1U;
-    return 1;
+    for (;;) {
+        uint32_t pending = __atomic_load_n(&process->pending_signals, __ATOMIC_ACQUIRE);
+        uint32_t blocked = __atomic_load_n(&process->blocked_signals, __ATOMIC_ACQUIRE);
+        uint32_t available = pending & ~blocked;
+        if (!available) return 0;
+        uint32_t bit = 0;
+        while ((available & (1U << bit)) == 0) ++bit;
+        uint32_t updated = pending & ~(1U << bit);
+        if (__atomic_compare_exchange_n(&process->pending_signals, &pending, updated,
+                                        0, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE)) {
+            *signal = bit + 1U;
+            return 1;
+        }
+    }
 }
 
 int process_terminate(process_t *process, int32_t status) {

@@ -457,6 +457,9 @@ only when a valid acknowledgement reaches the stored sequence end.
 The persistent network service now polls those records, resolves the peer
 hardware address from the ARP cache, rebuilds the IPv4/Ethernet envelope, and
 transmits due retries through e1000.
+TCP orderly shutdown now validates peer FINs, acknowledges them through
+CLOSE-WAIT, emits the local FIN through LAST-ACK, and reaches CLOSED only after
+the final acknowledgement.
 The network service loop now forwards validated UDP frames from the hardware
 packet queue into bound endpoint tables, and the QEMU boot probe exercises that
 end-to-end queue-to-endpoint delivery path.

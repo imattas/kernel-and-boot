@@ -981,6 +981,63 @@ void kernel_main(void *boot_info) {
         serial_write("TCP retransmission ACK failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
+    tcp_connection_t tcp_close_probe;
+    tcp_connection_result_t tcp_close_result;
+    tcp_segment_view_t tcp_close_view;
+    tcp_connection_initialize(&tcp_close_probe, 6001, 4096);
+    if (!tcp_connection_listen(&tcp_close_probe) ||
+        !tcp_segment_build(tcp_probe_packet, sizeof(tcp_probe_packet),
+                           ipv4_probe_source, ipv4_probe_destination, 6000,
+                           6001, 100, 0, TCP_FLAG_SYN, 4096, 0, 0,
+                           &tcp_probe_length) ||
+        !tcp_segment_parse(tcp_probe_packet, tcp_probe_length,
+                           ipv4_probe_source, ipv4_probe_destination,
+                           &tcp_close_view) ||
+        !tcp_connection_receive(&tcp_close_probe, &tcp_close_view,
+                                &tcp_close_result) ||
+        !tcp_segment_build(tcp_probe_packet, sizeof(tcp_probe_packet),
+                           ipv4_probe_source, ipv4_probe_destination, 6000,
+                           6001, 101, 1, TCP_FLAG_ACK, 4096, 0, 0,
+                           &tcp_probe_length) ||
+        !tcp_segment_parse(tcp_probe_packet, tcp_probe_length,
+                           ipv4_probe_source, ipv4_probe_destination,
+                           &tcp_close_view) ||
+        !tcp_connection_receive(&tcp_close_probe, &tcp_close_view,
+                                &tcp_close_result) ||
+        !tcp_segment_build(tcp_probe_packet, sizeof(tcp_probe_packet),
+                           ipv4_probe_source, ipv4_probe_destination, 6000,
+                           6001, 101, 1, TCP_FLAG_FIN | TCP_FLAG_ACK, 4096,
+                           0, 0, &tcp_probe_length) ||
+        !tcp_segment_parse(tcp_probe_packet, tcp_probe_length,
+                           ipv4_probe_source, ipv4_probe_destination,
+                           &tcp_close_view) ||
+        !tcp_connection_receive(&tcp_close_probe, &tcp_close_view,
+                                &tcp_close_result) ||
+        tcp_close_probe.state != TCP_CONNECTION_CLOSE_WAIT ||
+        !tcp_connection_close(&tcp_close_probe) ||
+        !tcp_connection_build(&tcp_close_probe, ipv4_probe_destination,
+                              ipv4_probe_source, TCP_FLAG_FIN, 0, 0,
+                              tcp_probe_packet, sizeof(tcp_probe_packet),
+                              &tcp_probe_length) ||
+        tcp_close_probe.state != TCP_CONNECTION_LAST_ACK ||
+        !tcp_segment_parse(tcp_probe_packet, tcp_probe_length,
+                           ipv4_probe_destination, ipv4_probe_source,
+                           &tcp_close_view) ||
+        (tcp_close_view.flags & (TCP_FLAG_FIN | TCP_FLAG_ACK)) !=
+            (TCP_FLAG_FIN | TCP_FLAG_ACK) ||
+        !tcp_segment_build(tcp_probe_packet, sizeof(tcp_probe_packet),
+                           ipv4_probe_source, ipv4_probe_destination, 6000,
+                           6001, 102, 2, TCP_FLAG_ACK, 4096, 0, 0,
+                           &tcp_probe_length) ||
+        !tcp_segment_parse(tcp_probe_packet, tcp_probe_length,
+                           ipv4_probe_source, ipv4_probe_destination,
+                           &tcp_close_view) ||
+        !tcp_connection_receive(&tcp_close_probe, &tcp_close_view,
+                                &tcp_close_result) ||
+        tcp_close_probe.state != TCP_CONNECTION_CLOSED) {
+        serial_write("TCP close lifecycle failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
     serial_write("TCP transport ready\r\n");
     static tcp_endpoint_table_t tcp_endpoint_probe_table;
     static uint8_t tcp_endpoint_probe_ip[ETHERNET_MAX_PAYLOAD_SIZE];

@@ -781,6 +781,8 @@ replacement-map publication to the allocated buffer.
 The UEFI loader now retries the final `ExitBootServices` handoff across a
 bounded series of freshly captured memory-map keys, covering transient map-key
 invalidation without looping indefinitely.
+Timer waits now clamp intervals to the signed wrap-safe range, preventing an
+overflowed deadline from being interpreted as an already-completed wait.
 
 ## Phase 10 — Userland begins after the kernel gate
 

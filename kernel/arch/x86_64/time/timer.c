@@ -24,9 +24,9 @@ uint64_t timer_now_ns(void) {
     return count * TIMER_NS_PER_TICK;
 }
 void timer_wait(uint64_t target) {
+    if (target > (uint64_t)INT64_MAX) target = (uint64_t)INT64_MAX;
     uint64_t start = timer_ticks();
     uint64_t deadline = start + target;
-    if (deadline < start) deadline = UINT64_MAX;
     while ((int64_t)(timer_ticks() - deadline) < 0) {
         __asm__ volatile ("hlt" ::: "memory");
     }

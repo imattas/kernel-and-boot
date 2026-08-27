@@ -609,6 +609,8 @@ interleaving controller state transitions.
 UHCI probing now requires a complete 0x20-byte I/O BAR within the 16-bit x86
 I/O-port range, preventing BAR-address truncation from redirecting MMIO-style
 accesses to unrelated ports.
+UHCI controller start now polls for HALTED to clear and rejects controller,
+host-system, or process errors instead of reporting a start success blindly.
 The boot path now attempts a HID interrupt poll, tolerates an idle keyboard’s
 valid no-report response, and feeds any completed decoded report into the
 shared input event queue.

@@ -69,6 +69,8 @@ static uint8_t uhci_async_input;
 static uint8_t uhci_async_pending;
 static int uhci_async_completion;
 
+static void uhci_acknowledge_status(uint16_t status);
+
 typedef struct {
     uint32_t link;
     uint32_t status;
@@ -122,7 +124,20 @@ static int uhci_set_running(int running) {
         }
         return 0;
     }
-    return 1;
+    for (uint32_t wait = 0; wait < 100000; ++wait) {
+        uint16_t status;
+        __asm__ volatile ("inw %1, %0" : "=a"(status)
+                          : "Nd"((uint16_t)(controller_base + UHCI_USBSTS)));
+        if ((status & (UHCI_STATUS_ERROR | UHCI_STATUS_HOST_SYSTEM_ERROR |
+                       UHCI_STATUS_PROCESS_ERROR)) != 0) {
+            uhci_acknowledge_status(status & (UHCI_STATUS_ERROR |
+                                              UHCI_STATUS_HOST_SYSTEM_ERROR |
+                                              UHCI_STATUS_PROCESS_ERROR));
+            return 0;
+        }
+        if ((status & UHCI_STATUS_HALTED) == 0) return 1;
+    }
+    return 0;
 }
 
 static uint16_t uhci_status(void) {

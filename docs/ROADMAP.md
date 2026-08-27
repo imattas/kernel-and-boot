@@ -259,8 +259,9 @@ backend dispatch, rejects duplicate device names, and has hosted contract-test
 build support without executing privileged interrupt-state instructions.
 The PS/2 keyboard backend now consumes Set-1 extended prefixes and emits
 distinct extended key codes while retaining make/break values.
-The PS/2 IRQ stub now sends a local-APIC EOI for the IOAPIC-routed keyboard
-interrupt, preventing the in-service bit from blocking subsequent key events.
+The PS/2 IRQ stub now sends a local-APIC EOI for IOAPIC delivery and retains a
+PIC EOI for the legacy fallback, preventing either route from blocking later
+keyboard events.
 The ATA PIO fallback now selects validated LBA48 task-file commands when the
 device advertises 48-bit addressing, while retaining the bounded LBA28 path.
 ATA PIO task-file access and shared IDENTIFY metadata are now serialized with

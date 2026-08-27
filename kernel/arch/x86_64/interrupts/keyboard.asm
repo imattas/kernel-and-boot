@@ -17,6 +17,8 @@ arch_keyboard_irq_stub:
     push r11
     call ps2_keyboard_irq
     call arch_apic_eoi
+    mov al, 0x20
+    out 0x20, al
     pop r11
     pop r10
     pop r9

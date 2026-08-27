@@ -600,6 +600,7 @@ test: all image
 	$(MAKE) exfat-test
 	$(MAKE) ext4-test
 	$(MAKE) xfs-test
+	$(MAKE) xfs-alloc-test
 	$(MAKE) xfs-unwritten-test
 	$(MAKE) btrfs-test
 	$(MAKE) deflate-test

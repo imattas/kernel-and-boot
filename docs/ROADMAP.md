@@ -281,6 +281,8 @@ endpoint toggles; the boot path discovers an interrupt-IN endpoint from the
 configuration descriptors and exercises the USB HID polling path.
 PCI now assigns bounded low-MMIO addresses to unmapped or above-4-GiB memory
 BARs, allowing the NVMe admin path to operate under the current identity map.
+PCI enumeration now enables memory/I/O space and bus mastering before BAR
+drivers probe, making DMA activation an explicit kernel-owned contract.
 NVMe namespace I/O now supports bounded multi-sector transfers within one DMA
 page and is covered by a real two-sector write/read-back QEMU check. Admin and
 namespace queue state is serialized with an interrupt-safe lock; timed-out

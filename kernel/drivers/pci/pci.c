@@ -64,6 +64,14 @@ static uint8_t config_read8(uint8_t bus, uint8_t slot, uint8_t function,
 
 static void scan_bus(uint8_t bus);
 
+static void enable_device(uint8_t bus, uint8_t slot, uint8_t function) {
+    uint32_t command_status = config_read(bus, slot, function, 0x04);
+    uint16_t command = (uint16_t)command_status;
+    command = (uint16_t)(command | 0x0007U);
+    config_write(bus, slot, function, 0x04,
+                 (command_status & 0xffff0000U) | command);
+}
+
 static uint64_t bar_size(uint32_t mask, uint64_t high_mask, int wide) {
     uint64_t combined = (uint64_t)(mask & ~0xfu) |
                         (wide ? (uint64_t)high_mask << 32 : 0);
@@ -132,6 +140,7 @@ static void read_resources(device_t *device, uint8_t header_type) {
 static void scan_function(uint8_t bus, uint8_t slot, uint8_t function) {
     uint16_t vendor = config_read16(bus, slot, function, 0x00);
     if (vendor == 0xffffu) return;
+    enable_device(bus, slot, function);
 
     device_t device = {
         .bus = DEVICE_BUS_PCI,

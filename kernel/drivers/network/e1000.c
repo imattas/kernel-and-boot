@@ -229,6 +229,10 @@ int e1000_transmit(const void *data, uint16_t length) {
     if (!e1000_regs || !e1000_tx_ring || !data || length == 0 || length > 2048)
         return 0;
     uint64_t flags = spinlock_lock_irqsave(&e1000_lock);
+    if ((e1000_regs[E1000_STATUS / 4] & E1000_STATUS_LINK_UP) == 0) {
+        spinlock_unlock_irqrestore(&e1000_lock, flags);
+        return 0;
+    }
     e1000_tx_desc_t *descriptor = &e1000_tx_ring[e1000_tx_index];
     if (e1000_tx_pending == E1000_RING_COUNT ||
         (descriptor->status & E1000_DESC_DONE) == 0) {

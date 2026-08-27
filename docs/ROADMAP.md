@@ -517,6 +517,9 @@ reachable on real hardware rather than only represented in software.
 e1000 descriptor publication now uses explicit x86 DMA write/read barriers
 around TX doorbells and RX ownership inspection, preventing compiler or CPU
 reordering across hardware descriptor transitions.
+e1000 TX submission now rechecks the live link state while holding the driver
+lock and rejects frames during link-down intervals instead of queueing work
+that the controller cannot transmit.
 RTC CMOS transactions now serialize the index/data port pair with an
 IRQ-safe lock, reject malformed BCD digits, and require two matching stable
 samples so SMP callers cannot observe a torn calendar value across rollover.

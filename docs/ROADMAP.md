@@ -355,6 +355,9 @@ complete payload from its SMP-safe four-slot table.
 The bounded UDP endpoint table now provides locked bind/unbind, exact-address
 and wildcard delivery, FIFO datagram queues, and explicit overflow accounting
 for the future kernel socket boundary.
+The network decoder now delivers validated nested UDP frames into bound kernel
+endpoints, completing the first hardware-independent receive path above the
+e1000 adapter boundary.
 The e1000 ISR now records delivery, and the post-interrupt-enable QEMU probe
 transmits a frame and requires an observed interrupt before continuing.
 The e1000 ISR now preserves cleared interrupt causes for the polling/service

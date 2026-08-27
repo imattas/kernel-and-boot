@@ -31,6 +31,18 @@ int network_decode_frame(const void *frame, uint16_t length,
     return 1;
 }
 
+int network_deliver_frame(const void *frame, uint16_t length,
+                          udp_endpoint_table_t *udp_table) {
+    if (!udp_table) return 0;
+    network_frame_view_t view;
+    if (!network_decode_frame(frame, length, &view) ||
+        view.kind != NETWORK_FRAME_UDP) return 0;
+    return udp_endpoint_deliver(udp_table, view.ipv4.destination,
+                                view.udp.destination_port,
+                                view.ipv4.source, view.udp.source_port,
+                                view.udp.payload, view.udp.payload_length);
+}
+
 int network_e1000_transmit(const void *frame, uint16_t length) {
     ethernet_frame_view_t view;
     if (!frame || !ethernet_frame_parse(frame, length, &view)) return 0;

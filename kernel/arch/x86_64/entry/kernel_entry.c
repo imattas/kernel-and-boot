@@ -819,6 +819,23 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("UDP endpoint ready\r\n");
+    udp_endpoint_table_initialize(&udp_endpoint_probe_table);
+    if (!udp_endpoint_bind(&udp_endpoint_probe_table, ipv4_probe_destination,
+                           6001, &udp_endpoint_any) ||
+        !network_deliver_frame(network_dispatch_frame,
+                                network_dispatch_frame_length,
+                                &udp_endpoint_probe_table) ||
+        !udp_endpoint_receive(&udp_endpoint_probe_table, udp_endpoint_any,
+                              udp_endpoint_source, &udp_endpoint_source_port,
+                              udp_endpoint_output,
+                              sizeof(udp_endpoint_output),
+                              &udp_endpoint_output_length) ||
+        udp_endpoint_source_port != 6000 || udp_endpoint_output_length != 3 ||
+        udp_endpoint_output[0] != 0xa1) {
+        serial_write("network UDP delivery failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("network UDP delivery ready\r\n");
     if (e1000_controller_count() != 0)
         serial_write(e1000_link_up() ? "e1000 link ready\r\n" :
                      "e1000 link down\r\n");

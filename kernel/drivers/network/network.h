@@ -7,6 +7,7 @@
 #include "ipv4.h"
 #include "udp.h"
 #include "icmp.h"
+#include "udp_endpoint.h"
 
 typedef enum {
     NETWORK_FRAME_ETHERNET,
@@ -29,5 +30,7 @@ int network_e1000_transmit(const void *frame, uint16_t length);
 uint32_t network_e1000_poll(network_packet_queue_t *queue, uint32_t budget);
 int network_decode_frame(const void *frame, uint16_t length,
                          network_frame_view_t *view);
+int network_deliver_frame(const void *frame, uint16_t length,
+                          udp_endpoint_table_t *udp_table);
 
 #endif

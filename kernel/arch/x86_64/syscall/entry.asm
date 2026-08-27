@@ -21,5 +21,10 @@ arch_enter_user:
     push rax
     push qword 0x202
     push qword 0x2b
-    push rdi
+    mov rax, rdi
+    xor edi, edi
+    xor esi, esi
+    xor edx, edx
+    xor ecx, ecx
+    push rax
     iretq

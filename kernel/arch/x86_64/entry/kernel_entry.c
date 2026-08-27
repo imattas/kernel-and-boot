@@ -265,7 +265,7 @@ static void build_user_image_probe(void) {
     probe64(&user_image_probe[72], 120); probe64(&user_image_probe[80], 0x8000001000ULL);
     probe64(&user_image_probe[88], 0x8000001000ULL); probe64(&user_image_probe[96], 8);
     probe64(&user_image_probe[104], 4096); probe64(&user_image_probe[112], 1);
-    user_image_probe[120] = 0xb8; user_image_probe[121] = 0; user_image_probe[122] = 0;
+    user_image_probe[120] = 0xb8; user_image_probe[121] = 15; user_image_probe[122] = 0;
     user_image_probe[123] = 0; user_image_probe[124] = 0; user_image_probe[125] = 0xcd;
     user_image_probe[126] = 0x80; user_image_probe[127] = 0xf4;
     probe32(&user_image_probe[176], 1); probe32(&user_image_probe[180], 4);
@@ -2745,6 +2745,13 @@ void kernel_main(void *boot_info) {
         serial_write("user task context failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
+    process_thread_t *ring3_probe_thread = process_thread_create_user(
+        runtime_process, 5, runtime_process->image.entry,
+        runtime_process->user_stack_top, 4096);
+    if (!ring3_probe_thread) {
+        serial_write("user task transition setup failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
     serial_write("process lifecycle ready\r\n");
     process_t *signal_process = process_create(2);
     static uint8_t handle_probe_object;
@@ -3084,6 +3091,23 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("VFS permission syscalls ready\r\n");
+    if (!process_thread_start(ring3_probe_thread)) {
+        serial_write("ring3 thread start failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    if (!scheduler_start()) {
+        serial_write("ring3 scheduler return failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    if (runtime_process->state != PROCESS_EXITED) {
+        serial_write("ring3 exit syscall failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    if (!process_thread_destroy(ring3_probe_thread)) {
+        serial_write("ring3 transition failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("ring3 transition ready\r\n");
     if (!kernel_init_state_advance(&init_state, KERNEL_INIT_SERVICES))
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     serial_write("user mode deferred until kernel completion\r\n");

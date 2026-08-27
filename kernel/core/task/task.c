@@ -10,7 +10,7 @@ __attribute__((noreturn)) void arch_user_task_start(
     struct process *process, const struct address_space *space,
     uint64_t entry, uint64_t user_stack) {
     (void)space;
-    if (!process_activate(process))
+    if (process_current() != process && !process_activate(process))
         scheduler_task_exit();
     arch_enter_user(entry, user_stack);
     scheduler_task_exit();

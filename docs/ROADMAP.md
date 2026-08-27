@@ -1092,6 +1092,14 @@ bus and silently missing devices behind deeper bridge topologies.
 Bridge traversal also validates the bridge's primary-bus field against the
 currently scanned bus before following child ranges, rejecting malformed
 firmware topology metadata without probing an unrelated bus.
+The kernel now exercises its privilege boundary with a mapped user image that
+enters ring 3, invokes the user-callable exit gate, returns through the
+scheduler, and is reaped without populating `userland/`.
+The ring-3 entry stub now initializes user argument registers instead of
+leaking the kernel bootstrap's entry pointer into the first syscall argument;
+the exit transition probe validates the corrected boundary.
+User-task startup now recognizes an already-active address space instead of
+rejecting the process and exiting before the first ring-3 instruction.
 AHCI now preserves each port's interrupt-status bits across IRQ acknowledgement
 until the active command consumes them, preventing the interrupt handler from
 erasing DMA error evidence before completion validation.

@@ -36,6 +36,7 @@ LZO_TEST := $(TEST_DIR)/lzo_contract
 ZSTD_TEST := $(TEST_DIR)/zstd_contract
 ZSTD_FIXTURE := $(TEST_DIR)/zstd_real.zst
 FSE_TEST := $(TEST_DIR)/fse_contract
+CACHE_TEST := $(TEST_DIR)/cache_contract
 UEFI_OBJ := $(BUILD_DIR)/uefi/efi_main.obj
 UEFI_ENTRY_OBJ := $(BUILD_DIR)/uefi/entry.obj
 UEFI_CONSOLE_OBJ := $(BUILD_DIR)/uefi/console.obj
@@ -84,7 +85,7 @@ OVMF_CODE ?= /usr/share/edk2/x64/OVMF_CODE.4m.fd
 OVMF_VARS ?= /usr/share/edk2/x64/OVMF_VARS.4m.fd
 QEMU_LOG := $(BUILD_DIR)/qemu-serial.log
 
-.PHONY: all test image qemu-test fat32-test exfat-test ext4-test xfs-test btrfs-test deflate-test lzo-test zstd-test fse-test run clean distclean
+.PHONY: all test image qemu-test fat32-test exfat-test ext4-test xfs-test btrfs-test deflate-test lzo-test zstd-test fse-test cache-test run clean distclean
 
 all: $(CONTRACT_ELF) $(UEFI_EFI) $(KERNEL_ELF)
 
@@ -580,6 +581,7 @@ test: all image
 	$(MAKE) lzo-test
 	$(MAKE) zstd-test
 	$(MAKE) fse-test
+	$(MAKE) cache-test
 	sh scripts/tests/sh/validate_build.sh $(CONTRACT_ELF)
 	sh scripts/tests/sh/validate_uefi.sh $(UEFI_EFI)
 	sh scripts/tests/sh/validate_kernel.sh $(KERNEL_ELF)
@@ -612,6 +614,9 @@ zstd-test: $(ZSTD_TEST)
 fse-test: $(FSE_TEST)
 	$(FSE_TEST)
 
+cache-test: $(CACHE_TEST)
+	$(CACHE_TEST)
+
 $(EXFAT_TEST): scripts/tests/c/exfat_contract.c kernel/fs/exfat/exfat.c kernel/fs/exfat/exfat.h kernel/drivers/storage/storage.c kernel/drivers/storage/storage.h kernel/core/sync/spinlock.c kernel/core/sync/spinlock.h | $(TEST_DIR)
 	$(CC) -std=c11 -Wall -Wextra -Werror -I. -o $@ scripts/tests/c/exfat_contract.c kernel/fs/exfat/exfat.c kernel/drivers/storage/storage.c kernel/core/sync/spinlock.c
 
@@ -638,6 +643,9 @@ $(ZSTD_TEST): scripts/tests/c/zstd_contract.c kernel/fs/btrfs/zstd.c kernel/fs/b
 
 $(FSE_TEST): scripts/tests/c/fse_contract.c kernel/fs/btrfs/fse.c kernel/fs/btrfs/fse.h | $(TEST_DIR)
 	$(CC) -std=c11 -Wall -Wextra -Werror -I. -o $@ scripts/tests/c/fse_contract.c kernel/fs/btrfs/fse.c
+
+$(CACHE_TEST): scripts/tests/c/cache_contract.c kernel/fs/cache/cache.c kernel/fs/cache/cache.h kernel/fs/block/block.c kernel/fs/block/block.h kernel/core/sync/spinlock.c kernel/core/sync/spinlock.h | $(TEST_DIR)
+	$(CC) -std=c11 -Wall -Wextra -Werror -I. -o $@ scripts/tests/c/cache_contract.c kernel/fs/cache/cache.c kernel/fs/block/block.c kernel/core/sync/spinlock.c
 
 $(FAT32_TEST): scripts/tests/c/fat32_contract.c kernel/fs/fat/fat32.c kernel/fs/fat/fat32.h kernel/drivers/storage/storage.h kernel/core/sync/spinlock.c | $(TEST_DIR)
 	$(CC) -std=c11 -Wall -Wextra -Werror -O2 -I. scripts/tests/c/fat32_contract.c kernel/fs/fat/fat32.c kernel/core/sync/spinlock.c -o $@

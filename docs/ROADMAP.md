@@ -497,6 +497,9 @@ releases that lock before invoking hardware, preventing callback re-entry
 deadlocks and keeping registry operations independent of device latency.
 The block cache now performs cache-miss reads and write-through device I/O
 outside its metadata lock, then merges bounded results under lock.
+The cache contract now verifies misses, hits, write-through coherence, sector
+invalidation, LRU eviction, and device-wide invalidation against a backing
+block device.
 Task wait nodes now record their owning queue, so removal from the wrong queue
 cannot corrupt either queue's linked list.
 Scheduler initialization now precedes process-thread lifecycle operations, so

@@ -94,9 +94,8 @@ static int ata_read_locked(uint64_t lba, uint32_t count, void *buffer) {
     if (!buffer || (!lba48_supported && lba > 0x0fffffffULL) || count == 0 || count > 256 ||
         lba >= sector_count || count > sector_count - lba) return 0;
     uint8_t *output = (uint8_t *)buffer;
+    ata_issue(lba, count, lba48_supported ? 0x24 : 0x20);
     for (uint32_t sector = 0; sector < count; ++sector) {
-        uint64_t current = lba + sector;
-        ata_issue(current, 1, lba48_supported ? 0x24 : 0x20);
         if (!wait_status(0x88, 0x08)) return 0;
         for (uint32_t word = 0; word < 256; ++word) {
             uint16_t value = in16(io_base);
@@ -104,23 +103,21 @@ static int ata_read_locked(uint64_t lba, uint32_t count, void *buffer) {
             output[sector * 512 + word * 2 + 1] = (uint8_t)(value >> 8);
         }
     }
-    out8(io_base + 7, lba48_supported ? 0xea : 0xe7);
-    return wait_status(0x80, 0);
+    return wait_status(0x81, 0);
 }
 
 static int ata_write_locked(uint64_t lba, uint32_t count, const void *buffer) {
     if ((!lba48_supported && lba > 0x0fffffffULL) || count == 0 || count > 256 ||
         lba >= sector_count || count > sector_count - lba || !buffer) return 0;
     const uint8_t *input = (const uint8_t *)buffer;
+    ata_issue(lba, count, lba48_supported ? 0x34 : 0x30);
     for (uint32_t sector = 0; sector < count; ++sector) {
-        uint64_t current = lba + sector;
-        ata_issue(current, 1, lba48_supported ? 0x34 : 0x30);
         if (!wait_status(0x88, 0x08)) return 0;
         for (uint32_t word = 0; word < 256; ++word)
             out16(io_base, (uint16_t)input[sector * 512 + word * 2] |
                   ((uint16_t)input[sector * 512 + word * 2 + 1] << 8));
-        if (!wait_status(0x80, 0)) return 0;
     }
+    if (!wait_status(0x81, 0)) return 0;
     /* Do not report completion until the device has committed its write cache. */
     out8(io_base + 7, lba48_supported ? 0xea : 0xe7);
     return wait_status(0x80, 0);

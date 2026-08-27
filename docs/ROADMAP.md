@@ -383,8 +383,9 @@ an IRQ-safe driver lock, preventing concurrent SMP callers from interleaving
 register programming or observing partial geometry state. ATA PIO writes now
 issue and validate the appropriate cache-flush command before reporting
 completion, and IDENTIFY rejects ATAPI/non-LBA disk types. The ATA backend now
-also exposes bounded multi-sector read/write operations, with QEMU verifying
-two-sector PIO write/read-back through the real boot disk.
+also exposes bounded multi-sector read/write operations using one true PIO
+multi-sector command per request, with QEMU verifying two-sector PIO
+write/read-back through the real boot disk.
 Driver enumeration and hardware
 coverage remain incomplete. The QEMU gate now supplies an emulated e1000 NIC
 so its controller path and bounded TX/RX descriptor operations can be exercised;

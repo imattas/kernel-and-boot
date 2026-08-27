@@ -444,6 +444,8 @@ The ELF loader now falls back from its preferred physical base to a bounded
 below-4-GiB allocation when that address is unavailable.
 UEFI GOP handoff now validates pitch/height multiplication, framebuffer size,
 and address-range overflow before publishing framebuffer metadata.
+The framebuffer surface independently rejects overflowing row geometry and uses
+64-bit pixel offsets for clear, pixel, and rectangle operations.
 UEFI failure paths now close opened filesystem handles, release pool buffers,
 and free rejected kernel-page allocations, preventing boot-time resource leaks.
 

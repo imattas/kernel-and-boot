@@ -32,6 +32,7 @@
 #include "../../../drivers/ahci/ahci.h"
 #include "../../../drivers/nvme/nvme.h"
 #include "../../../drivers/network/e1000.h"
+#include "../../../drivers/network/ethernet.h"
 #include "../../../time/clock.h"
 #include "../../../debug/assert.h"
 #include "../../../core/task/context.h"
@@ -461,6 +462,39 @@ void kernel_main(void *boot_info) {
     serial_write("e1000 driver ready controllers=");
     serial_write_hex_line("", e1000_controller_count());
     static const uint8_t network_probe_packet[60] = {0};
+    static const uint8_t ethernet_probe_destination[6] =
+        {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
+    static const uint8_t ethernet_probe_source[6] =
+        {0x02, 0x00, 0x00, 0x00, 0x00, 0x01};
+    static const uint8_t ethernet_probe_payload[4] =
+        {0xde, 0xad, 0xbe, 0xef};
+    static uint8_t ethernet_probe_frame[ETHERNET_MAX_FRAME_SIZE];
+    uint16_t ethernet_probe_length = 0;
+    ethernet_frame_view_t ethernet_probe_view;
+    if (!ethernet_frame_build(ethernet_probe_frame,
+                              sizeof(ethernet_probe_frame),
+                              ethernet_probe_destination,
+                              ethernet_probe_source, 0x88b5,
+                              ethernet_probe_payload,
+                              sizeof(ethernet_probe_payload),
+                              &ethernet_probe_length) ||
+        ethernet_probe_length != ETHERNET_MIN_FRAME_SIZE ||
+        !ethernet_frame_parse(ethernet_probe_frame, ethernet_probe_length,
+                              &ethernet_probe_view) ||
+        ethernet_probe_view.ether_type != 0x88b5 ||
+        ethernet_probe_view.payload_length !=
+            ETHERNET_MIN_FRAME_SIZE - ETHERNET_HEADER_SIZE ||
+        !ethernet_address_is_broadcast(ethernet_probe_view.destination) ||
+        ethernet_probe_view.payload[0] != 0xde ||
+        ethernet_frame_build(ethernet_probe_frame, 59,
+                             ethernet_probe_destination, ethernet_probe_source,
+                             0x88b5, ethernet_probe_payload,
+                             sizeof(ethernet_probe_payload),
+                             &ethernet_probe_length)) {
+        serial_write("Ethernet frame failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("Ethernet frame ready\r\n");
     if (e1000_controller_count() != 0 &&
         !e1000_transmit(network_probe_packet, sizeof(network_probe_packet))) {
         serial_write("e1000 transmit failure\r\n");

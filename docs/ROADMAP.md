@@ -315,6 +315,10 @@ The driver reports whether PCI MSI or ACPI-MADT IOAPIC legacy routing was
 enabled. The standard QEMU e1000 model exposes no usable MSI capability, so
 the QEMU gate now validates the routed legacy interrupt path instead of
 accepting polling as the driver milestone.
+The first bounded Ethernet-II layer now constructs and parses canonical
+14-byte-header frames, enforces the 1500-byte payload and 1518-byte frame
+limits, pads short frames to the hardware minimum, and rejects non-EtherType
+length fields before higher network protocols consume a frame.
 The e1000 ISR now records delivery, and the post-interrupt-enable QEMU probe
 transmits a frame and requires an observed interrupt before continuing.
 The e1000 ISR now preserves cleared interrupt causes for the polling/service

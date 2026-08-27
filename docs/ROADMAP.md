@@ -91,9 +91,7 @@ enters an interruptible idle loop. Per-CPU lookup is APIC-identified and global
 tick accounting is BSP-owned. Tick counts are exposed as a monotonic
 nanosecond clock with overflow-safe waits and BSP-owned global tick accounting;
 the BSP and AP now calibrate their periodic APIC timer against the PIT with a
-bounded fallback;
-richer per-CPU execution stacks and address-space-backed threads remain later
-work. The
+bounded fallback. The
 kernel now has intrusive, spinlock-protected FIFO wait queues with duplicate
 enqueue rejection, removal, dequeue, and task-state definitions. The scheduler
 core now owns a ready queue and transitions task descriptors between ready and
@@ -101,8 +99,9 @@ running states while remaining independent of scheduling policy.
 Current-task ownership, cooperative yield/dispatch, and timer preemption now
 sit above the queue. Kernel task objects can
 now own heap-backed stacks and initialized architecture contexts, with safe
-rejection of queued or running destruction; address-space-backed threads remain
-later work.
+rejection of queued or running destruction. Address-space-backed user threads
+are now bound to their process address space, and user-page unmapping reclaims
+empty owned page-table levels with a QEMU regression probe.
 The kernel-thread path is exercised by an actual context entry and return in
 QEMU, not only by descriptor construction.
 Process-owned kernel threads now have explicit scheduler start semantics, and

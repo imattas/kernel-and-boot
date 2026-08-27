@@ -397,6 +397,18 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     user_image_destroy(&process_space, &loaded_image);
+    if (!address_space_unmap_page(&process_space, 0x8000000000ULL) ||
+        process_space.owned_count != 2 ||
+        !address_space_map_page(&process_space, 0x8000000000ULL, process_page,
+                                ADDRESS_SPACE_WRITABLE | ADDRESS_SPACE_USER)) {
+        serial_write("address space table reclamation failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    if (!address_space_unmap_page(&process_space, 0x8000000000ULL) ||
+        process_space.owned_count != 2) {
+        serial_write("address space table reclamation failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
     if (!address_space_activate(&process_space) ||
         (kernel_space.root = virtual_memory_root(), !address_space_activate(&kernel_space)) ||
         !address_space_destroy(&process_space)) {

@@ -253,6 +253,23 @@ static int address_space_update_page_flags_locked(address_space_t *space,
     return 1;
 }
 
+static int address_space_table_empty(const uint64_t *table) {
+    for (uint32_t index = 0; index < 512; ++index)
+        if ((table[index] & PAGE_PRESENT) != 0) return 0;
+    return 1;
+}
+
+static int address_space_release_table(address_space_t *space, uint64_t frame) {
+    if (!space || frame == 0) return 0;
+    for (uint32_t index = 0; index < space->owned_count; ++index) {
+        if (space->owned_frames[index] != frame) continue;
+        space->owned_frames[index] = space->owned_frames[--space->owned_count];
+        physical_free_frame(frame);
+        return 1;
+    }
+    return 0;
+}
+
 static int address_space_unmap_page_locked(address_space_t *space,
                                            uint64_t virtual_address) {
     if (!space || space->root == 0 || (virtual_address & (PAGE_SIZE - 1)) != 0 ||
@@ -271,6 +288,17 @@ static int address_space_unmap_page_locked(address_space_t *space,
     if ((*pte & PAGE_PRESENT) == 0) return 0;
     *pte = 0;
     invalidate_active_page(space, virtual_address);
+    if (address_space_table_empty(pt) &&
+        address_space_release_table(space, pde & ~(PAGE_SIZE - 1))) {
+        pd[(virtual_address >> 21) & 0x1ff] = 0;
+        if (address_space_table_empty(pd) &&
+            address_space_release_table(space, pdpte & ~(PAGE_SIZE - 1))) {
+            pdpt[(virtual_address >> 30) & 0x1ff] = 0;
+            if (address_space_table_empty(pdpt) &&
+                address_space_release_table(space, pml4e & ~(PAGE_SIZE - 1)))
+                pml4_table[(virtual_address >> 39) & 0x1ff] = 0;
+        }
+    }
     return 1;
 }
 

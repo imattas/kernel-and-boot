@@ -14,6 +14,8 @@ int main(void) {
     uint8_t rle[] = {0x28, 0xb5, 0x2f, 0xfd, 0x20, 0x05, 0x2b, 0x00, 0x00, 'A'};
     uint8_t compressed[] = {0x28, 0xb5, 0x2f, 0xfd, 0x20, 0x05, 0x3d, 0x00, 0x00,
                             0x28, 'h', 'e', 'l', 'l', 'o', 0x00};
+    uint8_t checksummed[] = {0x28, 0xb5, 0x2f, 0xfd, 0x24, 0x05, 0x29, 0x00, 0x00,
+                             'h', 'e', 'l', 'l', 'o', 0xf9, 0x77, 0x00, 0xfb};
     uint8_t huffman[] = {0x28, 0xb5, 0x2f, 0xfd, 0x20, 0x02, 0x3d, 0x00, 0x00,
                          0x22, 0xc0, 0x00, 0x80, 0x10, 0x05, 0x00};
     uint8_t long_size[] = {0x28, 0xb5, 0x2f, 0xfd, 0x21, 0x00, 0x05, 0x00,
@@ -44,6 +46,9 @@ int main(void) {
     assert(size == 5 && output[0] == 'A' && output[4] == 'A');
     assert(btrfs_zstd_decompress(compressed, sizeof(compressed), output, sizeof(output), &size));
     assert(size == 5 && memcmp(output, "hello", 5) == 0);
+    assert(btrfs_zstd_decompress(checksummed, sizeof(checksummed), output, sizeof(output), &size));
+    checksummed[sizeof(checksummed) - 1U] ^= 1U;
+    assert(!btrfs_zstd_decompress(checksummed, sizeof(checksummed), output, sizeof(output), &size));
     assert(!btrfs_zstd_decompress(raw, sizeof(raw) - 1, output, sizeof(output), &size));
     assert(!btrfs_zstd_decompress(raw, sizeof(raw), output, 4, &size));
     assert(btrfs_zstd_read_sequence_header((const uint8_t[]){0}, 1, &sequence));

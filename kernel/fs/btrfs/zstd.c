@@ -10,6 +10,44 @@ static uint64_t le64(const uint8_t *p) {
     return (uint64_t)le32(p) | ((uint64_t)le32(p + 4) << 32);
 }
 
+static uint32_t zstd_rotl32(uint32_t value, uint32_t bits) {
+    return (value << bits) | (value >> (32U - bits));
+}
+
+static uint32_t zstd_xxhash32(const uint8_t *input, uint32_t size) {
+    static const uint32_t p1 = 0x9e3779b1U, p2 = 0x85ebca77U;
+    static const uint32_t p3 = 0xc2b2ae3dU, p4 = 0x27d4eb2fU, p5 = 0x165667b1U;
+    uint32_t hash, position = 0;
+    if (size >= 16U) {
+        uint32_t v1 = p1 + p2, v2 = p2, v3 = 0, v4 = 0U - p1;
+        v3 = 0;
+        while (position + 16U <= size) {
+            v1 = zstd_rotl32(v1 + le32(input + position) * p3, 17) * p4;
+            v2 = zstd_rotl32(v2 + le32(input + position + 4U) * p3, 17) * p4;
+            v3 = zstd_rotl32(v3 + le32(input + position + 8U) * p3, 17) * p4;
+            v4 = zstd_rotl32(v4 + le32(input + position + 12U) * p3, 17) * p4;
+            position += 16U;
+        }
+        hash = zstd_rotl32(v1, 1) + zstd_rotl32(v2, 7) +
+               zstd_rotl32(v3, 12) + zstd_rotl32(v4, 18);
+    } else hash = p5 + size;
+    while (position + 4U <= size) {
+        hash += le32(input + position) * p3;
+        hash = zstd_rotl32(hash, 17) * p4;
+        position += 4U;
+    }
+    while (position < size) {
+        hash += input[position++] * p5;
+        hash = zstd_rotl32(hash, 11) * p1;
+    }
+    hash ^= hash >> 15;
+    hash *= p2;
+    hash ^= hash >> 13;
+    hash *= p3;
+    hash ^= hash >> 16;
+    return hash;
+}
+
 static uint64_t frame_content_size(const uint8_t *header, uint32_t descriptor,
                                    uint8_t single_segment) {
     uint32_t flag = descriptor & 3U;
@@ -452,6 +490,7 @@ int btrfs_zstd_decompress(const uint8_t *input, uint32_t input_size,
     }
     if (checksum) {
         if (position > input_size - 4U) return 0;
+        if (le32(&input[position]) != zstd_xxhash32(output, output_position)) return 0;
         position += 4U;
     }
     if (position != input_size || (content_size && content_size != output_position)) return 0;

@@ -232,6 +232,9 @@ Process handle tables now serialize open, lookup, and close operations with
 their own lock, making descriptor rights checks safe across kernel threads.
 Handles now carry a generation tag, so closing and reopening a slot cannot
 make an old numeric handle access the replacement object.
+VFS file descriptions now retain their node, serialize per-open offsets, enforce
+read/write rights, and can be installed as owned process handles with safe close
+and retained-reference behavior.
 The process registry now serializes duplicate-ID checks, insertion, lookup,
 and removal across concurrent lifecycle operations.
 The bootable `dist/os.img` is now a standards-compliant FAT32 superfloppy

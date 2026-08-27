@@ -15,6 +15,7 @@
 #include "../../../ipc/channel.h"
 #include "../../../security/credentials.h"
 #include "../../../fs/vfs/vfs.h"
+#include "../../../fs/vfs/file.h"
 #include "../../../fs/vfs/mount.h"
 #include "../../../fs/vfs/probe.h"
 #include "../../../fs/block/block.h"
@@ -1552,6 +1553,26 @@ void kernel_main(void *boot_info) {
         serial_write("procfs read failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
+    vfs_file_t *proc_file = vfs_file_open(proc_pid, VFS_FILE_READ);
+    process_handle_table_t file_handles;
+    process_handle_ref_t file_ref = {0};
+    process_handle_table_initialize(&file_handles);
+    int file_handle = vfs_file_open_handle(&file_handles, proc_pid, VFS_FILE_READ);
+    char file_pid_text[4] = {0};
+    if (!proc_file || vfs_file_read(proc_file, file_pid_text, 3) != 3 ||
+        file_pid_text[0] != '4' || file_pid_text[1] != '2' ||
+        file_pid_text[2] != '\n' || vfs_file_offset(proc_file) != 3 ||
+        !vfs_file_seek(proc_file, 0) || vfs_file_write(proc_file, file_pid_text, 1) ||
+        !file_handle || !process_handle_get_retain(&file_handles,
+            (uint32_t)file_handle, PROCESS_HANDLE_READ, &file_ref) ||
+        !process_handle_close(&file_handles, (uint32_t)file_handle)) {
+        if (proc_file) vfs_file_release(proc_file);
+        serial_write("VFS file description failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    process_handle_release_ref(&file_ref);
+    vfs_file_release(proc_file);
+    serial_write("VFS file descriptions ready\r\n");
     vfs_node_t *proc_self = vfs_node_lookup(proc_root, "self");
     if (!proc_self || !vfs_node_remove(proc_self, proc_pid) ||
         !vfs_node_remove(proc_root, proc_self)) {

@@ -242,6 +242,7 @@ KERNEL_ATA_OBJ := $(BUILD_DIR)/kernel/ata.o
 KERNEL_IPC_OBJ := $(BUILD_DIR)/kernel/ipc_channel.o
 KERNEL_SECURITY_OBJ := $(BUILD_DIR)/kernel/security_credentials.o
 KERNEL_VFS_OBJ := $(BUILD_DIR)/kernel/vfs.o
+KERNEL_VFS_FILE_OBJ := $(BUILD_DIR)/kernel/vfs_file.o
 KERNEL_VFS_MOUNT_OBJ := $(BUILD_DIR)/kernel/vfs_mount.o
 KERNEL_VFS_PROBE_OBJ := $(BUILD_DIR)/kernel/vfs_probe.o
 KERNEL_BLOCK_OBJ := $(BUILD_DIR)/kernel/block.o
@@ -278,6 +279,7 @@ KERNEL_E1000_OBJ := $(BUILD_DIR)/kernel/e1000.o
 KERNEL_RTC_OBJ := $(BUILD_DIR)/kernel/rtc.o
 KERNEL_NVME_OBJ := $(KERNEL_NVME_OBJ) $(KERNEL_E1000_OBJ) $(KERNEL_ETHERNET_OBJ) $(KERNEL_ARP_OBJ) $(KERNEL_ARP_CACHE_OBJ) $(KERNEL_IPV4_OBJ) $(KERNEL_UDP_OBJ) $(KERNEL_ICMP_OBJ) $(KERNEL_ROUTE_OBJ) $(KERNEL_PACKET_QUEUE_OBJ) $(KERNEL_NETWORK_OBJ) $(KERNEL_REASSEMBLY_OBJ) $(KERNEL_UDP_ENDPOINT_OBJ) $(KERNEL_E1000_IRQ_OBJ) $(KERNEL_NVME_IRQ_OBJ) $(KERNEL_AHCI_IRQ_OBJ) $(KERNEL_HID_OBJ) $(KERNEL_STORAGE_BLOCK_OBJ) $(KERNEL_EXFAT_VFS_OBJ) $(KERNEL_EXT4_OBJ) $(KERNEL_EXT4_VFS_OBJ) $(KERNEL_XFS_OBJ) $(KERNEL_XFS_VFS_OBJ) $(KERNEL_BTRFS_OBJ) $(KERNEL_BTRFS_DEFLATE_OBJ) $(KERNEL_BTRFS_LZO_OBJ) $(KERNEL_BTRFS_ZSTD_OBJ) $(KERNEL_BTRFS_FSE_OBJ) $(KERNEL_BTRFS_VFS_OBJ) $(KERNEL_RTC_OBJ)
 KERNEL_NVME_OBJ := $(KERNEL_NVME_OBJ) $(KERNEL_VFS_PROBE_OBJ)
+KERNEL_NVME_OBJ := $(KERNEL_NVME_OBJ) $(KERNEL_VFS_FILE_OBJ)
 KERNEL_DEBUG_OBJ := $(BUILD_DIR)/kernel/debug_assert.o
 KERNEL_CLOCK_OBJ := $(BUILD_DIR)/kernel/clock.o
 
@@ -294,6 +296,10 @@ $(KERNEL_SECURITY_OBJ): kernel/security/credentials.c kernel/security/credential
 		-mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@
 
 $(KERNEL_VFS_OBJ): kernel/fs/vfs/vfs.c kernel/fs/vfs/vfs.h kernel/core/sync/spinlock.h kernel/mm/heap/heap.h | $(BUILD_DIR)/kernel
+	$(CC) -target x86_64-pc-none-elf -std=c11 -ffreestanding -fno-builtin -fno-stack-protector -fPIE -fno-plt \
+		-mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@
+
+$(KERNEL_VFS_FILE_OBJ): kernel/fs/vfs/file.c kernel/fs/vfs/file.h kernel/fs/vfs/vfs.h kernel/core/process/handle.h kernel/mm/heap/heap.h | $(BUILD_DIR)/kernel
 	$(CC) -target x86_64-pc-none-elf -std=c11 -ffreestanding -fno-builtin -fno-stack-protector -fPIE -fno-plt \
 		-mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@
 

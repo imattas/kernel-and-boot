@@ -152,9 +152,7 @@ int ps2_mouse_poll(input_queue_t *queue) {
          !ps2_mouse_decode_wheel(mouse_packet, events, &event_count)) ||
         (mouse_packet_size == 3 &&
          !ps2_mouse_decode(mouse_packet, events, &event_count))) return 0;
-    for (uint32_t i = 0; i < event_count; ++i)
-        if (!input_queue_push(queue, &events[i])) return 0;
-    return 1;
+    return input_queue_push_batch(queue, events, event_count);
 }
 
 void ps2_mouse_irq(void) {

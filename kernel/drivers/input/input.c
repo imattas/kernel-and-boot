@@ -23,6 +23,28 @@ int input_queue_push(input_queue_t *queue, const input_event_t *event) {
     return 1;
 }
 
+int input_queue_push_batch(input_queue_t *queue, const input_event_t *events,
+                           uint32_t count) {
+    if (!queue || !events || count == 0 || count > INPUT_EVENT_CAPACITY)
+        return 0;
+    for (uint32_t i = 0; i < count; ++i)
+        if (events[i].type < INPUT_EVENT_KEY ||
+            events[i].type > INPUT_EVENT_AXIS)
+            return 0;
+    uint64_t flags = spinlock_lock_irqsave(&queue->lock);
+    if (count > INPUT_EVENT_CAPACITY - queue->count) {
+        spinlock_unlock_irqrestore(&queue->lock, flags);
+        return 0;
+    }
+    for (uint32_t i = 0; i < count; ++i) {
+        queue->events[queue->tail] = events[i];
+        queue->tail = (queue->tail + 1U) % INPUT_EVENT_CAPACITY;
+    }
+    queue->count += count;
+    spinlock_unlock_irqrestore(&queue->lock, flags);
+    return 1;
+}
+
 int input_queue_pop(input_queue_t *queue, input_event_t *event) {
     if (!queue || !event) return 0;
     uint64_t flags = spinlock_lock_irqsave(&queue->lock);

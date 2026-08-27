@@ -127,8 +127,8 @@ static void input_runtime_task(void *argument) {
                                               input_runtime_packet,
                                               &input_runtime_hid_state,
                                               events, &event_count))
-                for (uint32_t event = 0; event < event_count; ++event)
-                    (void)input_queue_push(input_runtime_queue, &events[event]);
+                (void)input_queue_push_batch(input_runtime_queue, events,
+                                             event_count);
         }
         scheduler_yield();
     }
@@ -1639,6 +1639,17 @@ void kernel_main(void *boot_info) {
     }
     serial_write("input event queue ready\r\n");
     while (input_queue_pop(&input_queue, &input_out)) { }
+    input_event_t batch[2] = {input_event,
+                              {.type = INPUT_EVENT_AXIS, .code = 2,
+                               .value = -1, .timestamp = 8}};
+    if (!input_queue_push_batch(&input_queue, batch, 2) ||
+        input_queue_count(&input_queue) != 2 ||
+        !input_queue_pop(&input_queue, &input_out) || input_out.code != 30 ||
+        !input_queue_pop(&input_queue, &input_out) || input_out.code != 2 ||
+        input_queue_count(&input_queue) != 0) {
+        serial_write("input batch failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
     uint32_t framebuffer_storage[50];
     framebuffer_t framebuffer;
     if (!framebuffer_initialize(&framebuffer, framebuffer_storage, 8, 5, 10)) {

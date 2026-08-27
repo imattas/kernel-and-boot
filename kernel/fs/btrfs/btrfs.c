@@ -165,10 +165,13 @@ static int btrfs_read_item_full(btrfs_fs_t *fs, uint64_t tree_bytenr, uint64_t o
 
 int btrfs_read_item(btrfs_fs_t *fs, uint64_t tree_bytenr, uint64_t objectid,
                     uint8_t type, uint64_t offset, void *buffer, uint32_t size) {
+    uint8_t item[4096];
     uint32_t data_size = 0;
     if (!size || !btrfs_read_item_full(fs, tree_bytenr, objectid, type, offset,
-                                       buffer, size, &data_size)) return 0;
-    return data_size >= size;
+                                       item, sizeof(item), &data_size) || data_size < size)
+        return 0;
+    for (uint32_t i = 0; i < size; ++i) ((uint8_t *)buffer)[i] = item[i];
+    return 1;
 }
 
 int btrfs_resolve_filesystem_tree(btrfs_fs_t *fs) {

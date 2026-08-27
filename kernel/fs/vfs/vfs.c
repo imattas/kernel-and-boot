@@ -162,8 +162,9 @@ vfs_node_t *vfs_node_lookup(vfs_node_t *parent, const char *name) {
     for (vfs_node_t *child = parent->first_child; child;
          child = child->next_sibling) {
         if (string_equal(child->name, name)) {
-            if (!child->destroying && child->references != 0) {
-                ++child->references;
+            if (!__atomic_load_n(&child->destroying, __ATOMIC_ACQUIRE) &&
+                __atomic_load_n(&child->references, __ATOMIC_ACQUIRE) != 0) {
+                __atomic_add_fetch(&child->references, 1, __ATOMIC_RELAXED);
                 result = child;
             }
             break;
@@ -180,9 +181,10 @@ vfs_node_t *vfs_node_child(vfs_node_t *parent, uint32_t index) {
     uint32_t current = 0;
     for (vfs_node_t *child = parent->first_child; child;
          child = child->next_sibling) {
-        if (!child->destroying && child->references != 0) {
+        if (!__atomic_load_n(&child->destroying, __ATOMIC_ACQUIRE) &&
+            __atomic_load_n(&child->references, __ATOMIC_ACQUIRE) != 0) {
             if (current == index) {
-                ++child->references;
+                __atomic_add_fetch(&child->references, 1, __ATOMIC_RELAXED);
                 result = child;
                 break;
             }

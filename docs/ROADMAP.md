@@ -797,7 +797,8 @@ VFS mount validation now rejects self-mounts and mounts whose root contains the
 mountpoint, preventing cyclic mounted-path traversal.
 VFS child attach and removal now use a canonical node lock order, while child
 lookups rely on the parent structural lock, preventing parent/child lock
-inversion during concurrent tree mutation.
+inversion during concurrent tree mutation; lookup reference acquisition remains
+atomic against independent node release operations.
 VFS nodes now expose bounded write callbacks alongside reads, with boot-time
 write-path validation.
 Physical frame allocation now zero-fills reclaimed pages, with boot-time

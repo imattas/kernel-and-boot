@@ -162,6 +162,12 @@ static int ahci_probe(device_t *device) {
         active_command_list = command_list;
         ++ready_ports;
     }
+    if (ready_ports == 0) {
+        active_port = 0;
+        active_command_list = 0;
+        device_release_resource(device, AHCI_BAR_INDEX, &ahci_driver);
+        return 0;
+    }
     ++controllers;
     ports |= implemented_ports;
     arch_set_interrupt_gate(AHCI_IRQ_VECTOR, arch_ahci_irq_stub);

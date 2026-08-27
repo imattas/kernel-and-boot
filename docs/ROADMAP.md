@@ -330,6 +330,8 @@ the remaining compression formats remain before the filesystem milestone is
 complete. Btrfs regular extents now also support native LZO length-header and
 sector-segment framing with bounded LZO1X decoding. A
 format is not considered complete merely because its superblock is recognized.
+Zstandard frame parsing now has strict raw/RLE block contracts; compressed
+Huffman/FSE blocks are still pending and are not exposed through Btrfs yet.
 
 ## Phase 10 — Userland begins after the kernel gate
 

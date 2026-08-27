@@ -7,8 +7,11 @@ typedef struct {
     uint32_t block_size;
     uint32_t inode_size;
     uint32_t inodes_per_group;
-    uint32_t inode_table;
+    uint32_t descriptor_size;
+    uint64_t descriptor_block;
+    uint64_t groups_count;
     uint64_t block_count;
+    uint8_t has_64bit;
     uint8_t mounted;
 } ext4_fs_t;
 

@@ -32,29 +32,50 @@ int ext4_mount(ext4_fs_t *fs, uint32_t device) {
     uint32_t inode_size = load16(&sb[88]);
     uint32_t descriptor_size = load16(&sb[254]);
     if (log_block_size > 2 || block_size < 1024 || block_size > 4096 ||
-        (incompat & ~(EXT4_INCOMPAT_FILETYPE | EXT4_INCOMPAT_EXTENTS)) != 0 ||
+        (incompat & ~(EXT4_INCOMPAT_FILETYPE | EXT4_INCOMPAT_EXTENTS |
+                      EXT4_INCOMPAT_64BIT)) != 0 ||
         block_count == 0 || blocks_per_group == 0 || inodes_per_group == 0 ||
         inode_size < 128 || inode_size > block_size ||
         (block_size % inode_size) != 0 || descriptor_size < 32 ||
-        descriptor_size > block_size) return 0;
+        descriptor_size > block_size ||
+        ((incompat & EXT4_INCOMPAT_64BIT) && descriptor_size < 64U)) return 0;
+    if (incompat & EXT4_INCOMPAT_64BIT) block_count |= (uint64_t)load32(&sb[336]) << 32;
+    uint64_t groups_count = (block_count + blocks_per_group - 1U) / blocks_per_group;
+    if (!groups_count || groups_count > 0xffffffffULL) return 0;
     uint8_t group[4096];
     ext4_fs_t probe = {.device = device, .block_size = block_size, .block_count = block_count};
     uint64_t descriptor_block = block_size == 1024 ? 2 : 1;
     if (!read_block(&probe, descriptor_block, group)) return 0;
-    uint32_t inode_table = load32(&group[8]);
-    if (inode_table >= block_count || (uint64_t)inode_table +
-        (inodes_per_group * inode_size + block_size - 1U) / block_size > block_count) return 0;
+    uint64_t inode_table = load32(&group[8]);
+    if ((incompat & EXT4_INCOMPAT_64BIT) != 0) inode_table |= (uint64_t)load32(&group[40]) << 32;
+    uint64_t inode_table_blocks = (inodes_per_group * (uint64_t)inode_size + block_size - 1U) / block_size;
+    if (inode_table >= block_count || inode_table_blocks > block_count - inode_table) return 0;
     fs->device = device; fs->block_size = block_size; fs->inode_size = inode_size;
-    fs->inodes_per_group = inodes_per_group; fs->inode_table = inode_table;
-    fs->block_count = block_count; fs->mounted = 1;
+    fs->inodes_per_group = inodes_per_group; fs->descriptor_size = descriptor_size;
+    fs->descriptor_block = descriptor_block; fs->groups_count = groups_count;
+    fs->block_count = block_count; fs->has_64bit = (uint8_t)((incompat & EXT4_INCOMPAT_64BIT) != 0);
+    fs->mounted = 1;
     return 1;
 }
 
 static int read_inode(const ext4_fs_t *fs, uint32_t number, uint8_t *inode) {
-    if (!fs || !fs->mounted || number == 0 ||
-        number > fs->inodes_per_group || !inode) return 0;
-    uint64_t byte_offset = (uint64_t)(number - 1U) * fs->inode_size;
-    uint64_t block = fs->inode_table + byte_offset / fs->block_size;
+    if (!fs || !fs->mounted || number == 0 || !inode) return 0;
+    uint64_t group_number = ((uint64_t)number - 1U) / fs->inodes_per_group;
+    uint32_t group_index = (uint32_t)(((uint64_t)number - 1U) % fs->inodes_per_group);
+    if (group_number >= fs->groups_count) return 0;
+    uint8_t descriptor[64];
+    uint64_t descriptor_block = fs->descriptor_block +
+                                (group_number * fs->descriptor_size) / fs->block_size;
+    uint32_t descriptor_offset = (uint32_t)((group_number * fs->descriptor_size) % fs->block_size);
+    uint8_t descriptor_data[4096];
+    if (descriptor_offset + fs->descriptor_size > fs->block_size ||
+        !read_block(fs, descriptor_block, descriptor_data)) return 0;
+    for (uint32_t i = 0; i < fs->descriptor_size && i < sizeof(descriptor); ++i)
+        descriptor[i] = descriptor_data[descriptor_offset + i];
+    uint64_t inode_table = load32(&descriptor[8]);
+    if (fs->has_64bit) inode_table |= (uint64_t)load32(&descriptor[40]) << 32;
+    uint64_t byte_offset = (uint64_t)group_index * fs->inode_size;
+    uint64_t block = inode_table + byte_offset / fs->block_size;
     uint32_t offset = (uint32_t)(byte_offset % fs->block_size);
     if (offset + fs->inode_size > fs->block_size) return 0;
     uint8_t data[4096];

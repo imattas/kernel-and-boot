@@ -176,14 +176,20 @@ uint32_t network_service(network_packet_queue_t *queue,
                                        view.udp.payload_length);
         } else if (view.kind == NETWORK_FRAME_TCP && tcp_table) {
             tcp_connection_result_t tcp_result;
-            if (tcp_endpoint_deliver(tcp_table, view.ipv4.destination,
-                                     view.ipv4.source, &view.tcp,
-                                     &tcp_result) && tcp_result.response_flags &&
+            int delivered = tcp_endpoint_deliver(tcp_table,
+                view.ipv4.destination, view.ipv4.source, &view.tcp,
+                &tcp_result);
+            if (delivered && tcp_result.response_flags &&
                 tcp_result.response_flags != TCP_FLAG_RST &&
                 network_build_tcp_response(frame, length, local_hardware,
                                            local_protocol, &tcp_result,
                                            reply, sizeof(reply),
                                            &reply_length))
+                (void)network_e1000_transmit(reply, reply_length);
+            else if (!delivered && (view.tcp.flags & TCP_FLAG_RST) == 0 &&
+                     network_build_tcp_reset(frame, length, local_hardware,
+                                             local_protocol, reply,
+                                             sizeof(reply), &reply_length))
                 (void)network_e1000_transmit(reply, reply_length);
         }
         ++serviced;
@@ -257,6 +263,42 @@ int network_build_tcp_response(const void *frame, uint16_t length,
                            result->response_acknowledgment,
                            result->response_flags, view.tcp.window, 0, 0,
                            &segment_length) ||
+        !ipv4_packet_build(ip_packet, sizeof(ip_packet), local_protocol,
+                           view.ipv4.source, 6, 64, view.ipv4.identification,
+                           segment, segment_length, &ip_length) ||
+        !ethernet_frame_build(reply, capacity, view.ethernet.source,
+                              local_hardware, 0x0800, ip_packet, ip_length,
+                              reply_length)) return 0;
+    return 1;
+}
+
+int network_build_tcp_reset(const void *frame, uint16_t length,
+                            const uint8_t local_hardware[ETHERNET_ADDRESS_SIZE],
+                            const uint8_t local_protocol[4], void *reply,
+                            uint16_t capacity, uint16_t *reply_length) {
+    if (!frame || !local_hardware || !local_protocol || !reply ||
+        !reply_length) return 0;
+    network_frame_view_t view;
+    if (!network_decode_frame(frame, length, &view) ||
+        view.kind != NETWORK_FRAME_TCP || (view.tcp.flags & TCP_FLAG_RST) != 0)
+        return 0;
+    uint8_t segment[TCP_HEADER_SIZE];
+    uint8_t ip_packet[ETHERNET_MAX_PAYLOAD_SIZE];
+    uint16_t segment_length = 0, ip_length = 0;
+    uint32_t sequence = 0, acknowledgment = 0;
+    uint8_t flags = TCP_FLAG_RST;
+    if ((view.tcp.flags & TCP_FLAG_ACK) != 0) {
+        sequence = view.tcp.acknowledgment;
+    } else {
+        acknowledgment = view.tcp.sequence + view.tcp.payload_length;
+        if ((view.tcp.flags & TCP_FLAG_SYN) != 0) ++acknowledgment;
+        if ((view.tcp.flags & TCP_FLAG_FIN) != 0) ++acknowledgment;
+        flags |= TCP_FLAG_ACK;
+    }
+    if (!tcp_segment_build(segment, sizeof(segment), local_protocol,
+                           view.ipv4.source, view.tcp.destination_port,
+                           view.tcp.source_port, sequence, acknowledgment,
+                           flags, 0, 0, 0, &segment_length) ||
         !ipv4_packet_build(ip_packet, sizeof(ip_packet), local_protocol,
                            view.ipv4.source, 6, 64, view.ipv4.identification,
                            segment, segment_length, &ip_length) ||

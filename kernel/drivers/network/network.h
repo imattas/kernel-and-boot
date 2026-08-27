@@ -62,5 +62,9 @@ int network_build_tcp_response(const void *frame, uint16_t length,
                                const tcp_connection_result_t *result,
                                void *reply, uint16_t capacity,
                                uint16_t *reply_length);
+int network_build_tcp_reset(const void *frame, uint16_t length,
+                            const uint8_t local_hardware[ETHERNET_ADDRESS_SIZE],
+                            const uint8_t local_protocol[4], void *reply,
+                            uint16_t capacity, uint16_t *reply_length);
 
 #endif

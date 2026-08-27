@@ -456,6 +456,10 @@ through the accepted child.
 SYN retransmission for a child in `SYN_RECEIVED` now returns the original
 SYN-ACK without allocating a duplicate endpoint, preserving passive-open
 recovery under packet loss.
+The network service now generates standards-shaped TCP resets for validated
+segments with no matching endpoint, including correct sequence/acknowledgment
+selection for ACK-bearing and sequence-consuming inputs, while suppressing
+responses to incoming resets.
 TCP connections now track the unacknowledged send edge and peer-advertised
 window, advance it only on valid acknowledgements, and reject transmissions
 that exceed the bounded flow-control window.

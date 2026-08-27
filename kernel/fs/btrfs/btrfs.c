@@ -129,10 +129,11 @@ int btrfs_mount(btrfs_fs_t *fs, uint32_t device) {
     return 1;
 }
 
-int btrfs_read_item(btrfs_fs_t *fs, uint64_t tree_bytenr, uint64_t objectid,
-                    uint8_t type, uint64_t offset, void *buffer, uint32_t size) {
+static int btrfs_read_item_full(btrfs_fs_t *fs, uint64_t tree_bytenr, uint64_t objectid,
+                                uint8_t type, uint64_t offset, void *buffer,
+                                uint32_t capacity, uint32_t *data_size_out) {
     uint8_t node[65536];
-    if (!fs || !buffer || !size || fs->node_size > sizeof(node) ||
+    if (!fs || !buffer || !capacity || !data_size_out || fs->node_size > sizeof(node) ||
         !btrfs_read_node(fs, tree_bytenr, node)) return 0;
     for (;;) {
         uint32_t count = le32(&node[96]);
@@ -144,8 +145,9 @@ int btrfs_read_item(btrfs_fs_t *fs, uint64_t tree_bytenr, uint64_t objectid,
                 uint32_t data_offset = le32(&item[17]);
                 uint32_t data_size = le32(&item[21]);
                 if (data_offset > fs->node_size || data_size > fs->node_size - data_offset ||
-                    size > data_size) return 0;
-                for (uint32_t j = 0; j < size; ++j) ((uint8_t *)buffer)[j] = node[data_offset + j];
+                    data_size > capacity) return 0;
+                for (uint32_t j = 0; j < data_size; ++j) ((uint8_t *)buffer)[j] = node[data_offset + j];
+                *data_size_out = data_size;
                 return 1;
             }
             return 0;
@@ -159,6 +161,14 @@ int btrfs_read_item(btrfs_fs_t *fs, uint64_t tree_bytenr, uint64_t objectid,
         }
         if (!selected || !btrfs_read_node(fs, le64(&selected[17]), node)) return 0;
     }
+}
+
+int btrfs_read_item(btrfs_fs_t *fs, uint64_t tree_bytenr, uint64_t objectid,
+                    uint8_t type, uint64_t offset, void *buffer, uint32_t size) {
+    uint32_t data_size = 0;
+    if (!size || !btrfs_read_item_full(fs, tree_bytenr, objectid, type, offset,
+                                       buffer, size, &data_size)) return 0;
+    return data_size >= size;
 }
 
 int btrfs_resolve_filesystem_tree(btrfs_fs_t *fs) {
@@ -184,23 +194,31 @@ int btrfs_inode_stat(btrfs_fs_t *fs, uint64_t tree_bytenr, uint64_t inode,
 
 int btrfs_lookup_dir(btrfs_fs_t *fs, uint64_t tree_bytenr, uint64_t directory,
                      const char *name, uint64_t *inode_number) {
-    uint8_t item[4096]; uint32_t length = 0;
+    uint8_t item[4096]; uint32_t item_size = 0, position = 0, length = 0;
     if (!fs || !name || !name[0] || !inode_number) return 0;
     while (name[length] && length < 256U) ++length;
     if (length == 0 || length == 256U) return 0;
     uint32_t hash = name_hash(name, length);
-    if (!btrfs_read_item(fs, tree_bytenr, directory, BTRFS_DIR_ITEM_TYPE,
-                         hash, item, 30U)) return 0;
-    uint16_t data_length = le16(&item[25]);
-    uint16_t name_length = le16(&item[27]);
-    if (data_length != 0 || name_length != length ||
-        30U + name_length > sizeof(item)) return 0;
-    if (!btrfs_read_item(fs, tree_bytenr, directory, BTRFS_DIR_ITEM_TYPE,
-                         hash, item, 30U + name_length)) return 0;
-    for (uint32_t i = 0; i < length; ++i)
-        if (item[30U + i] != (uint8_t)name[i]) return 0;
-    *inode_number = le64(item);
-    return *inode_number != 0;
+    if (!btrfs_read_item_full(fs, tree_bytenr, directory, BTRFS_DIR_ITEM_TYPE,
+                              hash, item, sizeof(item), &item_size)) return 0;
+    while (position + 30U <= item_size) {
+        uint16_t data_length = le16(&item[position + 25U]);
+        uint16_t name_length = le16(&item[position + 27U]);
+        uint32_t entry_size = 30U + (uint32_t)data_length + (uint32_t)name_length;
+        if (!entry_size || entry_size > item_size - position ||
+            data_length != 0) return 0;
+        if (name_length == length) {
+            uint8_t match = 1;
+            for (uint32_t i = 0; i < length; ++i)
+                if (item[position + 30U + i] != (uint8_t)name[i]) match = 0;
+            if (match) {
+                *inode_number = le64(&item[position]);
+                return *inode_number != 0;
+            }
+        }
+        position += entry_size;
+    }
+    return 0;
 }
 
 int btrfs_read_extent_data(btrfs_fs_t *fs, uint64_t tree_bytenr, uint64_t inode,

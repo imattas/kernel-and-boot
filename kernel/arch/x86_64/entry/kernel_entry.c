@@ -1110,6 +1110,19 @@ void kernel_main(void *boot_info) {
     }
     tcp_endpoint_handle_t tcp_listener_probe_handle = tcp_endpoint_probe_handle;
     tcp_endpoint_probe_handle = tcp_endpoint_probe_result.endpoint_handle;
+    tcp_connection_result_t tcp_duplicate_result;
+    tcp_segment_view_t tcp_duplicate_view;
+    if (!tcp_segment_parse(tcp_probe_packet, tcp_endpoint_probe_tcp_length,
+                           ipv4_probe_source, ipv4_probe_destination,
+                           &tcp_duplicate_view) ||
+        !tcp_endpoint_deliver(&tcp_endpoint_probe_table,
+                              ipv4_probe_destination, ipv4_probe_source,
+                              &tcp_duplicate_view, &tcp_duplicate_result) ||
+        tcp_duplicate_result.endpoint_handle != tcp_endpoint_probe_handle ||
+        tcp_duplicate_result.response_flags != (TCP_FLAG_SYN | TCP_FLAG_ACK)) {
+        serial_write("TCP duplicate SYN failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
     tcp_connection_result_t tcp_second_result;
     tcp_segment_view_t tcp_second_view;
     if (!tcp_segment_build(tcp_probe_packet, sizeof(tcp_probe_packet),

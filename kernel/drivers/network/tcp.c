@@ -156,6 +156,14 @@ int tcp_connection_receive(tcp_connection_t *connection,
         return 1;
     }
     if (connection->state == TCP_CONNECTION_SYN_RECEIVED &&
+        (segment->flags & TCP_FLAG_SYN) != 0 &&
+        segment->sequence + 1U == connection->receive_next) {
+        result->response_flags = TCP_FLAG_SYN | TCP_FLAG_ACK;
+        result->response_sequence = connection->send_unacknowledged;
+        result->response_acknowledgment = connection->receive_next;
+        return 1;
+    }
+    if (connection->state == TCP_CONNECTION_SYN_RECEIVED &&
         (segment->flags & TCP_FLAG_ACK) != 0 &&
         segment->acknowledgment == connection->send_next) {
         connection->send_unacknowledged = connection->send_next;

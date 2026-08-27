@@ -453,6 +453,9 @@ child connection, and the endpoint API reports accepted children through
 `tcp_endpoint_accept`. Exact established-peer matching takes precedence over
 the listener; the QEMU probe covers two passive opens and service delivery
 through the accepted child.
+SYN retransmission for a child in `SYN_RECEIVED` now returns the original
+SYN-ACK without allocating a duplicate endpoint, preserving passive-open
+recovery under packet loss.
 TCP connections now track the unacknowledged send edge and peer-advertised
 window, advance it only on valid acknowledgements, and reject transmissions
 that exceed the bounded flow-control window.

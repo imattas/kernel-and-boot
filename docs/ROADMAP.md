@@ -369,8 +369,9 @@ The generic storage registry now serializes registration, enumeration, and
 backend dispatch, rejects duplicate device names, and has hosted contract-test
 build support without executing privileged interrupt-state instructions.
 The storage and block interfaces now expose an explicit flush operation, with
-the AHCI and NVMe backends publishing their durability barriers through the
-generic device path and the cache contract covering block-level flush dispatch.
+the AHCI, NVMe, and ATA backends publishing their durability barriers through
+the generic device path and the cache contract covering block-level flush
+dispatch.
 Storage registration now rejects empty names and devices whose advertised
 capacity would overflow the 64-bit byte range, preserving a safe contract for
 all filesystem adapters and future DMA backends.

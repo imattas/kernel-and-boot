@@ -137,6 +137,15 @@ static int ata_write(uint64_t lba, uint32_t count, const void *buffer) {
     return result;
 }
 
+static int ata_flush(void *context) {
+    (void)context;
+    uint64_t flags = spinlock_lock_irqsave(&ata_lock);
+    out8(io_base + 7, lba48_supported ? 0xea : 0xe7);
+    int result = wait_status(0x80, 0);
+    spinlock_unlock_irqrestore(&ata_lock, flags);
+    return result;
+}
+
 static int ata_match(const device_t *device) {
     return device && device->bus == DEVICE_BUS_PCI &&
            device->class_code == 0x01 && device->subclass == 0x01;
@@ -181,6 +190,7 @@ static int ata_probe(device_t *device) {
     discovered.block_count = sector_count;
     discovered.read = ata_read;
     discovered.write = ata_write;
+    discovered.flush = ata_flush;
     if (!storage_register(&discovered)) {
         if (claimed_io) device_release_resource(device, 0, &ata_driver);
         if (claimed_control) device_release_resource(device, 1, &ata_driver);

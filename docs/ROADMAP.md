@@ -445,6 +445,9 @@ delivers a complete framed handshake and reads the queued stream data back.
 TCP endpoints now generate checksummed outbound ACK/PSH data and FIN segments,
 advance send sequence space only after successful construction, and track
 FIN-WAIT/LAST-ACK transitions with bounded acknowledgment validation.
+TCP endpoint tables now support active opens, generating SYN segments and
+accepting a validated SYN-ACK with the correct ACK response and sequence state.
+The QEMU probe covers the client-side handshake path.
 The network service loop now forwards validated UDP frames from the hardware
 packet queue into bound endpoint tables, and the QEMU boot probe exercises that
 end-to-end queue-to-endpoint delivery path.

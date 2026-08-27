@@ -1077,6 +1077,42 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("TCP endpoint ready\r\n");
+    static tcp_endpoint_table_t tcp_active_probe_table;
+    static uint8_t tcp_active_probe_syn[TCP_HEADER_SIZE];
+    static uint8_t tcp_active_probe_synack[TCP_HEADER_SIZE];
+    tcp_endpoint_handle_t tcp_active_probe_handle = 0;
+    tcp_segment_view_t tcp_active_probe_view;
+    tcp_connection_result_t tcp_active_probe_result;
+    uint16_t tcp_active_probe_length = 0;
+    tcp_endpoint_table_initialize(&tcp_active_probe_table);
+    if (!tcp_endpoint_connect(&tcp_active_probe_table,
+                              ipv4_probe_destination, 6100,
+                              ipv4_probe_source, 6101, 500, 4096,
+                              &tcp_active_probe_handle, tcp_active_probe_syn,
+                              sizeof(tcp_active_probe_syn),
+                              &tcp_active_probe_length) ||
+        !tcp_segment_parse(tcp_active_probe_syn, tcp_active_probe_length,
+                           ipv4_probe_destination, ipv4_probe_source,
+                           &tcp_active_probe_view) ||
+        tcp_active_probe_view.sequence != 500 ||
+        tcp_active_probe_view.flags != TCP_FLAG_SYN ||
+        !tcp_segment_build(tcp_active_probe_synack, sizeof(tcp_active_probe_synack),
+                           ipv4_probe_source, ipv4_probe_destination, 6101,
+                           6100, 700, 501, TCP_FLAG_SYN | TCP_FLAG_ACK,
+                           4096, 0, 0, &tcp_active_probe_length) ||
+        !tcp_segment_parse(tcp_active_probe_synack, tcp_active_probe_length,
+                           ipv4_probe_source, ipv4_probe_destination,
+                           &tcp_active_probe_view) ||
+        !tcp_endpoint_deliver(&tcp_active_probe_table,
+                              ipv4_probe_destination, ipv4_probe_source,
+                              &tcp_active_probe_view, &tcp_active_probe_result) ||
+        tcp_active_probe_result.response_flags != TCP_FLAG_ACK ||
+        tcp_active_probe_result.response_sequence != 501 ||
+        tcp_active_probe_result.response_acknowledgment != 701) {
+        serial_write("TCP active endpoint failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("TCP active endpoint ready\r\n");
     static uint8_t arp_reply_probe_request[ETHERNET_MAX_FRAME_SIZE];
     static uint8_t arp_reply_probe_reply[ETHERNET_MAX_FRAME_SIZE];
     uint16_t arp_reply_probe_request_length = 0;

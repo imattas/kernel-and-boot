@@ -48,6 +48,49 @@ int tcp_endpoint_listen(tcp_endpoint_table_t *table,
     spinlock_unlock_irqrestore(&table->lock, flags); return 0;
 }
 
+int tcp_endpoint_connect(tcp_endpoint_table_t *table,
+                         const uint8_t local_address[4], uint16_t local_port,
+                         const uint8_t remote_address[4], uint16_t remote_port,
+                         uint32_t sequence, uint16_t window,
+                         tcp_endpoint_handle_t *handle, void *segment,
+                         uint16_t capacity, uint16_t *segment_length) {
+    if (!table || !local_address || !remote_address || !handle || !segment ||
+        !segment_length || local_port == 0 || remote_port == 0) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&table->lock);
+    for (uint32_t i = 0; i < TCP_ENDPOINT_CAPACITY; ++i) {
+        tcp_endpoint_t *endpoint = &table->endpoints[i];
+        if (!endpoint->valid || endpoint->connection.local_port != local_port ||
+            endpoint->connection.remote_port != remote_port) continue;
+        if (address_equal(endpoint->local_address, local_address) &&
+            address_equal(endpoint->remote_address, remote_address)) {
+            spinlock_unlock_irqrestore(&table->lock, flags); return 0;
+        }
+    }
+    tcp_endpoint_t *endpoint = 0;
+    for (uint32_t i = 0; i < TCP_ENDPOINT_CAPACITY; ++i)
+        if (!table->endpoints[i].valid) { endpoint = &table->endpoints[i]; *handle = i + 1U; break; }
+    if (!endpoint) {
+        spinlock_unlock_irqrestore(&table->lock, flags); return 0;
+    }
+    tcp_connection_initialize(&endpoint->connection, local_port, window);
+    if (!tcp_connection_open(&endpoint->connection, sequence, remote_port)) {
+        spinlock_unlock_irqrestore(&table->lock, flags); return 0;
+    }
+    endpoint->valid = 1;
+    for (uint32_t i = 0; i < 4; ++i) {
+        endpoint->local_address[i] = local_address[i];
+        endpoint->remote_address[i] = remote_address[i];
+    }
+    endpoint->connection.window = window;
+    endpoint->head = 0; endpoint->tail = 0; endpoint->count = 0; endpoint->dropped = 0;
+    int result = tcp_segment_build(segment, capacity, local_address, remote_address,
+                                   local_port, remote_port, sequence, 0,
+                                   TCP_FLAG_SYN, window, 0, 0, segment_length);
+    if (!result) endpoint->valid = 0;
+    spinlock_unlock_irqrestore(&table->lock, flags);
+    return result;
+}
+
 int tcp_endpoint_unbind(tcp_endpoint_table_t *table, tcp_endpoint_handle_t handle) {
     if (!table) return 0;
     uint64_t flags = spinlock_lock_irqsave(&table->lock);

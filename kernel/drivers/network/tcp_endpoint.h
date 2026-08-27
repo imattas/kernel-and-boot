@@ -34,6 +34,12 @@ void tcp_endpoint_table_initialize(tcp_endpoint_table_t *table);
 int tcp_endpoint_listen(tcp_endpoint_table_t *table,
                         const uint8_t local_address[4], uint16_t local_port,
                         uint16_t window, tcp_endpoint_handle_t *handle);
+int tcp_endpoint_connect(tcp_endpoint_table_t *table,
+                         const uint8_t local_address[4], uint16_t local_port,
+                         const uint8_t remote_address[4], uint16_t remote_port,
+                         uint32_t sequence, uint16_t window,
+                         tcp_endpoint_handle_t *handle, void *segment,
+                         uint16_t capacity, uint16_t *segment_length);
 int tcp_endpoint_unbind(tcp_endpoint_table_t *table,
                         tcp_endpoint_handle_t handle);
 int tcp_endpoint_deliver(tcp_endpoint_table_t *table,

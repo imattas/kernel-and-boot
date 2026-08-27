@@ -435,6 +435,8 @@ Current-process publication and lookup now use the process-table lock, so
 syscall and lifecycle paths cannot race on the active process pointer.
 Cross-process signal syscalls now require the same UID or
 `SECURITY_CAP_SYS_ADMIN`; self-signaling remains valid for every live process.
+Blocking signal waits now use the scheduler wait-queue handoff, and QEMU
+verifies a waiter waking on signal delivery before process teardown.
 Physical-memory initialization now rejects zero-sized or overflowing kernel
 ranges before reserving kernel frames, avoiding bitmap corruption from a bad
 firmware boot contract.

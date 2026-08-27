@@ -66,6 +66,8 @@ static volatile uint64_t preempt_task_a_ticks;
 static volatile uint64_t preempt_task_b_ticks;
 static ipc_channel_t ipc_block_probe_channel;
 static volatile uint8_t ipc_block_probe_result;
+static process_t *signal_wait_probe_process;
+static volatile uint8_t signal_wait_probe_result;
 static uint8_t ahci_read_probe[512];
 static void process_thread_probe(void *argument) { (void)argument; }
 static int block_probe_read(void *context, uint64_t sector, uint32_t count,
@@ -120,6 +122,21 @@ static void ipc_block_sender(void *argument) {
     static const char message[4] = {'p', 'i', 'n', 'g'};
     if (ipc_channel_send_wait(&ipc_block_probe_channel, 1, message,
                               sizeof(message))) ipc_block_probe_result |= 1U;
+    scheduler_task_exit();
+}
+
+static void signal_wait_receiver(void *argument) {
+    (void)argument;
+    uint32_t signal = 0;
+    if (process_wait_signal(signal_wait_probe_process, &signal) && signal == 6)
+        signal_wait_probe_result |= 2U;
+    scheduler_task_exit();
+}
+
+static void signal_wait_sender(void *argument) {
+    (void)argument;
+    if (process_send_signal(signal_wait_probe_process, 6))
+        signal_wait_probe_result |= 1U;
     scheduler_task_exit();
 }
 
@@ -1222,6 +1239,20 @@ void kernel_main(void *boot_info) {
         serial_write("process termination teardown failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
+    signal_wait_probe_process = process_create(4);
+    signal_wait_probe_result = 0;
+    scheduler_set_idle(0);
+    task_t *signal_waiter = task_create_kernel(400, signal_wait_receiver, 0, 4096);
+    task_t *signal_sender = task_create_kernel(401, signal_wait_sender, 0, 4096);
+    if (!signal_wait_probe_process || !signal_waiter || !signal_sender ||
+        !scheduler_enqueue(signal_waiter) || !scheduler_enqueue(signal_sender) ||
+        !scheduler_start() || signal_wait_probe_result != 3 ||
+        !process_destroy(signal_wait_probe_process) ||
+        !task_destroy_kernel(signal_waiter) || !task_destroy_kernel(signal_sender)) {
+        serial_write("signal blocking failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("signal blocking ready\r\n");
     serial_write("process signals ready\r\n");
     serial_write("process handles ready\r\n");
     syscall_initialize();

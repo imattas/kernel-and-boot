@@ -5,6 +5,7 @@
 #include "../../exec/exec.h"
 #include "handle.h"
 #include "../sync/spinlock.h"
+#include "../../sched/core/scheduler.h"
 
 #define PAGE_SIZE 0x1000ULL
 
@@ -42,6 +43,7 @@ process_t *process_create(uint64_t id) {
     process->user_stack_top = 0;
     process->pending_signals = 0;
     process->blocked_signals = 0;
+    task_wait_queue_initialize(&process->signal_waiters);
     process->exit_status = 0;
     process_handle_table_initialize(&process->handles);
     process->threads = 0;
@@ -173,6 +175,7 @@ int process_send_signal(process_t *process, uint32_t signal) {
     }
     __atomic_fetch_or(&process->pending_signals, 1U << (signal - 1U), __ATOMIC_RELEASE);
     spinlock_unlock_irqrestore(&process->lock, flags);
+    (void)scheduler_wake_one(&process->signal_waiters);
     return 1;
 }
 
@@ -191,29 +194,46 @@ int process_set_signal_mask(process_t *process, uint32_t mask) {
     }
     __atomic_store_n(&process->blocked_signals, mask, __ATOMIC_RELEASE);
     spinlock_unlock_irqrestore(&process->lock, flags);
+    (void)scheduler_wake_one(&process->signal_waiters);
     return 1;
 }
 
-int process_take_signal(process_t *process, uint32_t *signal) {
-    if (!process || !signal) return 0;
-    uint64_t flags = spinlock_lock_irqsave(&process->lock);
+static int take_signal_locked(process_t *process, uint32_t *signal) {
     for (;;) {
         uint32_t pending = __atomic_load_n(&process->pending_signals, __ATOMIC_ACQUIRE);
         uint32_t blocked = __atomic_load_n(&process->blocked_signals, __ATOMIC_ACQUIRE);
         uint32_t available = pending & ~blocked;
-        if (!available) {
-            spinlock_unlock_irqrestore(&process->lock, flags);
-            return 0;
-        }
+        if (!available) return 0;
         uint32_t bit = 0;
         while ((available & (1U << bit)) == 0) ++bit;
         uint32_t updated = pending & ~(1U << bit);
         if (__atomic_compare_exchange_n(&process->pending_signals, &pending, updated,
                                         0, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE)) {
             *signal = bit + 1U;
+            return 1;
+        }
+    }
+}
+
+int process_take_signal(process_t *process, uint32_t *signal) {
+    if (!process || !signal) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&process->lock);
+    int result = take_signal_locked(process, signal);
+    spinlock_unlock_irqrestore(&process->lock, flags);
+    return result;
+}
+
+int process_wait_signal(process_t *process, uint32_t *signal) {
+    if (!process || !signal) return 0;
+    for (;;) {
+        uint64_t flags = spinlock_lock_irqsave(&process->lock);
+        if (take_signal_locked(process, signal)) {
             spinlock_unlock_irqrestore(&process->lock, flags);
             return 1;
         }
+        if (process->state == PROCESS_EXITED ||
+            !scheduler_block_current_with_lock(&process->signal_waiters,
+                                               &process->lock, flags)) return 0;
     }
 }
 

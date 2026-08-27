@@ -6,6 +6,7 @@
 #include "../../security/credentials.h"
 #include "handle.h"
 #include "../../core/sync/spinlock.h"
+#include "../../core/task/wait_queue.h"
 
 typedef struct process_thread process_thread_t;
 
@@ -32,6 +33,7 @@ typedef struct process {
     uint64_t user_stack_top;
     uint32_t pending_signals;
     uint32_t blocked_signals;
+    task_wait_queue_t signal_waiters;
     int32_t exit_status;
     process_handle_table_t handles;
 } process_t;
@@ -48,6 +50,7 @@ int process_send_signal(process_t *process, uint32_t signal);
 int process_can_signal(const process_t *caller, const process_t *target);
 int process_set_signal_mask(process_t *process, uint32_t mask);
 int process_take_signal(process_t *process, uint32_t *signal);
+int process_wait_signal(process_t *process, uint32_t *signal);
 int process_terminate(process_t *process, int32_t status);
 
 #endif

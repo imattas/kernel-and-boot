@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 #include "kernel/fs/btrfs/zstd.h"
 
@@ -15,12 +16,12 @@ int main(void) {
     uint8_t compressed[] = {0x28, 0xb5, 0x2f, 0xfd, 0x20, 0x05, 0x3d, 0x00, 0x00,
                             0x28, 'h', 'e', 'l', 'l', 'o', 0x00};
     uint8_t checksummed[] = {0x28, 0xb5, 0x2f, 0xfd, 0x24, 0x05, 0x29, 0x00, 0x00,
-                             'h', 'e', 'l', 'l', 'o', 0xf9, 0x77, 0x00, 0xfb};
+                             'h', 'e', 'l', 'l', 'o', 0xa3, 0x6d, 0x9f, 0x88};
     uint8_t huffman[] = {0x28, 0xb5, 0x2f, 0xfd, 0x20, 0x02, 0x3d, 0x00, 0x00,
                          0x22, 0xc0, 0x00, 0x80, 0x10, 0x05, 0x00};
     uint8_t long_size[] = {0x28, 0xb5, 0x2f, 0xfd, 0x21, 0x00, 0x05, 0x00,
                            0x2b, 0x08, 0x00, 'A'};
-    uint8_t output[261] = {0};
+    uint8_t output[512] = {0};
     uint32_t size = 0;
     btrfs_zstd_sequence_header_t sequence;
     btrfs_fse_table_t sequence_tables[3];
@@ -118,5 +119,21 @@ int main(void) {
                                         &sequence_state, &sequence_state, &sequence_state,
                                         (const uint8_t[]){0x04}, &sequence_bits, 2,
                                         sequence_list, 1));
+    FILE *compressed_file = fopen("build/tests/zstd_real.zst", "rb");
+    FILE *raw_file = fopen("build/tests/zstd_real.raw", "rb");
+    assert(compressed_file && raw_file);
+    fseek(compressed_file, 0, SEEK_END); long compressed_length = ftell(compressed_file); rewind(compressed_file);
+    fseek(raw_file, 0, SEEK_END); long raw_length = ftell(raw_file); rewind(raw_file);
+    assert(compressed_length > 0 && compressed_length < 65536 && raw_length == 256);
+    uint8_t *compressed_bytes = malloc((size_t)compressed_length);
+    uint8_t *raw_bytes = malloc((size_t)raw_length);
+    assert(compressed_bytes && raw_bytes);
+    assert(fread(compressed_bytes, 1, (size_t)compressed_length, compressed_file) == (size_t)compressed_length);
+    assert(fread(raw_bytes, 1, (size_t)raw_length, raw_file) == (size_t)raw_length);
+    fclose(compressed_file); fclose(raw_file);
+    assert(btrfs_zstd_decompress(compressed_bytes, (uint32_t)compressed_length,
+                                 output, sizeof(output), &size));
+    assert(size == (uint32_t)raw_length && memcmp(output, raw_bytes, (size_t)raw_length) == 0);
+    free(compressed_bytes); free(raw_bytes);
     return 0;
 }

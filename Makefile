@@ -34,6 +34,7 @@ BTRFS_TEST := $(TEST_DIR)/btrfs_contract
 DEFLATE_TEST := $(TEST_DIR)/deflate_contract
 LZO_TEST := $(TEST_DIR)/lzo_contract
 ZSTD_TEST := $(TEST_DIR)/zstd_contract
+ZSTD_FIXTURE := $(TEST_DIR)/zstd_real.zst
 FSE_TEST := $(TEST_DIR)/fse_contract
 UEFI_OBJ := $(BUILD_DIR)/uefi/efi_main.obj
 UEFI_ENTRY_OBJ := $(BUILD_DIR)/uefi/entry.obj
@@ -530,7 +531,10 @@ $(DEFLATE_TEST): scripts/tests/c/deflate_contract.c kernel/fs/btrfs/deflate.c ke
 $(LZO_TEST): scripts/tests/c/lzo_contract.c kernel/fs/btrfs/lzo.c kernel/fs/btrfs/lzo.h | $(TEST_DIR)
 	$(CC) -std=c11 -Wall -Wextra -Werror -I. -o $@ scripts/tests/c/lzo_contract.c kernel/fs/btrfs/lzo.c
 
-$(ZSTD_TEST): scripts/tests/c/zstd_contract.c kernel/fs/btrfs/zstd.c kernel/fs/btrfs/zstd.h kernel/fs/btrfs/fse.c kernel/fs/btrfs/fse.h | $(TEST_DIR)
+$(ZSTD_FIXTURE): scripts/tests/python/create_zstd_fixture.py | $(TEST_DIR)
+	python3 $< $@
+
+$(ZSTD_TEST): scripts/tests/c/zstd_contract.c kernel/fs/btrfs/zstd.c kernel/fs/btrfs/zstd.h kernel/fs/btrfs/fse.c kernel/fs/btrfs/fse.h $(ZSTD_FIXTURE) | $(TEST_DIR)
 	$(CC) -std=c11 -Wall -Wextra -Werror -I. -o $@ scripts/tests/c/zstd_contract.c kernel/fs/btrfs/zstd.c kernel/fs/btrfs/fse.c
 
 $(FSE_TEST): scripts/tests/c/fse_contract.c kernel/fs/btrfs/fse.c kernel/fs/btrfs/fse.h | $(TEST_DIR)

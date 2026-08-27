@@ -10,42 +10,53 @@ static uint64_t le64(const uint8_t *p) {
     return (uint64_t)le32(p) | ((uint64_t)le32(p + 4) << 32);
 }
 
-static uint32_t zstd_rotl32(uint32_t value, uint32_t bits) {
-    return (value << bits) | (value >> (32U - bits));
+static uint64_t zstd_rotl64(uint64_t value, uint32_t bits) {
+    return (value << bits) | (value >> (64U - bits));
 }
 
 static uint32_t zstd_xxhash32(const uint8_t *input, uint32_t size) {
-    static const uint32_t p1 = 0x9e3779b1U, p2 = 0x85ebca77U;
-    static const uint32_t p3 = 0xc2b2ae3dU, p4 = 0x27d4eb2fU, p5 = 0x165667b1U;
-    uint32_t hash, position = 0;
-    if (size >= 16U) {
-        uint32_t v1 = p1 + p2, v2 = p2, v3 = 0, v4 = 0U - p1;
-        v3 = 0;
-        while (position + 16U <= size) {
-            v1 = zstd_rotl32(v1 + le32(input + position) * p3, 17) * p4;
-            v2 = zstd_rotl32(v2 + le32(input + position + 4U) * p3, 17) * p4;
-            v3 = zstd_rotl32(v3 + le32(input + position + 8U) * p3, 17) * p4;
-            v4 = zstd_rotl32(v4 + le32(input + position + 12U) * p3, 17) * p4;
-            position += 16U;
+    static const uint64_t p1 = 0x9e3779b185ebca87ULL;
+    static const uint64_t p2 = 0xc2b2ae3d27d4eb4fULL;
+    static const uint64_t p3 = 0x165667b19e3779f9ULL;
+    static const uint64_t p4 = 0x85ebca77c2b2ae63ULL;
+    static const uint64_t p5 = 0x27d4eb2f165667c5ULL;
+    uint64_t hash, position = 0;
+    if (size >= 32U) {
+        uint64_t v1 = p1 + p2, v2 = p2, v3 = 0, v4 = 0U - p1;
+        while (position + 32U <= size) {
+            v1 = zstd_rotl64(v1 + le64(input + position) * p2, 31) * p1;
+            v2 = zstd_rotl64(v2 + le64(input + position + 8U) * p2, 31) * p1;
+            v3 = zstd_rotl64(v3 + le64(input + position + 16U) * p2, 31) * p1;
+            v4 = zstd_rotl64(v4 + le64(input + position + 24U) * p2, 31) * p1;
+            position += 32U;
         }
-        hash = zstd_rotl32(v1, 1) + zstd_rotl32(v2, 7) +
-               zstd_rotl32(v3, 12) + zstd_rotl32(v4, 18);
-    } else hash = p5 + size;
-    while (position + 4U <= size) {
-        hash += le32(input + position) * p3;
-        hash = zstd_rotl32(hash, 17) * p4;
-        position += 4U;
+        hash = zstd_rotl64(v1, 1) + zstd_rotl64(v2, 7) +
+               zstd_rotl64(v3, 12) + zstd_rotl64(v4, 18);
+        v1 = zstd_rotl64(v1 * p2, 31) * p1;
+        hash ^= v1; hash = hash * p1 + p4;
+        v2 = zstd_rotl64(v2 * p2, 31) * p1;
+        hash ^= v2; hash = hash * p1 + p4;
+        v3 = zstd_rotl64(v3 * p2, 31) * p1;
+        hash ^= v3; hash = hash * p1 + p4;
+        v4 = zstd_rotl64(v4 * p2, 31) * p1;
+        hash ^= v4; hash = hash * p1 + p4;
+    } else hash = p5;
+    hash += size;
+    while (position + 8U <= size) {
+        uint64_t lane = zstd_rotl64(le64(input + position) * p2, 31) * p1;
+        hash ^= lane; hash = zstd_rotl64(hash, 27) * p1 + p4; position += 8U;
+    }
+    if (position + 4U <= size) {
+        hash ^= (uint64_t)le32(input + position) * p1;
+        hash = zstd_rotl64(hash, 23) * p2 + p3; position += 4U;
     }
     while (position < size) {
-        hash += input[position++] * p5;
-        hash = zstd_rotl32(hash, 11) * p1;
+        hash ^= (uint64_t)input[position++] * p5;
+        hash = zstd_rotl64(hash, 11) * p1;
     }
-    hash ^= hash >> 15;
-    hash *= p2;
-    hash ^= hash >> 13;
-    hash *= p3;
-    hash ^= hash >> 16;
-    return hash;
+    hash ^= hash >> 33; hash *= p2; hash ^= hash >> 29;
+    hash *= p3; hash ^= hash >> 32;
+    return (uint32_t)hash;
 }
 
 static uint64_t frame_content_size(const uint8_t *header, uint32_t descriptor,
@@ -196,6 +207,57 @@ int btrfs_zstd_execute_sequences(uint8_t *output, uint32_t output_capacity,
         if (!btrfs_zstd_execute_sequence(output, output_capacity, output_size,
                                          literals, literal_size, &literal_offset,
                                          &sequences[i])) return 0;
+    if (literal_offset > literal_size || literal_size - literal_offset >
+        output_capacity - *output_size) return 0;
+    for (uint32_t i = literal_offset; i < literal_size; ++i)
+        output[(*output_size)++] = literals[i];
+    return 1;
+}
+
+static int zstd_execute_sequences_with_offsets(
+    uint8_t *output, uint32_t output_capacity, uint32_t *output_size,
+    const uint8_t *literals, uint32_t literal_size,
+    const btrfs_zstd_sequence_t *sequences, uint32_t sequence_count,
+    uint32_t recent[3]) {
+    uint32_t literal_offset = 0;
+    if (!output || !output_size || !literals || !sequences || !recent ||
+        *output_size > output_capacity) return 0;
+    for (uint32_t i = 0; i < sequence_count; ++i) {
+        const btrfs_zstd_sequence_t *sequence = &sequences[i];
+        uint32_t offset, index;
+        if (sequence->literal_length > literal_size - literal_offset ||
+            sequence->literal_length > output_capacity - *output_size) return 0;
+        for (uint32_t j = 0; j < sequence->literal_length; ++j)
+            output[*output_size + j] = literals[literal_offset + j];
+        *output_size += sequence->literal_length;
+        literal_offset += sequence->literal_length;
+        if (sequence->offset <= 3U) {
+            index = sequence->offset - 1U;
+            if (!sequence->literal_length) ++index;
+            if (index == 3U) {
+                if (recent[0] <= 1U) return 0;
+                offset = recent[0] - 1U;
+            } else {
+                offset = recent[index];
+            }
+            if (sequence->offset == 3U && !sequence->literal_length) {
+                recent[2] = recent[1];
+                recent[1] = recent[0];
+                recent[0] = offset;
+            } else if (index != 0U) {
+                uint32_t used = recent[index];
+                for (uint32_t j = index; j > 0; --j) recent[j] = recent[j - 1U];
+                recent[0] = used;
+            }
+        } else {
+            offset = sequence->offset - 3U;
+            recent[2] = recent[1];
+            recent[1] = recent[0];
+            recent[0] = offset;
+        }
+        if (!btrfs_zstd_copy_match(output, output_capacity, output_size,
+                                   offset, sequence->match_length)) return 0;
+    }
     if (literal_offset > literal_size || literal_size - literal_offset >
         output_capacity - *output_size) return 0;
     for (uint32_t i = literal_offset; i < literal_size; ++i)
@@ -404,7 +466,7 @@ static int decode_compressed_literals(const uint8_t *input, uint32_t size,
 
 static int decode_compressed_block(const uint8_t *input, uint32_t size,
                                    uint8_t *output, uint32_t capacity,
-                                   uint32_t *decoded_size) {
+                                   uint32_t *decoded_size, uint32_t recent[3]) {
     uint32_t literals_size, literals_decoded, sequences;
     uint8_t *literals = 0;
     if (!input || !size || !output || !decoded_size ||
@@ -423,8 +485,10 @@ static int decode_compressed_block(const uint8_t *input, uint32_t size,
     btrfs_zstd_sequence_header_t header;
     btrfs_fse_table_t tables[3];
     uint32_t table_end, bit_start, bit_size, count;
-    if (!btrfs_zstd_read_sequence_header(&input[literals_size], size - literals_size, &header) ||
-        !btrfs_zstd_prepare_sequence_tables(&input[literals_size], size - literals_size,
+    if (!btrfs_zstd_read_sequence_header(&input[literals_size], size - literals_size, &header)) {
+        kfree(literals); return 0;
+    }
+    if (!btrfs_zstd_prepare_sequence_tables(&input[literals_size], size - literals_size,
                                             &header, 0, tables, &table_end) ||
         table_end > size - literals_size || table_end == size - literals_size) {
         kfree(literals); return 0;
@@ -440,15 +504,17 @@ static int decode_compressed_block(const uint8_t *input, uint32_t size,
     if (!decoded || !btrfs_fse_stream_begin(&input[bit_start], bit_size, &offset) ||
         !btrfs_fse_stream_seed(&tables[0], &input[bit_start], &states[0], &offset) ||
         !btrfs_fse_stream_seed(&tables[1], &input[bit_start], &states[2], &offset) ||
-        !btrfs_fse_stream_seed(&tables[2], &input[bit_start], &states[1], &offset) ||
-        !btrfs_zstd_decode_sequences(&tables[0], &tables[2], &tables[1], &states[0],
+        !btrfs_fse_stream_seed(&tables[2], &input[bit_start], &states[1], &offset)) {
+        kfree(decoded); kfree(literals); return 0;
+    }
+    if (!btrfs_zstd_decode_sequences(&tables[0], &tables[2], &tables[1], &states[0],
                                      &states[1], &states[2], &input[bit_start], &offset,
                                      count, decoded, count) || offset != 0) {
         kfree(decoded); kfree(literals); return 0;
     }
     uint32_t output_size = 0;
-    if (!btrfs_zstd_execute_sequences(output, capacity, &output_size, literals,
-                                      literals_decoded, decoded, count)) {
+    if (!zstd_execute_sequences_with_offsets(output, capacity, &output_size, literals,
+                                             literals_decoded, decoded, count, recent)) {
         kfree(decoded); kfree(literals); return 0;
     }
     *decoded_size = output_size;
@@ -462,6 +528,7 @@ int btrfs_zstd_decompress(const uint8_t *input, uint32_t input_size,
     uint64_t content_size;
     uint32_t header_size, dict_size;
     uint8_t single_segment, checksum;
+    uint32_t recent[3] = {1, 4, 8};
     if (!input || !output || !output_size || input_size < 6 || !output_capacity ||
         le32(input) != 0xfd2fb528U) return 0;
     descriptor = input[4];
@@ -503,7 +570,8 @@ int btrfs_zstd_decompress(const uint8_t *input, uint32_t input_size,
         } else if (block_type == 2U) {
             uint32_t decoded_block = 0;
             if (!decode_compressed_block(&input[position], block_size, output + output_position,
-                                         output_capacity - output_position, &decoded_block)) return 0;
+                                         output_capacity - output_position, &decoded_block,
+                                         recent)) return 0;
             block_size = decoded_block;
         }
         output_position += block_size;

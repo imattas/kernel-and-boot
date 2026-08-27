@@ -353,16 +353,20 @@ The predefined LL/offset/ML distributions and RLE sequence-table mode are now
 implemented and contracted. A shared sequence-table selector now handles
 predefined, RLE, FSE-compressed, and repeat modes with bounded consumption.
 Zstandard sequence-section count/mode header parsing is now implemented and
-contracted; checksum verification is complete for frames that carry a checksum.
-An end-to-end generated FSE-weight literal vector remains to be added to the
-contract suite.
+contracted; checksum verification now uses the format's XXH64 low-32-bit value
+and is covered by both a generated compressed frame and a checksum rejection
+case. A generated FSE-weight literal vector now exercises the complete
+compressed-literal, sequence, match-history, and checksum path. Four-stream
+literal blocks and their size formats remain before the Zstandard portion of
+the filesystem milestone is complete.
 The bounded overlap-safe match-copy primitive is now
 implemented and contracted, including destination-underflow rejection.
 Zstandard sequence code expansion for literal lengths, match lengths, and
 offsets is now implemented and contracted. Sequence execution now copies
-literal runs and performs validated overlapping matches; FSE symbol wiring and
-complete compressed-block sequence integration remain. FSE states are now
-wired into one-sequence decoding with offset, match-length, and literal-length
+literal runs and performs validated overlapping matches with persistent repeat
+offset history; FSE symbol wiring and complete compressed-block sequence
+integration are now exercised by the generated frame. FSE states are now
+wired into sequence decoding with offset, match-length, and literal-length
 extra-bit consumption and optional state updates.
 The block-output layer now executes all decoded sequences and appends trailing
 literals with bounded total-output validation.

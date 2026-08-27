@@ -60,16 +60,23 @@ int xfs_allocate_extent(xfs_fs_t *fs, uint32_t allocation_group,
     uint32_t records = be32(&tree[8]);
     if (records == 0 || records > (fs->block_size - 16U) / 8U) return 0;
     uint32_t selected = UINT32_MAX, selected_start = 0, selected_count = 0;
+    uint32_t previous_end = 0;
+    uint64_t total_free = 0;
     for (uint32_t i = 0; i < records; ++i) {
         uint32_t record_start = be32(&tree[16U + i * 8U]);
         uint32_t record_count = be32(&tree[20U + i * 8U]);
         if (record_count == 0 || record_count > fs->ag_blocks ||
-            record_start > fs->ag_blocks - record_count)
+            record_start > fs->ag_blocks - record_count ||
+            (i != 0 && record_start < previous_end) ||
+            total_free > UINT32_MAX - record_count)
             return 0;
+        previous_end = record_start + record_count;
+        total_free += record_count;
         if (record_count >= blocks && (selected == UINT32_MAX || record_count < selected_count)) {
             selected = i; selected_start = record_start; selected_count = record_count;
         }
     }
+    if (total_free != be32(&agf[40])) return 0;
     if (selected == UINT32_MAX || selected_start > fs->ag_blocks - blocks ||
         ag_base + selected_start > UINT64_MAX - blocks ||
         ag_base + selected_start + blocks > fs->block_count) return 0;
@@ -127,17 +134,21 @@ int xfs_free_extent(xfs_fs_t *fs, uint64_t start, uint32_t blocks) {
     if (records > capacity) return 0;
     uint32_t insert = records;
     uint32_t previous_end = 0;
+    uint64_t total_free = 0;
     for (uint32_t i = 0; i < records; ++i) {
         uint32_t record_start = be32(&tree[16U + i * 8U]);
         uint32_t record_count = be32(&tree[20U + i * 8U]);
         if (record_count == 0 || record_count > fs->ag_blocks ||
             record_start > fs->ag_blocks - record_count ||
-            (i != 0 && record_start < previous_end)) return 0;
+            (i != 0 && record_start < previous_end) ||
+            total_free > UINT32_MAX - record_count) return 0;
         previous_end = record_start + record_count;
+        total_free += record_count;
         if (relative < record_start && insert == records) insert = i;
         if (relative < record_start + record_count &&
             relative + blocks > record_start) return 0;
     }
+    if (total_free != be32(&agf[40])) return 0;
     uint32_t previous = insert == 0 ? UINT32_MAX : insert - 1U;
     uint32_t next = insert < records ? insert : UINT32_MAX;
     int joins_previous = previous != UINT32_MAX &&

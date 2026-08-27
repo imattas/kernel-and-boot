@@ -1063,6 +1063,9 @@ XFS now allocates from a validated single-level AG free-space BNO tree, updating
 AGF free-block and longest-run metadata and rolling back the tree if the AGF
 write fails. Matching extent release now rejects overlap, inserts in order, and
 coalesces adjacent free records while maintaining the same AGF accounting.
+XFS BNO allocation and release now also verify sorted non-overlapping records and
+the aggregate free-record count against AGF free-block metadata before mutation,
+rejecting inconsistent free-space trees without changing them.
 Multi-level BNO/CNT trees and full transaction logging remain later hardening
 work.
 Btrfs regular-file truncation now accepts zero-length targets, updating the

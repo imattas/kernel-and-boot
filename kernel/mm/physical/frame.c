@@ -87,6 +87,9 @@ uint64_t physical_alloc_frame(void) {
             mark_allocated(frame, 1);
             --stats.free_frames;
             ++stats.reserved_frames;
+            volatile uint64_t *memory = (volatile uint64_t *)(uintptr_t)(frame * FRAME_SIZE);
+            for (uint32_t word = 0; word < FRAME_SIZE / sizeof(uint64_t); ++word)
+                memory[word] = 0;
             spinlock_unlock_irqrestore(&frame_lock, flags);
             return frame * FRAME_SIZE;
         }

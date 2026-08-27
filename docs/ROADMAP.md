@@ -689,6 +689,8 @@ VFS now exposes retained directory-child iteration for safe enumeration by
 filesystem adapters and future userland traversal.
 VFS nodes now expose bounded write callbacks alongside reads, with boot-time
 write-path validation.
+Physical frame allocation now zero-fills reclaimed pages, with boot-time
+reallocation validation preventing stale frame contents from crossing owners.
 UHCI and e1000 now use an explicit shared PCI interrupt dispatcher because
 legacy IRQ lines may be shared; each handler independently filters its device
 status before acknowledging its own controller.

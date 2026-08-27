@@ -253,6 +253,23 @@ void kernel_main(void *boot_info) {
         serial_write("physical ownership failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
+    uint64_t zero_frame = physical_alloc_frame();
+    if (!zero_frame) {
+        serial_write("physical allocation failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    volatile uint8_t *zero_memory = (volatile uint8_t *)(uintptr_t)zero_frame;
+    zero_memory[0] = 0xa5; zero_memory[4095] = 0x5a;
+    physical_free_frame(zero_frame);
+    uint64_t recycled_frame = physical_alloc_frame();
+    if (!recycled_frame || ((volatile uint8_t *)(uintptr_t)recycled_frame)[0] != 0 ||
+        ((volatile uint8_t *)(uintptr_t)recycled_frame)[4095] != 0) {
+        if (recycled_frame) physical_free_frame(recycled_frame);
+        serial_write("physical zeroing failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    physical_free_frame(recycled_frame);
+    serial_write("physical frame hygiene ready\r\n");
     if (!virtual_memory_initialize()) {
         serial_write("virtual memory initialization failed\r\n");
         for (;;) __asm__ volatile ("hlt" ::: "memory");

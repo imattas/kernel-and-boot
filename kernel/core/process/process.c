@@ -13,6 +13,10 @@ static process_t *current_process;
 static process_t *process_table[PROCESS_MAX];
 static spinlock_t process_table_lock;
 
+static void wake_all_signal_waiters(process_t *process) {
+    while (scheduler_wake_one(&process->signal_waiters)) { }
+}
+
 int process_initialize(void) {
     spinlock_init(&process_table_lock);
     for (uint32_t i = 0; i < PROCESS_MAX; ++i) process_table[i] = 0;
@@ -138,6 +142,7 @@ int process_destroy(process_t *process) {
     if (!process) return 0;
     uint64_t process_flags = spinlock_lock_irqsave(&process->lock);
     if (process_current() == process || process->state == PROCESS_RUNNING ||
+        task_wait_queue_count(&process->signal_waiters) != 0 ||
         !process_thread_destroy_all_locked(process)) {
         spinlock_unlock_irqrestore(&process->lock, process_flags);
         return 0;
@@ -256,5 +261,6 @@ int process_terminate(process_t *process, int32_t status) {
     process->exit_status = status;
     process->state = PROCESS_EXITED;
     spinlock_unlock_irqrestore(&process->lock, flags);
+    wake_all_signal_waiters(process);
     return 1;
 }

@@ -261,7 +261,8 @@ The e1000 path now has independent build/link ownership, enables bounded
 RX/TX completion causes, and exposes a polling service that acknowledges
 causes and reclaims completed TX entries. TX/RX ring state is serialized with
 an interrupt-safe driver lock so polling and future interrupt delivery cannot
-race descriptor ownership.
+race descriptor ownership. RX delivery rejects malformed, zero-length, and
+oversized descriptors instead of silently truncating packets.
 UHCI control transfers now build a bounded multi-packet endpoint-0 TD chain,
 validate the setup transfer length, alternate data toggles, and verify every
 TD before releasing DMA frames.

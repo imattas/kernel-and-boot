@@ -178,7 +178,9 @@ int e1000_receive(void *data, uint16_t capacity, uint16_t *length) {
         spinlock_unlock_irqrestore(&e1000_lock, flags);
         return 0;
     }
-    if ((descriptor->status & E1000_DESC_EOP) == 0 || descriptor->errors != 0) {
+    if ((descriptor->status & E1000_DESC_EOP) == 0 || descriptor->errors != 0 ||
+        descriptor->length == 0 || descriptor->length > 4096 ||
+        descriptor->length > capacity) {
         descriptor->status = 0;
         descriptor->errors = 0;
         e1000_rx_index = (e1000_rx_index + 1U) % E1000_RING_COUNT;
@@ -186,7 +188,7 @@ int e1000_receive(void *data, uint16_t capacity, uint16_t *length) {
         spinlock_unlock_irqrestore(&e1000_lock, flags);
         return 0;
     }
-    uint16_t count = descriptor->length < capacity ? descriptor->length : capacity;
+    uint16_t count = descriptor->length;
     const uint8_t *source = (const uint8_t *)(uintptr_t)e1000_rx_buffers[e1000_rx_index];
     uint8_t *destination = (uint8_t *)data;
     for (uint16_t i = 0; i < count; ++i) destination[i] = source[i];

@@ -686,7 +686,8 @@ void kernel_main(void *boot_info) {
         !vfs_node_add_child(vfs_root, vfs_etc) ||
         !vfs_node_add_child(vfs_dev, vfs_console) ||
         !vfs_node_add_child(vfs_outer, vfs_root) ||
-        vfs_node_add_child(vfs_root, vfs_dev)) {
+        vfs_node_add_child(vfs_root, vfs_dev) ||
+        vfs_node_add_child(vfs_etc, vfs_dev)) {
         serial_write("VFS hierarchy failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }

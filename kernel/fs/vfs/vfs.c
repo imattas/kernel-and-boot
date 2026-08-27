@@ -86,12 +86,18 @@ int vfs_node_read(vfs_node_t *node, uint64_t offset, void *buffer, uint32_t size
 
 int vfs_node_add_child(vfs_node_t *parent, vfs_node_t *child) {
     if (!parent || !child || parent == child ||
-        parent->type != VFS_NODE_DIRECTORY || child->parent ||
-        child->name[0] == '\0') return 0;
+        parent->type != VFS_NODE_DIRECTORY || child->name[0] == '\0') return 0;
     uint64_t flags = spinlock_lock_irqsave(&parent->lock);
+    uint64_t child_flags = spinlock_lock_irqsave(&child->lock);
+    if (child->parent) {
+        spinlock_unlock_irqrestore(&child->lock, child_flags);
+        spinlock_unlock_irqrestore(&parent->lock, flags);
+        return 0;
+    }
     for (vfs_node_t *existing = parent->first_child; existing;
          existing = existing->next_sibling) {
         if (string_equal(existing->name, child->name)) {
+            spinlock_unlock_irqrestore(&child->lock, child_flags);
             spinlock_unlock_irqrestore(&parent->lock, flags);
             return 0;
         }
@@ -101,6 +107,7 @@ int vfs_node_add_child(vfs_node_t *parent, vfs_node_t *child) {
     parent->first_child = child;
     ++parent->child_count;
     __atomic_add_fetch(&child->references, 1, __ATOMIC_RELAXED);
+    spinlock_unlock_irqrestore(&child->lock, child_flags);
     spinlock_unlock_irqrestore(&parent->lock, flags);
     return 1;
 }
@@ -174,8 +181,10 @@ void vfs_node_release(vfs_node_t *node) {
 int vfs_node_remove(vfs_node_t *parent, vfs_node_t *child) {
     if (!parent || !child) return 0;
     uint64_t flags = spinlock_lock_irqsave(&parent->lock);
+    uint64_t child_flags = spinlock_lock_irqsave(&child->lock);
     if (parent->type != VFS_NODE_DIRECTORY || child->parent != parent ||
         child->child_count != 0) {
+        spinlock_unlock_irqrestore(&child->lock, child_flags);
         spinlock_unlock_irqrestore(&parent->lock, flags);
         return 0;
     }
@@ -189,6 +198,7 @@ int vfs_node_remove(vfs_node_t *parent, vfs_node_t *child) {
     child->next_sibling = 0;
     child->parent = 0;
     --parent->child_count;
+    spinlock_unlock_irqrestore(&child->lock, child_flags);
     spinlock_unlock_irqrestore(&parent->lock, flags);
     vfs_node_release(child);
     return 1;

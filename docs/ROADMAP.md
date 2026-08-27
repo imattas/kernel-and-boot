@@ -474,6 +474,9 @@ VFS attachment now rejects ancestor cycles, preserving a tree rather than
 allowing an ancestor to be inserted below one of its descendants.
 VFS reclamation now serializes child-count and private-destructor publication,
 then runs destruction outside the node lock before releasing the allocation.
+VFS node retain/release now prevents reference resurrection and marks nodes
+destroying under lock before private-data teardown, closing the SMP lifetime
+race at zero references.
 Credential access checks now reject permission values outside the supported
 Unix mode mask instead of silently ignoring malformed bits.
 The signal-next syscall now validates its writable user destination before

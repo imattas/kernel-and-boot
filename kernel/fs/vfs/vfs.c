@@ -17,23 +17,6 @@ static int string_equal(const char *left, const char *right) {
     return left[i] == right[i];
 }
 
-static void node_free_if_unused(vfs_node_t *node) {
-    if (!node) return;
-    uint64_t flags = spinlock_lock_irqsave(&node->lock);
-    if (__atomic_load_n(&node->references, __ATOMIC_ACQUIRE) != 0 ||
-        node->child_count != 0) {
-        spinlock_unlock_irqrestore(&node->lock, flags);
-        return;
-    }
-    vfs_private_destroy_fn destroy = node->private_destroy;
-    void *private_data = node->private_data;
-    node->private_destroy = 0;
-    node->private_data = 0;
-    spinlock_unlock_irqrestore(&node->lock, flags);
-    if (destroy) destroy(private_data);
-    kfree(node);
-}
-
 vfs_node_t *vfs_node_create(const char *name, vfs_node_type_t type,
                             uint64_t owner_uid, uint64_t owner_gid,
                             uint32_t mode) {
@@ -48,6 +31,7 @@ vfs_node_t *vfs_node_create(const char *name, vfs_node_type_t type,
     node->next_sibling = 0;
     node->child_count = 0;
     node->references = 1;
+    node->destroying = 0;
     node->owner_uid = owner_uid;
     node->owner_gid = owner_gid;
     node->mode = mode;
@@ -98,7 +82,7 @@ int vfs_node_add_child(vfs_node_t *parent, vfs_node_t *child) {
         parent->type != VFS_NODE_DIRECTORY || child->name[0] == '\0') return 0;
     uint64_t flags = spinlock_lock_irqsave(&parent->lock);
     uint64_t child_flags = spinlock_lock_irqsave(&child->lock);
-    if (child->parent) {
+    if (child->parent || child->destroying || child->references == 0) {
         spinlock_unlock_irqrestore(&child->lock, child_flags);
         spinlock_unlock_irqrestore(&parent->lock, flags);
         return 0;
@@ -135,8 +119,12 @@ vfs_node_t *vfs_node_lookup(vfs_node_t *parent, const char *name) {
     for (vfs_node_t *child = parent->first_child; child;
          child = child->next_sibling) {
         if (string_equal(child->name, name)) {
-            __atomic_add_fetch(&child->references, 1, __ATOMIC_RELAXED);
-            result = child;
+            uint64_t child_flags = spinlock_lock_irqsave(&child->lock);
+            if (!child->destroying && child->references != 0) {
+                ++child->references;
+                result = child;
+            }
+            spinlock_unlock_irqrestore(&child->lock, child_flags);
             break;
         }
     }
@@ -180,18 +168,33 @@ vfs_node_t *vfs_lookup_path(vfs_node_t *root, const char *path) {
 }
 
 void vfs_node_retain(vfs_node_t *node) {
-    if (node) __atomic_add_fetch(&node->references, 1, __ATOMIC_RELAXED);
+    if (!node) return;
+    uint64_t flags = spinlock_lock_irqsave(&node->lock);
+    if (!node->destroying && node->references != 0) ++node->references;
+    spinlock_unlock_irqrestore(&node->lock, flags);
 }
 
 void vfs_node_release(vfs_node_t *node) {
     if (!node) return;
-    uint32_t references = __atomic_load_n(&node->references, __ATOMIC_ACQUIRE);
-    while (references != 0 &&
-           !__atomic_compare_exchange_n(&node->references, &references,
-                                        references - 1, 0, __ATOMIC_ACQ_REL,
-                                        __ATOMIC_ACQUIRE)) { }
-    if (references != 1) return;
-    node_free_if_unused(node);
+    uint64_t flags = spinlock_lock_irqsave(&node->lock);
+    if (node->destroying || node->references == 0) {
+        spinlock_unlock_irqrestore(&node->lock, flags);
+        return;
+    }
+    --node->references;
+    int free_node = node->references == 0 && node->child_count == 0;
+    if (free_node) node->destroying = 1;
+    vfs_private_destroy_fn destroy = free_node ? node->private_destroy : 0;
+    void *private_data = free_node ? node->private_data : 0;
+    if (free_node) {
+        node->private_destroy = 0;
+        node->private_data = 0;
+    }
+    spinlock_unlock_irqrestore(&node->lock, flags);
+    if (free_node) {
+        if (destroy) destroy(private_data);
+        kfree(node);
+    }
 }
 
 int vfs_node_remove(vfs_node_t *parent, vfs_node_t *child) {

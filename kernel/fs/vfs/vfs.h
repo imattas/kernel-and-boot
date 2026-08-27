@@ -22,6 +22,7 @@ struct vfs_node {
     struct vfs_node *next_sibling;
     uint32_t child_count;
     uint32_t references;
+    uint8_t destroying;
     uint64_t owner_uid;
     uint64_t owner_gid;
     uint32_t mode;

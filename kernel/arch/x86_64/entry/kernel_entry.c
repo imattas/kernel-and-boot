@@ -83,6 +83,11 @@ static volatile uint8_t ipc_block_probe_result;
 static process_t *signal_wait_probe_process;
 static volatile uint8_t signal_wait_probe_result;
 static uint8_t ahci_read_probe[512];
+static volatile uint32_t owned_handle_release_count;
+
+static void owned_handle_release_probe(void *object) {
+    if (object) ++owned_handle_release_count;
+}
 typedef struct {
     network_packet_queue_t *queue;
     arp_cache_t *arp_cache;
@@ -2110,8 +2115,13 @@ void kernel_main(void *boot_info) {
     int handle_probe = signal_process ? process_handle_open(&signal_process->handles,
         &handle_probe_object, PROCESS_HANDLE_READ | PROCESS_HANDLE_WRITE) : 0;
     int replacement_handle = 0;
+    owned_handle_release_count = 0;
+    int owned_handle = signal_process ? process_handle_open_owned(
+        &signal_process->handles, &handle_probe_object, PROCESS_HANDLE_READ,
+        owned_handle_release_probe) : 0;
     uint32_t signal = 0;
     if (!signal_process || process_lookup(2) != signal_process || !handle_probe ||
+        !owned_handle ||
         process_handle_get(&signal_process->handles, (uint32_t)handle_probe,
                            PROCESS_HANDLE_READ) != &handle_probe_object ||
         process_handle_get(&signal_process->handles, (uint32_t)handle_probe,
@@ -2129,7 +2139,8 @@ void kernel_main(void *boot_info) {
         !process_take_signal(signal_process, &signal) || signal != 2 ||
         process_take_signal(signal_process, &signal) ||
         !process_terminate(signal_process, 42) ||
-        signal_process->exit_status != 42 || !process_destroy(signal_process)) {
+        signal_process->exit_status != 42 || !process_destroy(signal_process) ||
+        owned_handle_release_count != 1) {
         serial_write("process signal lifecycle failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }

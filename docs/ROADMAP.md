@@ -37,6 +37,9 @@ retained process lookup, user-status copyout, self-wait rejection, and cleanup
 of the retained process object.
 Process construction now has an atomic kernel helper that owns ELF loading,
 the complete user stack, and the initial user task, with teardown on failure.
+Process handles now optionally own release callbacks, and close/process teardown
+detaches entries before invoking callbacks so object destruction cannot run under
+the handle-table lock.
 
 Establish early stack/state assumptions, descriptor tables, exception handling, interrupt infrastructure, CPU feature discovery, panic/diagnostic paths, and a documented boot-to-kernel contract.
 

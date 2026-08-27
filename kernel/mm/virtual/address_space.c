@@ -367,6 +367,15 @@ int address_space_activate(const address_space_t *space) {
     return result;
 }
 
+int address_space_activate_kernel(void) {
+    uint64_t flags = spinlock_lock_irqsave(&address_space_lock);
+    x86_64_load_page_root(root);
+    active_root = root;
+    active_space = 0;
+    spinlock_unlock_irqrestore(&address_space_lock, flags);
+    return root != 0;
+}
+
 int address_space_destroy(address_space_t *space) {
     uint64_t flags = spinlock_lock_irqsave(&address_space_lock);
     int result = address_space_destroy_locked(space);

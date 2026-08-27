@@ -19,6 +19,7 @@ int virtual_memory_map_page(uint64_t virtual_address, uint64_t physical_address,
 uint64_t virtual_memory_root(void);
 int address_space_create(address_space_t *space);
 int address_space_activate(const address_space_t *space);
+int address_space_activate_kernel(void);
 int address_space_destroy(address_space_t *space);
 int address_space_map_page(address_space_t *space, uint64_t virtual_address,
                            uint64_t physical_address, uint64_t flags);

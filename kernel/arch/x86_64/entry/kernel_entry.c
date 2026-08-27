@@ -3118,7 +3118,9 @@ void kernel_main(void *boot_info) {
         serial_write("dead process remained current\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
-    if (!process_thread_destroy(ring3_probe_thread)) {
+    if (!process_thread_destroy(ring3_probe_thread) ||
+        !address_space_activate_kernel() ||
+        !process_destroy(runtime_process)) {
         serial_write("ring3 transition failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }

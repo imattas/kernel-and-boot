@@ -432,6 +432,9 @@ shared input event queue.
 USB HID keyboard decoding now validates and exposes all six boot-report key
 slots through a bounded event array; the boot probe covers multi-key reports
 and duplicate-key rejection.
+USB HID keyboard polling now tracks the previous six-key report and emits
+bounded press/release transitions, preventing repeated held-key reports from
+being misclassified as new presses.
 PS/2 mouse initialization now verifies the controller auxiliary-port test
 before enabling mouse commands, preventing an unavailable second port from
 being published as an active input backend.

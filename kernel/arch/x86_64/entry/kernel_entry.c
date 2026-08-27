@@ -1618,6 +1618,24 @@ void kernel_main(void *boot_info) {
         serial_write("USB HID keyboard failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
+    usb_hid_keyboard_state_t hid_probe_state;
+    input_event_t hid_transition_events[12];
+    uint32_t hid_transition_count = 0;
+    usb_hid_keyboard_state_initialize(&hid_probe_state);
+    static const uint8_t hid_release_report[8] = {0, 0, 0x05, 0, 0, 0, 0, 0};
+    if (!usb_hid_keyboard_decode_state(hid_probe_report, sizeof(hid_probe_report),
+                                       &hid_probe_state, hid_transition_events,
+                                       &hid_transition_count) ||
+        hid_transition_count != 2 ||
+        !usb_hid_keyboard_decode_state(hid_release_report,
+                                       sizeof(hid_release_report),
+                                       &hid_probe_state, hid_transition_events,
+                                       &hid_transition_count) ||
+        hid_transition_count != 1 || hid_transition_events[0].code != 0x04 ||
+        hid_transition_events[0].value != 0) {
+        serial_write("USB HID keyboard state failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
     serial_write("USB HID keyboard ready\r\n");
     static const uint8_t hid_mouse_probe_report[3] = {0x05, 0x04, 0xfb};
     input_event_t hid_mouse_probe_events[3];
@@ -1642,11 +1660,18 @@ void kernel_main(void *boot_info) {
         int uhci_report_ready = uhci_interrupt_transfer(
             1, uhci_interrupt_endpoint, uhci_report, uhci_interrupt_packet,
             uhci_interrupt_packet, &uhci_toggle);
-        input_event_t uhci_events[6];
+        input_event_t uhci_events[12];
         uint32_t uhci_event_count = 0;
+        static usb_hid_keyboard_state_t uhci_hid_state;
+        static uint8_t uhci_hid_state_initialized;
+        if (!uhci_hid_state_initialized) {
+            usb_hid_keyboard_state_initialize(&uhci_hid_state);
+            uhci_hid_state_initialized = 1;
+        }
         if (uhci_report_ready &&
-            usb_hid_keyboard_decode_report(uhci_report, uhci_interrupt_packet,
-                                           uhci_events, &uhci_event_count)) {
+            usb_hid_keyboard_decode_state(uhci_report, uhci_interrupt_packet,
+                                          &uhci_hid_state, uhci_events,
+                                          &uhci_event_count)) {
             for (uint32_t event = 0; event < uhci_event_count; ++event)
                 if (!input_queue_push(&input_queue, &uhci_events[event])) {
                     serial_write("UHCI HID input delivery failure\r\n");

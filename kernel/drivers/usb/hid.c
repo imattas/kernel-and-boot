@@ -18,13 +18,46 @@ int usb_hid_keyboard_decode_report(const uint8_t *report, uint32_t length,
         return 0;
     for (uint32_t i = 2; i < 8; ++i)
         for (uint32_t j = i + 1; j < 8; ++j)
-            if (report[i] != 0 && report[i] == report[j]) return 0;
+            if (report[i] != 0 && (report[i] < 4 || report[i] == report[j]))
+                return 0;
     *event_count = 0;
     for (uint32_t i = 2; i < 8; ++i) {
         if (report[i] == 0) continue;
         events[*event_count] = (input_event_t){INPUT_EVENT_KEY, report[i], 1, 0};
         ++*event_count;
     }
+    return 1;
+}
+
+void usb_hid_keyboard_state_initialize(usb_hid_keyboard_state_t *state) {
+    if (!state) return;
+    for (uint32_t i = 0; i < 6; ++i) state->keys[i] = 0;
+}
+
+static int hid_key_present(const uint8_t keys[6], uint8_t key) {
+    for (uint32_t i = 0; i < 6; ++i)
+        if (keys[i] == key) return 1;
+    return 0;
+}
+
+int usb_hid_keyboard_decode_state(const uint8_t *report, uint32_t length,
+                                  usb_hid_keyboard_state_t *state,
+                                  input_event_t events[12],
+                                  uint32_t *event_count) {
+    if (!state || !events || !event_count ||
+        !usb_hid_keyboard_decode_report(report, length, events, event_count))
+        return 0;
+    uint8_t next[6];
+    for (uint32_t i = 0; i < 6; ++i) next[i] = report[i + 2];
+    uint32_t count = 0;
+    for (uint32_t i = 0; i < 6; ++i)
+        if (state->keys[i] != 0 && !hid_key_present(next, state->keys[i]))
+            events[count++] = (input_event_t){INPUT_EVENT_KEY, state->keys[i], 0, 0};
+    for (uint32_t i = 0; i < 6; ++i)
+        if (next[i] != 0 && !hid_key_present(state->keys, next[i]))
+            events[count++] = (input_event_t){INPUT_EVENT_KEY, next[i], 1, 0};
+    for (uint32_t i = 0; i < 6; ++i) state->keys[i] = next[i];
+    *event_count = count;
     return 1;
 }
 

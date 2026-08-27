@@ -1281,6 +1281,30 @@ void kernel_main(void *boot_info) {
         serial_write("TCP reset response failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
+    if (!tcp_segment_build(tcp_reset_segment, sizeof(tcp_reset_segment),
+                           ipv4_probe_source, ipv4_probe_destination, 6500,
+                           6501, 50, 0, TCP_FLAG_SYN, 4096, 0, 0,
+                           &tcp_reset_segment_length) ||
+        !ipv4_packet_build(tcp_reset_ip, sizeof(tcp_reset_ip),
+                           ipv4_probe_source, ipv4_probe_destination, 6, 64,
+                           0x6502, tcp_reset_segment, tcp_reset_segment_length,
+                           &tcp_reset_ip_length) ||
+        !ethernet_frame_build(tcp_reset_frame, sizeof(tcp_reset_frame),
+                              ethernet_probe_destination, ethernet_probe_source,
+                              0x0800, tcp_reset_ip, tcp_reset_ip_length,
+                              &tcp_reset_frame_length) ||
+        !network_build_tcp_reset(tcp_reset_frame, tcp_reset_frame_length,
+                                 ethernet_probe_source, ipv4_probe_destination,
+                                 tcp_reset_reply, sizeof(tcp_reset_reply),
+                                 &tcp_reset_reply_length) ||
+        !network_decode_frame(tcp_reset_reply, tcp_reset_reply_length,
+                              &tcp_reset_view) || tcp_reset_view.tcp.flags !=
+                              (TCP_FLAG_RST | TCP_FLAG_ACK) ||
+                              tcp_reset_view.tcp.sequence != 0 ||
+                              tcp_reset_view.tcp.acknowledgment != 51) {
+        serial_write("TCP SYN reset response failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
     serial_write("TCP reset response ready\r\n");
     static tcp_endpoint_table_t tcp_active_probe_table;
     static uint8_t tcp_active_probe_syn[TCP_HEADER_SIZE];

@@ -3,6 +3,7 @@ default rel
 
 global arch_keyboard_irq_stub
 extern ps2_keyboard_irq
+extern arch_apic_eoi
 
 arch_keyboard_irq_stub:
     push rax
@@ -15,8 +16,7 @@ arch_keyboard_irq_stub:
     push r10
     push r11
     call ps2_keyboard_irq
-    mov al, 0x20
-    out 0x20, al
+    call arch_apic_eoi
     pop r11
     pop r10
     pop r9

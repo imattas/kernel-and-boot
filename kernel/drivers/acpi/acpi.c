@@ -15,6 +15,8 @@ typedef struct {
     acpi_header_t header; uint32_t lapic_address; uint32_t flags;
 } __attribute__((packed)) acpi_madt_t;
 
+#define ACPI_MAX_TABLE_LENGTH (1024U * 1024U)
+
 static uint32_t enabled_cpus;
 static uint32_t apic_ids[64];
 static uint64_t local_apic_base;
@@ -27,6 +29,12 @@ static uint32_t io_apic_count;
 static uint32_t irq_gsi[16];
 static uint16_t irq_flags[16];
 static uint8_t irq_override[16];
+
+static int table_range_valid(uint64_t address, uint32_t length) {
+    return address != 0 && address <= UINT32_MAX && length != 0 &&
+           length <= ACPI_MAX_TABLE_LENGTH &&
+           address <= UINT64_MAX - (uint64_t)length;
+}
 
 static int checksum_ok(const void *address, uint32_t length) {
     const uint8_t *bytes = address; uint8_t checksum = 0;
@@ -49,22 +57,29 @@ int acpi_initialize(uint64_t rsdp_address) {
     for (uint32_t i = 0; i < 16; ++i) {
         irq_gsi[i] = i; irq_flags[i] = 0; irq_override[i] = 0;
     }
-    if (!rsdp_address) return 0;
+    if (!table_range_valid(rsdp_address, sizeof(acpi_rsdp_t))) return 0;
     const acpi_rsdp_t *rsdp = (const acpi_rsdp_t *)(uintptr_t)rsdp_address;
     if (!signature_is(rsdp->signature, "RSD PTR ", 8) || !checksum_ok(rsdp, 20) ||
         rsdp->revision < 2 || rsdp->length < sizeof(acpi_rsdp_t) ||
-        !checksum_ok(rsdp, rsdp->length) || !rsdp->xsdt_address) return 0;
+        !table_range_valid(rsdp_address, rsdp->length) ||
+        !checksum_ok(rsdp, rsdp->length) ||
+        !table_range_valid(rsdp->xsdt_address, sizeof(acpi_header_t))) return 0;
     const acpi_header_t *xsdt = (const acpi_header_t *)(uintptr_t)rsdp->xsdt_address;
     if (!signature_is(xsdt->signature, "XSDT", 4) ||
-        xsdt->length < sizeof(acpi_header_t) || !checksum_ok(xsdt, xsdt->length)) return 0;
+        xsdt->length < sizeof(acpi_header_t) ||
+        !table_range_valid(rsdp->xsdt_address, xsdt->length) ||
+        !checksum_ok(xsdt, xsdt->length)) return 0;
     uint32_t entry_bytes = xsdt->length - sizeof(acpi_header_t);
     if (entry_bytes & 7) return 0;
     const uint64_t *entries = (const uint64_t *)((const uint8_t *)xsdt + sizeof(acpi_header_t));
     const acpi_madt_t *madt = 0;
     for (uint32_t i = 0; i < entry_bytes / sizeof(uint64_t); ++i) {
+        if (!table_range_valid(entries[i], sizeof(acpi_header_t))) continue;
         const acpi_header_t *table = (const acpi_header_t *)(uintptr_t)entries[i];
-        if (table && signature_is(table->signature, "APIC", 4)) {
-            if (table->length >= sizeof(acpi_madt_t) && checksum_ok(table, table->length))
+        if (signature_is(table->signature, "APIC", 4)) {
+            if (table->length >= sizeof(acpi_madt_t) &&
+                table_range_valid(entries[i], table->length) &&
+                checksum_ok(table, table->length))
                 madt = (const acpi_madt_t *)table;
             break;
         }

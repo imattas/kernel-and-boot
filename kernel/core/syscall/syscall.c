@@ -158,6 +158,9 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
             process_handle_release_ref(&ref);
             return 1;
         }
+        case OS_SYSCALL_EXIT:
+            if (arg1 > UINT32_MAX) return OS_SYSCALL_ERROR;
+            process_exit_current((int32_t)(uint32_t)arg1);
         case OS_SYSCALL_SIGNAL_NEXT: {
             uint32_t signal = 0;
             if (!user_range(arg1, sizeof(signal), 1) ||

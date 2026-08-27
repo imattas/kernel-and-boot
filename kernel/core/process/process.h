@@ -68,5 +68,6 @@ int process_take_signal(process_t *process, uint32_t *signal);
 int process_wait_signal(process_t *process, uint32_t *signal);
 int process_wait(process_t *process, int32_t *status);
 int process_terminate(process_t *process, int32_t status);
+__attribute__((noreturn)) void process_exit_current(int32_t status);
 
 #endif

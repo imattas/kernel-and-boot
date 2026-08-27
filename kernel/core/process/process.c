@@ -17,6 +17,25 @@ static void wake_all_signal_waiters(process_t *process) {
     while (scheduler_wake_one(&process->signal_waiters)) { }
 }
 
+__attribute__((noreturn)) void process_exit_current(int32_t status) {
+    process_t *process = process_current();
+    task_t *task = scheduler_current();
+    if (!process || !task) {
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    uint64_t flags = spinlock_lock_irqsave(&process->lock);
+    if (process->state == PROCESS_EXITED) {
+        spinlock_unlock_irqrestore(&process->lock, flags);
+        scheduler_task_exit();
+    }
+    process->exit_status = status;
+    process->state = PROCESS_EXITED;
+    spinlock_unlock_irqrestore(&process->lock, flags);
+    wake_all_signal_waiters(process);
+    while (scheduler_wake_one(&process->exit_waiters)) { }
+    scheduler_task_exit();
+}
+
 int process_initialize(void) {
     spinlock_init(&process_table_lock);
     for (uint32_t i = 0; i < PROCESS_MAX; ++i) process_table[i] = 0;

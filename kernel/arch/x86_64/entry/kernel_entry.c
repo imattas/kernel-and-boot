@@ -2266,6 +2266,8 @@ void kernel_main(void *boot_info) {
             OS_SYSCALL_ERROR ||
         syscall_dispatch(OS_SYSCALL_SIGNAL_SEND_TO, 1, 0x100000001ULL, 0) !=
             OS_SYSCALL_ERROR ||
+        syscall_dispatch(OS_SYSCALL_EXIT, 0x100000000ULL, 0, 0) !=
+            OS_SYSCALL_ERROR ||
         syscall_dispatch(OS_SYSCALL_PROCESS_WAIT, 6, 0x8000009fffULL, 0) !=
             OS_SYSCALL_ERROR ||
         syscall_dispatch(OS_SYSCALL_PROCESS_WAIT, 6, 0x8000002000ULL, 0) != 0 ||

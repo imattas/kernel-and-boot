@@ -3,6 +3,7 @@
 #include "../pci/pci.h"
 #include "../../mm/physical/frame.h"
 #include "../../arch/x86_64/cpu/tables.h"
+#include "../../core/sync/spinlock.h"
 
 #define UHCI_BAR_INDEX 4
 #define UHCI_USBCMD 0x00
@@ -44,6 +45,7 @@ static int uhci_irq_enabled;
 static volatile uint32_t uhci_interrupts;
 static int uhci_low_speed;
 static int uhci_io_disabled;
+static spinlock_t uhci_lock;
 
 typedef struct {
     uint32_t link;
@@ -190,7 +192,7 @@ static int uhci_probe(device_t *device) {
     return 1;
 }
 
-int uhci_control_transfer(uint8_t address, uint8_t endpoint,
+static int uhci_control_transfer_locked(uint8_t address, uint8_t endpoint,
                           const uint8_t setup[8], void *data, uint16_t length) {
     if (uhci_io_disabled || !controller_base || !controller_frame_list || !setup || address > 127 ||
         endpoint > 15 || length > 4096 || (length != 0 && !data) ||
@@ -276,7 +278,7 @@ int uhci_control_transfer(uint8_t address, uint8_t endpoint,
     return complete;
 }
 
-int uhci_interrupt_transfer(uint8_t address, uint8_t endpoint, void *data,
+static int uhci_interrupt_transfer_locked(uint8_t address, uint8_t endpoint, void *data,
                             uint16_t length, uint16_t max_packet,
                             uint8_t *toggle) {
     if (uhci_io_disabled || !controller_base || !controller_frame_list || !data || address > 127 ||
@@ -364,6 +366,7 @@ int uhci_initialize(void) {
     uhci_io_disabled = 0;
     uhci_irq_enabled = 0;
     uhci_interrupts = 0;
+    spinlock_init(&uhci_lock);
     uhci_driver.name = "uhci";
     uhci_driver.bus = DEVICE_BUS_PCI;
     uhci_driver.match = uhci_match;
@@ -375,10 +378,34 @@ uint32_t uhci_controller_count(void) { return controllers; }
 uint32_t uhci_root_port_count(void) { return root_ports; }
 int uhci_interrupt_enabled(void) { return uhci_irq_enabled; }
 uint32_t uhci_interrupt_count(void) { return uhci_interrupts; }
+int uhci_control_transfer(uint8_t address, uint8_t endpoint,
+                          const uint8_t setup[8], void *data, uint16_t length) {
+    uint64_t flags = spinlock_lock_irqsave(&uhci_lock);
+    int result = uhci_control_transfer_locked(address, endpoint, setup, data, length);
+    spinlock_unlock_irqrestore(&uhci_lock, flags);
+    return result;
+}
+
+int uhci_interrupt_transfer(uint8_t address, uint8_t endpoint, void *data,
+                            uint16_t length, uint16_t max_packet,
+                            uint8_t *toggle) {
+    uint64_t flags = spinlock_lock_irqsave(&uhci_lock);
+    int result = uhci_interrupt_transfer_locked(address, endpoint, data, length,
+                                                max_packet, toggle);
+    spinlock_unlock_irqrestore(&uhci_lock, flags);
+    return result;
+}
+
 void uhci_interrupt_handler(void) {
-    if (!controller_base) return;
+    uint64_t flags = spinlock_lock_irqsave(&uhci_lock);
+    if (!controller_base) {
+        spinlock_unlock_irqrestore(&uhci_lock, flags);
+        return;
+    }
     uint16_t status = uhci_status();
-    if ((status & UHCI_INTR_MASK) == 0) return;
-    ++uhci_interrupts;
-    uhci_acknowledge_status(status & 0x001fU);
+    if ((status & UHCI_INTR_MASK) != 0) {
+        ++uhci_interrupts;
+        uhci_acknowledge_status(status & 0x001fU);
+    }
+    spinlock_unlock_irqrestore(&uhci_lock, flags);
 }

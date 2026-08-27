@@ -170,7 +170,7 @@ int xfs_write_file(xfs_fs_t *fs, uint64_t inode, uint64_t offset,
     if (!fs || !fs->mounted || !buffer || size == 0 ||
         !xfs_read_inode(fs, inode, data)) return 0;
     uint32_t core = fs->inode_size == 256 ? 100U : 176U;
-    uint64_t file_size = be64(&data[8]);
+    uint64_t file_size = be64(&data[56]);
     if (offset > file_size || (uint64_t)size > file_size - offset ||
         core > fs->inode_size || (be16(&data[0]) & 0xf000U) != 0x8000U)
         return 0;

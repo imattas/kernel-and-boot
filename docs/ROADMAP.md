@@ -1002,6 +1002,9 @@ Ext4 direct-block regular files now support bounded growth through the group
 block bitmap, zero-filled newly allocated blocks, inode pointer updates, and
 block release during shrink/truncate; the contract covers multi-block growth
 and readback.
+XFS local-format regular files now support bounded append growth within the
+inode payload and zero-length truncation with inline data clearing; extent
+allocation remains a separate XFS metadata milestone.
 validates the primary and backup boot-region checksums, supports bounded
 directory-relative lookup and reads, validates directory entry-set checksums,
 and compares validated UTF-8 names with their on-disk UTF-16 names. Ext4 now has

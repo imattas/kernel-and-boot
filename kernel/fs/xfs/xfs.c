@@ -194,17 +194,18 @@ int xfs_write_file(xfs_fs_t *fs, uint64_t inode, uint64_t offset,
         !xfs_read_inode(fs, inode, data)) return 0;
     uint32_t core = fs->inode_size == 256 ? 100U : 176U;
     uint64_t file_size = be64(&data[56]);
-    if (offset > file_size || (uint64_t)size > file_size - offset ||
+    if (offset > file_size || offset > UINT64_MAX - size ||
         core > fs->inode_size || (be16(&data[2]) & 0xf000U) != 0x8000U)
         return 0;
     if (data[5] == XFS_FORMAT_LOCAL) {
-        if (offset > fs->inode_size - core ||
-            size > fs->inode_size - core - (uint32_t)offset) return 0;
+        uint64_t end = offset + size;
+        if (end > fs->inode_size - core) return 0;
         for (uint32_t i = 0; i < size; ++i)
             data[core + (uint32_t)offset + i] = ((const uint8_t *)buffer)[i];
+        if (end > file_size) store_be64(&data[56], end);
         return xfs_write_inode(fs, inode, data);
     }
-    if (data[5] != XFS_FORMAT_EXTENTS) return 0;
+    if (data[5] != XFS_FORMAT_EXTENTS || (uint64_t)size > file_size - offset) return 0;
     uint32_t extent_count = be32(&data[76]);
     if (extent_count == 0 || extent_count > (fs->inode_size - core) / 16U)
         return 0;
@@ -232,8 +233,13 @@ int xfs_write_file(xfs_fs_t *fs, uint64_t inode, uint64_t offset,
 
 int xfs_truncate_file(xfs_fs_t *fs, uint64_t inode, uint64_t size) {
     uint8_t data[4096];
-    if (!fs || !fs->mounted || size == 0 || !xfs_read_inode(fs, inode, data) ||
-        (be16(&data[2]) & 0xf000U) != 0x8000U || size >= be64(&data[56])) return 0;
+    if (!fs || !fs->mounted || !xfs_read_inode(fs, inode, data) ||
+        (be16(&data[2]) & 0xf000U) != 0x8000U || size > be64(&data[56])) return 0;
+    if (data[5] == XFS_FORMAT_LOCAL) {
+        uint32_t core = data[4] == 2 ? XFS_CORE_V2_SIZE : 100U;
+        if (size > fs->inode_size - core) return 0;
+        for (uint64_t i = size; i < be64(&data[56]); ++i) data[core + i] = 0;
+    }
     store_be64(&data[56], size);
     return xfs_write_inode(fs, inode, data);
 }

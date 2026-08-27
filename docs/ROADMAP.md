@@ -347,6 +347,8 @@ duplicate driver names before binding.
 Device registration, driver registration, enumeration, and binding now use
 dedicated IRQ-safe synchronization, while probe callbacks do not hold the
 resource ownership lock.
+Driver binding snapshots the published driver table under the registry lock,
+so concurrent registration cannot expose a partially written callback entry.
 Device resource claim, release, and ownership queries now serialize through an
 IRQ-safe ownership lock, preventing concurrent driver probes from claiming the
 same BAR.

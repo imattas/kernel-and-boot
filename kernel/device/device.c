@@ -82,6 +82,9 @@ int device_bind_drivers(void) {
     uint64_t flags = spinlock_lock_irqsave(&registry_lock);
     uint32_t devices = registry_count;
     uint32_t drivers_total = driver_count;
+    const device_driver_t *driver_snapshot[DEVICE_DRIVER_CAPACITY];
+    for (uint32_t i = 0; i < drivers_total; ++i)
+        driver_snapshot[i] = drivers[i];
     spinlock_unlock_irqrestore(&registry_lock, flags);
     for (uint32_t i = 0; i < devices; ++i) {
         flags = spinlock_lock_irqsave(&registry_lock);
@@ -89,7 +92,7 @@ int device_bind_drivers(void) {
         spinlock_unlock_irqrestore(&registry_lock, flags);
         if (already_bound) continue;
         for (uint32_t j = 0; j < drivers_total; ++j) {
-            const device_driver_t *driver = drivers[j];
+            const device_driver_t *driver = driver_snapshot[j];
             if (driver->bus != registry[i].bus || !driver->match(&registry[i]))
                 continue;
             if (driver->probe(&registry[i])) {

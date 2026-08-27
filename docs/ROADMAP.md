@@ -352,6 +352,10 @@ freeing, and availability queries.
 Virtual memory mapping, address-space lifecycle, page-flag updates, unmapping,
 and user-range validation now share an IRQ-safe address-space lock, protecting
 page-table and owned-frame metadata across SMP callers.
+Process-table startup now has an explicit initializer that resets table,
+current-process, and lock state before process/thread creation.
+APIC PIT calibration now uses a bounded wait budget and retains a validated
+fallback count, preventing slow firmware emulation from blocking kernel boot.
 UEFI memory-map retries now release rejected candidate pools and validate boot
 services before dereferencing them, keeping ExitBootServices preparation
 bounded without leaking retry buffers.

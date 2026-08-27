@@ -27,6 +27,7 @@
 #define PIT_CONTROL 0x61
 #define PIT_INPUT_HZ 1193182U
 #define PIT_CALIBRATION_HZ 100U
+#define APIC_CALIBRATION_ATTEMPTS 250000U
 
 static volatile uint32_t *lapic;
 
@@ -70,7 +71,7 @@ static uint32_t apic_timer_calibrate(void) {
     io_write8(PIT_CHANNEL2, (uint8_t)(pit_count >> 8));
 
     lapic_write(APIC_REG_TIMER_INITIAL, 0xffffffffU);
-    uint32_t attempts = 2000000U;
+    uint32_t attempts = APIC_CALIBRATION_ATTEMPTS;
     while ((io_read8(PIT_CONTROL) & 0x20U) == 0 && attempts-- != 0)
         __asm__ volatile ("pause" ::: "memory");
     uint32_t elapsed = 0xffffffffU - lapic_read(APIC_REG_TIMER_CURRENT);

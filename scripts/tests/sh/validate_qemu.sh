@@ -32,6 +32,7 @@ grep -F 'e1000 interrupt delivery ready' "$log" >/dev/null
 grep -E 'AHCI driver ready controllers=0x[0-9a-fA-F]*[1-9a-fA-F].*ready=0x[0-9a-fA-F]*[1-9a-fA-F]' "$log" >/dev/null
 grep -F 'AHCI identify ready' "$log" >/dev/null
 grep -F 'AHCI sector read ready' "$log" >/dev/null
+grep -F 'AHCI interrupt delivery ready' "$log" >/dev/null
 grep -E 'storage devices=0x[0-9a-fA-F]*[1-9a-fA-F]' "$log" >/dev/null
 grep -F 'storage ready' "$log" >/dev/null
 grep -F 'storage read-write ready' "$log" >/dev/null

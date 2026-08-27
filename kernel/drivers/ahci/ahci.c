@@ -1,6 +1,8 @@
 #include "ahci.h"
 #include "../../device/device.h"
 #include "../../mm/physical/frame.h"
+#include "../../arch/x86_64/cpu/tables.h"
+#include "../pci/pci.h"
 
 #define PCI_CLASS_MASS_STORAGE 0x01
 #define PCI_SUBCLASS_SATA 0x06
@@ -23,8 +25,14 @@
 #define AHCI_PORT_TFD 0x20
 #define AHCI_PORT_SIG 0x24
 #define AHCI_PORT_IS 0x10
+#define AHCI_PORT_IE 0x14
 #define AHCI_PORT_PRDBC 0x04
 #define AHCI_SIGNATURE_SATA 0x00000101U
+#define AHCI_IRQ_VECTOR 0x54
+#define AHCI_GHC_IE (1U << 1)
+#define AHCI_PORT_IRQ_MASK 0x0000001fU
+
+extern void arch_ahci_irq_stub(void);
 
 static uint32_t controllers;
 static uint32_t ports;
@@ -34,6 +42,10 @@ static uint64_t active_command_list;
 static uint64_t active_command_table;
 static uint64_t active_data;
 static device_driver_t ahci_driver;
+static volatile uint32_t *active_abar;
+static uint32_t active_port_number;
+static int ahci_irq_enabled;
+static volatile uint32_t ahci_interrupts;
 
 static int ahci_stop_engine(void) {
     if (!active_port) return 0;
@@ -101,14 +113,23 @@ static int ahci_probe(device_t *device) {
         regs[AHCI_PORT_FB / 4] = (uint32_t)fis;
         regs[(AHCI_PORT_FB / 4) + 1] = 0;
         regs[AHCI_PORT_SERR / 4] = UINT32_MAX;
+        regs[AHCI_PORT_IS / 4] = UINT32_MAX;
+        regs[AHCI_PORT_IE / 4] = AHCI_PORT_IRQ_MASK;
         regs[AHCI_PORT_CI / 4] = 0;
         regs[AHCI_PORT_CMD / 4] |= AHCI_CMD_FRE | AHCI_CMD_ST;
         active_port = regs;
+        active_abar = abar;
+        active_port_number = port;
         active_command_list = command_list;
         ++ready_ports;
     }
     ++controllers;
     ports |= implemented_ports;
+    arch_set_interrupt_gate(AHCI_IRQ_VECTOR, arch_ahci_irq_stub);
+    ahci_irq_enabled = pci_enable_msi(device, AHCI_IRQ_VECTOR);
+    if (!ahci_irq_enabled)
+        ahci_irq_enabled = pci_enable_legacy_irq(device, AHCI_IRQ_VECTOR);
+    if (ahci_irq_enabled) abar[AHCI_GHC_OFFSET / 4] |= AHCI_GHC_IE;
     return 1;
 }
 
@@ -116,6 +137,10 @@ int ahci_initialize(void) {
     controllers = 0;
     ports = 0;
     ready_ports = 0;
+    active_abar = 0;
+    active_port_number = 0;
+    ahci_irq_enabled = 0;
+    ahci_interrupts = 0;
     ahci_driver.name = "ahci";
     ahci_driver.bus = DEVICE_BUS_PCI;
     ahci_driver.match = ahci_match;
@@ -127,6 +152,16 @@ int ahci_initialize(void) {
 uint32_t ahci_controller_count(void) { return controllers; }
 uint32_t ahci_port_mask(void) { return ports; }
 uint32_t ahci_ready_port_count(void) { return ready_ports; }
+int ahci_interrupt_enabled(void) { return ahci_irq_enabled; }
+uint32_t ahci_interrupt_count(void) { return ahci_interrupts; }
+void ahci_interrupt_handler(void) {
+    if (!active_port) return;
+    uint32_t status = active_port[AHCI_PORT_IS / 4];
+    if (status == 0) return;
+    ++ahci_interrupts;
+    active_port[AHCI_PORT_IS / 4] = status;
+    if (active_abar) active_abar[2] = 1U << active_port_number;
+}
 
 typedef struct {
     uint16_t flags, prdt_length;

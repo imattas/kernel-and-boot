@@ -1008,6 +1008,18 @@ void kernel_main(void *boot_info) {
         }
         serial_write("NVMe interrupt delivery ready\r\n");
     }
+    if (ahci_controller_count() != 0 && ahci_interrupt_enabled() != 0) {
+        static uint8_t ahci_interrupt_probe[512];
+        if (!ahci_read_sector(0, ahci_interrupt_probe)) {
+            serial_write("AHCI interrupt probe read failure\r\n");
+            for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+        }
+        if (ahci_interrupt_count() == 0) {
+            serial_write("AHCI interrupt delivery failure\r\n");
+            for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+        }
+        serial_write("AHCI interrupt delivery ready\r\n");
+    }
     if (e1000_controller_count() != 0) {
         static const uint8_t e1000_interrupt_packet[60] = {0};
         if (!e1000_transmit(e1000_interrupt_packet,

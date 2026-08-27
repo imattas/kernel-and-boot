@@ -66,6 +66,7 @@ KERNEL_TIMER_ASM_OBJ := $(BUILD_DIR)/kernel/timer.asm.o
 KERNEL_KEYBOARD_ASM_OBJ := $(BUILD_DIR)/kernel/keyboard.asm.o
 KERNEL_E1000_IRQ_OBJ := $(BUILD_DIR)/kernel/e1000_irq.asm.o
 KERNEL_NVME_IRQ_OBJ := $(BUILD_DIR)/kernel/nvme_irq.asm.o
+KERNEL_AHCI_IRQ_OBJ := $(BUILD_DIR)/kernel/ahci_irq.asm.o
 KERNEL_ELF := $(BUILD_DIR)/kernel/kernel.elf
 IMAGE := $(DIST_DIR)/os.img
 OVMF_CODE ?= /usr/share/edk2/x64/OVMF_CODE.4m.fd
@@ -260,7 +261,7 @@ KERNEL_UHCI_OBJ := $(BUILD_DIR)/kernel/uhci.o
 KERNEL_AHCI_OBJ := $(BUILD_DIR)/kernel/ahci.o
 KERNEL_NVME_OBJ := $(BUILD_DIR)/kernel/nvme.o
 KERNEL_E1000_OBJ := $(BUILD_DIR)/kernel/e1000.o
-KERNEL_NVME_OBJ := $(KERNEL_NVME_OBJ) $(KERNEL_E1000_OBJ) $(KERNEL_E1000_IRQ_OBJ) $(KERNEL_NVME_IRQ_OBJ) $(KERNEL_HID_OBJ) $(KERNEL_EXFAT_VFS_OBJ) $(KERNEL_EXT4_OBJ) $(KERNEL_EXT4_VFS_OBJ) $(KERNEL_XFS_OBJ) $(KERNEL_XFS_VFS_OBJ) $(KERNEL_BTRFS_OBJ) $(KERNEL_BTRFS_DEFLATE_OBJ) $(KERNEL_BTRFS_LZO_OBJ) $(KERNEL_BTRFS_ZSTD_OBJ) $(KERNEL_BTRFS_FSE_OBJ) $(KERNEL_BTRFS_VFS_OBJ)
+KERNEL_NVME_OBJ := $(KERNEL_NVME_OBJ) $(KERNEL_E1000_OBJ) $(KERNEL_E1000_IRQ_OBJ) $(KERNEL_NVME_IRQ_OBJ) $(KERNEL_AHCI_IRQ_OBJ) $(KERNEL_HID_OBJ) $(KERNEL_EXFAT_VFS_OBJ) $(KERNEL_EXT4_OBJ) $(KERNEL_EXT4_VFS_OBJ) $(KERNEL_XFS_OBJ) $(KERNEL_XFS_VFS_OBJ) $(KERNEL_BTRFS_OBJ) $(KERNEL_BTRFS_DEFLATE_OBJ) $(KERNEL_BTRFS_LZO_OBJ) $(KERNEL_BTRFS_ZSTD_OBJ) $(KERNEL_BTRFS_FSE_OBJ) $(KERNEL_BTRFS_VFS_OBJ)
 KERNEL_DEBUG_OBJ := $(BUILD_DIR)/kernel/debug_assert.o
 KERNEL_CLOCK_OBJ := $(BUILD_DIR)/kernel/clock.o
 
@@ -392,7 +393,7 @@ $(KERNEL_UHCI_OBJ): kernel/drivers/usb/uhci.c kernel/drivers/usb/uhci.h kernel/d
 	$(CC) -target x86_64-pc-none-elf -std=c11 -ffreestanding -fno-builtin -fno-stack-protector -fPIE -fno-plt \
 		-mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@
 
-$(KERNEL_AHCI_OBJ): kernel/drivers/ahci/ahci.c kernel/drivers/ahci/ahci.h kernel/device/device.h | $(BUILD_DIR)/kernel
+$(KERNEL_AHCI_OBJ): kernel/drivers/ahci/ahci.c kernel/drivers/ahci/ahci.h kernel/device/device.h kernel/arch/x86_64/cpu/tables.h kernel/drivers/pci/pci.h | $(BUILD_DIR)/kernel
 	$(CC) -target x86_64-pc-none-elf -std=c11 -ffreestanding -fno-builtin -fno-stack-protector -fPIE -fno-plt \
 		-mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@
 
@@ -408,6 +409,9 @@ $(KERNEL_E1000_IRQ_OBJ): kernel/arch/x86_64/interrupts/e1000.asm kernel/drivers/
 	$(NASM) -f elf64 $< -o $@
 
 $(KERNEL_NVME_IRQ_OBJ): kernel/arch/x86_64/interrupts/nvme.asm kernel/drivers/nvme/nvme.h | $(BUILD_DIR)/kernel
+	$(NASM) -f elf64 $< -o $@
+
+$(KERNEL_AHCI_IRQ_OBJ): kernel/arch/x86_64/interrupts/ahci.asm kernel/drivers/ahci/ahci.h | $(BUILD_DIR)/kernel
 	$(NASM) -f elf64 $< -o $@
 
 

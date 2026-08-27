@@ -314,6 +314,9 @@ without unnecessarily destroying a healthy queue.
 NVMe now has a dedicated MSI/legacy IRQ vector and ISR accounting; the QEMU
 gate requires post-`sti` namespace I/O to observe delivery when routing is
 enabled.
+AHCI now enables controller/port interrupt causes through a dedicated
+MSI/legacy vector, acknowledges port causes in its ISR, and the QEMU gate
+requires post-`sti` disk I/O to observe delivery when routing is enabled.
 The scheduler now has an explicit core boundary
 and round-robin policy module. Process pending/blocked signal state and explicit
 termination status are now implemented; signal delivery policy remains bounded

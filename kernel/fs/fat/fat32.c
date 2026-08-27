@@ -674,3 +674,21 @@ int fat32_read_named_file_in_directory(fat32_fs_t *fs, uint32_t directory_cluste
                                         &file_size, &is_directory) || is_directory) return 0;
     return fat32_read_file_cluster(fs, cluster, file_size, offset, buffer, size);
 }
+
+int fat32_set_attributes_in_directory(fat32_fs_t *fs, uint32_t directory_cluster,
+                                      const char short_name[11], uint8_t attributes) {
+    if (!fs || !short_name) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&fs->write_lock);
+    uint32_t sector = 0, entry_offset = 0, first = 0, size = 0;
+    int result = 0;
+    if (fat32_find_entry(fs, directory_cluster, short_name, &sector, &entry_offset,
+                         &first, &size)) {
+        uint8_t data[FAT32_SECTOR_SIZE];
+        if (read_sector(fs->device, sector, data)) {
+            data[entry_offset + 11] = attributes;
+            result = storage_write(fs->device, sector, 1, data);
+        }
+    }
+    spinlock_unlock_irqrestore(&fs->write_lock, flags);
+    return result;
+}

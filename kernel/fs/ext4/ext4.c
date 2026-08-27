@@ -748,6 +748,13 @@ int ext4_inode_mode(ext4_fs_t *fs, uint32_t inode_number, uint32_t *mode) {
     return 1;
 }
 
+int ext4_set_mode(ext4_fs_t *fs, uint32_t inode_number, uint16_t mode) {
+    uint8_t inode[4096];
+    if (!fs || !read_inode(fs, inode_number, inode)) return 0;
+    store16(inode, (uint16_t)((load16(inode) & 0xf000U) | (mode & 0x0fffU)));
+    return write_inode(fs, inode_number, inode);
+}
+
 int ext4_read_file(ext4_fs_t *fs, uint32_t inode_number, uint64_t offset,
                    void *buffer, uint32_t size) {
     if (!fs || !buffer || size == 0) return 0;

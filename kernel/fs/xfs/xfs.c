@@ -30,6 +30,10 @@ static void store_be32(uint8_t *p, uint32_t value) {
     p[2] = (uint8_t)(value >> 8); p[3] = (uint8_t)value;
 }
 
+static void store_be16(uint8_t *p, uint16_t value) {
+    p[0] = (uint8_t)(value >> 8); p[1] = (uint8_t)value;
+}
+
 static void xfs_store_extent(uint8_t *record, uint64_t logical,
                              uint64_t physical, uint64_t length,
                              uint8_t unwritten) {
@@ -184,6 +188,13 @@ int xfs_inode_size(xfs_fs_t *fs, uint64_t inode, uint64_t *size) {
         (be16(&data[2]) & 0xf000U) != 0x8000U) return 0;
     *size = be64(&data[56]);
     return 1;
+}
+
+int xfs_set_mode(xfs_fs_t *fs, uint64_t inode, uint16_t mode) {
+    uint8_t data[4096];
+    if (!fs || !xfs_read_inode(fs, inode, data)) return 0;
+    store_be16(&data[2], (uint16_t)((be16(&data[2]) & 0xf000U) | (mode & 0x0fffU)));
+    return xfs_write_inode(fs, inode, data);
 }
 
 int xfs_lookup(xfs_fs_t *fs, uint64_t directory_inode, const char *name,

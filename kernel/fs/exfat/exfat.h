@@ -33,5 +33,7 @@ int exfat_write_file_in_directory(exfat_fs_t *fs, uint32_t directory_cluster,
                                   const void *buffer, uint32_t size);
 int exfat_truncate_file_in_directory(exfat_fs_t *fs, uint32_t directory_cluster,
                                      const char *name, uint64_t size);
+int exfat_set_attributes_in_directory(exfat_fs_t *fs, uint32_t directory_cluster,
+                                      const char *name, uint16_t attributes);
 
 #endif

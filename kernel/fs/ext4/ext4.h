@@ -20,6 +20,7 @@ int ext4_lookup(ext4_fs_t *fs, uint32_t directory_inode, const char *name,
                 uint32_t *inode_number);
 int ext4_inode_size(ext4_fs_t *fs, uint32_t inode_number, uint64_t *size);
 int ext4_inode_mode(ext4_fs_t *fs, uint32_t inode_number, uint32_t *mode);
+int ext4_set_mode(ext4_fs_t *fs, uint32_t inode_number, uint16_t mode);
 int ext4_read_file(ext4_fs_t *fs, uint32_t inode_number, uint64_t offset,
                    void *buffer, uint32_t size);
 int ext4_write_file(ext4_fs_t *fs, uint32_t inode_number, uint64_t offset,

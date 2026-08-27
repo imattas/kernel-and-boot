@@ -63,5 +63,7 @@ int fat32_append_file_in_directory(fat32_fs_t *fs, uint32_t directory_cluster,
                                    uint32_t size);
 int fat32_truncate_file_in_directory(fat32_fs_t *fs, uint32_t directory_cluster,
                                      const char short_name[11], uint32_t size);
+int fat32_set_attributes_in_directory(fat32_fs_t *fs, uint32_t directory_cluster,
+                                      const char short_name[11], uint8_t attributes);
 
 #endif

@@ -9,6 +9,9 @@
 static uint16_t load16(const uint8_t *p) { return (uint16_t)p[0] | ((uint16_t)p[1] << 8); }
 static uint32_t load32(const uint8_t *p) { return (uint32_t)load16(p) | ((uint32_t)load16(p + 2) << 16); }
 static uint64_t load64(const uint8_t *p) { return (uint64_t)load32(p) | ((uint64_t)load32(p + 4) << 32); }
+static void store16(uint8_t *p, uint16_t value) {
+    p[0] = (uint8_t)value; p[1] = (uint8_t)(value >> 8);
+}
 static void store32(uint8_t *p, uint32_t value) {
     p[0] = (uint8_t)value; p[1] = (uint8_t)(value >> 8);
     p[2] = (uint8_t)(value >> 16); p[3] = (uint8_t)(value >> 24);
@@ -471,4 +474,20 @@ int exfat_write_file_in_directory(exfat_fs_t *fs, uint32_t directory_cluster,
 int exfat_truncate_file_in_directory(exfat_fs_t *fs, uint32_t directory_cluster,
                                      const char *name, uint64_t size) {
     return exfat_resize_file(fs, directory_cluster, name, size);
+}
+
+int exfat_set_attributes_in_directory(exfat_fs_t *fs, uint32_t directory_cluster,
+                                      const char *name, uint16_t attributes) {
+    uint8_t directory[EXFAT_MAX_CLUSTER_BYTES];
+    uint32_t index, secondary_count, entry_cluster;
+    if (!fs || !fs->mounted || !exfat_locate_entry(fs, directory_cluster, name,
+                                                   directory, &index,
+                                                   &secondary_count,
+                                                   &entry_cluster)) return 0;
+    store16(&directory[index * 32U + 4], attributes);
+    uint16_t checksum = entry_set_checksum(directory, index, secondary_count);
+    store16(&directory[index * 32U + 2], checksum);
+    uint64_t lba = fs->heap_start + (uint64_t)(entry_cluster - 2U) *
+                   fs->sectors_per_cluster;
+    return storage_write(fs->device, lba, fs->sectors_per_cluster, directory);
 }

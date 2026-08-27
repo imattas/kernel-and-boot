@@ -282,7 +282,7 @@ static int uhci_interrupt_transfer_locked(uint8_t address, uint8_t endpoint, voi
                             uint16_t length, uint16_t max_packet,
                             uint8_t *toggle) {
     if (uhci_io_disabled || !controller_base || !controller_frame_list || !data || address > 127 ||
-        endpoint > 15 || length == 0 || length > 4096 || max_packet == 0 ||
+        (endpoint & 0x7fU) > 15 || length == 0 || length > 4096 || max_packet == 0 ||
         max_packet > 64 || !toggle || *toggle > 1) return 0;
     uint32_t packet_count = (length + max_packet - 1U) / max_packet;
     uint64_t qh_frame = physical_alloc_frame();

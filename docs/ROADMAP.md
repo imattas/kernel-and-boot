@@ -493,6 +493,8 @@ endpoint toggles; the boot path discovers an interrupt-IN endpoint from the
 configuration descriptors and exercises the USB HID polling path.
 UHCI interrupt transfers now reject endpoint values before token bit-packing,
 preventing invalid endpoint numbers from being silently truncated.
+UHCI interrupt transfers now accept the USB endpoint direction bit while still
+validating the four-bit endpoint number, enabling real interrupt-IN HID paths.
 UHCI control/interrupt transfers and ISR status acknowledgement now share an
 IRQ-safe driver lock, preventing SMP callers and interrupt delivery from
 interleaving controller state transitions.

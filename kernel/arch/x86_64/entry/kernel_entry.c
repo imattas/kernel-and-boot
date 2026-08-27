@@ -1069,6 +1069,8 @@ void kernel_main(void *boot_info) {
     serial_write_hex(ahci_port_mask());
     serial_write(" ready=");
     serial_write_hex(ahci_ready_port_count());
+    serial_write(" mask=");
+    serial_write_hex(ahci_ready_port_mask());
     serial_write("\r\n");
     serial_write(acpi_reset_available() ? "ACPI reset service ready\r\n" :
                  "ACPI reset service unavailable\r\n");

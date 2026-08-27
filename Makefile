@@ -653,6 +653,7 @@ qemu-test: $(IMAGE)
 	@test -f "$(OVMF_VARS)" || (echo "OVMF_VARS not found: $(OVMF_VARS)" >&2; exit 2)
 	cp "$(OVMF_VARS)" $(BUILD_DIR)/OVMF_VARS.4m.fd
 	cp "$(IMAGE)" $(BUILD_DIR)/ahci-test.img
+	cp "$(IMAGE)" $(BUILD_DIR)/ahci-test-secondary.img
 	cp "$(IMAGE)" $(BUILD_DIR)/nvme-test.img
 	: > $(QEMU_LOG)
 	timeout 20s qemu-system-x86_64 -machine pc -smp 2 -m 128M \
@@ -665,6 +666,8 @@ qemu-test: $(IMAGE)
 		-device ich9-ahci,id=ahci \
 		-drive if=none,id=ahcidisk,format=raw,file=$(BUILD_DIR)/ahci-test.img \
 		-device ide-hd,drive=ahcidisk,bus=ahci.1 \
+		-drive if=none,id=ahcidisk2,format=raw,file=$(BUILD_DIR)/ahci-test-secondary.img \
+		-device ide-hd,drive=ahcidisk2,bus=ahci.2 \
 		-device nvme,drive=nvmedisk,serial=OSNVME01 \
 		-drive if=none,id=nvmedisk,format=raw,file=$(BUILD_DIR)/nvme-test.img \
 	-display none -no-reboot -no-shutdown || test $$? -eq 124
@@ -675,6 +678,7 @@ run: $(IMAGE)
 	@test -f "$(OVMF_VARS)" || (echo "OVMF_VARS not found: $(OVMF_VARS)" >&2; exit 2)
 	cp "$(OVMF_VARS)" $(BUILD_DIR)/OVMF_VARS.4m.fd
 	cp "$(IMAGE)" $(BUILD_DIR)/ahci-test.img
+	cp "$(IMAGE)" $(BUILD_DIR)/ahci-test-secondary.img
 	cp "$(IMAGE)" $(BUILD_DIR)/nvme-test.img
 	exec qemu-system-x86_64 -machine pc -smp 2 -m 128M \
 		-drive if=pflash,format=raw,readonly=on,file="$(OVMF_CODE)" \
@@ -686,6 +690,8 @@ run: $(IMAGE)
 		-device ich9-ahci,id=ahci \
 		-drive if=none,id=ahcidisk,format=raw,file=$(BUILD_DIR)/ahci-test.img \
 		-device ide-hd,drive=ahcidisk,bus=ahci.1 \
+		-drive if=none,id=ahcidisk2,format=raw,file=$(BUILD_DIR)/ahci-test-secondary.img \
+		-device ide-hd,drive=ahcidisk2,bus=ahci.2 \
 		-device nvme,drive=nvmedisk,serial=OSNVME01 \
 		-drive if=none,id=nvmedisk,format=raw,file=$(BUILD_DIR)/nvme-test.img \
 		-no-reboot -no-shutdown

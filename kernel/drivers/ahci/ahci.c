@@ -47,6 +47,13 @@ extern void arch_ahci_irq_stub(void);
 static uint32_t controllers;
 static uint32_t ports;
 static uint32_t ready_ports;
+static uint32_t ready_port_mask;
+typedef struct {
+    volatile uint32_t *regs;
+    uint64_t command_list;
+    uint64_t fis;
+} ahci_port_state_t;
+static ahci_port_state_t port_state[32];
 static volatile uint32_t *active_port;
 static uint64_t active_command_list;
 static uint64_t active_command_table;
@@ -135,6 +142,9 @@ static int ahci_probe(device_t *device) {
         return 0;
     }
     ready_ports = 0;
+    ready_port_mask = 0;
+    for (uint32_t port = 0; port < 32; ++port)
+        port_state[port] = (ahci_port_state_t){0};
     active_port = 0; active_command_list = 0; active_command_table = 0; active_data = 0;
     ahci_io_disabled = 0;
     for (uint32_t port = 0; port < 32; ++port) {
@@ -154,7 +164,6 @@ static int ahci_probe(device_t *device) {
                 stopped = 1; break;
             }
         if (!stopped) continue;
-        if (ready_ports != 0) continue;
         uint64_t command_list = physical_alloc_frame();
         uint64_t fis = physical_alloc_frame();
         if (!command_list || !fis) {
@@ -175,11 +184,16 @@ static int ahci_probe(device_t *device) {
         regs[AHCI_PORT_IE / 4] = AHCI_PORT_IRQ_MASK;
         regs[AHCI_PORT_CI / 4] = 0;
         regs[AHCI_PORT_CMD / 4] |= AHCI_CMD_FRE | AHCI_CMD_ST;
+        port_state[port].regs = regs;
+        port_state[port].command_list = command_list;
+        port_state[port].fis = fis;
+        ready_port_mask |= 1U << port;
+        ++ready_ports;
+        if (active_port) continue;
         active_port = regs;
         active_abar = abar;
         active_port_number = port;
         active_command_list = command_list;
-        ++ready_ports;
     }
     if (ready_ports == 0) {
         active_port = 0;
@@ -202,6 +216,9 @@ int ahci_initialize(void) {
     controllers = 0;
     ports = 0;
     ready_ports = 0;
+    ready_port_mask = 0;
+    for (uint32_t port = 0; port < 32; ++port)
+        port_state[port] = (ahci_port_state_t){0};
     spinlock_init(&ahci_lock);
     active_abar = 0;
     active_port_number = 0;
@@ -221,15 +238,22 @@ int ahci_initialize(void) {
 uint32_t ahci_controller_count(void) { return controllers; }
 uint32_t ahci_port_mask(void) { return ports; }
 uint32_t ahci_ready_port_count(void) { return ready_ports; }
+uint32_t ahci_ready_port_mask(void) { return ready_port_mask; }
 int ahci_interrupt_enabled(void) { return ahci_irq_enabled; }
 uint32_t ahci_interrupt_count(void) { return ahci_interrupts; }
 void ahci_interrupt_handler(void) {
-    if (!active_port) return;
-    uint32_t status = active_port[AHCI_PORT_IS / 4];
-    if (status == 0) return;
-    ++ahci_interrupts;
-    active_port[AHCI_PORT_IS / 4] = status;
-    if (active_abar) active_abar[2] = 1U << active_port_number;
+    if (!active_abar) return;
+    uint32_t handled = 0;
+    for (uint32_t port = 0; port < 32; ++port) {
+        if ((ready_port_mask & (1U << port)) == 0 || !port_state[port].regs)
+            continue;
+        uint32_t status = port_state[port].regs[AHCI_PORT_IS / 4];
+        if (status == 0) continue;
+        ++ahci_interrupts;
+        port_state[port].regs[AHCI_PORT_IS / 4] = status;
+        handled |= 1U << port;
+    }
+    if (handled) active_abar[2] = handled;
 }
 
 typedef struct {

@@ -60,6 +60,34 @@ int network_build_icmp_echo_reply(const void *frame, uint16_t length,
     return 1;
 }
 
+int network_build_arp_reply(const void *frame, uint16_t length,
+                            const uint8_t local_hardware[ETHERNET_ADDRESS_SIZE],
+                            const uint8_t local_protocol[4], void *reply,
+                            uint16_t capacity, uint16_t *reply_length) {
+    if (!frame || !local_hardware || !local_protocol || !reply ||
+        !reply_length) return 0;
+    network_frame_view_t view;
+    if (!network_decode_frame(frame, length, &view) ||
+        view.kind != NETWORK_FRAME_ARP ||
+        view.arp.operation != ARP_OPERATION_REQUEST)
+        return 0;
+    for (uint32_t i = 0; i < ETHERNET_ADDRESS_SIZE; ++i)
+        if (view.ethernet.source[i] != view.arp.sender_hardware[i]) return 0;
+    for (uint32_t i = 0; i < 4; ++i)
+        if (view.arp.target_protocol[i] != local_protocol[i]) return 0;
+
+    uint8_t packet[ARP_PACKET_SIZE];
+    uint16_t packet_length = 0;
+    if (!arp_packet_build(packet, sizeof(packet), ARP_OPERATION_REPLY,
+                          local_hardware, local_protocol,
+                          view.arp.sender_hardware, view.arp.sender_protocol,
+                          &packet_length) ||
+        !ethernet_frame_build(reply, capacity, view.arp.sender_hardware,
+                              local_hardware, 0x0806U, packet,
+                              packet_length, reply_length)) return 0;
+    return 1;
+}
+
 int network_deliver_frame(const void *frame, uint16_t length,
                           udp_endpoint_table_t *udp_table) {
     if (!udp_table) return 0;

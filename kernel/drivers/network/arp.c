@@ -39,7 +39,8 @@ int arp_packet_build(void *packet, uint16_t capacity, uint16_t operation,
 
 int arp_packet_parse(const void *packet, uint16_t packet_length,
                      arp_packet_view_t *view) {
-    if (!packet || packet_length != ARP_PACKET_SIZE || !view) return 0;
+    /* Ethernet minimum frames pad the ARP payload beyond its wire size. */
+    if (!packet || packet_length < ARP_PACKET_SIZE || !view) return 0;
     const uint8_t *bytes = (const uint8_t *)packet;
     uint16_t operation = load_be16(bytes + 6);
     if (load_be16(bytes + 0) != ARP_HARDWARE_ETHERNET ||

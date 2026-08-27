@@ -732,6 +732,37 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("network frame decode ready\r\n");
+    static uint8_t arp_reply_probe_request[ETHERNET_MAX_FRAME_SIZE];
+    static uint8_t arp_reply_probe_reply[ETHERNET_MAX_FRAME_SIZE];
+    uint16_t arp_reply_probe_request_length = 0;
+    uint16_t arp_reply_probe_reply_length = 0;
+    network_frame_view_t arp_reply_probe_view;
+    if (!ethernet_frame_build(arp_reply_probe_request,
+                              sizeof(arp_reply_probe_request),
+                              ethernet_probe_destination,
+                              arp_probe_sender_hardware, 0x0806U,
+                              arp_probe_packet, arp_probe_length,
+                              &arp_reply_probe_request_length) ||
+        !network_build_arp_reply(arp_reply_probe_request,
+                                 arp_reply_probe_request_length,
+                                 ethernet_probe_source,
+                                 arp_probe_target_protocol,
+                                 arp_reply_probe_reply,
+                                 sizeof(arp_reply_probe_reply),
+                                 &arp_reply_probe_reply_length) ||
+        !network_decode_frame(arp_reply_probe_reply,
+                              arp_reply_probe_reply_length,
+                              &arp_reply_probe_view) ||
+        arp_reply_probe_view.kind != NETWORK_FRAME_ARP ||
+        arp_reply_probe_view.arp.operation != ARP_OPERATION_REPLY ||
+        arp_reply_probe_view.arp.sender_protocol[3] != 1 ||
+        arp_reply_probe_view.arp.target_protocol[3] != 2 ||
+        arp_reply_probe_view.ethernet.destination[0] !=
+            arp_probe_sender_hardware[0]) {
+        serial_write("ARP reply failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("ARP reply ready\r\n");
     static const uint8_t icmp_reply_probe_payload[4] =
         {0x10, 0x20, 0x30, 0x40};
     static uint8_t icmp_reply_probe_packet[ICMP_ECHO_HEADER_SIZE +

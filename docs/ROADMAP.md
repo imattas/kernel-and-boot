@@ -656,6 +656,10 @@ applies the final-sequence state-update rule.
 The network service now generates bounded ICMP echo replies from validated
 Ethernet/IPv4 requests, swapping addresses and preserving identifiers,
 sequences, and payloads through the complete protocol stack.
+It now also answers validated ARP requests for the configured local IPv4
+address with correctly addressed Ethernet/ARP replies.
+ARP parsing accepts the Ethernet minimum-frame padding while still requiring
+the complete fixed-size ARP wire payload.
 
 ## Phase 10 — Userland begins after the kernel gate
 

@@ -49,8 +49,10 @@ static volatile uint32_t nvme_completion_pending;
 static volatile uint32_t nvme_errors;
 static volatile uint16_t nvme_last_status;
 static int nvme_disabled;
+static int nvme_recovery_ready;
 static uint64_t nvme_quarantined_prp;
 static uint64_t nvme_quarantined_prp_list;
+static uint32_t nvme_quarantined_prp_pages;
 static uint64_t active_namespace_sectors;
 static uint32_t nvme_last_io_pages;
 
@@ -98,9 +100,63 @@ static int nvme_abort_controller(void) {
         active_io_sq = 0; active_io_cq = 0;
         active_asq = 0; active_acq = 0;
     }
+    nvme_recovery_ready = stopped;
     /* A stopped controller has no queue reinitialization path yet. */
     nvme_disabled = 1;
     return stopped;
+}
+
+static int nvme_recover(void) {
+    if (!nvme_disabled || !nvme_recovery_ready || !active_regs) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&nvme_lock);
+    if (!nvme_disabled || !nvme_recovery_ready || active_asq || active_acq) {
+        int ready = !nvme_disabled;
+        spinlock_unlock_irqrestore(&nvme_lock, flags);
+        return ready;
+    }
+    if (nvme_quarantined_prp) {
+        physical_free_frames(nvme_quarantined_prp,
+                             nvme_quarantined_prp_pages);
+        nvme_quarantined_prp = 0;
+        nvme_quarantined_prp_pages = 0;
+    }
+    if (nvme_quarantined_prp_list) {
+        physical_free_frame(nvme_quarantined_prp_list);
+        nvme_quarantined_prp_list = 0;
+    }
+    uint64_t asq = physical_alloc_frame();
+    uint64_t acq = physical_alloc_frame();
+    if (!asq || !acq) {
+        if (asq) physical_free_frame(asq);
+        if (acq) physical_free_frame(acq);
+        spinlock_unlock_irqrestore(&nvme_lock, flags);
+        return 0;
+    }
+    active_regs[NVME_AQA / 4] = (active_queue_entries - 1U) |
+                                 ((active_queue_entries - 1U) << 16);
+    active_regs[NVME_ASQ / 4] = (uint32_t)asq;
+    active_regs[(NVME_ASQ / 4) + 1] = 0;
+    active_regs[NVME_ACQ / 4] = (uint32_t)acq;
+    active_regs[(NVME_ACQ / 4) + 1] = 0;
+    active_regs[NVME_CC / 4] |= NVME_CC_EN |
+        (NVME_CC_IOCQES << 20) | (NVME_CC_IOSQES << 16);
+    if (!nvme_wait_ready(active_regs, NVME_CSTS_RDY)) {
+        active_regs[NVME_CC / 4] &= ~NVME_CC_EN;
+        physical_free_frame(asq);
+        physical_free_frame(acq);
+        spinlock_unlock_irqrestore(&nvme_lock, flags);
+        return 0;
+    }
+    active_asq = asq;
+    active_acq = acq;
+    active_sq_tail = 0;
+    active_cq_head = 0;
+    active_cq_phase = 1;
+    active_command_id = 0;
+    nvme_disabled = 0;
+    nvme_recovery_ready = 0;
+    spinlock_unlock_irqrestore(&nvme_lock, flags);
+    return nvme_initialize_io();
 }
 
 static int nvme_probe(device_t *device) {
@@ -171,8 +227,10 @@ fail:
     active_io_sq = 0; active_io_cq = 0; active_io_ready = 0;
     nvme_irq_enabled = 0;
     nvme_disabled = 0;
+    nvme_recovery_ready = 0;
     nvme_quarantined_prp = 0;
     nvme_quarantined_prp_list = 0;
+    nvme_quarantined_prp_pages = 0;
     nvme_last_io_pages = 0;
     device_release_resource(device, NVME_BAR_INDEX, &nvme_driver);
     return 0;
@@ -247,7 +305,10 @@ static int nvme_submit_admin_words(uint8_t opcode, uint32_t namespace_id,
         spinlock_unlock_irqrestore(&nvme_lock, flags);
         return success;
     }
-    if (prp1 && !nvme_abort_controller()) nvme_quarantined_prp = prp1;
+    if (prp1 && !nvme_abort_controller()) {
+        nvme_quarantined_prp = prp1;
+        nvme_quarantined_prp_pages = 1;
+    }
     spinlock_unlock_irqrestore(&nvme_lock, flags);
     return 0;
 }
@@ -336,6 +397,7 @@ fail:
 }
 
 static int nvme_io(uint64_t lba, void *buffer, uint32_t count, int write) {
+    if (nvme_disabled && !nvme_recover()) return 0;
     if (nvme_disabled || !active_io_ready || !nvme_lba_valid(lba, count) ||
         !buffer || count > NVME_MAX_IO_SECTORS_PER_COMMAND) return 0;
     uint64_t flags = spinlock_lock_irqsave(&nvme_lock);
@@ -413,6 +475,7 @@ static int nvme_io(uint64_t lba, void *buffer, uint32_t count, int write) {
     if (!completed && !nvme_abort_controller()) {
         nvme_quarantined_prp = data_frame;
         nvme_quarantined_prp_list = prp_list;
+        nvme_quarantined_prp_pages = data_pages;
     }
     if (data_frame != nvme_quarantined_prp)
         physical_free_frames(data_frame, data_pages);
@@ -423,6 +486,7 @@ static int nvme_io(uint64_t lba, void *buffer, uint32_t count, int write) {
 }
 
 static int nvme_io_range(uint64_t lba, void *buffer, uint32_t count, int write) {
+    if (nvme_disabled && !nvme_recover()) return 0;
     if (!nvme_lba_valid(lba, count) || !buffer) return 0;
     uint32_t completed = 0;
     while (completed < count) {
@@ -513,7 +577,10 @@ int nvme_initialize(void) {
     nvme_errors = 0;
     nvme_last_status = 0;
     nvme_disabled = 0;
+    nvme_recovery_ready = 0;
     nvme_quarantined_prp = 0;
+    nvme_quarantined_prp_list = 0;
+    nvme_quarantined_prp_pages = 0;
     active_namespace_sectors = 0;
     spinlock_init(&nvme_lock);
     nvme_driver.name = "nvme";

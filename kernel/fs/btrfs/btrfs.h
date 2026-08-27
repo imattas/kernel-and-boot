@@ -7,6 +7,7 @@ typedef struct {
     uint64_t logical;
     uint64_t length;
     uint64_t physical;
+    uint64_t mirror_physical;
 } btrfs_chunk_t;
 
 typedef struct {

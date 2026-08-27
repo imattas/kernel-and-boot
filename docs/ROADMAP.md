@@ -311,7 +311,8 @@ ranges, sparse holes, and multi-extent files. Btrfs now performs hashed
 DIR_ITEM lookup with variable-length entry checks and packed hash-collision
 entries; its multi-extent read path is integrated into a read-only VFS file
 adapter. Redundant same-device chunk layouts are now accepted by selecting a
-validated mirror stripe. Compression, encryption, and multi-device stripe
+validated mirror stripe with read fallback after checksum failure. Compression,
+encryption, and multi-device stripe
 mapping remain before
 the filesystem milestone is complete. A
 format is not considered complete merely because its superblock is recognized.

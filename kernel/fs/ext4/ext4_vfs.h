@@ -4,4 +4,8 @@
 #include "../vfs/vfs.h"
 int ext4_vfs_attach_file(ext4_fs_t *fs, vfs_node_t *root,
                          const char *filesystem_name, const char *name);
+int ext4_vfs_attach_file_in_directory(ext4_fs_t *fs, vfs_node_t *root,
+                                      uint32_t directory,
+                                      const char *filesystem_name,
+                                      const char *name);
 #endif

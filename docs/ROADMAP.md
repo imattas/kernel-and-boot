@@ -1006,6 +1006,8 @@ allowing validated files below the filesystem root to be exposed through the
 same adapter while preserving the inode permission bits.
 XFS VFS file attachment now likewise accepts an explicit directory inode, so
 validated files in nested short-form directories use the same adapter boundary.
+Ext4 VFS file attachment now accepts an explicit directory inode and validates
+the inode type while carrying its on-disk permission bits into the VFS node.
 Btrfs
 validates its CRC32C superblock checksum
 and supported checksum type, validates tree-node checksums/identity, and reads

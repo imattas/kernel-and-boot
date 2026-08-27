@@ -24,18 +24,24 @@ static int ext4_vfs_write(vfs_node_t *node, uint64_t offset,
     spinlock_unlock_irqrestore(&file->lock, flags);
     return result;
 }
-int ext4_vfs_attach_file(ext4_fs_t *fs, vfs_node_t *root,
-                         const char *filesystem_name, const char *name) {
+int ext4_vfs_attach_file_in_directory(ext4_fs_t *fs, vfs_node_t *root,
+                                      uint32_t directory,
+                                      const char *filesystem_name,
+                                      const char *name) {
     if (!fs || !fs->mounted || !root || root->type != VFS_NODE_DIRECTORY ||
         !filesystem_name || !name) return 0;
     uint32_t inode_number = 0;
-    if (!ext4_lookup(fs, 2, filesystem_name, &inode_number)) return 0;
+    if (!ext4_lookup(fs, directory, filesystem_name, &inode_number)) return 0;
     ext4_vfs_file_t *file = (ext4_vfs_file_t *)kmalloc(sizeof(*file));
     if (!file) return 0;
     file->fs = fs; file->inode = inode_number;
     spinlock_init(&file->lock);
-    if (!ext4_inode_size(fs, inode_number, &file->size)) { kfree(file); return 0; }
-    vfs_node_t *node = vfs_node_create(name, VFS_NODE_REGULAR, 0, 0, 0644);
+    uint32_t mode = 0;
+    if (!ext4_inode_size(fs, inode_number, &file->size) ||
+        !ext4_inode_mode(fs, inode_number, &mode) ||
+        (mode & 0170000U) != 0100000U) { kfree(file); return 0; }
+    vfs_node_t *node = vfs_node_create(name, VFS_NODE_REGULAR, 0, 0,
+                                       mode & 0777U);
     if (!node || !vfs_node_set_read(node, ext4_vfs_read, file) ||
         !vfs_node_set_write(node, ext4_vfs_write, file) ||
         !vfs_node_set_private_destructor(node, ext4_vfs_destroy) ||
@@ -47,4 +53,10 @@ int ext4_vfs_attach_file(ext4_fs_t *fs, vfs_node_t *root,
         return 0;
     }
     vfs_node_release(node); return 1;
+}
+
+int ext4_vfs_attach_file(ext4_fs_t *fs, vfs_node_t *root,
+                         const char *filesystem_name, const char *name) {
+    return ext4_vfs_attach_file_in_directory(fs, root, 2,
+                                              filesystem_name, name);
 }

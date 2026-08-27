@@ -175,7 +175,9 @@ or scheduler mechanisms are split into independent implementations.
 Owns bounded kernel communication channels. Channels copy fixed-size messages
 under IRQ-safe locking, preserve FIFO order, report sender identity, reject
 oversized or unavailable capacity, and allow queued messages to drain after
-close. Blocking wait integration is a later scheduler-facing extension.
+close. Blocking send and receive operations join scheduler wait queues when
+the bounded queue is full or empty; close wakes all blocked peers while
+preserving the queued-message drain rule.
 
 ### `fs`
 Owns the VFS and filesystem-independent caching plus kernel-provided pseudo filesystems such as device and process views. The initial VFS layer provides reference-counted hierarchy nodes, duplicate-safe child insertion, removal, and absolute path lookup with `.` and `..` handling. `fs/block` provides bounded, callback-backed sector I/O without depending on a concrete hardware driver, and `fs/cache` provides a bounded write-through sector cache. `devfs` exposes registered devices as read-only VFS device nodes, while `procfs` provides a read-only `/self/pid` pseudo-file through the VFS read callback. The FAT12 reader validates the generated image BPB, FAT, root entries, and cluster reads, and its VFS adapter exposes read-only file nodes.

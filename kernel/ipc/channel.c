@@ -1,4 +1,5 @@
 #include "channel.h"
+#include "../sched/core/scheduler.h"
 
 static void copy_bytes(uint8_t *destination, const uint8_t *source,
                        uint32_t size) {
@@ -11,6 +12,8 @@ void ipc_channel_initialize(ipc_channel_t *channel) {
     channel->tail = 0;
     channel->count = 0;
     channel->open = 1;
+    task_wait_queue_initialize(&channel->readers);
+    task_wait_queue_initialize(&channel->writers);
 }
 
 int ipc_channel_send(ipc_channel_t *channel, uint64_t sender,
@@ -28,7 +31,21 @@ int ipc_channel_send(ipc_channel_t *channel, uint64_t sender,
     channel->tail = (channel->tail + 1U) % IPC_QUEUE_CAPACITY;
     ++channel->count;
     spinlock_unlock_irqrestore(&channel->lock, flags);
+    (void)scheduler_wake_one(&channel->readers);
     return 1;
+}
+
+int ipc_channel_send_wait(ipc_channel_t *channel, uint64_t sender,
+                          const void *data, uint32_t size) {
+    if (!channel || !data || size == 0 || size > IPC_MESSAGE_MAX) return 0;
+    for (;;) {
+        if (ipc_channel_send(channel, sender, data, size)) return 1;
+        uint64_t flags = spinlock_lock_irqsave(&channel->lock);
+        int closed = !channel->open;
+        int full = channel->count == IPC_QUEUE_CAPACITY;
+        spinlock_unlock_irqrestore(&channel->lock, flags);
+        if (closed || !full || !scheduler_block_current(&channel->writers)) return 0;
+    }
 }
 
 int ipc_channel_receive(ipc_channel_t *channel, uint64_t receiver,
@@ -48,7 +65,27 @@ int ipc_channel_receive(ipc_channel_t *channel, uint64_t receiver,
     channel->head = (channel->head + 1U) % IPC_QUEUE_CAPACITY;
     --channel->count;
     spinlock_unlock_irqrestore(&channel->lock, flags);
+    (void)scheduler_wake_one(&channel->writers);
     return 1;
+}
+
+int ipc_channel_receive_wait(ipc_channel_t *channel, uint64_t receiver,
+                             void *data, uint32_t capacity,
+                             uint64_t *sender, uint32_t *size) {
+    if (!channel || !data || !sender || !size) return 0;
+    for (;;) {
+        if (ipc_channel_receive(channel, receiver, data, capacity, sender, size))
+            return 1;
+        uint64_t flags = spinlock_lock_irqsave(&channel->lock);
+        int closed = !channel->open;
+        int empty = channel->count == 0;
+        spinlock_unlock_irqrestore(&channel->lock, flags);
+        if (closed || !empty || !scheduler_block_current(&channel->readers)) return 0;
+    }
+}
+
+static void wake_all(task_wait_queue_t *queue) {
+    while (scheduler_wake_one(queue)) { }
 }
 
 int ipc_channel_close(ipc_channel_t *channel) {
@@ -60,6 +97,8 @@ int ipc_channel_close(ipc_channel_t *channel) {
     }
     channel->open = 0;
     spinlock_unlock_irqrestore(&channel->lock, flags);
+    wake_all(&channel->readers);
+    wake_all(&channel->writers);
     return 1;
 }
 

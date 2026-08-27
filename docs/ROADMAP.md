@@ -178,6 +178,9 @@ permission and lifetime changes cannot remain hidden behind stale TLB entries.
 Page-flag replacement now clears stale writable, user, and NX state before
 applying the requested user-page policy, and failed page-table allocation
 rolls back newly installed table links and owned frames.
+IPC channels now integrate with scheduler wait queues: blocking senders and
+receivers sleep on full/empty queues, successful transfers wake the opposite
+side, and close wakes all waiters while queued messages remain drainable.
 
 ## Phase 7 — VFS and kernel abstractions
 

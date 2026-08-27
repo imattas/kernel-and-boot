@@ -184,6 +184,9 @@ validated syscall buffer before use.
 Bounded anonymous user mappings now allocate zeroed physical frames, track
 ownership in the address space, roll back partial ranges, and expose validated
 map/unmap syscall operations; userland launch remains deferred.
+User memory protection now has a range-level API and syscall that prevalidates
+the complete mapped range, updates W^X page policy under the address-space lock,
+and invalidates active TLB entries; failed ranges remain unchanged.
 ELF page mappings now carry the segment write policy, with a controlled flag
 update for shared pages; the QEMU image probe verifies a non-writable code
 page while the process stack remains writable.

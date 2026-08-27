@@ -161,7 +161,10 @@ address-space lock used by mapping and unmapping, closing the validation-to-use
 race at the syscall boundary.
 The address-space API also owns bounded anonymous user mappings, records their
 physical frames, rolls back partial allocation, and releases them on explicit
-unmap or address-space destruction.
+unmap or address-space destruction. Range protection validates every user page
+before changing permissions, updates writable and executable policy under the
+address-space lock, and invalidates active TLB entries; its syscall cannot leave
+a partially changed range when a page is absent.
 The initial user-image loader accepts only validated x86_64 ELF executables,
 reuses pages shared by load segments, rejects malformed ranges, allocates
 zeroed physical pages for PT_LOAD regions, and records executable entry points.

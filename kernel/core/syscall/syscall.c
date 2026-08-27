@@ -353,6 +353,17 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
                                                  (uint32_t)arg2) ? 0 :
                    OS_SYSCALL_ERROR;
         }
+        case OS_SYSCALL_PROTECT_MEMORY: {
+            process_t *process = process_current();
+            if (!process || arg1 < (1ULL << 39) ||
+                (arg1 & 0xfffULL) != 0 || arg2 == 0 ||
+                arg2 > ADDRESS_SPACE_MAX_ANONYMOUS_PAGES ||
+                (arg3 & ~(ADDRESS_SPACE_WRITABLE | ADDRESS_SPACE_EXECUTABLE)) != 0)
+                return OS_SYSCALL_ERROR;
+            return address_space_protect_range(&process->address_space, arg1,
+                                               (uint32_t)arg2, arg3) ? 0 :
+                   OS_SYSCALL_ERROR;
+        }
         case OS_SYSCALL_SIGNAL_NEXT: {
             uint32_t signal = 0;
             if (!user_range(arg1, sizeof(signal), 1) ||

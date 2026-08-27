@@ -2742,6 +2742,23 @@ void kernel_main(void *boot_info) {
                                       ADDRESS_SPACE_WRITABLE) ||
         !address_space_user_range_valid(&runtime_process->address_space,
                                         anonymous_probe_address, 2 * 0x1000ULL, 1) ||
+        !address_space_protect_range(&runtime_process->address_space,
+                                      anonymous_probe_address, 1,
+                                      ADDRESS_SPACE_EXECUTABLE) ||
+        address_space_user_range_valid(&runtime_process->address_space,
+                                       anonymous_probe_address, 0x1000, 1) ||
+        !address_space_page_executable(&runtime_process->address_space,
+                                       anonymous_probe_address) ||
+        !address_space_protect_range(&runtime_process->address_space,
+                                     anonymous_probe_address, 1,
+                                     ADDRESS_SPACE_WRITABLE) ||
+        !address_space_user_range_valid(&runtime_process->address_space,
+                                        anonymous_probe_address, 0x1000, 1) ||
+        address_space_protect_range(&runtime_process->address_space,
+                                    anonymous_probe_address, 3,
+                                    ADDRESS_SPACE_EXECUTABLE) ||
+        !address_space_user_range_valid(&runtime_process->address_space,
+                                        anonymous_probe_address, 0x1000, 1) ||
         !address_space_unmap_anonymous(&runtime_process->address_space,
                                        anonymous_probe_address, 2) ||
         address_space_user_range_valid(&runtime_process->address_space,
@@ -2886,6 +2903,24 @@ void kernel_main(void *boot_info) {
         serial_write("user address space activation failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
+    if (syscall_dispatch(OS_SYSCALL_MAP_ANONYMOUS, anonymous_probe_address,
+                         2, ADDRESS_SPACE_WRITABLE) != anonymous_probe_address ||
+        syscall_dispatch(OS_SYSCALL_PROTECT_MEMORY, anonymous_probe_address,
+                         1, ADDRESS_SPACE_EXECUTABLE) != 0 ||
+        address_space_user_range_valid(&runtime_process->address_space,
+                                       anonymous_probe_address, 0x1000, 1) ||
+        syscall_dispatch(OS_SYSCALL_PROTECT_MEMORY, anonymous_probe_address,
+                         3, ADDRESS_SPACE_EXECUTABLE) != OS_SYSCALL_ERROR ||
+        address_space_user_range_valid(&runtime_process->address_space,
+                                       anonymous_probe_address, 0x1000, 1) ||
+        syscall_dispatch(OS_SYSCALL_PROTECT_MEMORY, anonymous_probe_address,
+                         1, ADDRESS_SPACE_WRITABLE) != 0 ||
+        syscall_dispatch(OS_SYSCALL_UNMAP_ANONYMOUS, anonymous_probe_address,
+                         2, 0) != 0) {
+        serial_write("memory protection syscall failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("memory protection syscall ready\r\n");
     static const char syscall_marker[] = "ok";
     char syscall_copy[sizeof(syscall_marker)] = {0};
     if (!syscall_copy_to_user(0x8000002000ULL, syscall_marker,

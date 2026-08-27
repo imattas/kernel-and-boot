@@ -404,6 +404,42 @@ int address_space_update_page_flags(address_space_t *space, uint64_t virtual_add
     return result;
 }
 
+int address_space_protect_range(address_space_t *space, uint64_t virtual_address,
+                                uint32_t pages, uint64_t flags) {
+    if (!space || pages == 0 ||
+        virtual_address > UINT64_MAX - (uint64_t)pages * PAGE_SIZE ||
+        virtual_address < (1ULL << 39) ||
+        virtual_address + (uint64_t)pages * PAGE_SIZE > (1ULL << 48) ||
+        (virtual_address & (PAGE_SIZE - 1)) != 0 ||
+        (flags & ~(ADDRESS_SPACE_WRITABLE | ADDRESS_SPACE_EXECUTABLE)) != 0)
+        return 0;
+    uint64_t lock_flags = spinlock_lock_irqsave(&address_space_lock);
+    int valid = 1;
+    for (uint32_t page = 0; page < pages; ++page) {
+        uint64_t address = virtual_address + (uint64_t)page * PAGE_SIZE;
+        uint64_t *pml4_table = (uint64_t *)(uintptr_t)space->root;
+        uint64_t pml4e = space->root ? pml4_table[(address >> 39) & 0x1ff] : 0;
+        uint64_t *pdpt = (uint64_t *)(uintptr_t)(pml4e & ~(PAGE_SIZE - 1));
+        uint64_t pdpte = (pml4e & PAGE_PRESENT) ? pdpt[(address >> 30) & 0x1ff] : 0;
+        uint64_t *pd = (uint64_t *)(uintptr_t)(pdpte & ~(PAGE_SIZE - 1));
+        uint64_t pde = (pdpte & PAGE_PRESENT) ? pd[(address >> 21) & 0x1ff] : 0;
+        uint64_t *pt = (uint64_t *)(uintptr_t)(pde & ~(PAGE_SIZE - 1));
+        uint64_t pte = (pde & PAGE_PRESENT) ? pt[(address >> 12) & 0x1ff] : 0;
+        if ((pte & (PAGE_PRESENT | PAGE_USER)) != (PAGE_PRESENT | PAGE_USER)) {
+            valid = 0;
+            break;
+        }
+    }
+    if (valid) {
+        for (uint32_t page = 0; page < pages; ++page)
+            valid = address_space_update_page_flags_locked(
+                space, virtual_address + (uint64_t)page * PAGE_SIZE,
+                flags | ADDRESS_SPACE_USER);
+    }
+    spinlock_unlock_irqrestore(&address_space_lock, lock_flags);
+    return valid;
+}
+
 int address_space_unmap_page(address_space_t *space, uint64_t virtual_address) {
     uint64_t flags = spinlock_lock_irqsave(&address_space_lock);
     int result = address_space_unmap_page_locked(space, virtual_address);

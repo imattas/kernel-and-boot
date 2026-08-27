@@ -34,6 +34,8 @@ int address_space_map_anonymous(address_space_t *space, uint64_t virtual_address
                                 uint32_t pages, uint64_t flags);
 int address_space_unmap_anonymous(address_space_t *space, uint64_t virtual_address,
                                   uint32_t pages);
+int address_space_protect_range(address_space_t *space, uint64_t virtual_address,
+                                uint32_t pages, uint64_t flags);
 int address_space_update_page_flags(address_space_t *space, uint64_t virtual_address,
                                     uint64_t flags);
 int address_space_page_executable(const address_space_t *space, uint64_t virtual_address);

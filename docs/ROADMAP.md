@@ -276,8 +276,8 @@ to the kernel process object until userland exists. ACPI parsing is now owned by
 the kernel ACPI driver boundary rather than an empty driver scaffold. The boot
 path now tracks ordered initialization stages and validates the firmware boot
 contract through a dedicated boundary. CR3 activation is now isolated behind
-the x86_64 memory architecture boundary; the reserved BIOS boot directory is
-the only remaining empty kernel directory.
+the x86_64 memory architecture boundary. The unused BIOS scaffold directory
+was removed; BIOS remains a separate later boot path.
 
 ## Phase 9 — Userspace boundary
 

@@ -349,6 +349,9 @@ The kernel heap now serializes allocation, page commitment, split/coalesce, and
 free validation with an IRQ-safe lock for SMP-safe ownership of its block list.
 Slab caches now provide the same IRQ-safe serialization for object allocation,
 freeing, and availability queries.
+Virtual memory mapping, address-space lifecycle, page-flag updates, unmapping,
+and user-range validation now share an IRQ-safe address-space lock, protecting
+page-table and owned-frame metadata across SMP callers.
 UEFI memory-map retries now release rejected candidate pools and validate boot
 services before dereferencing them, keeping ExitBootServices preparation
 bounded without leaking retry buffers.

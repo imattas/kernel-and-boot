@@ -2,6 +2,7 @@
 #include "address_space.h"
 #include "../physical/frame.h"
 #include "../../arch/x86_64/memory/paging.h"
+#include "../../core/sync/spinlock.h"
 
 #define PAGE_SIZE 0x1000ULL
 #define HUGE_PAGE_SIZE 0x200000ULL
@@ -20,6 +21,7 @@ static int heap_page_table_active;
 static uint64_t root;
 static uint64_t active_root;
 static const address_space_t *active_space;
+static spinlock_t address_space_lock;
 
 static void clear_table(uint64_t *table) {
     for (uint64_t i = 0; i < 512; ++i) table[i] = 0;
@@ -31,6 +33,7 @@ static void invalidate_active_page(const address_space_t *space, uint64_t addres
 }
 
 int virtual_memory_initialize(void) {
+    spinlock_init(&address_space_lock);
     uint32_t low, high;
     __asm__ volatile ("rdmsr" : "=a"(low), "=d"(high) : "c"(0xc0000080));
     low |= 1U << 11;
@@ -52,7 +55,8 @@ int virtual_memory_initialize(void) {
     return 1;
 }
 
-int virtual_memory_map_identity(uint64_t address, uint64_t size, uint64_t flags) {
+static int virtual_memory_map_identity_locked(uint64_t address, uint64_t size,
+                                              uint64_t flags) {
     if ((address & (HUGE_PAGE_SIZE - 1)) != 0 || (size & (HUGE_PAGE_SIZE - 1)) != 0 ||
         size == 0 || address >= 0x100000000ULL || size > 0x100000000ULL - address) return 0;
     uint64_t first = address / HUGE_PAGE_SIZE;
@@ -66,7 +70,9 @@ int virtual_memory_map_identity(uint64_t address, uint64_t size, uint64_t flags)
     return 1;
 }
 
-int virtual_memory_map_page(uint64_t virtual_address, uint64_t physical_address, uint64_t flags) {
+static int virtual_memory_map_page_locked(uint64_t virtual_address,
+                                          uint64_t physical_address,
+                                          uint64_t flags) {
     if ((virtual_address & (PAGE_SIZE - 1)) != 0 || (physical_address & (PAGE_SIZE - 1)) != 0 ||
         virtual_address < 0x40000000ULL || virtual_address >= 0x40200000ULL || physical_address >= 0x100000000ULL) return 0;
     if (!heap_page_table_active) {
@@ -80,6 +86,22 @@ int virtual_memory_map_page(uint64_t virtual_address, uint64_t physical_address,
 }
 
 uint64_t virtual_memory_root(void) { return root; }
+
+int virtual_memory_map_identity(uint64_t address, uint64_t size, uint64_t flags) {
+    uint64_t lock_flags = spinlock_lock_irqsave(&address_space_lock);
+    int result = virtual_memory_map_identity_locked(address, size, flags);
+    spinlock_unlock_irqrestore(&address_space_lock, lock_flags);
+    return result;
+}
+
+int virtual_memory_map_page(uint64_t virtual_address, uint64_t physical_address,
+                            uint64_t flags) {
+    uint64_t lock_flags = spinlock_lock_irqsave(&address_space_lock);
+    int result = virtual_memory_map_page_locked(virtual_address, physical_address,
+                                                flags);
+    spinlock_unlock_irqrestore(&address_space_lock, lock_flags);
+    return result;
+}
 
 static uint64_t address_space_allocate_table(address_space_t *space) {
     if (space->owned_count >= 32) return 0;
@@ -101,7 +123,7 @@ static void address_space_rollback_tables(address_space_t *space, uint32_t owned
         physical_free_frame(space->owned_frames[--space->owned_count]);
 }
 
-int address_space_create(address_space_t *space) {
+static int address_space_create_locked(address_space_t *space) {
     if (!space || space->root != 0) return 0;
     space->owned_count = 0;
     uint64_t root_frame = address_space_allocate_table(space);
@@ -119,7 +141,7 @@ int address_space_create(address_space_t *space) {
     return 1;
 }
 
-int address_space_activate(const address_space_t *space) {
+static int address_space_activate_locked(const address_space_t *space) {
     if (!space || (space->root & (PAGE_SIZE - 1)) != 0 || space->root == 0) return 0;
     x86_64_load_page_root(space->root);
     active_root = space->root;
@@ -127,7 +149,7 @@ int address_space_activate(const address_space_t *space) {
     return 1;
 }
 
-int address_space_destroy(address_space_t *space) {
+static int address_space_destroy_locked(address_space_t *space) {
     if (!space || space->root == 0 || space->root == root || space->root == active_root)
         return 0;
     for (uint32_t i = space->owned_count; i != 0; --i)
@@ -137,8 +159,10 @@ int address_space_destroy(address_space_t *space) {
     return 1;
 }
 
-int address_space_map_page(address_space_t *space, uint64_t virtual_address,
-                           uint64_t physical_address, uint64_t flags) {
+static int address_space_map_page_locked(address_space_t *space,
+                                         uint64_t virtual_address,
+                                         uint64_t physical_address,
+                                         uint64_t flags) {
     if (!space || space->root == 0 || (virtual_address & (PAGE_SIZE - 1)) != 0 ||
         (physical_address & (PAGE_SIZE - 1)) != 0 || virtual_address < (1ULL << 39) ||
         virtual_address >= (1ULL << 48) || physical_address >= 0x100000000ULL)
@@ -201,8 +225,9 @@ int address_space_map_page(address_space_t *space, uint64_t virtual_address,
     return 1;
 }
 
-int address_space_update_page_flags(address_space_t *space, uint64_t virtual_address,
-                                    uint64_t flags) {
+static int address_space_update_page_flags_locked(address_space_t *space,
+                                                   uint64_t virtual_address,
+                                                   uint64_t flags) {
     if (!space || space->root == 0 || (virtual_address & (PAGE_SIZE - 1)) != 0 ||
         virtual_address < (1ULL << 39) || virtual_address >= (1ULL << 48) ||
         (flags & ~(ADDRESS_SPACE_WRITABLE | ADDRESS_SPACE_USER | ADDRESS_SPACE_EXECUTABLE)) != 0)
@@ -226,7 +251,8 @@ int address_space_update_page_flags(address_space_t *space, uint64_t virtual_add
     return 1;
 }
 
-int address_space_unmap_page(address_space_t *space, uint64_t virtual_address) {
+static int address_space_unmap_page_locked(address_space_t *space,
+                                           uint64_t virtual_address) {
     if (!space || space->root == 0 || (virtual_address & (PAGE_SIZE - 1)) != 0 ||
         virtual_address < (1ULL << 39) || virtual_address >= (1ULL << 48)) return 0;
     uint64_t *pml4_table = (uint64_t *)(uintptr_t)space->root;
@@ -246,7 +272,8 @@ int address_space_unmap_page(address_space_t *space, uint64_t virtual_address) {
     return 1;
 }
 
-int address_space_page_executable(const address_space_t *space, uint64_t virtual_address) {
+static int address_space_page_executable_locked(const address_space_t *space,
+                                                uint64_t virtual_address) {
     if (!space || space->root == 0 || (virtual_address & (PAGE_SIZE - 1)) != 0 ||
         virtual_address < (1ULL << 39) || virtual_address >= (1ULL << 48)) return 0;
     uint64_t *pml4_table = (uint64_t *)(uintptr_t)space->root;
@@ -266,8 +293,9 @@ int address_space_page_executable(const address_space_t *space, uint64_t virtual
 
 const address_space_t *address_space_active(void) { return active_space; }
 
-int address_space_user_range_valid(const address_space_t *space, uint64_t address,
-                                   uint64_t size, int writable) {
+static int address_space_user_range_valid_locked(const address_space_t *space,
+                                                 uint64_t address, uint64_t size,
+                                                 int writable) {
     if (!space || space->root == 0 || size == 0 || address < (1ULL << 39) ||
         address >= (1ULL << 48) || size > (1ULL << 48) - address) return 0;
     uint64_t end = address + size - 1;
@@ -293,4 +321,64 @@ int address_space_user_range_valid(const address_space_t *space, uint64_t addres
         if (page == last_page) break;
     }
     return 1;
+}
+
+int address_space_create(address_space_t *space) {
+    uint64_t flags = spinlock_lock_irqsave(&address_space_lock);
+    int result = address_space_create_locked(space);
+    spinlock_unlock_irqrestore(&address_space_lock, flags);
+    return result;
+}
+
+int address_space_activate(const address_space_t *space) {
+    uint64_t flags = spinlock_lock_irqsave(&address_space_lock);
+    int result = address_space_activate_locked(space);
+    spinlock_unlock_irqrestore(&address_space_lock, flags);
+    return result;
+}
+
+int address_space_destroy(address_space_t *space) {
+    uint64_t flags = spinlock_lock_irqsave(&address_space_lock);
+    int result = address_space_destroy_locked(space);
+    spinlock_unlock_irqrestore(&address_space_lock, flags);
+    return result;
+}
+
+int address_space_map_page(address_space_t *space, uint64_t virtual_address,
+                           uint64_t physical_address, uint64_t flags) {
+    uint64_t lock_flags = spinlock_lock_irqsave(&address_space_lock);
+    int result = address_space_map_page_locked(space, virtual_address,
+                                               physical_address, flags);
+    spinlock_unlock_irqrestore(&address_space_lock, lock_flags);
+    return result;
+}
+
+int address_space_update_page_flags(address_space_t *space, uint64_t virtual_address,
+                                    uint64_t flags) {
+    uint64_t lock_flags = spinlock_lock_irqsave(&address_space_lock);
+    int result = address_space_update_page_flags_locked(space, virtual_address, flags);
+    spinlock_unlock_irqrestore(&address_space_lock, lock_flags);
+    return result;
+}
+
+int address_space_unmap_page(address_space_t *space, uint64_t virtual_address) {
+    uint64_t flags = spinlock_lock_irqsave(&address_space_lock);
+    int result = address_space_unmap_page_locked(space, virtual_address);
+    spinlock_unlock_irqrestore(&address_space_lock, flags);
+    return result;
+}
+
+int address_space_page_executable(const address_space_t *space, uint64_t virtual_address) {
+    uint64_t flags = spinlock_lock_irqsave(&address_space_lock);
+    int result = address_space_page_executable_locked(space, virtual_address);
+    spinlock_unlock_irqrestore(&address_space_lock, flags);
+    return result;
+}
+
+int address_space_user_range_valid(const address_space_t *space, uint64_t address,
+                                   uint64_t size, int writable) {
+    uint64_t flags = spinlock_lock_irqsave(&address_space_lock);
+    int result = address_space_user_range_valid_locked(space, address, size, writable);
+    spinlock_unlock_irqrestore(&address_space_lock, flags);
+    return result;
 }

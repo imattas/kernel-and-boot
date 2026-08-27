@@ -975,6 +975,10 @@ requires the FAT region to contain entries for every declared cluster.
 ExFAT VFS regular files now support bounded sector read-modify-write updates
 within existing contiguous or FAT-linked extents; allocation, append, and
 truncate remain separate metadata operations.
+ExFAT now supports bounded nonzero shrink/truncation for existing allocated
+files, updating valid/data lengths and the directory-entry checksum atomically
+at the directory-cluster write boundary; allocation and zero-length shrink
+remain separate metadata work.
 The exFAT contract now exercises an actual write followed by a readback on the
 synthetic filesystem image.
 FAT32, exFAT, ext4, XFS, and Btrfs VFS file adapters now serialize direct node

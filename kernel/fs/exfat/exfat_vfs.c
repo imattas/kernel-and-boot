@@ -30,6 +30,18 @@ static int exfat_vfs_write(vfs_node_t *node, uint64_t offset,
     return result;
 }
 
+static int exfat_vfs_truncate(vfs_node_t *node, uint32_t size) {
+    exfat_vfs_file_t *file = node ? (exfat_vfs_file_t *)node->private_data : 0;
+    if (!file || size == 0 || (uint64_t)size >= file->size) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&file->lock);
+    int result = exfat_truncate_file_in_directory(file->fs,
+                                                  file->directory_cluster,
+                                                  file->name, size);
+    if (result) file->size = size;
+    spinlock_unlock_irqrestore(&file->lock, flags);
+    return result;
+}
+
 int exfat_vfs_attach_file_in_directory(exfat_fs_t *fs, vfs_node_t *root,
                                         uint32_t directory_cluster,
                                         const char *filesystem_name,
@@ -51,6 +63,7 @@ int exfat_vfs_attach_file_in_directory(exfat_fs_t *fs, vfs_node_t *root,
     vfs_node_t *node = vfs_node_create(name, VFS_NODE_REGULAR, 0, 0, 0644);
     if (!node || !vfs_node_set_read(node, exfat_vfs_read, file) ||
         !vfs_node_set_write(node, exfat_vfs_write, file) ||
+        !vfs_node_set_truncate(node, exfat_vfs_truncate) ||
         !vfs_node_set_private_destructor(node, exfat_vfs_destroy) ||
         !vfs_node_add_child(root, node)) {
         if (node) {

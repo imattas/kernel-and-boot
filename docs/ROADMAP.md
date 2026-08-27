@@ -701,6 +701,8 @@ The block cache now performs cache-miss reads and write-through device I/O
 outside its metadata lock, then merges bounded results under lock.
 The cache now exposes an explicit flush operation that delegates to the
 underlying block device, completing the write-through durability boundary.
+The boot storage probe now exercises that cache flush path during QEMU
+validation as well as in the hosted contract.
 The cache contract now verifies misses, hits, write-through coherence, sector
 invalidation, LRU eviction, and device-wide invalidation against a backing
 block device.

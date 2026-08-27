@@ -16,6 +16,7 @@
 #include "../../../security/credentials.h"
 #include "../../../fs/vfs/vfs.h"
 #include "../../../fs/vfs/mount.h"
+#include "../../../fs/vfs/probe.h"
 #include "../../../fs/block/block.h"
 #include "../../../fs/block/storage_block.h"
 #include "../../../fs/cache/cache.h"
@@ -1096,6 +1097,13 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("FAT32 filesystem ready\r\n");
+    vfs_filesystem_type_t detected_filesystem;
+    if (!vfs_probe_filesystem(0, &detected_filesystem) ||
+        detected_filesystem != VFS_FILESYSTEM_FAT32) {
+        serial_write("filesystem probe dispatch failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("filesystem probe dispatch ready\r\n");
     vfs_node_t *fat_vfs_root = vfs_node_create("fat", VFS_NODE_DIRECTORY,
                                                0, 0, 0555);
     uint8_t fat_vfs_probe[4];

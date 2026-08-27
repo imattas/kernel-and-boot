@@ -679,6 +679,8 @@ window handling, BCD/binary decoding, and 12/24-hour conversion.
 ACPI now validates and exposes the firmware reset register as a guarded kernel
 service when the FADT supplies a supported system-I/O GAS, and reports the
 capability absence without treating optional firmware support as a boot error.
+The VFS now has a common bounded filesystem probe dispatcher covering FAT32,
+exFAT, ext4, XFS, and Btrfs above the storage-device interface.
 UHCI and e1000 now use an explicit shared PCI interrupt dispatcher because
 legacy IRQ lines may be shared; each handler independently filters its device
 status before acknowledging its own controller.

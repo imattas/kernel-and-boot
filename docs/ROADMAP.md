@@ -316,6 +316,15 @@ duplicate driver names before binding.
 Device resource claim, release, and ownership queries now serialize through an
 IRQ-safe ownership lock, preventing concurrent driver probes from claiming the
 same BAR.
+The block-device registry now rejects duplicate device names and serializes
+registration-state lookup before returning stable registered descriptors.
+Task wait nodes now record their owning queue, so removal from the wrong queue
+cannot corrupt either queue's linked list.
+Scheduler initialization now precedes process-thread lifecycle operations, so
+thread startup and teardown never touch an uninitialized ready queue.
+The kernel Makefile now explicitly tracks the wait-queue header for
+process-thread compilation, preventing stale object layouts after task ABI
+changes.
 ACPI IOAPIC discovery now retains bounded multi-IOAPIC GSI ranges and routes
 each legacy PCI IRQ through the controller that owns its GSI.
 PCI now programs a validated single-entry MSI-X table when available, with

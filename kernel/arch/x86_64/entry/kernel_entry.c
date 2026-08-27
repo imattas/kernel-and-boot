@@ -910,6 +910,7 @@ void kernel_main(void *boot_info) {
     kernel_assert(!kernel_debug_range_valid(0x1000, 1, 0x1000),
                   "debug overflow assertion failure");
     serial_write("kernel debug ready\r\n");
+    scheduler_initialize();
     if (!process_initialize()) {
         serial_write("process initialization failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
@@ -947,7 +948,6 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("task wait queues ready\r\n");
-    scheduler_initialize();
     task_initialize(&scheduler_demo_task_a, 1);
     task_initialize(&scheduler_demo_task_b, 2);
     if (!scheduler_enqueue(&scheduler_demo_task_a) ||

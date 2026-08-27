@@ -15,13 +15,23 @@ void block_registry_initialize(block_registry_t *registry) {
 
 int block_registry_register(block_registry_t *registry,
                             const block_device_t *device) {
-    if (!registry || !device ||
-        name_length(device->name) == 0 || name_length(device->name) >= 32 ||
+    uint32_t length = device ? name_length(device->name) : 0;
+    if (!registry || !device || length == 0 || length >= 32 ||
         device->sector_count == 0 || device->sector_size == 0 ||
         !device->read || !device->write)
         return 0;
     uint64_t flags = spinlock_lock_irqsave(&registry->lock);
     for (uint32_t i = 0; i < BLOCK_MAX_DEVICES; ++i) {
+        if (registry->devices[i].registered &&
+            name_length(registry->devices[i].name) == length) {
+            uint32_t j = 0;
+            while (j < length &&
+                   registry->devices[i].name[j] == device->name[j]) ++j;
+            if (j == length) {
+                spinlock_unlock_irqrestore(&registry->lock, flags);
+                return 0;
+            }
+        }
         if (registry->devices[i].registered) continue;
         registry->devices[i] = *device;
         registry->devices[i].registered = 1;
@@ -33,9 +43,12 @@ int block_registry_register(block_registry_t *registry,
 }
 
 block_device_t *block_registry_at(block_registry_t *registry, uint32_t index) {
-    if (!registry || index >= BLOCK_MAX_DEVICES ||
-        !registry->devices[index].registered) return 0;
-    return &registry->devices[index];
+    if (!registry || index >= BLOCK_MAX_DEVICES) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&registry->lock);
+    block_device_t *device = registry->devices[index].registered ?
+        &registry->devices[index] : 0;
+    spinlock_unlock_irqrestore(&registry->lock, flags);
+    return device;
 }
 
 static int valid_request(const block_device_t *device, uint64_t sector,

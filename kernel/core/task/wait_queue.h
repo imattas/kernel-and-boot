@@ -14,11 +14,12 @@ typedef enum {
 typedef struct task_wait_node {
     struct task_wait_node *previous;
     struct task_wait_node *next;
+    struct task_wait_queue *queue;
     void *owner;
     uint8_t queued;
 } task_wait_node_t;
 
-typedef struct {
+typedef struct task_wait_queue {
     spinlock_t lock;
     task_wait_node_t *head;
     task_wait_node_t *tail;

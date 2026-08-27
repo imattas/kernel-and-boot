@@ -141,7 +141,7 @@ $(UEFI_EFI): $(UEFI_OBJ) $(UEFI_ENTRY_OBJ) $(UEFI_CONSOLE_OBJ) $(UEFI_FIRMWARE_O
 $(BUILD_DIR)/kernel:
 	mkdir -p $@
 
-$(KERNEL_OBJ): kernel/arch/x86_64/entry/kernel_entry.c kernel/arch/x86_64/cpu/tables.h kernel/drivers/network/e1000.h kernel/drivers/network/ethernet.h kernel/drivers/network/arp.h kernel/drivers/network/arp_cache.h kernel/drivers/network/ipv4.h kernel/drivers/network/udp.h kernel/drivers/network/icmp.h kernel/drivers/network/route.h kernel/drivers/network/packet_queue.h kernel/drivers/network/network.h kernel/drivers/network/reassembly.h kernel/drivers/network/udp_endpoint.h kernel/fs/vfs/vfs.h kernel/fs/vfs/file.h kernel/ipc/endpoint.h kernel/syscall/abi.h | $(BUILD_DIR)/kernel
+$(KERNEL_OBJ): kernel/arch/x86_64/entry/kernel_entry.c kernel/arch/x86_64/cpu/tables.h kernel/drivers/storage/ata.h kernel/drivers/network/e1000.h kernel/drivers/network/ethernet.h kernel/drivers/network/arp.h kernel/drivers/network/arp_cache.h kernel/drivers/network/ipv4.h kernel/drivers/network/udp.h kernel/drivers/network/icmp.h kernel/drivers/network/route.h kernel/drivers/network/packet_queue.h kernel/drivers/network/network.h kernel/drivers/network/reassembly.h kernel/drivers/network/udp_endpoint.h kernel/fs/vfs/vfs.h kernel/fs/vfs/file.h kernel/ipc/endpoint.h kernel/syscall/abi.h | $(BUILD_DIR)/kernel
 	$(CC) -target x86_64-pc-none-elf -std=c11 -ffreestanding -fno-builtin -Iboot/UEFI/core -fno-stack-protector \
 		-fPIE -fno-plt -mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@
 

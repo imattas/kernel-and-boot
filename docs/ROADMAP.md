@@ -632,6 +632,9 @@ and reclaims this context without starting ring 3.
 Process-thread creation now owns that user context directly, requires a READY
 process, and exercises invalid-entry rejection plus teardown through the normal
 process-thread lifetime path.
+Processes now expose an exit wait primitive: waiters block on a dedicated
+queue, termination publishes the exit status and wakes them, and destruction
+refuses to reclaim a process while exit waiters remain.
 Scheduler current-task, idle-task, preemption, counter, and lifecycle state now
 use an IRQ-safe scheduler lock around shared metadata and queue transitions.
 Scheduler block and wake transitions now hold that lock across wait-queue

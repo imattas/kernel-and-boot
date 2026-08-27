@@ -2140,9 +2140,12 @@ void kernel_main(void *boot_info) {
     process_t *terminate_process = process_create(3);
     process_thread_t *terminate_thread = terminate_process ?
         process_thread_create(terminate_process, 202, process_thread_probe, 0, 4096) : 0;
+    int32_t waited_status = 0;
     if (!terminate_thread || !process_terminate(terminate_process, 7) ||
         terminate_process->thread_count != 0 || terminate_process->state != PROCESS_EXITED ||
-        terminate_process->exit_status != 7 || !process_destroy(terminate_process)) {
+        terminate_process->exit_status != 7 ||
+        !process_wait(terminate_process, &waited_status) || waited_status != 7 ||
+        !process_destroy(terminate_process)) {
         serial_write("process termination teardown failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }

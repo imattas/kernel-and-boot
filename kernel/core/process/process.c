@@ -51,6 +51,7 @@ process_t *process_create(uint64_t id) {
     process->pending_signals = 0;
     process->blocked_signals = 0;
     task_wait_queue_initialize(&process->signal_waiters);
+    task_wait_queue_initialize(&process->exit_waiters);
     process->exit_status = 0;
     process_handle_table_initialize(&process->handles);
     process->threads = 0;
@@ -198,6 +199,7 @@ int process_destroy(process_t *process) {
     }
     if (process_current() == process || process->state == PROCESS_RUNNING ||
         task_wait_queue_count(&process->signal_waiters) != 0 ||
+        task_wait_queue_count(&process->exit_waiters) != 0 ||
         !process_thread_destroy_all_locked(process)) {
         spinlock_unlock_irqrestore(&process->lock, process_flags);
         return 0;
@@ -299,6 +301,22 @@ int process_wait_signal(process_t *process, uint32_t *signal) {
     }
 }
 
+int process_wait(process_t *process, int32_t *status) {
+    if (!process || !status) return 0;
+    for (;;) {
+        uint64_t flags = spinlock_lock_irqsave(&process->lock);
+        if (process->state == PROCESS_EXITED) {
+            *status = process->exit_status;
+            spinlock_unlock_irqrestore(&process->lock, flags);
+            return 1;
+        }
+        if (scheduler_block_current_with_lock(&process->exit_waiters,
+                                              &process->lock, flags))
+            continue;
+        return 0;
+    }
+}
+
 int process_terminate(process_t *process, int32_t status) {
     if (!process) return 0;
     uint64_t flags = spinlock_lock_irqsave(&process->lock);
@@ -319,5 +337,6 @@ int process_terminate(process_t *process, int32_t status) {
     process->state = PROCESS_EXITED;
     spinlock_unlock_irqrestore(&process->lock, flags);
     wake_all_signal_waiters(process);
+    while (scheduler_wake_one(&process->exit_waiters)) { }
     return 1;
 }

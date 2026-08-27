@@ -654,6 +654,8 @@ The framebuffer surface independently rejects overflowing row geometry and uses
 64-bit pixel offsets for clear, pixel, and rectangle operations.
 UEFI failure paths now close opened filesystem handles, release pool buffers,
 and free rejected kernel-page allocations, preventing boot-time resource leaks.
+UEFI ELF validation now rejects writable-executable load segments before kernel
+memory allocation, preserving a W^X boot image contract.
 
 ## Phase 9 — Userspace boundary
 

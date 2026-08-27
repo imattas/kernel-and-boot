@@ -14,6 +14,7 @@ static int valid_elf(const elf64_header_t *e, uint64_t size) {
         if (first->type != 1) continue;
         if (first->filesz > first->memsz || first->offset > size ||
             first->filesz > size - first->offset ||
+            (first->flags & 3U) == 3U ||
             first->vaddr + first->memsz < first->vaddr ||
             (first->align > 1 && ((first->align & (first->align - 1)) != 0 ||
                                   (first->vaddr & (first->align - 1)) !=

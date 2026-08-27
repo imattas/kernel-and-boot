@@ -80,6 +80,16 @@ static int mouse_command_noarg(uint8_t command) {
     return wait_read() && in8(0x60) == 0xfa;
 }
 
+static int mouse_command_id(uint8_t command, uint8_t *id) {
+    if (!id || !wait_write()) return 0;
+    out8(0x64, 0xd4);
+    if (!wait_write()) return 0;
+    out8(0x60, command);
+    if (!wait_read() || in8(0x60) != 0xfa || !wait_read()) return 0;
+    *id = in8(0x60);
+    return *id == 0 || *id == 3 || *id == 4 || *id == 5;
+}
+
 int ps2_keyboard_initialize(input_queue_t *queue) {
     if (!queue || !wait_write()) return 0;
     out8(0x64, 0xad);
@@ -113,7 +123,8 @@ int ps2_mouse_initialize(input_queue_t *queue) {
     if (!controller_command(0xa9, &response) || response != 0x00) return 0;
     if (!controller_command(0x20, &config)) return 0;
     config |= 0x02U;
-    if (!controller_write_config(config) || !mouse_command_noarg(0xf4))
+    if (!controller_write_config(config) || !mouse_command_noarg(0xf4) ||
+        !mouse_command_id(0xf2, &response))
         return 0;
     mouse_packet_length = 0;
     mouse_queue = queue;

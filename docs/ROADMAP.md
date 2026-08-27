@@ -325,6 +325,9 @@ requests and replies for the Ethernet layer.
 The bounded ARP cache now serializes updates and lookups, replaces the oldest
 entry when full, refreshes existing mappings, and expires entries using a
 caller-supplied monotonic timestamp.
+The bounded IPv4 layer now builds and validates version/IHL, total length,
+TTL, protocol, addresses, and Internet checksums, while rejecting fragmented
+packets until a reassembly component is available.
 The e1000 ISR now records delivery, and the post-interrupt-enable QEMU probe
 transmits a frame and requires an observed interrupt before continuing.
 The e1000 ISR now preserves cleared interrupt causes for the polling/service

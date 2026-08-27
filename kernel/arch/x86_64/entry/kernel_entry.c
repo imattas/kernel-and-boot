@@ -35,6 +35,7 @@
 #include "../../../drivers/network/ethernet.h"
 #include "../../../drivers/network/arp.h"
 #include "../../../drivers/network/arp_cache.h"
+#include "../../../drivers/network/ipv4.h"
 #include "../../../time/clock.h"
 #include "../../../debug/assert.h"
 #include "../../../core/task/context.h"
@@ -544,6 +545,32 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("ARP cache ready\r\n");
+    static const uint8_t ipv4_probe_source[4] = {192, 168, 0, 2};
+    static const uint8_t ipv4_probe_destination[4] = {192, 168, 0, 1};
+    static const uint8_t ipv4_probe_payload[4] = {1, 2, 3, 4};
+    static uint8_t ipv4_probe_packet[IPV4_MIN_HEADER_SIZE + 4];
+    uint16_t ipv4_probe_length = 0;
+    ipv4_packet_view_t ipv4_probe_view;
+    if (!ipv4_packet_build(ipv4_probe_packet, sizeof(ipv4_probe_packet),
+                           ipv4_probe_source, ipv4_probe_destination, 17, 64,
+                           0x1234, ipv4_probe_payload,
+                           sizeof(ipv4_probe_payload), &ipv4_probe_length) ||
+        ipv4_probe_length != sizeof(ipv4_probe_packet) ||
+        !ipv4_packet_parse(ipv4_probe_packet, ipv4_probe_length,
+                           &ipv4_probe_view) || ipv4_probe_view.ihl != 5 ||
+        ipv4_probe_view.protocol != 17 || ipv4_probe_view.ttl != 64 ||
+        ipv4_probe_view.payload_length != sizeof(ipv4_probe_payload) ||
+        ipv4_probe_view.payload[3] != 4) {
+        serial_write("IPv4 packet failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    ipv4_probe_packet[10] ^= 1U;
+    if (ipv4_packet_parse(ipv4_probe_packet, ipv4_probe_length,
+                          &ipv4_probe_view)) {
+        serial_write("IPv4 checksum failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("IPv4 packet ready\r\n");
     if (e1000_controller_count() != 0 &&
         !e1000_transmit(network_probe_packet, sizeof(network_probe_packet))) {
         serial_write("e1000 transmit failure\r\n");

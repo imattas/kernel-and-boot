@@ -295,6 +295,8 @@ UHCI now programs its PCI legacy IRQ through the shared e1000/UHCI ISR and
 enables completion/error causes when ACPI routing is available. The current
 QEMU synchronous HID transfer does not expose a completion cause, so UHCI
 interrupt delivery remains unverified and polling remains the tested path.
+Control and interrupt transfer chains now set UHCI interrupt-on-completion on
+their terminal TD, allowing the enabled completion IRQ to be generated.
 UHCI TD status handling now uses the controller’s low-speed and error-bit
 definitions, with low-speed selected from the connected root-port status; the QEMU gate performs a real USB keyboard device-descriptor
 control transfer and validates the returned descriptor.

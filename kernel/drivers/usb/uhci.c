@@ -18,6 +18,7 @@
 #define UHCI_STATUS_HOST_SYSTEM_ERROR 0x0008
 #define UHCI_STATUS_PROCESS_ERROR 0x0010
 #define UHCI_TD_ACTIVE (1U << 23)
+#define UHCI_TD_IOC (1U << 24)
 #define UHCI_TD_LOW_SPEED (1U << 26)
 #define UHCI_TD_ERROR_MASK (0x3fU << 17)
 #define UHCI_PORT_BASE 0x10
@@ -66,9 +67,9 @@ static int uhci_td_complete(const uhci_td_t *td) {
            (td->status & UHCI_TD_ERROR_MASK) == 0;
 }
 
-static uint32_t uhci_td_status(void) {
+static uint32_t uhci_td_status(int interrupt_on_complete) {
     return (3U << 27) | (uhci_low_speed ? UHCI_TD_LOW_SPEED : 0) |
-           UHCI_TD_ACTIVE;
+           (interrupt_on_complete ? UHCI_TD_IOC : 0) | UHCI_TD_ACTIVE;
 }
 
 static int uhci_set_running(int running) {
@@ -204,7 +205,7 @@ int uhci_control_transfer(uint8_t address, uint8_t endpoint,
         for (uint32_t i = 0; i < length; ++i) data_copy[i] = ((uint8_t *)data)[i];
     uint32_t data_count = length ? ((length + 63U) / 64U) : 0;
     td[0].link = (uint32_t)(td_frame + sizeof(uhci_td_t)) | 0U;
-    td[0].status = uhci_td_status();
+    td[0].status = uhci_td_status(0);
     td[0].token = uhci_token(0x2d, address, endpoint, 0, 8);
     td[0].buffer = (uint32_t)setup_frame;
     for (uint32_t i = 0; i < data_count; ++i) {
@@ -212,14 +213,14 @@ int uhci_control_transfer(uint8_t address, uint8_t endpoint,
         uint16_t chunk = (uint16_t)(length - i * 64U);
         if (chunk > 64U) chunk = 64U;
         current->link = (uint32_t)(td_frame + (2U + i) * sizeof(uhci_td_t));
-        current->status = uhci_td_status();
+        current->status = uhci_td_status(0);
         current->token = uhci_token((setup[0] & 0x80U) ? 0x69 : 0xe1,
                                     address, endpoint, (uint8_t)(1U ^ (i & 1U)), chunk);
         current->buffer = (uint32_t)(data_frame + i * 64U);
     }
     uhci_td_t *status_td = &td[1U + data_count];
     status_td->link = 1U;
-    status_td->status = uhci_td_status();
+    status_td->status = uhci_td_status(1);
     status_td->token = uhci_token((setup[0] & 0x80U) ? 0xe1 : 0x69,
                                   address, endpoint, 1, 0);
     status_td->buffer = 0;
@@ -294,7 +295,7 @@ int uhci_interrupt_transfer(uint8_t address, uint8_t endpoint, void *data,
         if (chunk > max_packet) chunk = max_packet;
         td[i].link = i + 1U < packet_count ?
             (uint32_t)(td_frame + (i + 1U) * sizeof(uhci_td_t)) : 1U;
-        td[i].status = uhci_td_status();
+        td[i].status = uhci_td_status(i + 1U == packet_count);
         td[i].token = uhci_token(input ? 0x69 : 0xe1, address,
                                  endpoint & 0x0fU, current_toggle, chunk);
         td[i].buffer = (uint32_t)(data_frame + i * max_packet);

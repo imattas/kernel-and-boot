@@ -20,6 +20,15 @@ static void finish_boot_region(uint32_t start) {
     uint32_t checksum = boot_checksum();
     for (uint32_t i = 0; i < 512; i += 4) put32(&image[(start + 11) * 512 + i], checksum);
 }
+static uint16_t entry_checksum(const uint8_t *directory, uint32_t index, uint32_t secondary_count) {
+    uint32_t checksum = 0;
+    for (uint32_t entry = 0; entry <= secondary_count; ++entry)
+        for (uint32_t byte = 0; byte < 32; ++byte) {
+            if (entry == 0 && (byte == 2 || byte == 3)) continue;
+            checksum = ((checksum >> 1) | (checksum << 15)) + directory[(index + entry) * 32 + byte];
+        }
+    return (uint16_t)checksum;
+}
 int main(void) {
     memset(image, 0, sizeof(image)); uint8_t *boot = image;
     boot[0] = 0xeb; boot[2] = 0x90; memcpy(&boot[3], "EXFAT   ", 8);
@@ -30,6 +39,7 @@ int main(void) {
     put32(&image[24 * 512 + 2 * 4], 0xfffffff8U); put32(&image[24 * 512 + 3 * 4], 0xffffffffU);
     uint8_t *root = &image[25 * 512]; root[0] = 0x85; root[1] = 2; root[32] = 0xc0; root[33] = 2; root[35] = 9; put32(&root[52], 3); put64(&root[56], 5); root[64] = 0xc1;
     const char *name = "HELLO.TXT"; for (uint32_t i = 0; i < 9; ++i) put16(&root[66 + i * 2], (uint8_t)name[i]); memcpy(&image[26 * 512], "hello", 5);
+    put16(&root[2], entry_checksum(root, 0, 2));
     storage_initialize(); storage_device_t device = {"ram-exfat", 512, 64, image_read, image_write}; assert(storage_register(&device));
     exfat_fs_t fs; assert(exfat_mount(&fs, 0)); uint32_t cluster = 0; uint64_t size = 0; uint8_t no_fat = 0;
     assert(exfat_lookup(&fs, "hello.txt", &cluster, &size, &no_fat)); assert(cluster == 3 && size == 5 && no_fat);
@@ -42,6 +52,8 @@ int main(void) {
     subdir[96] = 0x85; subdir[97] = 2; subdir[128] = 0xc0; subdir[129] = 2; subdir[131] = 4;
     put32(&subdir[148], 7); put64(&subdir[152], 4); subdir[160] = 0xc1;
     put16(&subdir[162], 'c'); put16(&subdir[164], 'a'); put16(&subdir[166], 'f'); put16(&subdir[168], 0x00e9);
+    put16(&root[98], entry_checksum(root, 3, 2)); put16(&subdir[2], entry_checksum(subdir, 0, 2));
+    put16(&subdir[98], entry_checksum(subdir, 3, 2));
     put32(&image[24 * 512 + 4 * 4], 0xfffffff8U);
     put32(&image[24 * 512 + 7 * 4], 0xfffffff8U); memcpy(&image[30 * 512], "utf8", 4);
     assert(exfat_lookup_in_directory(&fs, 4, "hello.txt", &cluster, &size, &no_fat) &&
@@ -52,6 +64,7 @@ int main(void) {
            cluster == 7 && size == 4);
     memset(output, 0, sizeof(output)); assert(exfat_read_file_in_directory(&fs, 4, "caf\xc3\xa9", 0, output, 4) &&
                                              memcmp(output, "utf8", 4) == 0);
+    root[2] ^= 1; assert(!exfat_lookup(&fs, "HELLO.TXT", &cluster, &size, &no_fat)); root[2] ^= 1;
     image[11 * 512] ^= 1; assert(!exfat_mount(&fs, 0)); image[11 * 512] ^= 1;
     image[0] = 0; assert(!exfat_mount(&fs, 0)); return 0;
 }

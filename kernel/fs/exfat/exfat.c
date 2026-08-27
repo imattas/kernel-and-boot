@@ -131,6 +131,19 @@ static int utf16_name_equal(const uint16_t *units, uint32_t count, const char *n
     return *cursor == 0;
 }
 
+static uint16_t entry_set_checksum(const uint8_t *directory, uint32_t index,
+                                   uint32_t secondary_count) {
+    uint32_t checksum = 0;
+    for (uint32_t entry = 0; entry <= secondary_count; ++entry) {
+        const uint8_t *data = &directory[(index + entry) * 32U];
+        for (uint32_t byte = 0; byte < 32U; ++byte) {
+            if (entry == 0U && (byte == 2U || byte == 3U)) continue;
+            checksum = ((checksum >> 1) | (checksum << 15)) + data[byte];
+        }
+    }
+    return (uint16_t)checksum;
+}
+
 int exfat_lookup_in_directory(exfat_fs_t *fs, uint32_t directory_cluster,
                               const char *name, uint32_t *first_cluster,
                               uint64_t *size, uint8_t *no_fat_chain) {
@@ -147,6 +160,7 @@ int exfat_lookup_in_directory(exfat_fs_t *fs, uint32_t directory_cluster,
             if (entry[0] != 0x85) continue;
             uint32_t secondary_count = entry[1];
             if (secondary_count < 2 || index + secondary_count >= entries) continue;
+            if (load16(&entry[2]) != entry_set_checksum(directory, index, secondary_count)) continue;
             const uint8_t *stream = &directory[(index + 1U) * 32U];
             if (stream[0] != 0xc0) continue;
             uint16_t candidate[256] = {0};

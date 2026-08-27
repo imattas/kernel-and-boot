@@ -57,23 +57,32 @@ int usb_hid_keyboard_decode_state(const uint8_t *report, uint32_t length,
     uint32_t count = 0;
     for (uint32_t bit = 0; bit < 8; ++bit)
         if ((state->modifiers & (uint8_t)(1U << bit)) != 0 &&
-            (report[0] & (uint8_t)(1U << bit)) == 0)
+            (report[0] & (uint8_t)(1U << bit)) == 0) {
+            if (count == 20) return 0;
             events[count++] = (input_event_t){INPUT_EVENT_KEY,
                                               (uint16_t)(0xe0U + bit), 0,
                                               timestamp};
+        }
     for (uint32_t i = 0; i < 6; ++i)
-        if (state->keys[i] != 0 && !hid_key_present(next, state->keys[i]))
+        if (state->keys[i] != 0 && !hid_key_present(next, state->keys[i])) {
+            if (count == 20) return 0;
             events[count++] = (input_event_t){INPUT_EVENT_KEY, state->keys[i], 0,
                                               timestamp};
+        }
     for (uint32_t bit = 0; bit < 8; ++bit)
         if ((report[0] & (uint8_t)(1U << bit)) != 0 &&
-            (state->modifiers & (uint8_t)(1U << bit)) == 0)
+            (state->modifiers & (uint8_t)(1U << bit)) == 0) {
+            if (count == 20) return 0;
             events[count++] = (input_event_t){INPUT_EVENT_KEY,
                                               (uint16_t)(0xe0U + bit), 1,
                                               timestamp};
+        }
     for (uint32_t i = 0; i < 6; ++i)
-        if (next[i] != 0 && !hid_key_present(state->keys, next[i]))
-            events[count++] = (input_event_t){INPUT_EVENT_KEY, next[i], 1, 0};
+        if (next[i] != 0 && !hid_key_present(state->keys, next[i])) {
+            if (count == 20) return 0;
+            events[count++] = (input_event_t){INPUT_EVENT_KEY, next[i], 1,
+                                              timestamp};
+        }
     for (uint32_t i = 0; i < 6; ++i) state->keys[i] = next[i];
     state->modifiers = report[0];
     *event_count = count;

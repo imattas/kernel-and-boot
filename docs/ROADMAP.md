@@ -508,6 +508,8 @@ and duplicate-key rejection.
 USB HID keyboard polling now tracks the previous six-key report and emits
 bounded press/release transitions, preventing repeated held-key reports from
 being misclassified as new presses.
+HID transition emission now timestamps key presses consistently and guards the
+fixed 20-event output capacity before publishing a state update.
 The HID state tracker now also emits transitions for all eight boot-report
 modifier bits using stable modifier key codes.
 The shared input queue now supports atomic bounded event batches, so one

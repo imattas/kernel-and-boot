@@ -1824,6 +1824,16 @@ void kernel_main(void *boot_info) {
         serial_write("USB HID keyboard state failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
+    usb_hid_keyboard_state_t hid_capacity_state = { {4, 5, 6, 7, 8, 9}, 0xff };
+    static const uint8_t hid_capacity_report[8] = {0, 0, 10, 11, 12, 13, 14, 15};
+    if (!usb_hid_keyboard_decode_state(hid_capacity_report,
+                                       sizeof(hid_capacity_report),
+                                       &hid_capacity_state, hid_transition_events,
+                                       &hid_transition_count) ||
+        hid_transition_count != 20) {
+        serial_write("USB HID keyboard capacity failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
     serial_write("USB HID keyboard ready\r\n");
     static const uint8_t hid_mouse_probe_report[3] = {0x05, 0x04, 0xfb};
     input_event_t hid_mouse_probe_events[3];

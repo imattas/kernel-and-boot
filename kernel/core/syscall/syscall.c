@@ -315,6 +315,14 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
             process_handle_release_ref(&ref);
             return valid ? 0 : OS_SYSCALL_ERROR;
         }
+        case OS_SYSCALL_DUP: {
+            process_t *process = process_current();
+            if (!process || arg2 > 7U) return OS_SYSCALL_ERROR;
+            int handle = process_handle_duplicate(&process->handles,
+                                                  (uint32_t)arg1,
+                                                  (uint32_t)arg2);
+            return handle ? (uint64_t)(uint32_t)handle : OS_SYSCALL_ERROR;
+        }
         case OS_SYSCALL_SIGNAL_NEXT: {
             uint32_t signal = 0;
             if (!user_range(arg1, sizeof(signal), 1) ||

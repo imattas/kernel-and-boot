@@ -5,6 +5,7 @@ void process_handle_table_initialize(process_handle_table_t *table) {
     for (uint32_t i = 0; i < PROCESS_HANDLE_CAPACITY; ++i) {
         table->entries[i].object = 0; table->entries[i].rights = 0;
         table->entries[i].release = 0;
+        table->entries[i].retain = 0;
         table->entries[i].retained_references = 0;
         table->entries[i].closing = 0;
         table->generations[i] = 1;
@@ -32,17 +33,55 @@ int process_handle_open(process_handle_table_t *table, void *object, uint32_t ri
 
 int process_handle_open_owned(process_handle_table_t *table, void *object,
                               uint32_t rights, process_handle_release_fn release) {
+    return process_handle_open_owned_retain(table, object, rights, release, 0);
+}
+
+int process_handle_open_owned_retain(process_handle_table_t *table, void *object,
+                                     uint32_t rights,
+                                     process_handle_release_fn release,
+                                     process_handle_retain_fn retain) {
     if (!table || !object || rights == 0 || (rights & ~7U) != 0) return 0;
     uint64_t flags = spinlock_lock_irqsave(&table->lock);
     for (uint32_t i = 0; i < PROCESS_HANDLE_CAPACITY; ++i)
         if (!table->entries[i].object) {
             table->entries[i].object = object; table->entries[i].rights = rights;
             table->entries[i].release = release;
+            table->entries[i].retain = retain;
             table->entries[i].closing = 0;
             int handle = (int)make_handle(i, table->generations[i]);
             spinlock_unlock_irqrestore(&table->lock, flags);
             return handle;
         }
+    spinlock_unlock_irqrestore(&table->lock, flags);
+    return 0;
+}
+int process_handle_duplicate(process_handle_table_t *table, uint32_t handle,
+                             uint32_t rights) {
+    uint32_t slot; uint16_t generation;
+    if (!table || !decode_handle(handle, &slot, &generation)) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&table->lock);
+    process_handle_t *source = &table->entries[slot];
+    if (table->generations[slot] != generation || source->closing ||
+        !source->object || !source->retain ||
+        (rights && (rights & ~source->rights) != 0)) {
+        spinlock_unlock_irqrestore(&table->lock, flags);
+        return 0;
+    }
+    uint32_t duplicated_rights = rights ? rights : source->rights;
+    for (uint32_t i = 0; i < PROCESS_HANDLE_CAPACITY; ++i) {
+        process_handle_t *entry = &table->entries[i];
+        if (!entry->object) {
+            source->retain(source->object);
+            entry->object = source->object;
+            entry->rights = duplicated_rights;
+            entry->release = source->release;
+            entry->retain = source->retain;
+            entry->closing = 0;
+            int result = (int)make_handle(i, table->generations[i]);
+            spinlock_unlock_irqrestore(&table->lock, flags);
+            return result;
+        }
+    }
     spinlock_unlock_irqrestore(&table->lock, flags);
     return 0;
 }
@@ -80,6 +119,7 @@ int process_handle_close(process_handle_table_t *table, uint32_t handle) {
     if (entry->retained_references == 0) {
         entry->object = 0;
         entry->release = 0;
+        entry->retain = 0;
     } else {
         release = 0;
     }
@@ -102,6 +142,7 @@ void process_handle_table_close_all(process_handle_table_t *table) {
         if (table->entries[i].retained_references == 0) {
             table->entries[i].object = 0;
             table->entries[i].release = 0;
+            table->entries[i].retain = 0;
         } else {
             objects[i] = 0;
             releases[i] = 0;
@@ -133,7 +174,7 @@ int process_handle_get_retain(process_handle_table_t *table, uint32_t handle,
     ++entry->retained_references;
     ++table->retained_references;
     ref->table = table; ref->entry = entry; ref->object = entry->object;
-    ref->release = entry->release; ref->active = 1;
+            ref->release = entry->release; ref->active = 1;
     spinlock_unlock_irqrestore(&table->lock, flags);
     return 1;
 }

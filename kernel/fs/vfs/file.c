@@ -51,6 +51,10 @@ static void release_handle(void *object) {
     vfs_file_release((vfs_file_t *)object);
 }
 
+static void retain_handle(void *object) {
+    vfs_file_retain((vfs_file_t *)object);
+}
+
 int vfs_file_open_handle(process_handle_table_t *table, vfs_node_t *node,
                          uint32_t flags) {
     vfs_file_t *file = vfs_file_open(node, flags);
@@ -58,7 +62,8 @@ int vfs_file_open_handle(process_handle_table_t *table, vfs_node_t *node,
     uint32_t rights = 0;
     if (flags & VFS_FILE_READ) rights |= PROCESS_HANDLE_READ;
     if (flags & VFS_FILE_WRITE) rights |= PROCESS_HANDLE_WRITE;
-    int handle = process_handle_open_owned(table, file, rights, release_handle);
+    int handle = process_handle_open_owned_retain(table, file, rights,
+                                                   release_handle, retain_handle);
     if (!handle) vfs_file_release(file);
     return handle;
 }

@@ -2355,6 +2355,24 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("fstat syscall ready\r\n");
+    uint64_t duplicate_source = syscall_dispatch(OS_SYSCALL_OPEN,
+        0x8000002000ULL, sizeof(file_syscall_path) - 1, VFS_FILE_READ);
+    uint64_t duplicate_handle = duplicate_source == OS_SYSCALL_ERROR ?
+                                OS_SYSCALL_ERROR :
+        syscall_dispatch(OS_SYSCALL_DUP, duplicate_source, VFS_FILE_READ, 0);
+    uint8_t duplicate_read[sizeof(file_syscall_data)] = {0};
+    if (duplicate_source == OS_SYSCALL_ERROR || duplicate_handle == OS_SYSCALL_ERROR ||
+        syscall_dispatch(OS_SYSCALL_CLOSE, duplicate_source, 0, 0) != 0 ||
+        syscall_dispatch(OS_SYSCALL_READ, (uint32_t)duplicate_handle,
+                         0x8000004000ULL, sizeof(file_syscall_data) - 1) !=
+            sizeof(file_syscall_data) - 1 ||
+        !syscall_copy_from_user(duplicate_read, 0x8000004000ULL,
+                                sizeof(duplicate_read) - 1) ||
+        duplicate_read[0] != 'f' || duplicate_read[3] != 'e') {
+        serial_write("dup syscall failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("dup syscall ready\r\n");
     uint64_t directory_syscall_handle = syscall_dispatch(OS_SYSCALL_OPEN,
         0x8000002000ULL, 1, VFS_FILE_READ);
     os_syscall_dirent_t syscall_dirent = {0};

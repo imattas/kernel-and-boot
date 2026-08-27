@@ -1,7 +1,6 @@
 #include <assert.h>
 #include <stdint.h>
 #include <string.h>
-#include <stdio.h>
 #include "../../../kernel/fs/ext4/ext4.h"
 #include "../../../kernel/drivers/storage/storage.h"
 static uint8_t image[128 * 512];
@@ -19,6 +18,8 @@ int main(void) {
     for (uint32_t block = 15; block <= 18; ++block)
         image[3 * 1024 + block / 8] |= (uint8_t)(1U << (block & 7));
     image[3 * 1024 + 19 / 8] |= (uint8_t)(1U << (19 & 7));
+    for (uint32_t block = 20; block <= 23; ++block)
+        image[3 * 1024 + block / 8] |= (uint8_t)(1U << (block & 7));
     uint8_t *root_inode = &image[5 * 1024 + 128]; put16(root_inode, 0x41ed); put32(&root_inode[4], 1024); put32(&root_inode[40], 7);
     uint8_t *file_inode = &image[5 * 1024 + 256]; put16(file_inode, 0x81a4); put32(&file_inode[4], 5); put32(&file_inode[40], 8);
     uint8_t *sparse_inode = &image[5 * 1024 + 640]; put16(sparse_inode, 0x81a4); put32(&sparse_inode[4], 1024);
@@ -26,6 +27,7 @@ int main(void) {
     uint8_t *double_inode = &image[5 * 1024 + 768]; put16(double_inode, 0x81a4); put32(&double_inode[4], (12U + 256U + 2U) * 1024U); put32(&double_inode[92], 15);
     uint8_t *extent_leaf_inode = &image[5 * 1024 + 896]; put16(extent_leaf_inode, 0x81a4); put32(&extent_leaf_inode[4], 1024); put32(&extent_leaf_inode[32], 0x00080000); put16(&extent_leaf_inode[40], 0xf30a); put16(&extent_leaf_inode[42], 1); put16(&extent_leaf_inode[44], 4); put16(&extent_leaf_inode[46], 0); put32(&extent_leaf_inode[52], 0); put16(&extent_leaf_inode[56], 1); put32(&extent_leaf_inode[60], 19);
     uint8_t *extent_inode = &image[5 * 1024 + 512]; put16(extent_inode, 0x81a4); put32(&extent_inode[4], 1024); put32(&extent_inode[32], 0x00080000); put16(&extent_inode[40], 0xf30a); put16(&extent_inode[42], 1); put16(&extent_inode[44], 4); put16(&extent_inode[46], 1); put32(&extent_inode[52], 0); put32(&extent_inode[56], 11);
+    uint8_t *extent_split_inode = &image[13 * 1024 + 128]; put16(extent_split_inode, 0x81a4); put32(&extent_split_inode[4], 1024); put32(&extent_split_inode[32], 0x00080000); put16(&extent_split_inode[40], 0xf30a); put16(&extent_split_inode[42], 1); put16(&extent_split_inode[44], 4); put16(&extent_split_inode[46], 1); put32(&extent_split_inode[52], 0); put32(&extent_split_inode[56], 21);
     uint8_t *dir = &image[7 * 1024]; put32(dir, 2); put16(&dir[4], 12); dir[6] = 1; dir[7] = 2; dir[8] = '.';
     put32(&dir[12], 2); put16(&dir[16], 12); dir[18] = 2; dir[19] = 2; dir[20] = '.'; dir[21] = '.';
     put32(&dir[24], 3); put16(&dir[28], 1000); dir[30] = 5; dir[31] = 1; memcpy(&dir[32], "hello", 5);
@@ -37,6 +39,8 @@ int main(void) {
     put32(&image[15 * 1024], 16); put32(&image[16 * 1024], 17); put32(&image[16 * 1024 + 4], 18);
     memcpy(&image[19 * 1024], "extent", 6);
     put16(&image[11 * 1024], 0xf30a); put16(&image[11 * 1024 + 2], 1); put16(&image[11 * 1024 + 4], 4); put32(&image[11 * 1024 + 12], 0); put16(&image[11 * 1024 + 16], 1); put32(&image[11 * 1024 + 20], 12); memcpy(&image[12 * 1024], "deep", 4);
+    put16(&image[21 * 1024], 0xf30a); put16(&image[21 * 1024 + 2], 1); put16(&image[21 * 1024 + 4], 1); put32(&image[21 * 1024 + 12], 0); put16(&image[21 * 1024 + 16], 1); put32(&image[21 * 1024 + 20], 22);
+    memcpy(&image[22 * 1024], "split", 5);
     storage_initialize(); storage_device_t device = {.name = "ram-ext4", .block_size = 512, .block_count = 128, .read = image_read, .write = image_write}; assert(storage_register(&device));
     ext4_fs_t fs; assert(ext4_mount(&fs, 0)); uint32_t inode = 0; uint64_t size = 0;
     assert(ext4_lookup(&fs, 2, "hello", &inode) && inode == 3);
@@ -46,6 +50,17 @@ int main(void) {
     assert(ext4_read_file(&fs, inode, 0, output, 5));
     assert(memcmp(output, "warld", 5) == 0);
     assert(ext4_write_file(&fs, inode, 1, "o", 1));
+    assert(ext4_write_file(&fs, 10, 1024, "split", 5));
+    assert(ext4_inode_size(&fs, 10, &size) && size == 1029);
+    uint8_t leaf_growth[1024]; memset(leaf_growth, 'l', sizeof(leaf_growth));
+    assert(ext4_write_file(&fs, 10, 1029, leaf_growth, sizeof(leaf_growth)));
+    assert(ext4_inode_size(&fs, 10, &size) && size == 2053);
+    assert(ext4_truncate_file(&fs, 10, 1024));
+    assert(ext4_inode_size(&fs, 10, &size) && size == 1024);
+    assert((image[3 * 1024 + 24 / 8] & (1U << (24 & 7))) == 0);
+    assert((image[3 * 1024 + 25 / 8] & (1U << (25 & 7))) == 0);
+    assert((image[3 * 1024 + 26 / 8] & (1U << (26 & 7))) == 0);
+    assert(ext4_truncate_file(&fs, 10, 0));
     uint8_t growth[5000]; memset(growth, 'x', sizeof(growth));
     assert(ext4_write_file(&fs, inode, 5, growth, sizeof(growth)));
     assert(ext4_inode_size(&fs, inode, &size) && size == 5005);
@@ -59,7 +74,7 @@ int main(void) {
     memset(output, 0, sizeof(output)); assert(ext4_read_file(&fs, 8, 1024, output, 6) && memcmp(output, "growth", 6) == 0);
     assert(ext4_truncate_file(&fs, 8, 1024));
     assert(ext4_inode_size(&fs, 8, &size) && size == 1024);
-    assert((image[3 * 1024 + 20 / 8] & (1U << (20 & 7))) == 0);
+    assert((image[3 * 1024 + 24 / 8] & (1U << (24 & 7))) == 0);
     assert(ext4_truncate_file(&fs, 8, 0));
     assert((image[3 * 1024 + 19 / 8] & (1U << (19 & 7))) == 0);
     memset(output, 0, sizeof(output)); assert(ext4_read_file(&fs, 4, 1024U * 12U, output, 5)); assert(memcmp(output, "indir", 5) == 0);

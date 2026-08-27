@@ -32,6 +32,8 @@ static int valid_elf(const elf64_header_t *e, uint64_t size) {
     return entry_executable;
 }
 
+typedef efi_status_t (*efi_free_pages_t)(efi_physical_address_t, efi_uintn_t);
+
 static void copy_bytes(void *dst, const void *src, uint64_t size) {
     uint8_t *d = dst; const uint8_t *s = src;
     for (uint64_t i = 0; i < size; ++i) d[i] = s[i];
@@ -64,8 +66,13 @@ efi_status_t uefi_elf_load(efi_boot_services_t *bs, const void *file,
         load_address = 0xffffffffULL;
         status = allocate_pages(1, 4, pages, &load_address);
     }
-    if (status != 0 || load_address > 0xffffffffULL ||
-        rounded_size > 0x100000000ULL - load_address) return 1;
+    if (status != 0) return 1;
+    if (load_address > 0xffffffffULL ||
+        rounded_size > 0x100000000ULL - load_address) {
+        if (bs->free_pages)
+            ((efi_free_pages_t)bs->free_pages)(load_address, pages);
+        return 1;
+    }
     for (uint16_t i = 0; i < elf->phnum; ++i) {
         const elf64_program_t *ph = (const elf64_program_t *)
             ((const uint8_t *)file + elf->phoff + (uint64_t)i * elf->phentsize);

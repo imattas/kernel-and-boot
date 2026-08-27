@@ -156,6 +156,18 @@ int main(void) {
         size != 0 || is_directory || !fat32_unlink_file_in_directory(&fs, 2, created_name) ||
         fat32_lookup_in_directory(&fs, 2, created_name, &cluster, &size, &is_directory))
         return fail("directory create/unlink failed");
+    const char created_directory[11] = {'N','E','W','D','I','R',' ',' ',' ',' ',' '};
+    const char dot_name[11] = {'.',' ',' ',' ',' ',' ',' ',' ',' ',' ',' '};
+    uint32_t child_cluster = 0;
+    if (!fat32_create_directory_in_directory(&fs, 2, created_directory) ||
+        !fat32_lookup_in_directory(&fs, 2, created_directory, &child_cluster, &size,
+                                   &is_directory) || !is_directory || size != 0 ||
+        !fat32_lookup_in_directory(&fs, child_cluster, dot_name, &cluster, &size,
+                                   &is_directory) || !is_directory || cluster != child_cluster)
+        return fail("directory create failed");
+    if (!fat32_lookup_in_directory(&fs, child_cluster, dot_name, &cluster, &size,
+                                   &is_directory) || !is_directory || cluster != child_cluster)
+        return fail("directory create failed");
     set_fat(3, 0x0ffffff7);
     fs.fat_sector_valid = 0;
     if (fat32_read_file(&fs, name, 0, output, sizeof(output))) return fail("bad cluster accepted");

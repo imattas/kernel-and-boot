@@ -67,6 +67,8 @@ int fat32_set_attributes_in_directory(fat32_fs_t *fs, uint32_t directory_cluster
                                       const char short_name[11], uint8_t attributes);
 int fat32_create_file_in_directory(fat32_fs_t *fs, uint32_t directory_cluster,
                                    const char short_name[11], uint8_t attributes);
+int fat32_create_directory_in_directory(fat32_fs_t *fs, uint32_t directory_cluster,
+                                         const char short_name[11]);
 int fat32_unlink_file_in_directory(fat32_fs_t *fs, uint32_t directory_cluster,
                                    const char short_name[11]);
 

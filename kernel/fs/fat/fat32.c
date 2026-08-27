@@ -738,6 +738,63 @@ done:
     return result;
 }
 
+int fat32_create_directory_in_directory(fat32_fs_t *fs, uint32_t directory_cluster,
+                                         const char short_name[11]) {
+    if (!fs || !short_name || !cluster_valid(fs, directory_cluster)) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&fs->write_lock);
+    uint32_t existing = 0, size = 0;
+    uint8_t is_directory = 0;
+    uint32_t sector = 0, offset = 0, child = 0;
+    int result = 0;
+    if (fat32_lookup_in_directory(fs, directory_cluster, short_name, &existing,
+                                  &size, &is_directory) ||
+        !fat32_find_free_entry(fs, directory_cluster, &sector, &offset) ||
+        !fat32_find_free_cluster(fs, &child) ||
+        !fat_set(fs, child, 0x0fffffffU)) goto done;
+    fat32_fsinfo_adjust(fs, -1, child + 1U);
+    uint8_t data[FAT32_SECTOR_SIZE];
+    for (uint32_t byte = 0; byte < FAT32_SECTOR_SIZE; ++byte) data[byte] = 0;
+    data[0] = '.';
+    for (uint32_t byte = 1; byte < 11U; ++byte) data[byte] = ' ';
+    data[11] = 0x10;
+    data[20] = (uint8_t)(child >> 16); data[21] = (uint8_t)(child >> 24);
+    data[26] = (uint8_t)child; data[27] = (uint8_t)(child >> 8);
+    data[32] = '.'; data[33] = '.';
+    for (uint32_t byte = 34; byte < 43U; ++byte) data[byte] = ' ';
+    data[43] = 0x10;
+    data[52] = (uint8_t)(directory_cluster >> 16);
+    data[53] = (uint8_t)(directory_cluster >> 24);
+    data[58] = (uint8_t)directory_cluster;
+    data[59] = (uint8_t)(directory_cluster >> 8);
+    for (uint32_t cluster_sector = 0; cluster_sector < fs->sectors_per_cluster;
+         ++cluster_sector) {
+        uint32_t target = fs->data_start + (child - 2U) * fs->sectors_per_cluster +
+                          cluster_sector;
+        if (!storage_write(fs->device, target, 1, data)) {
+            fat32_free_chain(fs, child);
+            goto done;
+        }
+        for (uint32_t byte = 0; byte < FAT32_SECTOR_SIZE; ++byte) data[byte] = 0;
+    }
+    if (!read_sector(fs->device, sector, data)) {
+        fat32_free_chain(fs, child); goto done;
+    }
+    for (uint32_t byte = 0; byte < 32U; ++byte) data[offset + byte] = 0;
+    for (uint32_t byte = 0; byte < 11U; ++byte) data[offset + byte] = (uint8_t)short_name[byte];
+    data[offset + 11] = 0x10;
+    data[offset + 20] = (uint8_t)(child >> 16);
+    data[offset + 21] = (uint8_t)(child >> 24);
+    data[offset + 26] = (uint8_t)child;
+    data[offset + 27] = (uint8_t)(child >> 8);
+    if (!storage_write(fs->device, sector, 1, data)) {
+        fat32_free_chain(fs, child); goto done;
+    }
+    result = 1;
+done:
+    spinlock_unlock_irqrestore(&fs->write_lock, flags);
+    return result;
+}
+
 int fat32_unlink_file_in_directory(fat32_fs_t *fs, uint32_t directory_cluster,
                                    const char short_name[11]) {
     if (!fs || !short_name) return 0;

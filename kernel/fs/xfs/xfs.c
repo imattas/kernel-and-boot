@@ -376,7 +376,8 @@ static int xfs_allocate_real_bno(xfs_fs_t *fs, uint32_t allocation_group,
     for (uint32_t i = 0; i < root_records; ++i) {
         uint32_t key_start = be32(&root[16U + i * 8U]);
         uint32_t key_count = be32(&root[20U + i * 8U]);
-        if (key_count == 0 || key_start > fs->ag_blocks - key_count ||
+        if (key_count == 0 || key_count > fs->ag_blocks ||
+            key_start > fs->ag_blocks - key_count ||
             (i != 0 && key_start < previous_key)) return 0;
         previous_key = key_start;
         uint32_t child = be32(&root[pointer_offset + i * 4U]);
@@ -496,7 +497,8 @@ static int xfs_free_real_bno(xfs_fs_t *fs, uint64_t start, uint32_t blocks) {
     for (uint32_t i = 0; i < root_records; ++i) {
         uint32_t key_start = be32(&root[16U + i * 8U]);
         uint32_t key_count = be32(&root[20U + i * 8U]);
-        if (key_count == 0 || key_start > fs->ag_blocks - key_count ||
+        if (key_count == 0 || key_count > fs->ag_blocks ||
+            key_start > fs->ag_blocks - key_count ||
             (i != 0 && key_start < previous_key)) return 0;
         previous_key = key_start;
         uint32_t child = be32(&root[pointer_offset + i * 4U]);

@@ -611,6 +611,9 @@ interleaving controller state transitions.
 UHCI probing now requires a complete 0x20-byte I/O BAR within the 16-bit x86
 I/O-port range, preventing BAR-address truncation from redirecting MMIO-style
 accesses to unrelated ports.
+UHCI root-port reset now clears change bits using their write-one-to-clear
+semantics, enables only connected ports, and publishes a root port only after
+post-reset connection and enable state are verified.
 UHCI controller start now polls for HALTED to clear and rejects controller,
 host-system, or process errors instead of reporting a start success blindly.
 The boot path now attempts a HID interrupt poll, tolerates an idle keyboard’s

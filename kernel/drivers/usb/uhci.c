@@ -25,7 +25,9 @@
 #define UHCI_PORT_BASE 0x10
 #define UHCI_PORT_COUNT 2
 #define UHCI_PORT_CONNECT 0x0001
+#define UHCI_PORT_CONNECT_CHANGE 0x0002
 #define UHCI_PORT_ENABLE 0x0004
+#define UHCI_PORT_ENABLE_CHANGE 0x0008
 #define UHCI_PORT_RESET 0x0200
 #define UHCI_USBLEGSUP 0xc0
 #define UHCI_LEGACY_BIOS_OWNED 0x0001U
@@ -228,11 +230,14 @@ static int uhci_probe(device_t *device) {
         if (root_ports == 0) uhci_low_speed = (status & (1U << 8)) != 0;
         __asm__ volatile ("outw %0, %1" :: "a"((uint16_t)UHCI_PORT_RESET), "Nd"(port_address));
         for (volatile uint32_t delay = 0; delay < 10000; ++delay) __asm__ volatile ("pause");
-        __asm__ volatile ("outw %0, %1" :: "a"((uint16_t)(UHCI_PORT_RESET | UHCI_PORT_CONNECT)),
+        __asm__ volatile ("outw %0, %1" :: "a"((uint16_t)(UHCI_PORT_CONNECT_CHANGE |
+                                                           UHCI_PORT_ENABLE_CHANGE)),
                           "Nd"(port_address));
-        __asm__ volatile ("outw %0, %1" :: "a"((uint16_t)(UHCI_PORT_ENABLE | UHCI_PORT_CONNECT)),
+        __asm__ volatile ("outw %0, %1" :: "a"((uint16_t)UHCI_PORT_ENABLE),
                           "Nd"(port_address));
-        ++root_ports;
+        __asm__ volatile ("inw %1, %0" : "=a"(status) : "Nd"(port_address));
+        if ((status & (UHCI_PORT_CONNECT | UHCI_PORT_ENABLE)) ==
+            (UHCI_PORT_CONNECT | UHCI_PORT_ENABLE)) ++root_ports;
     }
     ++controllers;
     return 1;

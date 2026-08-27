@@ -743,6 +743,9 @@ status before acknowledging its own controller.
 The UHCI QEMU gate now distinguishes successful control-transfer support and
 IRQ-path configuration from optional IOC delivery, which this emulated device
 does not raise reliably.
+The UEFI memory-map capture now rejects malformed successful firmware results
+unless descriptor size and map length satisfy the boot contract, and bounds
+replacement-map publication to the allocated buffer.
 
 ## Phase 10 — Userland begins after the kernel gate
 

@@ -439,6 +439,8 @@ bounded press/release transitions, preventing repeated held-key reports from
 being misclassified as new presses.
 The HID state tracker now also emits transitions for all eight boot-report
 modifier bits using stable modifier key codes.
+USB HID keyboard and mouse events now sample one monotonic kernel tick per
+report, matching PS/2 event timestamp semantics.
 PS/2 mouse initialization now verifies the controller auxiliary-port test
 before enabling mouse commands, preventing an unavailable second port from
 being published as an active input backend.

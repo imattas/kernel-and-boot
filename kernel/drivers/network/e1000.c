@@ -70,8 +70,8 @@ static device_driver_t e1000_driver;
 static uint64_t e1000_rx_buffers[E1000_RING_COUNT];
 static uint64_t e1000_tx_buffers[E1000_RING_COUNT];
 static volatile uint32_t *e1000_regs;
-static e1000_tx_desc_t *e1000_tx_ring;
-static e1000_rx_desc_t *e1000_rx_ring;
+static volatile e1000_tx_desc_t *e1000_tx_ring;
+static volatile e1000_rx_desc_t *e1000_rx_ring;
 static uint32_t e1000_tx_index;
 static uint32_t e1000_tx_reclaim_index;
 static uint32_t e1000_tx_pending;
@@ -233,7 +233,7 @@ int e1000_transmit(const void *data, uint16_t length) {
         spinlock_unlock_irqrestore(&e1000_lock, flags);
         return 0;
     }
-    e1000_tx_desc_t *descriptor = &e1000_tx_ring[e1000_tx_index];
+    volatile e1000_tx_desc_t *descriptor = &e1000_tx_ring[e1000_tx_index];
     if (e1000_tx_pending == E1000_RING_COUNT ||
         (descriptor->status & E1000_DESC_DONE) == 0) {
         spinlock_unlock_irqrestore(&e1000_lock, flags);
@@ -287,7 +287,7 @@ int e1000_receive(void *data, uint16_t capacity, uint16_t *length) {
     int invalid = 0;
     e1000_dma_read_barrier();
     for (;;) {
-        e1000_rx_desc_t *descriptor = &e1000_rx_ring[index];
+        volatile e1000_rx_desc_t *descriptor = &e1000_rx_ring[index];
         if ((descriptor->status & E1000_DESC_DONE) == 0) {
             if (descriptors == 0) {
                 spinlock_unlock_irqrestore(&e1000_lock, flags);
@@ -328,7 +328,7 @@ int e1000_receive(void *data, uint16_t capacity, uint16_t *length) {
     index = e1000_rx_index;
     uint32_t copied = 0;
     for (uint32_t consumed = 0; consumed < descriptors; ++consumed) {
-        e1000_rx_desc_t *descriptor = &e1000_rx_ring[index];
+        volatile e1000_rx_desc_t *descriptor = &e1000_rx_ring[index];
         const uint8_t *source =
             (const uint8_t *)(uintptr_t)e1000_rx_buffers[index];
         uint8_t *destination = (uint8_t *)data;

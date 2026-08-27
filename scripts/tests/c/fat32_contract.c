@@ -22,6 +22,10 @@ static void store16(uint8_t *p, uint16_t value) { p[0] = value; p[1] = value >> 
 static void store32(uint8_t *p, uint32_t value) {
     store16(p, (uint16_t)value); store16(p + 2, (uint16_t)(value >> 16));
 }
+static uint32_t load32_test(const uint8_t *p) {
+    return (uint32_t)p[0] | ((uint32_t)p[1] << 8) |
+           ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
+}
 static int read_image(uint64_t lba, uint32_t count, void *buffer) {
     memcpy(buffer, image + lba * 512U, (size_t)count * 512U); return 1;
 }
@@ -118,6 +122,13 @@ int main(void) {
         memcmp(output, vfs_append, 3) != 0)
         return fail("VFS append failed");
     vfs_node_release(vfs_file);
+    if (!fat32_truncate_file(&fs, name, 512) ||
+        !fat32_lookup(&fs, name, &cluster, &size) || size != 512 ||
+        !fat32_read_file(&fs, name, 0, output, 512) ||
+        output[0] != 0 || output[511] != 'p' ||
+        load32_test(image + FAT_START * 512U + 4U * 4U) != 0 ||
+        load32_test(image + FAT_START * 512U + 8U * 4U) != 0)
+        return fail("truncate shrink failed");
     const char directory_name[11] = {'S','U','B','D','I','R',' ',' ',' ',' ',' '};
     const char nested_name[11] = {'N','E','S','T','E','D',' ',' ','T','X','T'};
     if (!fat32_lookup_in_directory(&fs, 2, directory_name, &cluster, &size, &is_directory) ||

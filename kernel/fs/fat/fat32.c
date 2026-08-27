@@ -443,6 +443,46 @@ static void fat32_free_chain(fat32_fs_t *fs, uint32_t first) {
     }
 }
 
+int fat32_truncate_file(fat32_fs_t *fs, const char short_name[11],
+                        uint32_t size) {
+    if (!fs || !short_name) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&fs->write_lock);
+    uint32_t entry_sector, entry_offset, first, old_size;
+    int result = 0;
+    if (!fat32_find_root_entry(fs, short_name, &entry_sector, &entry_offset,
+                               &first, &old_size) || size > old_size)
+        goto done;
+    if (size == old_size) { result = 1; goto done; }
+
+    uint32_t cluster_size = fs->sectors_per_cluster * FAT32_SECTOR_SIZE;
+    uint32_t required = (uint32_t)(((uint64_t)size + cluster_size - 1U) /
+                                   cluster_size);
+    uint32_t retained = 0, detached = first, current = first;
+    for (uint32_t index = 0; index < required; ++index) {
+        if (!cluster_valid(fs, current)) goto done;
+        retained = current;
+        uint32_t next;
+        if (!fat_next(fs, current, &next)) goto done;
+        if (index + 1U < required) {
+            if (next >= 0x0ffffff8U || !cluster_valid(fs, next)) goto done;
+            current = next;
+        } else {
+            detached = next;
+        }
+    }
+    if (required == 0) detached = first;
+    if (!fat32_update_root_entry(fs, entry_sector, entry_offset,
+                                 required == 0 ? 0 : first, size))
+        goto done;
+    if (retained && !fat_set(fs, retained, 0x0fffffffU)) goto done;
+    if (detached < 0x0ffffff8U && cluster_valid(fs, detached))
+        fat32_free_chain(fs, detached);
+    result = 1;
+done:
+    spinlock_unlock_irqrestore(&fs->write_lock, flags);
+    return result;
+}
+
 int fat32_append_file(fat32_fs_t *fs, const char short_name[11],
                       const void *buffer, uint32_t size) {
     if (!fs || !buffer || size == 0) return 0;

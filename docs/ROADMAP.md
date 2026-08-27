@@ -819,7 +819,9 @@ read-only, while FAT32 supports bounded in-place writes to existing file
 extents, including sector and cluster crossings, through its VFS adapter;
 FAT32 append growth now allocates free clusters, mirrors FAT updates, updates
 the directory size/first-cluster fields, and rolls back new chain state when
-metadata or data writes fail; arbitrary hole-punching and shrink remain later.
+metadata or data writes fail. FAT32 truncation now safely shrinks regular files,
+updates directory metadata, terminates the retained chain, and releases detached
+clusters; arbitrary hole-punching remains later.
 The FAT32 VFS adapter now exposes both bounded in-place writes and append
 growth, serializing per-file size updates around the filesystem write path.
 The FAT32 contract now exercises append growth through `vfs_node_write()` and

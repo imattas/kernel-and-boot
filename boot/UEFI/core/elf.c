@@ -55,10 +55,17 @@ efi_status_t uefi_elf_load(efi_boot_services_t *bs, const void *file,
     if (min_vaddr == UINT64_MAX || max_vaddr <= min_vaddr ||
         max_vaddr - min_vaddr > UINT64_MAX - 0xfffULL) return 1;
     uint64_t rounded_size = (max_vaddr - min_vaddr + 0xfffULL) & ~0xfffULL;
+    uint64_t pages = rounded_size / 0x1000ULL;
+    if (pages == 0 || pages > UINT64_MAX) return 1;
     efi_physical_address_t load_address = 0x02000000ULL;
     efi_allocate_pages_t allocate_pages = (efi_allocate_pages_t)bs->allocate_pages;
-    if (allocate_pages(2, 4, (rounded_size + 0xfffULL) / 0x1000ULL,
-                       &load_address) != 0) return 1;
+    efi_status_t status = allocate_pages(2, 4, pages, &load_address);
+    if (status != 0) {
+        load_address = 0xffffffffULL;
+        status = allocate_pages(1, 4, pages, &load_address);
+    }
+    if (status != 0 || load_address > 0xffffffffULL ||
+        rounded_size > 0x100000000ULL - load_address) return 1;
     for (uint16_t i = 0; i < elf->phnum; ++i) {
         const elf64_program_t *ph = (const elf64_program_t *)
             ((const uint8_t *)file + elf->phoff + (uint64_t)i * elf->phentsize);

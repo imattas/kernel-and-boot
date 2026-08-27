@@ -324,6 +324,8 @@ services before dereferencing them, keeping ExitBootServices preparation
 bounded without leaking retry buffers.
 Successful memory-map replacement now releases the original pool, and the
 UEFI loader releases the relocated kernel-file buffer before ExitBootServices.
+The ELF loader now falls back from its preferred physical base to a bounded
+below-4-GiB allocation when that address is unavailable.
 
 ## Phase 9 — Userspace boundary
 

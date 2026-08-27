@@ -26,6 +26,55 @@ static uint64_t frame_content_size(const uint8_t *header, uint32_t descriptor,
     return size;
 }
 
+static int decode_compressed_literals(const uint8_t *input, uint32_t size,
+                                      uint8_t *output, uint32_t capacity,
+                                      uint32_t *decoded_size) {
+    uint32_t header, format, regenerated, header_size;
+    if (!input || size < 2 || !output || !decoded_size) return 0;
+    header = input[0];
+    if ((header & 3U) > 1U) return 0;
+    format = (header >> 2) & 3U;
+    if (format == 0U || format == 2U) {
+        regenerated = header >> 3; header_size = 1;
+    } else if (format == 1U) {
+        if (size < 2) return 0;
+        regenerated = (header >> 4) | ((uint32_t)input[1] << 4); header_size = 2;
+    } else {
+        if (size < 3) return 0;
+        regenerated = (header >> 4) | ((uint32_t)input[1] << 4) |
+                      ((uint32_t)input[2] << 12); header_size = 3;
+    }
+    if (!regenerated || regenerated > capacity || header_size > size - regenerated) return 0;
+    if ((header & 3U) == 0U) {
+        for (uint32_t i = 0; i < regenerated; ++i) output[i] = input[header_size + i];
+    } else {
+        if (header_size >= size) return 0;
+        for (uint32_t i = 0; i < regenerated; ++i) output[i] = input[header_size];
+    }
+    *decoded_size = regenerated;
+    return 1;
+}
+
+static int decode_compressed_block(const uint8_t *input, uint32_t size,
+                                   uint8_t *output, uint32_t capacity,
+                                   uint32_t *decoded_size) {
+    uint32_t literals_size, literals_decoded, sequences;
+    if (!input || !size || !output || !decoded_size ||
+        !decode_compressed_literals(input, size, output, capacity, &literals_decoded)) return 0;
+    if (input[0] & 3U) return 0;
+    if (((input[0] >> 2) & 3U) == 0U || ((input[0] >> 2) & 3U) == 2U)
+        literals_size = 1U + literals_decoded;
+    else if (((input[0] >> 2) & 3U) == 1U)
+        literals_size = 2U + literals_decoded;
+    else
+        literals_size = 3U + literals_decoded;
+    if (literals_size >= size) return 0;
+    sequences = input[literals_size];
+    if (sequences != 0U) return 0;
+    *decoded_size = literals_decoded;
+    return literals_size + 1U == size;
+}
+
 int btrfs_zstd_decompress(const uint8_t *input, uint32_t input_size,
                           uint8_t *output, uint32_t output_capacity,
                           uint32_t *output_size) {
@@ -53,7 +102,7 @@ int btrfs_zstd_decompress(const uint8_t *input, uint32_t input_size,
                                       single_segment);
     if (content_size > output_capacity) return 0;
     for (;;) {
-        uint32_t block_header, block_size, block_type;
+        uint32_t block_header, block_size, stored_block_size, block_type;
         uint8_t last;
         if (position > input_size - 3U) return 0;
         block_header = (uint32_t)input[position] | ((uint32_t)input[position + 1] << 8) |
@@ -62,7 +111,8 @@ int btrfs_zstd_decompress(const uint8_t *input, uint32_t input_size,
         last = (uint8_t)(block_header & 1U);
         block_type = (block_header >> 1) & 3U;
         block_size = block_header >> 3;
-        if (block_type == 3U || block_size > output_capacity - output_position ||
+        stored_block_size = block_size;
+        if (block_type == 3U || (block_type != 2U && block_size > output_capacity - output_position) ||
             (block_type != 1U && block_size > input_size - position) ||
             (block_type == 1U && position >= input_size)) return 0;
         if (block_type == 0U) {
@@ -71,9 +121,13 @@ int btrfs_zstd_decompress(const uint8_t *input, uint32_t input_size,
             if (!block_size) return 0;
             for (uint32_t i = 0; i < block_size; ++i) output[output_position + i] = input[position];
         } else if (block_type == 2U) {
-            return 0;
+            uint32_t decoded_block = 0;
+            if (!decode_compressed_block(&input[position], block_size, output + output_position,
+                                         output_capacity - output_position, &decoded_block)) return 0;
+            block_size = decoded_block;
         }
-        output_position += block_size; position += block_type == 1U ? 1U : block_size;
+        output_position += block_size;
+        position += block_type == 1U ? 1U : stored_block_size;
         if (last) break;
     }
     if (checksum) {

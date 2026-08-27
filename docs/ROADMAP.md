@@ -1037,6 +1037,8 @@ UTF-16 directory entry set with directory attributes and a valid checksum, and
 releases the child allocation if parent metadata publication fails.
 ExFAT directory removal now rejects non-empty or malformed child directories
 before marking the entry set inactive and releasing its cluster chain.
+ExFAT directory creation now rejects case-insensitive name collisions before
+allocating entry slots or data clusters.
 FAT32, exFAT, ext4, XFS, and Btrfs VFS file adapters now serialize direct node
 reads and writes with per-file IRQ-safe locks, so concurrent filesystem users
 cannot interleave adapter operations.

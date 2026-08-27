@@ -581,6 +581,11 @@ int exfat_create_file_in_directory(exfat_fs_t *fs, uint32_t directory_cluster,
     uint32_t name_length = 0, index = 0, entry_cluster = 0;
     if (!fs || !fs->mounted || !cluster_valid(fs, directory_cluster) ||
         !exfat_encode_name(name, units, &name_length)) return 0;
+    uint32_t existing_cluster = 0; uint64_t existing_size = 0;
+    uint8_t existing_no_fat = 0;
+    if (exfat_lookup_in_directory(fs, directory_cluster, name,
+                                  &existing_cluster, &existing_size,
+                                  &existing_no_fat)) return 0;
     uint32_t secondary = 1U + (name_length + 14U) / 15U;
     uint32_t total = secondary + 1U;
     if (!exfat_find_free_entries(fs, directory_cluster, total, directory,
@@ -609,6 +614,11 @@ int exfat_create_directory_in_directory(exfat_fs_t *fs, uint32_t directory_clust
     uint32_t name_length = 0, index = 0, entry_cluster = 0, child = 0;
     if (!fs || !fs->mounted || !cluster_valid(fs, directory_cluster) ||
         !exfat_encode_name(name, units, &name_length)) return 0;
+    uint32_t existing_cluster = 0; uint64_t existing_size = 0;
+    uint8_t existing_no_fat = 0;
+    if (exfat_lookup_in_directory(fs, directory_cluster, name,
+                                  &existing_cluster, &existing_size,
+                                  &existing_no_fat)) return 0;
     uint32_t secondary = 1U + (name_length + 14U) / 15U;
     uint32_t total = secondary + 1U;
     if (!exfat_find_free_entries(fs, directory_cluster, total, directory,

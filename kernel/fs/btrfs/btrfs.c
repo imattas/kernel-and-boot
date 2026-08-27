@@ -455,8 +455,17 @@ static int btrfs_write_node(btrfs_fs_t *fs, uint64_t bytenr, uint8_t *node) {
     if (!fs || !node || !btrfs_map(fs, bytenr, fs->node_size, &device, &physical) ||
         physical % BTRFS_SECTOR_SIZE != 0) return 0;
     store32(node, crc32c(&node[32], fs->node_size - 32U));
-    return storage_write(device, physical / BTRFS_SECTOR_SIZE,
-                         fs->node_size / BTRFS_SECTOR_SIZE, node);
+    if (!storage_write(device, physical / BTRFS_SECTOR_SIZE,
+                       fs->node_size / BTRFS_SECTOR_SIZE, node)) return 0;
+    uint32_t mirror_device = 0; uint64_t mirror_physical = 0;
+    if (btrfs_map_at(fs, bytenr, fs->node_size, 1, &mirror_device,
+                     &mirror_physical) &&
+        (mirror_device != device || mirror_physical != physical)) {
+        if (mirror_physical % BTRFS_SECTOR_SIZE != 0 ||
+            !storage_write(mirror_device, mirror_physical / BTRFS_SECTOR_SIZE,
+                           fs->node_size / BTRFS_SECTOR_SIZE, node)) return 0;
+    }
+    return 1;
 }
 
 static int btrfs_update_data_csum(btrfs_fs_t *fs, uint64_t bytenr,

@@ -105,11 +105,13 @@ static int name_equal(const char *left, const char *right) {
     return left[i] == 0 && right[i] == 0;
 }
 
-int exfat_lookup(exfat_fs_t *fs, const char *name, uint32_t *first_cluster,
-                 uint64_t *size, uint8_t *no_fat_chain) {
-    if (!fs || !fs->mounted || !name || !first_cluster || !size || !no_fat_chain || name[0] == 0) return 0;
+int exfat_lookup_in_directory(exfat_fs_t *fs, uint32_t directory_cluster,
+                              const char *name, uint32_t *first_cluster,
+                              uint64_t *size, uint8_t *no_fat_chain) {
+    if (!fs || !fs->mounted || !cluster_valid(fs, directory_cluster) || !name ||
+        !first_cluster || !size || !no_fat_chain || name[0] == 0) return 0;
     uint8_t directory[EXFAT_MAX_CLUSTER_BYTES];
-    uint32_t cluster = fs->root_cluster;
+    uint32_t cluster = directory_cluster;
     for (uint32_t visited = 0; visited < fs->cluster_count; ++visited) {
         if (!exfat_read_cluster(fs, cluster, directory)) return 0;
         uint32_t entries = fs->sectors_per_cluster * EXFAT_SECTOR_SIZE / 32U;
@@ -144,6 +146,12 @@ int exfat_lookup(exfat_fs_t *fs, const char *name, uint32_t *first_cluster,
         cluster = next;
     }
     return 0;
+}
+
+int exfat_lookup(exfat_fs_t *fs, const char *name, uint32_t *first_cluster,
+                 uint64_t *size, uint8_t *no_fat_chain) {
+    return exfat_lookup_in_directory(fs, fs ? fs->root_cluster : 0, name,
+                                     first_cluster, size, no_fat_chain);
 }
 
 int exfat_read_file(exfat_fs_t *fs, const char *name, uint64_t offset,

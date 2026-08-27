@@ -303,7 +303,8 @@ milestone groundwork only; they do not pass this gate.
 ## Filesystem milestone before drivers
 
 FAT32 and exFAT have read-only parsers and VFS file adapters. exFAT now
-validates the primary and backup boot-region checksums. Ext4 now has
+validates the primary and backup boot-region checksums and supports bounded
+directory-relative lookup. Ext4 now has
 read-only inode, directory, direct/indirect-block reads, and extent-tree file
 reads through a VFS adapter. Ext4 now resolves inode tables across multiple
 block groups, supports 64-bit block-count/inode-table metadata, and combines

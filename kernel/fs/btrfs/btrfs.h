@@ -17,6 +17,7 @@ typedef struct {
     uint64_t root_bytenr;
     uint64_t chunk_root_bytenr;
     uint64_t fs_root_bytenr;
+    uint64_t csum_root_bytenr;
     uint8_t fsid[16];
     btrfs_chunk_t chunks[BTRFS_MAX_SYSTEM_CHUNKS];
     uint32_t chunk_count;

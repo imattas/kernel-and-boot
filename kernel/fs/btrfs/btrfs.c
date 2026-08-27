@@ -9,6 +9,9 @@
 #define BTRFS_EXTENT_DATA_TYPE 108U
 #define BTRFS_INODE_ITEM_TYPE 1U
 #define BTRFS_DIR_ITEM_TYPE 84U
+#define BTRFS_EXTENT_CSUM_OBJECTID (UINT64_MAX - 9ULL)
+#define BTRFS_EXTENT_CSUM_TYPE 128U
+#define BTRFS_CSUM_TREE_OBJECTID 7ULL
 
 static uint16_t le16(const uint8_t *p) { return (uint16_t)p[0] | ((uint16_t)p[1] << 8); }
 static uint32_t le32(const uint8_t *p) {
@@ -217,6 +220,13 @@ int btrfs_resolve_filesystem_tree(btrfs_fs_t *fs) {
     uint64_t root = le64(&root_item[176]);
     if (root < fs->sector_size || root >= fs->total_bytes || root % fs->sector_size != 0) return 0;
     fs->fs_root_bytenr = root;
+    if (!btrfs_read_item(fs, fs->root_bytenr, BTRFS_CSUM_TREE_OBJECTID,
+                         BTRFS_ROOT_ITEM_TYPE, BTRFS_CSUM_TREE_OBJECTID,
+                         root_item, 184U)) return 0;
+    uint64_t csum_root = le64(&root_item[176]);
+    if (csum_root < fs->sector_size || csum_root >= fs->total_bytes ||
+        csum_root % fs->sector_size != 0) return 0;
+    fs->csum_root_bytenr = csum_root;
     return 1;
 }
 
@@ -258,6 +268,51 @@ int btrfs_lookup_dir(btrfs_fs_t *fs, uint64_t tree_bytenr, uint64_t directory,
     return 0;
 }
 
+static int btrfs_find_data_csum(btrfs_fs_t *fs, uint64_t bytenr, uint64_t logical,
+                                uint8_t depth, uint32_t *checksum) {
+    uint8_t node[65536];
+    if (!fs || !checksum || depth > 8 || fs->node_size > sizeof(node) ||
+        !btrfs_read_node(fs, bytenr, node)) return 0;
+    uint32_t count = le32(&node[96]);
+    if (node[100] == 0) {
+        if (count > (fs->node_size - 101U) / 25U) return 0;
+        for (uint32_t i = 0; i < count; ++i) {
+            const uint8_t *item = &node[101U + i * 25U];
+            if (le64(item) != BTRFS_EXTENT_CSUM_OBJECTID || item[8] != BTRFS_EXTENT_CSUM_TYPE)
+                continue;
+            uint64_t start = le64(&item[9]);
+            uint32_t offset = le32(&item[17]), size = le32(&item[21]);
+            if (start > logical || logical - start > UINT64_MAX / sizeof(uint32_t) ||
+                (logical - start) % fs->sector_size != 0 || size % sizeof(uint32_t) != 0 ||
+                offset > fs->node_size || size > fs->node_size - offset) continue;
+            uint64_t index = (logical - start) / fs->sector_size;
+            if (index < size / sizeof(uint32_t)) {
+                *checksum = le32(&node[offset + index * sizeof(uint32_t)]);
+                return 1;
+            }
+        }
+        return 0;
+    }
+    if (node[100] > 8 || count == 0 || count > (fs->node_size - 101U) / 33U) return 0;
+    for (uint32_t i = 0; i < count; ++i)
+        if (btrfs_find_data_csum(fs, le64(&node[118U + i * 33U]), logical,
+                                 (uint8_t)(depth + 1U), checksum)) return 1;
+    return 0;
+}
+
+static int btrfs_validate_data(const btrfs_fs_t *fs, uint64_t logical,
+                               const uint8_t *data, uint32_t bytes) {
+    if (!fs || !data || !bytes || logical % fs->sector_size != 0 ||
+        bytes % fs->sector_size != 0) return 0;
+    for (uint32_t offset = 0; offset < bytes; offset += fs->sector_size) {
+        uint32_t expected = 0;
+        if (!btrfs_find_data_csum((btrfs_fs_t *)fs, fs->csum_root_bytenr,
+                                  logical + offset, 0, &expected) ||
+            crc32c(data + offset, fs->sector_size) != expected) return 0;
+    }
+    return 1;
+}
+
 int btrfs_read_extent_data(btrfs_fs_t *fs, uint64_t tree_bytenr, uint64_t inode,
                            uint64_t extent_offset, uint64_t file_offset,
                            void *buffer, uint32_t size) {
@@ -292,15 +347,17 @@ int btrfs_read_extent_data(btrfs_fs_t *fs, uint64_t tree_bytenr, uint64_t inode,
         size > disk_size - data_offset - relative ||
         file_offset > UINT64_MAX - disk_bytenr - data_offset) return 0;
     uint64_t logical = disk_bytenr + data_offset + relative;
-    uint64_t sector_logical = logical - logical % BTRFS_SECTOR_SIZE;
+    uint64_t sector_logical = logical - logical % fs->sector_size;
     uint32_t in_sector = (uint32_t)(logical - sector_logical);
     uint32_t transfer = in_sector + size;
     uint64_t physical = 0;
-    if (transfer < size || transfer > sizeof(data) ||
-        !btrfs_map(fs, sector_logical, transfer, &physical) ||
+    uint32_t covered = (transfer + fs->sector_size - 1U) / fs->sector_size * fs->sector_size;
+    if (transfer < size || covered < transfer || covered > sizeof(data) ||
+        !btrfs_map(fs, sector_logical, covered, &physical) ||
         physical % BTRFS_SECTOR_SIZE != 0 ||
         !storage_read(fs->device, physical / BTRFS_SECTOR_SIZE,
-                      (transfer + BTRFS_SECTOR_SIZE - 1U) / BTRFS_SECTOR_SIZE, data)) return 0;
+                      covered / BTRFS_SECTOR_SIZE, data)) return 0;
+    if (!btrfs_validate_data(fs, sector_logical, data, covered)) return 0;
     available = size;
     for (uint32_t i = 0; i < available; ++i) ((uint8_t *)buffer)[i] = data[in_sector + i];
     return 1;

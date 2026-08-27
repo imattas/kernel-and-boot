@@ -301,7 +301,9 @@ reads v1/v2 inodes, supports short-form directories, inline files, extent
 records, and a VFS file adapter. Btrfs validates its CRC32C superblock checksum
 and supported checksum type, validates tree-node checksums/identity, and reads
 bounded leaf items through single-stripe system-chunk logical-to-physical
-mapping, loads additional single-stripe mappings from the chunk tree, and resolves the standard FS_TREE root item from the root tree. Btrfs
+mapping, loads additional single-stripe mappings from the chunk tree, resolves
+the standard FS_TREE root item, and validates CRC32C checksums for filesystem
+sector data through the checksum tree. Btrfs
 now decodes bounded inline and uncompressed regular EXTENT_DATA records,
 extracts inode metadata, and reads mapped data including unaligned byte
 ranges, sparse holes, and multi-extent files. Btrfs now performs hashed

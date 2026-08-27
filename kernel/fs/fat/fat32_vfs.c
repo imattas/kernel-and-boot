@@ -34,9 +34,9 @@ static int fat32_vfs_write(vfs_node_t *node, uint64_t offset,
                                                file->directory_cluster,
                                                file->short_name, (uint32_t)offset,
                                                buffer, size) ? (int)size : 0;
-    else if (file->directory_cluster == file->fs->root_cluster &&
-             offset == file->size &&
-             fat32_append_file(file->fs, file->short_name, buffer, size)) {
+    else if (offset == file->size &&
+             fat32_append_file_in_directory(file->fs, file->directory_cluster,
+                                            file->short_name, buffer, size)) {
         file->size += size;
         result = (int)size;
     }
@@ -46,11 +46,12 @@ static int fat32_vfs_write(vfs_node_t *node, uint64_t offset,
 
 static int fat32_vfs_truncate(vfs_node_t *node, uint32_t size) {
     fat32_vfs_file_t *file = node ? (fat32_vfs_file_t *)node->private_data : 0;
-    if (!file || file->directory_cluster != file->fs->root_cluster) return 0;
+    if (!file) return 0;
     uint64_t flags = spinlock_lock_irqsave(&file->lock);
-    int result = size <= file->size && fat32_truncate_file(file->fs,
-                                                           file->short_name,
-                                                           size);
+    int result = size <= file->size &&
+                 fat32_truncate_file_in_directory(file->fs,
+                                                  file->directory_cluster,
+                                                  file->short_name, size);
     if (result) file->size = size;
     spinlock_unlock_irqrestore(&file->lock, flags);
     return result;

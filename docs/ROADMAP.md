@@ -1012,8 +1012,8 @@ ExFAT VFS files now retain their source directory cluster and use directory-
 relative read/write operations, enabling nested attachment without silently
 reinterpreting the name from the volume root.
 FAT32 VFS files now retain their source directory cluster and support nested
-in-place reads and writes; append and truncation remain restricted to the root
-metadata path until their directory-entry update helpers are generalized.
+reads, writes, append growth, and safe shrink/truncation through generalized
+directory-entry metadata updates.
 Btrfs
 validates its CRC32C superblock checksum
 and supported checksum type, validates tree-node checksums/identity, and reads

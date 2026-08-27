@@ -320,12 +320,13 @@ int fat32_read_file(fat32_fs_t *fs, const char short_name[11],
     return fat32_read_file_cluster(fs, cluster, file_size, offset, buffer, size);
 }
 
-static int fat32_write_file_unlocked(fat32_fs_t *fs, const char short_name[11],
-                                     uint32_t offset, const void *buffer,
-                                     uint32_t size) {
-    uint32_t cluster, file_size;
+static int fat32_write_file_unlocked(fat32_fs_t *fs, uint32_t directory_cluster,
+                                     const char short_name[11], uint32_t offset,
+                                     const void *buffer, uint32_t size) {
+    uint32_t cluster, file_size; uint8_t is_directory = 0;
     if (!fs || !fs->mounted || !buffer || size == 0 ||
-        !fat32_lookup(fs, short_name, &cluster, &file_size) ||
+        !fat32_lookup_in_directory(fs, directory_cluster, short_name, &cluster,
+                                   &file_size, &is_directory) || is_directory ||
         offset > file_size || size > file_size - offset) return 0;
     uint32_t cluster_size = fs->sectors_per_cluster * FAT32_SECTOR_SIZE;
     uint32_t skip = offset / cluster_size, inside = offset % cluster_size;
@@ -413,18 +414,21 @@ int fat32_write_file(fat32_fs_t *fs, const char short_name[11],
                      uint32_t offset, const void *buffer, uint32_t size) {
     if (!fs) return 0;
     uint64_t flags = spinlock_lock_irqsave(&fs->write_lock);
-    int result = fat32_write_file_unlocked(fs, short_name, offset, buffer, size);
+    int result = fat32_write_file_unlocked(fs, fs->root_cluster, short_name,
+                                           offset, buffer, size);
     spinlock_unlock_irqrestore(&fs->write_lock, flags);
     return result;
 }
 
-static int fat32_find_root_entry(fat32_fs_t *fs, const char short_name[11],
-                                 uint32_t *sector, uint32_t *entry_offset,
-                                 uint32_t *first_cluster, uint32_t *size) {
+static int fat32_find_entry(fat32_fs_t *fs, uint32_t directory_cluster,
+                            const char short_name[11], uint32_t *sector,
+                            uint32_t *entry_offset, uint32_t *first_cluster,
+                            uint32_t *size) {
     if (!fs || !short_name || !sector || !entry_offset || !first_cluster || !size)
         return 0;
     uint8_t directory[FAT32_MAX_SECTORS_PER_CLUSTER * FAT32_SECTOR_SIZE];
-    uint32_t cluster = fs->root_cluster;
+    if (!cluster_valid(fs, directory_cluster)) return 0;
+    uint32_t cluster = directory_cluster;
     for (uint32_t hops = 0; hops < fs->data_clusters; ++hops) {
         if (!fat32_read_cluster(fs, cluster, directory)) return 0;
         uint32_t cluster_bytes = fs->sectors_per_cluster * FAT32_SECTOR_SIZE;
@@ -453,9 +457,9 @@ static int fat32_find_root_entry(fat32_fs_t *fs, const char short_name[11],
     return 0;
 }
 
-static int fat32_update_root_entry(fat32_fs_t *fs, uint32_t sector,
-                                   uint32_t offset, uint32_t first_cluster,
-                                   uint32_t size) {
+static int fat32_update_entry(fat32_fs_t *fs, uint32_t sector,
+                              uint32_t offset, uint32_t first_cluster,
+                              uint32_t size) {
     uint8_t data[FAT32_SECTOR_SIZE];
     if (!fs || offset > FAT32_SECTOR_SIZE - 32U ||
         !read_sector(fs->device, sector, data)) return 0;
@@ -491,14 +495,14 @@ static void fat32_free_chain(fat32_fs_t *fs, uint32_t first) {
     }
 }
 
-int fat32_truncate_file(fat32_fs_t *fs, const char short_name[11],
-                        uint32_t size) {
+int fat32_truncate_file_in_directory(fat32_fs_t *fs, uint32_t directory_cluster,
+                                     const char short_name[11], uint32_t size) {
     if (!fs || !short_name) return 0;
     uint64_t flags = spinlock_lock_irqsave(&fs->write_lock);
     uint32_t entry_sector, entry_offset, first, old_size;
     int result = 0;
-    if (!fat32_find_root_entry(fs, short_name, &entry_sector, &entry_offset,
-                               &first, &old_size) || size > old_size)
+    if (!fat32_find_entry(fs, directory_cluster, short_name, &entry_sector,
+                          &entry_offset, &first, &old_size) || size > old_size)
         goto done;
     if (size == old_size) { result = 1; goto done; }
 
@@ -519,8 +523,8 @@ int fat32_truncate_file(fat32_fs_t *fs, const char short_name[11],
         }
     }
     if (required == 0) detached = first;
-    if (!fat32_update_root_entry(fs, entry_sector, entry_offset,
-                                 required == 0 ? 0 : first, size))
+    if (!fat32_update_entry(fs, entry_sector, entry_offset,
+                            required == 0 ? 0 : first, size))
         goto done;
     if (retained && !fat_set(fs, retained, 0x0fffffffU)) goto done;
     if (detached < 0x0ffffff8U && cluster_valid(fs, detached))
@@ -531,14 +535,15 @@ done:
     return result;
 }
 
-int fat32_append_file(fat32_fs_t *fs, const char short_name[11],
-                      const void *buffer, uint32_t size) {
+int fat32_append_file_in_directory(fat32_fs_t *fs, uint32_t directory_cluster,
+                                   const char short_name[11],
+                                   const void *buffer, uint32_t size) {
     if (!fs || !buffer || size == 0) return 0;
     uint64_t flags = spinlock_lock_irqsave(&fs->write_lock);
     uint32_t entry_sector, entry_offset, first, old_size;
     int result = 0;
-    if (!fat32_find_root_entry(fs, short_name, &entry_sector, &entry_offset,
-                               &first, &old_size) ||
+    if (!fat32_find_entry(fs, directory_cluster, short_name, &entry_sector,
+                          &entry_offset, &first, &old_size) ||
         size > UINT32_MAX - old_size) goto done;
     uint32_t cluster_size = fs->sectors_per_cluster * FAT32_SECTOR_SIZE;
     uint32_t old_count = 0, tail = 0, current = first;
@@ -573,21 +578,34 @@ int fat32_append_file(fat32_fs_t *fs, const char short_name[11],
         fat32_free_chain(fs, added_first); goto done;
     }
     if (added_first && !first) first = added_first;
-    if (!fat32_update_root_entry(fs, entry_sector, entry_offset, first,
-                                 old_size + size)) {
+    if (!fat32_update_entry(fs, entry_sector, entry_offset, first,
+                            old_size + size)) {
         if (tail) (void)fat_set(fs, tail, 0x0fffffffU);
         if (added_first) fat32_free_chain(fs, added_first);
         goto done;
     }
-    result = fat32_write_file_unlocked(fs, short_name, old_size, buffer, size);
+    result = fat32_write_file_unlocked(fs, directory_cluster, short_name,
+                                       old_size, buffer, size);
     if (!result) {
-        (void)fat32_update_root_entry(fs, entry_sector, entry_offset, first, old_size);
+        (void)fat32_update_entry(fs, entry_sector, entry_offset, first, old_size);
         if (tail) (void)fat_set(fs, tail, 0x0fffffffU);
         if (added_first) fat32_free_chain(fs, added_first);
     }
 done:
     spinlock_unlock_irqrestore(&fs->write_lock, flags);
     return result;
+}
+
+int fat32_truncate_file(fat32_fs_t *fs, const char short_name[11],
+                        uint32_t size) {
+    return fat32_truncate_file_in_directory(fs, fs ? fs->root_cluster : 0,
+                                            short_name, size);
+}
+
+int fat32_append_file(fat32_fs_t *fs, const char short_name[11],
+                      const void *buffer, uint32_t size) {
+    return fat32_append_file_in_directory(fs, fs ? fs->root_cluster : 0,
+                                          short_name, buffer, size);
 }
 
 int fat32_read_file_in_directory(fat32_fs_t *fs, uint32_t directory_cluster,

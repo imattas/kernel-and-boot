@@ -54,5 +54,10 @@ int fat32_read_named_file_in_directory(fat32_fs_t *fs, uint32_t directory_cluste
 int fat32_write_file_in_directory(fat32_fs_t *fs, uint32_t directory_cluster,
                                   const char short_name[11], uint32_t offset,
                                   const void *buffer, uint32_t size);
+int fat32_append_file_in_directory(fat32_fs_t *fs, uint32_t directory_cluster,
+                                   const char short_name[11], const void *buffer,
+                                   uint32_t size);
+int fat32_truncate_file_in_directory(fat32_fs_t *fs, uint32_t directory_cluster,
+                                     const char short_name[11], uint32_t size);
 
 #endif

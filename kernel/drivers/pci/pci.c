@@ -77,9 +77,11 @@ int pci_enable_msix(const device_t *device, uint8_t vector) {
     uint8_t capability = config_read8(device->bus_number, device->slot,
                                        device->function, 0x34) & 0xfcu;
     for (uint32_t step = 0; capability >= 0x40 && step < 48; ++step) {
+        if (capability > 0xfcu) return 0;
         uint32_t header = config_read(device->bus_number, device->slot,
                                       device->function, capability);
         if ((header & 0xffU) == 0x11U) {
+            if (capability > 0xf0u) return 0;
             uint32_t control_word = config_read(device->bus_number,
                                                  device->slot, device->function,
                                                  (uint8_t)(capability + 2));
@@ -95,7 +97,9 @@ int pci_enable_msix(const device_t *device, uint8_t vector) {
                 offset > device->resources[bir].size ||
                 device->resources[bir].size - offset < 16U ||
                 device->resources[bir].address == 0 ||
-                device->resources[bir].address >= 0x100000000ULL) return 0;
+                device->resources[bir].address >= 0x100000000ULL ||
+                offset > UINT64_MAX - device->resources[bir].address ||
+                device->resources[bir].address + offset >= 0x100000000ULL) return 0;
             volatile uint32_t *entry = (volatile uint32_t *)(uintptr_t)
                 (device->resources[bir].address + offset);
             uint16_t masked_control = (uint16_t)(control | (1U << 14));
@@ -126,6 +130,7 @@ int pci_enable_msi(const device_t *device, uint8_t vector) {
     uint8_t capability = config_read8(device->bus_number, device->slot,
                                        device->function, 0x34) & 0xfcu;
     for (uint32_t step = 0; capability >= 0x40 && step < 48; ++step) {
+        if (capability > 0xfcu) return 0;
         uint32_t header = config_read(device->bus_number, device->slot,
                                       device->function, capability);
         if ((header & 0xffU) == 0x05U) {
@@ -134,6 +139,7 @@ int pci_enable_msi(const device_t *device, uint8_t vector) {
                                             (uint8_t)(capability + 2));
             uint16_t message_control = (uint16_t)(control >> 16);
             int address_64 = (message_control & (1U << 7)) != 0;
+            if (capability > (address_64 ? 0xf0u : 0xf4u)) return 0;
             uint8_t data_offset = (uint8_t)(capability + (address_64 ? 12 : 8));
             config_write(device->bus_number, device->slot, device->function,
                          (uint8_t)(capability + 2),

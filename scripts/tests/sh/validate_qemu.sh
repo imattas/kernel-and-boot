@@ -43,6 +43,7 @@ grep -F 'AHCI interrupt delivery ready' "$log" >/dev/null
 grep -E 'storage devices=0x[0-9a-fA-F]*[1-9a-fA-F]' "$log" >/dev/null
 grep -F 'storage ready' "$log" >/dev/null
 grep -F 'storage read-write ready' "$log" >/dev/null
+grep -F 'ATA multi-sector I/O ready' "$log" >/dev/null
 grep -F 'FAT32 filesystem ready' "$log" >/dev/null
 grep -F 'filesystem probe dispatch ready' "$log" >/dev/null
 grep -F 'FAT32 VFS adapter ready' "$log" >/dev/null

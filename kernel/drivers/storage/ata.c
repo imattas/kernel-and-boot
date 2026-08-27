@@ -210,3 +210,9 @@ int ata_initialize(void) {
 }
 
 int ata_read_boot_sector(void *buffer) { return ata_read(0, 1, buffer); }
+int ata_read_sectors(uint64_t lba, uint32_t count, void *buffer) {
+    return ata_read(lba, count, buffer);
+}
+int ata_write_sectors(uint64_t lba, uint32_t count, const void *buffer) {
+    return ata_write(lba, count, buffer);
+}

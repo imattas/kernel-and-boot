@@ -1285,6 +1285,21 @@ void kernel_main(void *boot_info) {
         serial_write("ATA boot-sector read failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
+    uint8_t ata_multi_write[1024];
+    uint8_t ata_multi_read[1024];
+    for (uint32_t byte = 0; byte < sizeof(ata_multi_write); ++byte)
+        ata_multi_write[byte] = (uint8_t)(0xc3U ^ byte);
+    if (!ata_write_sectors(121, 2, ata_multi_write) ||
+        !ata_read_sectors(121, 2, ata_multi_read)) {
+        serial_write("ATA multi-sector I/O failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    for (uint32_t byte = 0; byte < sizeof(ata_multi_write); ++byte)
+        if (ata_multi_write[byte] != ata_multi_read[byte]) {
+            serial_write("ATA multi-sector verification failure\r\n");
+            for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+        }
+    serial_write("ATA multi-sector I/O ready\r\n");
     serial_write("storage ready\r\n");
     uint8_t storage_scratch[512];
     uint8_t storage_verify[512];

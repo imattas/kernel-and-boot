@@ -880,6 +880,11 @@ avoid recursive lock acquisition.
 Process termination now reads current-process ownership through the protected
 process-table accessor instead of racing activation against an unlocked
 global-pointer read.
+Cloned processes now retain an explicit parent reference, and process waiting
+requires that the target is the caller's child; the QEMU lifecycle probe covers
+child termination, status collection, parent-reference release, and reap.
+Kernel-created processes can now assign a live parent before entering the
+`READY` state, so the syscall wait probe exercises the same ownership rule.
 Current-process publication and lookup now use the process-table lock, so
 syscall and lifecycle paths cannot race on the active process pointer.
 Cross-process signal lookup now retains a process reference under the table

@@ -74,7 +74,7 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
             process_t *target = process_lookup_retain(arg1);
             int32_t status = 0;
             int valid = caller && target && target != caller &&
-                        process_wait(target, &status) &&
+                        process_wait_child(caller, target, &status) &&
                         syscall_copy_to_user(arg2, &status, sizeof(status));
             process_release(target);
             return valid ? 0 : OS_SYSCALL_ERROR;

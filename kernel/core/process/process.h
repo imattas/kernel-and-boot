@@ -26,6 +26,7 @@ typedef struct process {
     spinlock_t lock;
     uint32_t references;
     uint64_t id;
+    struct process *parent;
     process_state_t state;
     address_space_t address_space;
     user_image_t image;
@@ -48,6 +49,7 @@ typedef struct process {
 
 process_t *process_create(uint64_t id);
 process_t *process_create_auto(void);
+int process_set_parent(process_t *child, process_t *parent);
 process_t *process_create_user(uint64_t id, const void *image, uint64_t image_size,
                                uint64_t stack_base, uint32_t thread_id,
                                uint64_t kernel_stack_size);
@@ -73,6 +75,7 @@ int process_set_signal_mask(process_t *process, uint32_t mask);
 int process_take_signal(process_t *process, uint32_t *signal);
 int process_wait_signal(process_t *process, uint32_t *signal);
 int process_wait(process_t *process, int32_t *status);
+int process_wait_child(process_t *parent, process_t *child, int32_t *status);
 int process_terminate(process_t *process, int32_t status);
 __attribute__((noreturn)) void process_exit_current(int32_t status);
 

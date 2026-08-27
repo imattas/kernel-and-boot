@@ -13,6 +13,22 @@ static process_t *current_process;
 static process_t *process_table[PROCESS_MAX];
 static spinlock_t process_table_lock;
 
+static int process_retain_existing(process_t *process) {
+    if (!process) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&process_table_lock);
+    int retained = 0;
+    for (uint32_t i = 0; i < PROCESS_MAX; ++i)
+        if (process_table[i] == process) {
+            if (process->references != UINT32_MAX) {
+                ++process->references;
+                retained = 1;
+            }
+            break;
+        }
+    spinlock_unlock_irqrestore(&process_table_lock, flags);
+    return retained;
+}
+
 static void wake_all_signal_waiters(process_t *process) {
     while (scheduler_wake_one(&process->signal_waiters)) { }
 }
@@ -60,6 +76,7 @@ process_t *process_create(uint64_t id) {
     spinlock_init(&process->lock);
     process->references = 1;
     process->id = id;
+    process->parent = 0;
     process->state = PROCESS_NEW;
     process->address_space.root = 0;
     process->address_space.owned_count = 0;
@@ -212,6 +229,21 @@ int process_set_working_directory(process_t *process, vfs_node_t *directory) {
     return 1;
 }
 
+int process_set_parent(process_t *child, process_t *parent) {
+    if (!child || !parent || child == parent || !process_retain_existing(parent))
+        return 0;
+    uint64_t flags = spinlock_lock_irqsave(&parent->lock);
+    int parent_live = parent->state != PROCESS_EXITED;
+    spinlock_unlock_irqrestore(&parent->lock, flags);
+    flags = spinlock_lock_irqsave(&child->lock);
+    int available = parent_live && child->state == PROCESS_NEW &&
+                    child->parent == 0;
+    if (available) child->parent = parent;
+    spinlock_unlock_irqrestore(&child->lock, flags);
+    if (!available) process_release(parent);
+    return available;
+}
+
 process_t *process_create_user(uint64_t id, const void *image,
                                uint64_t image_size, uint64_t stack_base,
                                uint32_t thread_id, uint64_t kernel_stack_size) {
@@ -257,7 +289,14 @@ process_t *process_clone_user(process_t *parent, uint64_t id,
     }
     vfs_node_retain(root);
     vfs_node_retain(working);
+    if (!process_retain_existing(parent)) {
+        spinlock_unlock_irqrestore(&parent->lock, parent_flags);
+        vfs_node_release(working);
+        vfs_node_release(root);
+        return 0;
+    }
     process_t *child = process_create(id);
+    if (child) child->parent = parent;
     if (!child || !user_image_clone(&cloned_space, &parent->image, &cloned_image) ||
         !address_space_clone_anonymous(&cloned_space, &parent->address_space)) {
         spinlock_unlock_irqrestore(&parent->lock, parent_flags);
@@ -268,6 +307,7 @@ process_t *process_clone_user(process_t *parent, uint64_t id,
         else if (cloned_space.root != 0)
             (void)address_space_destroy(&cloned_space);
         if (child) (void)process_destroy(child);
+        else process_release(parent);
         return 0;
     }
     spinlock_unlock_irqrestore(&parent->lock, parent_flags);
@@ -453,6 +493,8 @@ int process_destroy(process_t *process) {
     process_handle_table_close_all(&process->handles);
     vfs_node_t *root = process->root_directory;
     vfs_node_t *working = process->working_directory;
+    process_t *parent = process->parent;
+    process->parent = 0;
     process->root_directory = 0;
     process->working_directory = 0;
     uint64_t flags = spinlock_lock_irqsave(&process_table_lock);
@@ -462,6 +504,7 @@ int process_destroy(process_t *process) {
     spinlock_unlock_irqrestore(&process->lock, process_flags);
     if (working) vfs_node_release(working);
     if (root) vfs_node_release(root);
+    if (parent) process_release(parent);
     process_release(process);
     return 1;
 }
@@ -558,6 +601,14 @@ int process_wait(process_t *process, int32_t *status) {
             continue;
         return 0;
     }
+}
+
+int process_wait_child(process_t *parent, process_t *child, int32_t *status) {
+    if (!parent || !child || parent == child) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&child->lock);
+    int related = child->parent == parent;
+    spinlock_unlock_irqrestore(&child->lock, flags);
+    return related && process_wait(child, status);
 }
 
 int process_terminate(process_t *process, int32_t status) {

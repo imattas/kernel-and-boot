@@ -2845,6 +2845,7 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     process_t *cloned_process = process_clone_user(runtime_process, 8, 80, 4096);
+    int32_t cloned_status = 0;
     if (!cloned_process || cloned_process->state != PROCESS_READY ||
         cloned_process->thread_count != 1 ||
         cloned_process->root_directory != runtime_process->root_directory ||
@@ -2854,7 +2855,9 @@ void kernel_main(void *boot_info) {
         cloned_process->address_space.anonymous_frames[0].physical_address ==
             runtime_process->address_space.anonymous_frames[0].physical_address ||
         ((volatile uint8_t *)(uintptr_t)cloned_process->address_space.anonymous_frames[0].physical_address)[0] != 0x5a ||
-        !process_destroy(cloned_process)) {
+        !process_terminate(cloned_process, 17) ||
+        !process_wait_child(runtime_process, cloned_process, &cloned_status) ||
+        cloned_status != 17 || !process_destroy(cloned_process)) {
         serial_write("user process clone failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
@@ -2945,7 +2948,9 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     process_t *wait_syscall_process = process_create(6);
-    if (!wait_syscall_process || !process_terminate(wait_syscall_process, 11)) {
+    if (!wait_syscall_process ||
+        !process_set_parent(wait_syscall_process, runtime_process) ||
+        !process_terminate(wait_syscall_process, 11)) {
         serial_write("process wait setup failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }

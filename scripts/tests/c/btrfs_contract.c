@@ -1,8 +1,11 @@
 #include <assert.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 #include "../../../kernel/fs/btrfs/btrfs.h"
 #include "../../../kernel/drivers/storage/storage.h"
+void *kmalloc(uint64_t size) { return malloc((size_t)size); }
+void kfree(void *pointer) { free(pointer); }
 static uint8_t image[512 * 264], mirror_image[512 * 264];
 static int rd(uint64_t lba, uint32_t n, void *p) { if (lba + n > 264) return 0; memcpy(p, image + lba * 512, n * 512U); return 1; }
 static int wr(uint64_t lba, uint32_t n, const void *p) { if (lba + n > 264) return 0; memcpy(image + lba * 512, p, n * 512U); return 1; }
@@ -13,6 +16,21 @@ static void p32(uint8_t *p, uint32_t v) { p[0] = v; p[1] = v >> 8; p[2] = v >> 1
 static void p64(uint8_t *p, uint64_t v) { p32(p, v); p32(p + 4, v >> 32); }
 static uint32_t crc32c(const uint8_t *data, uint32_t length) { uint32_t crc = ~0U; for (uint32_t i = 0; i < length; ++i) { crc ^= data[i]; for (uint32_t bit = 0; bit < 8; ++bit) crc = (crc >> 1) ^ (0x82f63b78U & (uint32_t)-(int32_t)(crc & 1U)); } return ~crc; }
 static uint32_t name_hash(const char *name) { uint32_t crc = ~1U; for (uint32_t i = 0; name[i]; ++i) { crc ^= (uint8_t)name[i]; for (uint32_t bit = 0; bit < 8; ++bit) crc = (crc >> 1) ^ (0x82f63b78U & (uint32_t)-(int32_t)(crc & 1U)); } return ~crc; }
+static int compressed_extent_probe(btrfs_fs_t *fs, uint8_t *tree, uint8_t *csum) {
+    static const uint8_t stream[] = {0x78, 0x01, 0x01, 0x03, 0x00, 0xfc, 0xff,
+                                     'a', 'b', 'c', 0x02, 0x4d, 0x01, 0x27};
+    uint8_t output[4] = {0};
+    memset(&image[45056], 0, 4096); memcpy(&image[45056], stream, sizeof(stream));
+    tree[416] = 1; p64(&tree[421], 45056); p64(&tree[429], sizeof(stream));
+    p64(&tree[437], 0); p64(&tree[445], 3); p64(&tree[400], 3);
+    p32(tree, crc32c(&tree[32], 4096 - 32));
+    p32(&csum[96], 3); p64(&csum[151], UINT64_MAX - 9ULL); csum[159] = 128;
+    p64(&csum[160], 45056); p32(&csum[168], 408); p32(&csum[172], 4);
+    p32(&csum[408], crc32c(&image[45056], 4096));
+    p32(csum, crc32c(&csum[32], 4096 - 32));
+    return btrfs_read_extent_data(fs, 16384, 256, 0, 0, output, 3) &&
+           memcmp(output, "abc", 3) == 0;
+}
 int main(void) {
     memset(image, 0, sizeof(image)); uint8_t *s = &image[64 * 1024];
     p64(&s[0x40], 0x4d5f53665248425fULL); p32(&s[0x90], 4096); p32(&s[0x94], 4096); p64(&s[0x70], 128 * 1024); p64(&s[0x50], 8192); p64(&s[0x58], 8192);
@@ -23,5 +41,5 @@ int main(void) {
     uint8_t *csum = &image[32768]; memcpy(&csum[32], &s[0x20], 16); p64(&csum[48], 32768); p32(&csum[96], 2); csum[100] = 0; p64(&csum[101], UINT64_MAX - 9ULL); csum[109] = 128; p64(&csum[110], 24576); p32(&csum[118], 400); p32(&csum[122], 4); p64(&csum[126], UINT64_MAX - 9ULL); csum[134] = 128; p64(&csum[135], 102400); p32(&csum[143], 404); p32(&csum[147], 4); memcpy(&image[24576], "world", 5); memcpy(&image[36864], "again", 5); memcpy(&image[40960], "again", 5); p32(&csum[400], crc32c(&image[24576], 4096)); p32(&csum[404], crc32c(&image[36864], 4096)); p32(csum, crc32c(&csum[32], 4096 - 32));
     uint8_t *tree = &image[16384]; memcpy(&tree[32], &s[0x20], 16); p64(&tree[48], 16384); p32(&tree[96], 4); tree[100] = 0; p64(&tree[101], 256); tree[109] = 1; p64(&tree[110], 0); p32(&tree[118], 600); p32(&tree[122], 160); p64(&tree[126], 256); tree[134] = 84; p64(&tree[135], name_hash("hello")); p32(&tree[143], 800); p32(&tree[147], 70); p64(&tree[151], 256); tree[159] = 108; p64(&tree[160], 0); p32(&tree[168], 400); p32(&tree[172], 53); p64(&tree[176], 256); tree[184] = 108; p64(&tree[185], 8); p32(&tree[193], 500); p32(&tree[197], 53); p64(&tree[600 + 16], 13); p32(&tree[600 + 96], 0x8000); p64(&tree[800], 258); tree[808] = 1; p64(&tree[809], 0); p16(&tree[825], 0); p16(&tree[827], 5); tree[829] = 8; memcpy(&tree[830], "other", 5); p64(&tree[835], 257); tree[843] = 1; p64(&tree[844], 0); p16(&tree[860], 0); p16(&tree[862], 5); tree[864] = 8; memcpy(&tree[865], "hello", 5); p64(&tree[400], 1); p64(&tree[408], 5); tree[416] = tree[417] = tree[418] = 0; tree[420] = 1; p64(&tree[421], 24576); p64(&tree[429], 512); p64(&tree[437], 0); p64(&tree[445], 5); p64(&tree[500], 1); p64(&tree[508], 5); tree[516] = tree[517] = tree[518] = 0; tree[520] = 1; p64(&tree[521], 102400); p64(&tree[529], 512); p64(&tree[537], 0); p64(&tree[545], 5); p32(tree, crc32c(&tree[32], 4096 - 32));
     memcpy(mirror_image, image, sizeof(image)); uint8_t *ms = &mirror_image[64 * 1024]; p64(&ms[0x100], 2); p32(ms, crc32c(&ms[32], 4096 - 32));
-    storage_initialize(); storage_device_t d = {"btrfs", 512, 264, rd, wr}; storage_device_t md = {"btrfs-mirror", 512, 264, mirror_rd, mirror_wr}; assert(storage_register(&d)); assert(storage_register(&md)); btrfs_fs_t fs; assert(btrfs_mount(&fs, 0)); assert(fs.node_size == 4096); assert(btrfs_resolve_filesystem_tree(&fs)); assert(fs.fs_root_bytenr == 16384); uint64_t file_size = 0, child = 0; uint32_t mode = 0; assert(btrfs_inode_stat(&fs, 16384, 256, &file_size, &mode) && file_size == 13 && mode == 0x8000); assert(btrfs_lookup_dir(&fs, 16384, 256, "hello", &child) && child == 257); char output[14] = {0}; assert(btrfs_read_item(&fs, 8192, 5, 1, 0, output, 5)); assert(btrfs_read_extent_data(&fs, 16384, 256, 0, 1, output, 3) && memcmp(output, "orl", 3) == 0); assert(btrfs_read_file(&fs, 16384, 256, 0, output, 13)); assert(memcmp(output, "world", 5) == 0 && output[5] == 0 && output[6] == 0 && output[7] == 0 && memcmp(&output[8], "again", 5) == 0); image[36864] ^= 1; memset(output, 0, sizeof(output)); assert(btrfs_read_extent_data(&fs, 16384, 256, 8, 8, output, 5) && memcmp(output, "again", 5) == 0); image[24576] ^= 1; mirror_image[24576] ^= 1; assert(!btrfs_read_extent_data(&fs, 16384, 256, 0, 1, output, 3)); s[0x40] = 0; assert(!btrfs_mount(&fs, 0)); return 0;
+    storage_initialize(); storage_device_t d = {"btrfs", 512, 264, rd, wr}; storage_device_t md = {"btrfs-mirror", 512, 264, mirror_rd, mirror_wr}; assert(storage_register(&d)); assert(storage_register(&md)); btrfs_fs_t fs; assert(btrfs_mount(&fs, 0)); assert(fs.node_size == 4096); assert(btrfs_resolve_filesystem_tree(&fs)); assert(fs.fs_root_bytenr == 16384); uint64_t file_size = 0, child = 0; uint32_t mode = 0; assert(btrfs_inode_stat(&fs, 16384, 256, &file_size, &mode) && file_size == 13 && mode == 0x8000); assert(btrfs_lookup_dir(&fs, 16384, 256, "hello", &child) && child == 257); char output[14] = {0}; assert(btrfs_read_item(&fs, 8192, 5, 1, 0, output, 5)); assert(btrfs_read_extent_data(&fs, 16384, 256, 0, 1, output, 3) && memcmp(output, "orl", 3) == 0); assert(btrfs_read_file(&fs, 16384, 256, 0, output, 13)); assert(memcmp(output, "world", 5) == 0 && output[5] == 0 && output[6] == 0 && output[7] == 0 && memcmp(&output[8], "again", 5) == 0); image[36864] ^= 1; memset(output, 0, sizeof(output)); assert(btrfs_read_extent_data(&fs, 16384, 256, 8, 8, output, 5) && memcmp(output, "again", 5) == 0); image[24576] ^= 1; mirror_image[24576] ^= 1; assert(!btrfs_read_extent_data(&fs, 16384, 256, 0, 1, output, 3)); assert(compressed_extent_probe(&fs, tree, csum)); s[0x40] = 0; assert(!btrfs_mount(&fs, 0)); return 0;
 }

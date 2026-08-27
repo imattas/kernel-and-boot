@@ -323,7 +323,11 @@ validated mirror stripe with read fallback after checksum failure. Btrfs now
 resolves matching filesystem devices by device ID and maps bounded RAID1
 mirrors across separate registered storage devices, with the same read
 fallback behavior. Compression and encryption remain before the filesystem
-milestone is complete. A
+milestone is complete. Btrfs regular extents now support bounded zlib-wrapped
+DEFLATE streams, including stored, fixed-Huffman, and dynamic-Huffman blocks,
+with Adler-32 validation and sector-checksum-protected input. Encryption and
+the remaining compression formats remain before the filesystem milestone is
+complete. A
 format is not considered complete merely because its superblock is recognized.
 
 ## Phase 10 — Userland begins after the kernel gate

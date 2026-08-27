@@ -1,5 +1,7 @@
 #include "btrfs.h"
+#include "deflate.h"
 #include "../../drivers/storage/storage.h"
+#include "../../mm/heap/heap.h"
 
 #define BTRFS_SECTOR_SIZE 512U
 #define BTRFS_SUPERBLOCK_SECTOR 128U
@@ -439,6 +441,21 @@ static int btrfs_validate_data(const btrfs_fs_t *fs, uint64_t logical,
     return 1;
 }
 
+static int btrfs_read_checked(btrfs_fs_t *fs, uint64_t logical, uint32_t bytes,
+                              uint8_t *data) {
+    uint32_t device = 0; uint64_t physical = 0;
+    if (!fs || !data || !bytes || !btrfs_map(fs, logical, bytes, &device, &physical) ||
+        physical % BTRFS_SECTOR_SIZE != 0) return 0;
+    if (storage_read(device, physical / BTRFS_SECTOR_SIZE,
+                     bytes / BTRFS_SECTOR_SIZE, data) &&
+        btrfs_validate_data(fs, logical, data, bytes)) return 1;
+    if (!btrfs_map_at(fs, logical, bytes, 1, &device, &physical) ||
+        physical % BTRFS_SECTOR_SIZE != 0 ||
+        !storage_read(device, physical / BTRFS_SECTOR_SIZE,
+                      bytes / BTRFS_SECTOR_SIZE, data)) return 0;
+    return btrfs_validate_data(fs, logical, data, bytes);
+}
+
 int btrfs_read_extent_data(btrfs_fs_t *fs, uint64_t tree_bytenr, uint64_t inode,
                            uint64_t extent_offset, uint64_t file_offset,
                            void *buffer, uint32_t size) {
@@ -450,7 +467,7 @@ int btrfs_read_extent_data(btrfs_fs_t *fs, uint64_t tree_bytenr, uint64_t inode,
     uint8_t extent_type = item[20];
     uint64_t relative = file_offset - extent_offset;
     uint64_t available;
-    if (item[16] != 0 || item[17] != 0 || item[18] != 0) return 0;
+    if (item[17] != 0 || item[18] != 0) return 0;
     if (extent_type == 0) {
         uint64_t ram_bytes = le64(&item[8]);
         uint32_t inline_size = 53U;
@@ -463,6 +480,35 @@ int btrfs_read_extent_data(btrfs_fs_t *fs, uint64_t tree_bytenr, uint64_t inode,
             ((uint8_t *)buffer)[i] = item[inline_size + (uint32_t)relative + i];
         return 1;
     }
+    if (item[16] == 1) {
+        uint64_t disk_bytenr = le64(&item[21]);
+        uint64_t disk_size = le64(&item[29]);
+        uint64_t data_offset = le64(&item[37]);
+        uint64_t data_size = le64(&item[45]);
+        if (extent_type != 1 || data_size == 0 || data_size > 65536U || disk_size == 0 ||
+            disk_size > 65536U || data_offset > disk_size || relative > data_size ||
+            size > data_size - relative || relative > disk_size - data_offset ||
+            file_offset > UINT64_MAX - disk_bytenr - data_offset) return 0;
+        uint64_t logical = disk_bytenr + data_offset;
+        uint64_t sector_logical = logical - logical % fs->sector_size;
+        uint32_t in_sector = (uint32_t)(logical - sector_logical);
+        uint32_t transfer = in_sector + (uint32_t)disk_size;
+        uint32_t covered = (transfer + fs->sector_size - 1U) / fs->sector_size * fs->sector_size;
+        if (transfer < disk_size || covered < transfer || covered > 65536U) return 0;
+        uint8_t *compressed = (uint8_t *)kmalloc(covered);
+        uint8_t *decoded = (uint8_t *)kmalloc((uint32_t)data_size);
+        uint32_t decoded_size = 0; int result = 0;
+        if (compressed && decoded && btrfs_read_checked(fs, sector_logical, covered, compressed) &&
+            btrfs_zlib_inflate(compressed + in_sector, (uint32_t)disk_size, decoded,
+                               (uint32_t)data_size, &decoded_size) &&
+            relative <= decoded_size && size <= decoded_size - relative) {
+            for (uint32_t i = 0; i < size; ++i) ((uint8_t *)buffer)[i] = decoded[relative + i];
+            result = 1;
+        }
+        kfree(decoded); kfree(compressed);
+        return result;
+    }
+    if (item[16] != 0) return 0;
     if (extent_type != 1) return 0;
     uint64_t disk_bytenr = le64(&item[21]);
     uint64_t disk_size = le64(&item[29]);

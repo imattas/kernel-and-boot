@@ -31,6 +31,7 @@ EXFAT_TEST := $(TEST_DIR)/exfat_contract
 EXT4_TEST := $(TEST_DIR)/ext4_contract
 XFS_TEST := $(TEST_DIR)/xfs_contract
 BTRFS_TEST := $(TEST_DIR)/btrfs_contract
+DEFLATE_TEST := $(TEST_DIR)/deflate_contract
 UEFI_OBJ := $(BUILD_DIR)/uefi/efi_main.obj
 UEFI_ENTRY_OBJ := $(BUILD_DIR)/uefi/entry.obj
 UEFI_CONSOLE_OBJ := $(BUILD_DIR)/uefi/console.obj
@@ -64,7 +65,7 @@ OVMF_CODE ?= /usr/share/edk2/x64/OVMF_CODE.4m.fd
 OVMF_VARS ?= /usr/share/edk2/x64/OVMF_VARS.4m.fd
 QEMU_LOG := $(BUILD_DIR)/qemu-serial.log
 
-.PHONY: all test image qemu-test fat32-test exfat-test ext4-test xfs-test btrfs-test run clean distclean
+.PHONY: all test image qemu-test fat32-test exfat-test ext4-test xfs-test btrfs-test deflate-test run clean distclean
 
 all: $(CONTRACT_ELF) $(UEFI_EFI) $(KERNEL_ELF)
 
@@ -230,6 +231,7 @@ KERNEL_EXT4_VFS_OBJ := $(BUILD_DIR)/kernel/ext4_vfs.o
 KERNEL_XFS_OBJ := $(BUILD_DIR)/kernel/xfs.o
 KERNEL_XFS_VFS_OBJ := $(BUILD_DIR)/kernel/xfs_vfs.o
 KERNEL_BTRFS_OBJ := $(BUILD_DIR)/kernel/btrfs.o
+KERNEL_BTRFS_DEFLATE_OBJ := $(BUILD_DIR)/kernel/btrfs_deflate.o
 KERNEL_BTRFS_VFS_OBJ := $(BUILD_DIR)/kernel/btrfs_vfs.o
 KERNEL_INPUT_OBJ := $(BUILD_DIR)/kernel/input.o
 KERNEL_PS2_OBJ := $(BUILD_DIR)/kernel/ps2.o
@@ -239,7 +241,7 @@ KERNEL_UHCI_OBJ := $(BUILD_DIR)/kernel/uhci.o
 KERNEL_AHCI_OBJ := $(BUILD_DIR)/kernel/ahci.o
 KERNEL_NVME_OBJ := $(BUILD_DIR)/kernel/nvme.o
 KERNEL_E1000_OBJ := $(BUILD_DIR)/kernel/e1000.o
-KERNEL_NVME_OBJ := $(KERNEL_NVME_OBJ) $(KERNEL_E1000_OBJ) $(KERNEL_EXFAT_VFS_OBJ) $(KERNEL_EXT4_OBJ) $(KERNEL_EXT4_VFS_OBJ) $(KERNEL_XFS_OBJ) $(KERNEL_XFS_VFS_OBJ) $(KERNEL_BTRFS_OBJ) $(KERNEL_BTRFS_VFS_OBJ)
+KERNEL_NVME_OBJ := $(KERNEL_NVME_OBJ) $(KERNEL_E1000_OBJ) $(KERNEL_EXFAT_VFS_OBJ) $(KERNEL_EXT4_OBJ) $(KERNEL_EXT4_VFS_OBJ) $(KERNEL_XFS_OBJ) $(KERNEL_XFS_VFS_OBJ) $(KERNEL_BTRFS_OBJ) $(KERNEL_BTRFS_DEFLATE_OBJ) $(KERNEL_BTRFS_VFS_OBJ)
 KERNEL_DEBUG_OBJ := $(BUILD_DIR)/kernel/debug_assert.o
 KERNEL_CLOCK_OBJ := $(BUILD_DIR)/kernel/clock.o
 
@@ -324,6 +326,10 @@ $(KERNEL_XFS_VFS_OBJ): kernel/fs/xfs/xfs_vfs.c kernel/fs/xfs/xfs_vfs.h kernel/fs
 		-mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@
 
 $(KERNEL_BTRFS_OBJ): kernel/fs/btrfs/btrfs.c kernel/fs/btrfs/btrfs.h kernel/drivers/storage/storage.h | $(BUILD_DIR)/kernel
+	$(CC) -target x86_64-pc-none-elf -std=c11 -ffreestanding -fno-builtin -fno-stack-protector -fPIE -fno-plt \
+		-mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@
+
+$(KERNEL_BTRFS_DEFLATE_OBJ): kernel/fs/btrfs/deflate.c kernel/fs/btrfs/deflate.h | $(BUILD_DIR)/kernel
 	$(CC) -target x86_64-pc-none-elf -std=c11 -ffreestanding -fno-builtin -fno-stack-protector -fPIE -fno-plt \
 		-mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@
 
@@ -452,6 +458,7 @@ test: all image
 	$(MAKE) ext4-test
 	$(MAKE) xfs-test
 	$(MAKE) btrfs-test
+	$(MAKE) deflate-test
 	sh scripts/tests/sh/validate_build.sh $(CONTRACT_ELF)
 	sh scripts/tests/sh/validate_uefi.sh $(UEFI_EFI)
 	sh scripts/tests/sh/validate_kernel.sh $(KERNEL_ELF)
@@ -472,6 +479,9 @@ xfs-test: $(XFS_TEST)
 btrfs-test: $(BTRFS_TEST)
 	$(BTRFS_TEST)
 
+deflate-test: $(DEFLATE_TEST)
+	$(DEFLATE_TEST)
+
 $(EXFAT_TEST): scripts/tests/c/exfat_contract.c kernel/fs/exfat/exfat.c kernel/fs/exfat/exfat.h kernel/drivers/storage/storage.c kernel/drivers/storage/storage.h | $(TEST_DIR)
 	$(CC) -std=c11 -Wall -Wextra -Werror -I. -o $@ scripts/tests/c/exfat_contract.c kernel/fs/exfat/exfat.c kernel/drivers/storage/storage.c
 
@@ -481,8 +491,11 @@ $(EXT4_TEST): scripts/tests/c/ext4_contract.c kernel/fs/ext4/ext4.c kernel/fs/ex
 $(XFS_TEST): scripts/tests/c/xfs_contract.c kernel/fs/xfs/xfs.c kernel/fs/xfs/xfs.h kernel/drivers/storage/storage.c kernel/drivers/storage/storage.h | $(TEST_DIR)
 	$(CC) -std=c11 -Wall -Wextra -Werror -I. -o $@ scripts/tests/c/xfs_contract.c kernel/fs/xfs/xfs.c kernel/drivers/storage/storage.c
 
-$(BTRFS_TEST): scripts/tests/c/btrfs_contract.c kernel/fs/btrfs/btrfs.c kernel/fs/btrfs/btrfs.h kernel/drivers/storage/storage.c kernel/drivers/storage/storage.h | $(TEST_DIR)
-	$(CC) -std=c11 -Wall -Wextra -Werror -I. -o $@ scripts/tests/c/btrfs_contract.c kernel/fs/btrfs/btrfs.c kernel/drivers/storage/storage.c
+$(BTRFS_TEST): scripts/tests/c/btrfs_contract.c kernel/fs/btrfs/btrfs.c kernel/fs/btrfs/btrfs.h kernel/fs/btrfs/deflate.c kernel/fs/btrfs/deflate.h kernel/drivers/storage/storage.c kernel/drivers/storage/storage.h | $(TEST_DIR)
+	$(CC) -std=c11 -Wall -Wextra -Werror -I. -o $@ scripts/tests/c/btrfs_contract.c kernel/fs/btrfs/btrfs.c kernel/fs/btrfs/deflate.c kernel/drivers/storage/storage.c
+
+$(DEFLATE_TEST): scripts/tests/c/deflate_contract.c kernel/fs/btrfs/deflate.c kernel/fs/btrfs/deflate.h | $(TEST_DIR)
+	$(CC) -std=c11 -Wall -Wextra -Werror -I. -o $@ scripts/tests/c/deflate_contract.c kernel/fs/btrfs/deflate.c
 
 $(FAT32_TEST): scripts/tests/c/fat32_contract.c kernel/fs/fat/fat32.c kernel/fs/fat/fat32.h kernel/drivers/storage/storage.h | $(TEST_DIR)
 	$(CC) -std=c11 -Wall -Wextra -Werror -O2 -I. scripts/tests/c/fat32_contract.c kernel/fs/fat/fat32.c -o $@

@@ -976,8 +976,9 @@ mount layers with contract tests. XFS now maps allocation-group inode numbers,
 reads v1/v2 inodes, supports short-form directories, inline files, extent
 records, and a VFS file adapter. XFS extent reads now decode the extent-state
 flag correctly and return zeroes for sparse gaps and unwritten extents. XFS
-regular files now support bounded read-modify-write updates for mapped written
-extents through the VFS adapter; sparse and unwritten extents remain protected.
+regular files now support bounded read-modify-write updates for inline data and
+mapped written extents through the VFS adapter; sparse and unwritten extents
+remain protected.
 Btrfs regular files now support bounded read-modify-write updates for
 uncompressed, mapped extents, publish mirrored data and checksum-tree metadata
 when available, and update the checksum-tree entry; compressed, sparse, and metadata-changing writes remain

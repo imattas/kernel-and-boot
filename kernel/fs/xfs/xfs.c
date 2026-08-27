@@ -95,6 +95,23 @@ static int xfs_extent(const uint8_t *record, uint64_t logical,
     return 1;
 }
 
+static int xfs_write_inode(const xfs_fs_t *fs, uint64_t inode,
+                           const uint8_t *data) {
+    if (!fs || !data) return 0;
+    uint64_t agno = inode >> (fs->ag_block_log + fs->inode_per_block_log);
+    uint64_t agino_mask = (1ULL << (fs->ag_block_log + fs->inode_per_block_log)) - 1ULL;
+    uint64_t agino = inode & agino_mask;
+    if (agno >= fs->ag_count ||
+        agino >= (uint64_t)fs->ag_blocks * (1U << fs->inode_per_block_log)) return 0;
+    uint64_t block = agno * fs->ag_blocks + (agino >> fs->inode_per_block_log);
+    uint32_t offset = (uint32_t)(agino & ((1U << fs->inode_per_block_log) - 1U)) * fs->inode_size;
+    if (offset + fs->inode_size > fs->block_size) return 0;
+    uint8_t block_data[4096];
+    if (!xfs_read_block(fs, block, block_data)) return 0;
+    for (uint32_t i = 0; i < fs->inode_size; ++i) block_data[offset + i] = data[i];
+    return xfs_write_block(fs, block, block_data);
+}
+
 int xfs_inode_size(xfs_fs_t *fs, uint64_t inode, uint64_t *size) {
     uint8_t data[4096];
     if (!size || !xfs_read_inode(fs, inode, data) ||
@@ -174,6 +191,14 @@ int xfs_write_file(xfs_fs_t *fs, uint64_t inode, uint64_t offset,
     if (offset > file_size || (uint64_t)size > file_size - offset ||
         core > fs->inode_size || (be16(&data[0]) & 0xf000U) != 0x8000U)
         return 0;
+    if (data[5] == XFS_FORMAT_LOCAL) {
+        if (offset > fs->inode_size - core ||
+            size > fs->inode_size - core - (uint32_t)offset) return 0;
+        for (uint32_t i = 0; i < size; ++i)
+            data[core + (uint32_t)offset + i] = ((const uint8_t *)buffer)[i];
+        return xfs_write_inode(fs, inode, data);
+    }
+    if (data[5] != XFS_FORMAT_EXTENTS) return 0;
     uint32_t extent_count = be32(&data[76]);
     if (extent_count == 0 || extent_count > (fs->inode_size - core) / 16U)
         return 0;

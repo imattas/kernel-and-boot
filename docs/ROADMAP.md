@@ -1098,6 +1098,9 @@ scheduler, and is reaped without populating `userland/`.
 The ring-3 probe now performs a real user `write` syscall from a user-mapped
 buffer before exiting, covering the syscall register ABI and copy-from-user
 path during the same scheduler return test.
+Process exit now clears the global current-process context before waking
+waiters, and the ring-3 gate verifies that exited processes are not reused by
+subsequent kernel work.
 The ring-3 entry stub now initializes user argument registers instead of
 leaking the kernel bootstrap's entry pointer into the first syscall argument;
 the exit transition probe validates the corrected boundary.

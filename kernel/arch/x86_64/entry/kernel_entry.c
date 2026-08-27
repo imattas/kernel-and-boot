@@ -3113,6 +3113,10 @@ void kernel_main(void *boot_info) {
         serial_write("ring3 exit syscall failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
+    if (process_current() != 0) {
+        serial_write("dead process remained current\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
     if (!process_thread_destroy(ring3_probe_thread)) {
         serial_write("ring3 transition failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");

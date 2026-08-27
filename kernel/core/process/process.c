@@ -31,6 +31,9 @@ __attribute__((noreturn)) void process_exit_current(int32_t status) {
     process->exit_status = status;
     process->state = PROCESS_EXITED;
     spinlock_unlock_irqrestore(&process->lock, flags);
+    flags = spinlock_lock_irqsave(&process_table_lock);
+    if (current_process == process) current_process = 0;
+    spinlock_unlock_irqrestore(&process_table_lock, flags);
     wake_all_signal_waiters(process);
     while (scheduler_wake_one(&process->exit_waiters)) { }
     scheduler_task_exit();

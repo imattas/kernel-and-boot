@@ -41,6 +41,38 @@ process_thread_t *process_thread_create(struct process *process, uint32_t id,
     return thread;
 }
 
+process_thread_t *process_thread_create_user(struct process *process, uint32_t id,
+                                             uint64_t entry, uint64_t user_stack,
+                                             uint64_t kernel_stack_size) {
+    if (!process || id == 0) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&process->lock);
+    if (process->state != PROCESS_READY ||
+        process_thread_lookup_locked(process, id)) {
+        spinlock_unlock_irqrestore(&process->lock, flags);
+        return 0;
+    }
+    process_thread_t *thread = (process_thread_t *)kmalloc(sizeof(*thread));
+    if (!thread) {
+        spinlock_unlock_irqrestore(&process->lock, flags);
+        return 0;
+    }
+    thread->task = task_create_user(id, &process->address_space, entry,
+                                    user_stack, kernel_stack_size);
+    if (!thread->task) {
+        kfree(thread);
+        spinlock_unlock_irqrestore(&process->lock, flags);
+        return 0;
+    }
+    thread->process = process;
+    thread->next = process->threads;
+    thread->references = 1;
+    thread->retained_references = 0;
+    process->threads = thread;
+    ++process->thread_count;
+    spinlock_unlock_irqrestore(&process->lock, flags);
+    return thread;
+}
+
 process_thread_t *process_thread_lookup(const struct process *process,
                                         uint32_t id) {
     if (!process || id == 0) return 0;

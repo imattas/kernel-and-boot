@@ -629,6 +629,9 @@ The task layer now validates an executable entry and writable user stack,
 prepares a kernel context associated with the process address space, and
 provides a deferred privilege-transition bootstrap path; the boot probe creates
 and reclaims this context without starting ring 3.
+Process-thread creation now owns that user context directly, requires a READY
+process, and exercises invalid-entry rejection plus teardown through the normal
+process-thread lifetime path.
 Scheduler current-task, idle-task, preemption, counter, and lifecycle state now
 use an IRQ-safe scheduler lock around shared metadata and queue transitions.
 Scheduler block and wake transitions now hold that lock across wait-queue

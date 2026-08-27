@@ -17,6 +17,9 @@ typedef struct process_thread {
 process_thread_t *process_thread_create(struct process *process, uint32_t id,
                                         void (*entry)(void *), void *argument,
                                         uint64_t stack_size);
+process_thread_t *process_thread_create_user(struct process *process, uint32_t id,
+                                             uint64_t entry, uint64_t user_stack,
+                                             uint64_t kernel_stack_size);
 process_thread_t *process_thread_lookup(const struct process *process,
                                         uint32_t id);
 void process_thread_release(process_thread_t *thread);

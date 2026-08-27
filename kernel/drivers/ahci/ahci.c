@@ -31,7 +31,11 @@
 #define AHCI_SIGNATURE_SATA 0x00000101U
 #define AHCI_IRQ_VECTOR 0x54
 #define AHCI_GHC_IE (1U << 1)
-#define AHCI_PORT_IRQ_MASK 0x0000001fU
+#define AHCI_PORT_IS_ERROR_MASK ((1U << 4) | (1U << 5) | (1U << 7) | \
+                                 (1U << 22) | (1U << 23) | (1U << 24) | \
+                                 (1U << 25) | (1U << 26) | (1U << 27) | \
+                                 (1U << 28) | (1U << 30) | (1U << 31))
+#define AHCI_PORT_IRQ_MASK (0x0000001fU | AHCI_PORT_IS_ERROR_MASK)
 
 extern void arch_ahci_irq_stub(void);
 
@@ -62,6 +66,19 @@ static int ahci_stop_engine(void) {
         __asm__ volatile ("pause" ::: "memory");
     }
     return 0;
+}
+
+static int ahci_command_ok(uint32_t task_file, uint32_t transferred,
+                           uint32_t expected) {
+    uint32_t interrupt_status = active_port[AHCI_PORT_IS / 4];
+    uint32_t serial_error = active_port[AHCI_PORT_SERR / 4];
+    if (interrupt_status & AHCI_PORT_IS_ERROR_MASK)
+        active_port[AHCI_PORT_IS / 4] =
+            interrupt_status & AHCI_PORT_IS_ERROR_MASK;
+    if (serial_error) active_port[AHCI_PORT_SERR / 4] = serial_error;
+    return (task_file & 0x09U) == 0 && transferred == expected &&
+           (interrupt_status & AHCI_PORT_IS_ERROR_MASK) == 0 &&
+           serial_error == 0;
 }
 
 static int ahci_match(const device_t *device) {
@@ -220,8 +237,7 @@ static int ahci_identify_locked(uint16_t *words) {
     for (uint32_t wait = 0; wait < 1000000; ++wait) {
         uint32_t status = active_port[AHCI_PORT_TFD / 4];
         if ((active_port[AHCI_PORT_CI / 4] & 1U) == 0) {
-            completed = (status & 0x01U) == 0 && (status & 0x08U) == 0 &&
-                        header[0].prdbc == 512;
+            completed = ahci_command_ok(status, header[0].prdbc, 512);
             break;
         }
     }
@@ -266,7 +282,7 @@ static int ahci_read_sector_locked(uint64_t lba, void *buffer) {
     for (uint32_t wait = 0; wait < 1000000; ++wait) {
         uint32_t status = active_port[AHCI_PORT_TFD / 4];
         if ((active_port[AHCI_PORT_CI / 4] & 1U) == 0) {
-            completed = (status & 0x09U) == 0 && header[0].prdbc == 512; break;
+            completed = ahci_command_ok(status, header[0].prdbc, 512); break;
         }
     }
     if (completed) {
@@ -314,7 +330,7 @@ static int ahci_write_sector_locked(uint64_t lba, const void *buffer) {
     for (uint32_t wait = 0; wait < 1000000; ++wait) {
         uint32_t status = active_port[AHCI_PORT_TFD / 4];
         if ((active_port[AHCI_PORT_CI / 4] & 1U) == 0) {
-            completed = (status & 0x09U) == 0 && header[0].prdbc == 512; break;
+            completed = ahci_command_ok(status, header[0].prdbc, 512); break;
         }
     }
     if (!completed && !ahci_stop_engine()) return 0;
@@ -369,8 +385,8 @@ static int ahci_io_sectors(uint64_t lba, uint32_t count, void *buffer, int write
     for (uint32_t wait = 0; wait < 1000000; ++wait) {
         uint32_t status = active_port[AHCI_PORT_TFD / 4];
         if ((active_port[AHCI_PORT_CI / 4] & 1U) == 0) {
-            completed = (status & 0x09U) == 0 &&
-                        header[0].prdbc == count * 512U;
+            completed = ahci_command_ok(status, header[0].prdbc,
+                                        count * 512U);
             break;
         }
     }

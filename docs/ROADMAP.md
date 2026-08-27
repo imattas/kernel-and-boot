@@ -324,7 +324,9 @@ MSI/legacy vector, acknowledges port causes in its ISR, and the QEMU gate
 requires post-`sti` disk I/O to observe delivery when routing is enabled.
 AHCI public command paths now serialize command-table/DMA state with an
 IRQ-safe driver lock, preventing concurrent callers from reusing active DMA
-buffers.
+buffers. Command completion now validates task-file, port interrupt, and SATA
+error status; only error causes are cleared during completion so normal
+completion causes remain observable by the IRQ path.
 The scheduler now has an explicit core boundary
 and round-robin policy module. Process pending/blocked signal state and explicit
 termination status are now implemented; signal delivery policy remains bounded

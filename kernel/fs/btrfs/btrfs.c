@@ -87,6 +87,11 @@ static int btrfs_add_chunk(btrfs_fs_t *fs, uint64_t logical, uint64_t length,
     for (uint32_t i = 0; i < fs->chunk_count; ++i)
         if (fs->chunks[i].logical == logical && fs->chunks[i].length == length &&
             fs->chunks[i].physical == physical) return 1;
+    for (uint32_t i = 0; i < fs->chunk_count; ++i) {
+        const btrfs_chunk_t *existing = &fs->chunks[i];
+        if (logical < existing->logical + existing->length &&
+            existing->logical < logical + length) return 0;
+    }
     if (fs->chunk_count >= BTRFS_MAX_SYSTEM_CHUNKS) return 0;
     fs->chunks[fs->chunk_count++] = (btrfs_chunk_t){logical, length, physical};
     return 1;

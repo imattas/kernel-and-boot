@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include "timer.h"
 #include "../interrupts/apic.h"
+#include "../smp/percpu.h"
 #include "../../../core/task/scheduler.h"
 
 static volatile uint64_t ticks;
@@ -8,10 +9,12 @@ static volatile uint64_t ticks;
 #define TIMER_NS_PER_TICK (1000000000ULL / TIMER_FREQUENCY_HZ)
 
 void timer_tick(void) {
-    if (arch_apic_id() == 0) ++ticks;
+    const arch_percpu_t *cpu = arch_percpu_current();
+    if (cpu && cpu->logical_id == 0) ++ticks;
 }
 void arch_scheduler_timer_interrupt(void) {
-    if (arch_apic_id() == 0) scheduler_timer_interrupt();
+    const arch_percpu_t *cpu = arch_percpu_current();
+    if (cpu && cpu->logical_id == 0) scheduler_timer_interrupt();
 }
 uint64_t timer_ticks(void) { return __atomic_load_n(&ticks, __ATOMIC_RELAXED); }
 uint32_t timer_frequency_hz(void) { return TIMER_FREQUENCY_HZ; }

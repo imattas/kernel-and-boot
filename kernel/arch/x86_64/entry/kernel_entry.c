@@ -96,6 +96,7 @@ typedef struct {
     arp_cache_t *arp_cache;
     ipv4_reassembly_table_t *reassembly;
     udp_endpoint_table_t *udp;
+    tcp_endpoint_table_t *tcp;
     uint8_t *local_hardware;
     const uint8_t *local_protocol;
     uint8_t *reassembly_output;
@@ -116,7 +117,7 @@ static void network_runtime_task(void *argument) {
     for (;;) {
         (void)network_service(runtime->queue, runtime->local_hardware,
                               runtime->local_protocol, runtime->arp_cache,
-                              runtime->udp, timer_ticks(), 8,
+                              runtime->udp, runtime->tcp, timer_ticks(), 8,
                               runtime->reassembly, runtime->reassembly_output,
                               IPV4_REASSEMBLY_MAX_PAYLOAD);
         scheduler_yield();
@@ -1305,6 +1306,8 @@ void kernel_main(void *boot_info) {
     network_runtime.arp_cache = &network_service_probe_cache;
     network_runtime.reassembly = &network_reassembly_probe_table;
     network_runtime.udp = &udp_endpoint_probe_table;
+    static tcp_endpoint_table_t network_tcp_runtime_table;
+    network_runtime.tcp = &network_tcp_runtime_table;
     network_runtime.local_hardware = ethernet_probe_source;
     network_runtime.local_protocol = ipv4_probe_destination;
     network_runtime.reassembly_output = network_reassembly_probe_output;
@@ -1312,6 +1315,77 @@ void kernel_main(void *boot_info) {
     arp_cache_initialize(&network_service_probe_cache);
     ipv4_reassembly_initialize(&network_reassembly_probe_table);
     udp_endpoint_table_initialize(&udp_endpoint_probe_table);
+    tcp_endpoint_table_initialize(&network_tcp_runtime_table);
+    tcp_endpoint_handle_t network_tcp_probe_handle = 0;
+    static uint8_t network_tcp_probe_payload[2] = {0x7a, 0x7b};
+    static uint8_t network_tcp_probe_segment[TCP_MAX_PACKET_SIZE];
+    uint16_t network_tcp_probe_segment_length = 0;
+    uint16_t network_tcp_probe_ip_length = 0;
+    uint16_t network_tcp_probe_frame_length = 0;
+    if (!tcp_endpoint_listen(&network_tcp_runtime_table,
+                             ipv4_probe_destination, 6201, 4096,
+                             &network_tcp_probe_handle) ||
+        !tcp_segment_build(network_tcp_probe_segment,
+                           sizeof(network_tcp_probe_segment),
+                           ipv4_probe_source, ipv4_probe_destination, 6200,
+                           6201, 300, 0, TCP_FLAG_SYN, 4096, 0, 0,
+                           &network_tcp_probe_segment_length) ||
+        !ipv4_packet_build(tcp_endpoint_probe_ip, sizeof(tcp_endpoint_probe_ip),
+                           ipv4_probe_source, ipv4_probe_destination, 6, 64,
+                           0x6201, network_tcp_probe_segment,
+                           network_tcp_probe_segment_length,
+                           &network_tcp_probe_ip_length) ||
+        !ethernet_frame_build(tcp_endpoint_probe_frame,
+                              sizeof(tcp_endpoint_probe_frame),
+                              ethernet_probe_destination, ethernet_probe_source,
+                              0x0800, tcp_endpoint_probe_ip,
+                              network_tcp_probe_ip_length,
+                              &network_tcp_probe_frame_length) ||
+        !network_packet_queue_push(&network_service_probe_queue,
+                                   tcp_endpoint_probe_frame,
+                                   network_tcp_probe_frame_length) ||
+        network_service(&network_service_probe_queue, ethernet_probe_source,
+                        ipv4_probe_destination, &network_service_probe_cache,
+                        &udp_endpoint_probe_table, &network_tcp_runtime_table,
+                        3, 4, &network_reassembly_probe_table,
+                        network_reassembly_probe_output,
+                        sizeof(network_reassembly_probe_output)) != 1 ||
+        !tcp_segment_build(network_tcp_probe_segment,
+                           sizeof(network_tcp_probe_segment),
+                           ipv4_probe_source, ipv4_probe_destination, 6200,
+                           6201, 301, 1, TCP_FLAG_ACK, 4096, 0, 0,
+                           &network_tcp_probe_segment_length) ||
+        !ipv4_packet_build(tcp_endpoint_probe_ip, sizeof(tcp_endpoint_probe_ip),
+                           ipv4_probe_source, ipv4_probe_destination, 6, 64,
+                           0x6202, network_tcp_probe_segment,
+                           network_tcp_probe_segment_length,
+                           &network_tcp_probe_ip_length) ||
+        !ethernet_frame_build(tcp_endpoint_probe_frame,
+                              sizeof(tcp_endpoint_probe_frame),
+                              ethernet_probe_destination, ethernet_probe_source,
+                              0x0800, tcp_endpoint_probe_ip,
+                              network_tcp_probe_ip_length,
+                              &network_tcp_probe_frame_length) ||
+        !network_packet_queue_push(&network_service_probe_queue,
+                                   tcp_endpoint_probe_frame,
+                                   network_tcp_probe_frame_length) ||
+        network_service(&network_service_probe_queue, ethernet_probe_source,
+                        ipv4_probe_destination, &network_service_probe_cache,
+                        &udp_endpoint_probe_table, &network_tcp_runtime_table,
+                        4, 4, &network_reassembly_probe_table,
+                        network_reassembly_probe_output,
+                        sizeof(network_reassembly_probe_output)) != 1 ||
+        !tcp_endpoint_send_segment(&network_tcp_runtime_table,
+                                   network_tcp_probe_handle,
+                                   network_tcp_probe_payload,
+                                   sizeof(network_tcp_probe_payload), 0,
+                                   network_tcp_probe_segment,
+                                   sizeof(network_tcp_probe_segment),
+                                   &network_tcp_probe_segment_length)) {
+        serial_write("network TCP service failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("network TCP service ready\r\n");
     if (!udp_endpoint_bind(&udp_endpoint_probe_table, ipv4_probe_destination,
                            6001, &udp_endpoint_any) ||
         !network_packet_queue_push(&network_service_probe_queue,
@@ -1322,7 +1396,8 @@ void kernel_main(void *boot_info) {
     }
     if (network_service(&network_service_probe_queue, ethernet_probe_source,
                         ipv4_probe_destination, &network_service_probe_cache,
-                        &udp_endpoint_probe_table, 1, 4,
+                        &udp_endpoint_probe_table, &network_tcp_runtime_table,
+                        1, 4,
                         &network_reassembly_probe_table,
                         network_reassembly_probe_output,
                         sizeof(network_reassembly_probe_output)) != 1 ||
@@ -1385,7 +1460,8 @@ void kernel_main(void *boot_info) {
                                    fragment_one_frame, fragment_one_frame_length) ||
         network_service(&network_service_probe_queue, ethernet_probe_source,
                         ipv4_probe_destination, &network_service_probe_cache,
-                        &udp_endpoint_probe_table, 2, 4,
+                        &udp_endpoint_probe_table, &network_tcp_runtime_table,
+                        2, 4,
                         &network_reassembly_probe_table,
                         network_reassembly_probe_output,
                         sizeof(network_reassembly_probe_output)) != 2 ||

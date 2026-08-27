@@ -131,7 +131,8 @@ int network_build_arp_reply(const void *frame, uint16_t length,
 uint32_t network_service(network_packet_queue_t *queue,
                          const uint8_t local_hardware[ETHERNET_ADDRESS_SIZE],
                          const uint8_t local_protocol[4], arp_cache_t *cache,
-                         udp_endpoint_table_t *udp_table, uint64_t now,
+                         udp_endpoint_table_t *udp_table,
+                         tcp_endpoint_table_t *tcp_table, uint64_t now,
                          uint32_t budget, ipv4_reassembly_table_t *reassembly,
                          void *reassembly_output,
                          uint16_t reassembly_capacity) {
@@ -173,6 +174,11 @@ uint32_t network_service(network_packet_queue_t *queue,
                                        view.udp.source_port,
                                        view.udp.payload,
                                        view.udp.payload_length);
+        } else if (view.kind == NETWORK_FRAME_TCP && tcp_table) {
+            tcp_connection_result_t tcp_result;
+            (void)tcp_endpoint_deliver(tcp_table, view.ipv4.destination,
+                                       view.ipv4.source, &view.tcp,
+                                       &tcp_result);
         }
         ++serviced;
     }

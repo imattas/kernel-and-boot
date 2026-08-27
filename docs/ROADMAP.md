@@ -459,6 +459,9 @@ the service and verifies endpoint delivery after reassembly.
 The validated network service now runs as a persistent preemptible kernel task
 after boot, keeping e1000 receive polling, protocol dispatch, and reply
 transmission active beyond the initialization probes.
+The persistent network service now dispatches validated TCP frames into the
+kernel TCP endpoint table alongside UDP, with the QEMU service probe covering
+SYN, ACK, and subsequent outbound stream generation through the service queue.
 IPv4 reassembly now has an explicit periodic expiry operation, and the runtime
 network service purges stale incomplete datagrams even when no new fragments
 arrive.

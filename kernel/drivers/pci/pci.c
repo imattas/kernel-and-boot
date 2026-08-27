@@ -1,6 +1,7 @@
 #include "pci.h"
 #include "../../device/device.h"
 #include "../../core/printk/serial.h"
+#include "../../core/sync/spinlock.h"
 #include "../../arch/x86_64/interrupts/apic.h"
 
 #define PCI_CONFIG_ADDRESS 0xcf8
@@ -12,6 +13,7 @@ static uint32_t discovered;
 static uint32_t resources;
 static uint64_t next_mmio_address;
 static volatile uint8_t scanned_buses[256];
+static spinlock_t pci_config_lock;
 
 static void out32(uint16_t port, uint32_t value) {
     __asm__ volatile ("outl %0, %1" :: "a"(value), "Nd"(port));
@@ -25,20 +27,25 @@ static uint32_t in32(uint16_t port) {
 
 static uint32_t config_read(uint8_t bus, uint8_t slot, uint8_t function,
                             uint8_t offset) {
+    uint64_t flags = spinlock_lock_irqsave(&pci_config_lock);
     uint32_t address = 0x80000000u | ((uint32_t)bus << 16) |
                        ((uint32_t)slot << 11) | ((uint32_t)function << 8) |
                        (offset & 0xfcu);
     out32(PCI_CONFIG_ADDRESS, address);
-    return in32(PCI_CONFIG_DATA);
+    uint32_t value = in32(PCI_CONFIG_DATA);
+    spinlock_unlock_irqrestore(&pci_config_lock, flags);
+    return value;
 }
 
 static void config_write(uint8_t bus, uint8_t slot, uint8_t function,
                          uint8_t offset, uint32_t value) {
+    uint64_t flags = spinlock_lock_irqsave(&pci_config_lock);
     uint32_t address = 0x80000000u | ((uint32_t)bus << 16) |
                        ((uint32_t)slot << 11) | ((uint32_t)function << 8) |
                        (offset & 0xfcu);
     out32(PCI_CONFIG_ADDRESS, address);
     out32(PCI_CONFIG_DATA, value);
+    spinlock_unlock_irqrestore(&pci_config_lock, flags);
 }
 
 uint32_t pci_config_read32(uint8_t bus, uint8_t slot, uint8_t function,
@@ -284,6 +291,7 @@ static void scan_bus(uint8_t bus) {
 int pci_initialize(void) {
     discovered = 0;
     resources = 0;
+    spinlock_init(&pci_config_lock);
     next_mmio_address = 0xd0000000ULL;
     for (uint32_t i = 0; i < sizeof(scanned_buses); ++i) scanned_buses[i] = 0;
     scan_bus(0);

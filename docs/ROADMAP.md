@@ -352,6 +352,8 @@ PCI now programs a validated single-entry MSI-X table when available, with
 MSI and ACPI IOAPIC fallback retained for devices without usable MSI-X.
 PCI MSI-X table validation now rejects I/O BARs and uses overflow-safe resource
 offset arithmetic before touching the table entry.
+PCI configuration-port transactions are now serialized with an IRQ-safe lock,
+preventing concurrent SMP probes from interleaving `0xCF8/0xCFC` accesses.
 NVMe namespace I/O now supports bounded multi-sector transfers within one DMA
 page and is covered by a real two-sector write/read-back QEMU check. Admin and
 namespace queue state is serialized with an interrupt-safe lock; timed-out

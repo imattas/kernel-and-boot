@@ -63,6 +63,7 @@ static uint32_t e1000_rx_index;
 static spinlock_t e1000_lock;
 static int e1000_msi_enabled;
 static volatile uint32_t e1000_interrupts;
+static volatile uint32_t e1000_pending_causes;
 
 static int e1000_match(const device_t *device) {
     return device && device->bus == DEVICE_BUS_PCI && device->class_code == 0x02 &&
@@ -138,6 +139,7 @@ int e1000_initialize(void) {
     e1000_tx_pending = 0;
     e1000_msi_enabled = 0;
     e1000_interrupts = 0;
+    e1000_pending_causes = 0;
     spinlock_init(&e1000_lock);
     for (uint32_t i = 0; i < E1000_RING_COUNT; ++i) {
         e1000_rx_buffers[i] = 0;
@@ -156,6 +158,7 @@ uint32_t e1000_interrupt_count(void) { return e1000_interrupts; }
 void e1000_interrupt_handler(void) {
     if (!e1000_regs) return;
     uint32_t causes = e1000_regs[E1000_ICR / 4];
+    __atomic_fetch_or(&e1000_pending_causes, causes, __ATOMIC_RELEASE);
     if ((causes & E1000_INTERRUPT_MASK) != 0) ++e1000_interrupts;
 }
 
@@ -185,7 +188,9 @@ int e1000_transmit(const void *data, uint16_t length) {
 uint32_t e1000_service(void) {
     if (!e1000_regs || !e1000_tx_ring) return 0;
     uint64_t flags = spinlock_lock_irqsave(&e1000_lock);
-    uint32_t causes = e1000_regs[E1000_ICR / 4];
+    uint32_t causes = __atomic_exchange_n(&e1000_pending_causes, 0,
+                                          __ATOMIC_ACQUIRE);
+    causes |= e1000_regs[E1000_ICR / 4];
     while (e1000_tx_pending != 0 &&
            (e1000_tx_ring[e1000_tx_reclaim_index].status & E1000_DESC_DONE) != 0) {
         e1000_tx_reclaim_index =

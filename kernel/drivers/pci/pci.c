@@ -8,6 +8,7 @@
 #define PCI_CONFIG_DATA 0xcfc
 #define PCI_HEADER_TYPE 0x0e
 #define PCI_SECONDARY_BUS 0x19
+#define PCI_SUBORDINATE_BUS 0x1a
 
 static uint32_t discovered;
 static uint32_t resources;
@@ -300,8 +301,14 @@ static void scan_function(uint8_t bus, uint8_t slot, uint8_t function) {
         device.subclass == 0x04u) {
         uint8_t secondary = config_read8(bus, slot, function,
                                          PCI_SECONDARY_BUS);
-        if (secondary != 0 && secondary != 0xff && secondary != bus)
-            scan_bus(secondary);
+        uint8_t subordinate = config_read8(bus, slot, function,
+                                           PCI_SUBORDINATE_BUS);
+        if (secondary != 0 && secondary != 0xff && secondary != bus &&
+            subordinate >= secondary) {
+            for (uint16_t child_bus = secondary; child_bus <= subordinate;
+                 ++child_bus)
+                scan_bus((uint8_t)child_bus);
+        }
     }
 }
 

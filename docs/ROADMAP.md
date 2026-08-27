@@ -993,6 +993,8 @@ sector updates.
 FAT32 mount validation now uses 64-bit geometry arithmetic, verifies the image
 fits its registered block device, and rejects FAT tables too small for the
 published cluster count.
+FAT32 now reads valid FSInfo metadata and keeps its free-cluster count and
+next-free hint synchronized across bounded append allocation and chain release.
 FAT32 FAT-cache and cluster-chain traversal now use a per-filesystem IRQ-safe
 lock, preventing concurrent readers from mixing cached FAT sectors.
 ExFAT mount validation now rejects invalid shift fields before evaluation and

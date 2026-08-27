@@ -61,7 +61,10 @@ int main(void) {
     uint8_t *boot = image;
     store16(boot + 11, 512); boot[13] = 1; store16(boot + 14, FAT_START);
     boot[16] = 1; store32(boot + 32, TOTAL_SECTORS); store32(boot + 36, FAT_SECTORS);
-    store16(boot + 42, 0); store32(boot + 44, 2); boot[510] = 0x55; boot[511] = 0xaa;
+    store16(boot + 42, 0); store32(boot + 44, 2); store16(boot + 48, 1); boot[510] = 0x55; boot[511] = 0xaa;
+    store32(image + 512, 0x41615252); store32(image + 512 + 484, 0x61417272);
+    store32(image + 512 + 488, DATA_CLUSTERS - 6U); store32(image + 512 + 492, 8);
+    store32(image + 512 + 508, 0xaa550000);
     set_fat(0, 0x0ffffff8); set_fat(1, 0x0fffffff); set_fat(2, 0x0fffffff);
     set_fat(3, 4); set_fat(4, 0x0fffffff);
     set_fat(5, 0x0fffffff); set_fat(6, 0x0fffffff); set_fat(7, 0x0fffffff);
@@ -93,6 +96,8 @@ int main(void) {
     const char name[11] = {'C','H','A','I','N',' ',' ',' ','B','I','N'};
     uint32_t cluster, size; uint8_t output[1100]; uint8_t is_directory = 0;
     if (!fat32_mount(&fs, 0)) return fail("mount failed");
+    if (!fs.fsinfo_valid || fs.fsinfo_free_count != DATA_CLUSTERS - 6U ||
+        fs.fsinfo_next_free != 8) return fail("FSInfo mount failed");
     if (!fat32_lookup(&fs, name, &cluster, &size) || cluster != 3 || size != 700)
         return fail("lookup failed");
     if (!fat32_read_file(&fs, name, 0, output, 700) ||
@@ -112,6 +117,7 @@ int main(void) {
         !fat32_read_file(&fs, name, 700, output, sizeof(appended)) ||
         memcmp(output, appended, sizeof(appended)) != 0)
         return fail("append growth failed");
+    if (fs.fsinfo_free_count != DATA_CLUSTERS - 7U) return fail("FSInfo allocation failed");
     vfs_node_t *vfs_root = vfs_node_create("fat", VFS_NODE_DIRECTORY, 0, 0, 0555);
     if (!vfs_root || !fat32_vfs_attach_file(&fs, vfs_root, name, "chain.bin"))
         return fail("VFS attach failed");

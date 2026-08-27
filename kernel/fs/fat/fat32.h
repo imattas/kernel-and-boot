@@ -19,6 +19,10 @@ typedef struct {
     uint32_t root_cluster;
     uint32_t data_clusters;
     uint32_t total_sectors;
+    uint16_t fsinfo_sector;
+    uint32_t fsinfo_free_count;
+    uint32_t fsinfo_next_free;
+    uint8_t fsinfo_valid;
     uint8_t fat_sector[FAT32_SECTOR_SIZE];
     uint32_t fat_sector_number;
     uint8_t fat_sector_valid;

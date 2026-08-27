@@ -9,8 +9,38 @@ static uint32_t load32(const uint8_t *data) {
     return (uint32_t)load16(data) | ((uint32_t)load16(data + 2) << 16);
 }
 
+static void store32(uint8_t *data, uint32_t value) {
+    data[0] = (uint8_t)value; data[1] = (uint8_t)(value >> 8);
+    data[2] = (uint8_t)(value >> 16); data[3] = (uint8_t)(value >> 24);
+}
+
 static int read_sector(uint32_t device, uint32_t sector, void *buffer) {
     return storage_read(device, sector, 1, buffer);
+}
+
+static void fat32_fsinfo_adjust(fat32_fs_t *fs, int32_t delta, uint32_t hint) {
+    if (!fs || !fs->fsinfo_valid) return;
+    uint8_t data[FAT32_SECTOR_SIZE];
+    if (!read_sector(fs->device, fs->fsinfo_sector, data) ||
+        load32(data) != 0x41615252U || load32(&data[484]) != 0x61417272U ||
+        load32(&data[508]) != 0xaa550000U) return;
+    if (delta < 0) {
+        uint32_t amount = (uint32_t)(-delta);
+        if (fs->fsinfo_free_count != 0xffffffffU && fs->fsinfo_free_count >= amount)
+            fs->fsinfo_free_count -= amount;
+        else if (fs->fsinfo_free_count != 0xffffffffU)
+            fs->fsinfo_free_count = 0xffffffffU;
+    } else if (fs->fsinfo_free_count != 0xffffffffU &&
+               fs->fsinfo_free_count <= fs->data_clusters - (uint32_t)delta) {
+        fs->fsinfo_free_count += (uint32_t)delta;
+    } else if (fs->fsinfo_free_count != 0xffffffffU) {
+        fs->fsinfo_free_count = 0xffffffffU;
+    }
+    if (hint >= 2 && hint < fs->data_clusters + 2U)
+        fs->fsinfo_next_free = hint;
+    store32(&data[488], fs->fsinfo_free_count);
+    store32(&data[492], fs->fsinfo_next_free);
+    (void)storage_write(fs->device, fs->fsinfo_sector, 1, data);
 }
 
 static int cluster_valid(const fat32_fs_t *fs, uint32_t cluster) {
@@ -178,6 +208,23 @@ int fat32_mount(fat32_fs_t *fs, uint32_t device) {
     fs->root_cluster = load32(&boot[44]) & 0x0fffffffU;
     fs->total_sectors = total;
     fs->data_clusters = (uint32_t)data_clusters;
+    fs->fsinfo_sector = load16(&boot[48]);
+    fs->fsinfo_free_count = 0xffffffffU;
+    fs->fsinfo_next_free = 0xffffffffU;
+    fs->fsinfo_valid = 0;
+    if (fs->fsinfo_sector != 0 && fs->fsinfo_sector < fs->reserved_sectors) {
+        uint8_t fsinfo[FAT32_SECTOR_SIZE];
+        if (read_sector(device, fs->fsinfo_sector, fsinfo) &&
+            load32(fsinfo) == 0x41615252U && load32(&fsinfo[484]) == 0x61417272U &&
+            load32(&fsinfo[508]) == 0xaa550000U) {
+            fs->fsinfo_free_count = load32(&fsinfo[488]);
+            fs->fsinfo_next_free = load32(&fsinfo[492]);
+            if (fs->fsinfo_free_count == 0xffffffffU ||
+                fs->fsinfo_free_count <= fs->data_clusters) {
+                fs->fsinfo_valid = 1;
+            }
+        }
+    }
     fs->fat_sector_number = 0;
     fs->fat_sector_valid = 0;
     spinlock_init(&fs->fat_lock);
@@ -490,6 +537,7 @@ static void fat32_free_chain(fat32_fs_t *fs, uint32_t first) {
                               hops < fs->data_clusters; ++hops) {
         uint32_t next;
         if (!fat_next(fs, cluster, &next) || !fat_set(fs, cluster, 0)) return;
+        fat32_fsinfo_adjust(fs, 1, cluster + 1U);
         if (next >= 0x0ffffff8U || !cluster_valid(fs, next)) return;
         cluster = next;
     }
@@ -567,6 +615,7 @@ int fat32_append_file_in_directory(fat32_fs_t *fs, uint32_t directory_cluster,
             if (added_first) fat32_free_chain(fs, added_first);
             goto done;
         }
+        fat32_fsinfo_adjust(fs, -1, fresh + 1U);
         if (!added_first) added_first = fresh;
         if (added_last && !fat_set(fs, added_last, fresh)) {
             (void)fat_set(fs, fresh, 0);

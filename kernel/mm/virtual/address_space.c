@@ -126,6 +126,7 @@ static void address_space_rollback_tables(address_space_t *space, uint32_t owned
 static int address_space_create_locked(address_space_t *space) {
     if (!space || space->root != 0) return 0;
     space->owned_count = 0;
+    space->anonymous_count = 0;
     uint64_t root_frame = address_space_allocate_table(space);
     uint64_t pdpt_frame = address_space_allocate_table(space);
     if (!root_frame || !pdpt_frame) {
@@ -152,6 +153,9 @@ static int address_space_activate_locked(const address_space_t *space) {
 static int address_space_destroy_locked(address_space_t *space) {
     if (!space || space->root == 0 || space->root == root || space->root == active_root)
         return 0;
+    for (uint32_t i = space->anonymous_count; i != 0; --i)
+        physical_free_frame(space->anonymous_frames[i - 1].physical_address);
+    space->anonymous_count = 0;
     for (uint32_t i = space->owned_count; i != 0; --i)
         physical_free_frame(space->owned_frames[i - 1]);
     space->owned_count = 0;
@@ -405,6 +409,79 @@ int address_space_unmap_page(address_space_t *space, uint64_t virtual_address) {
     int result = address_space_unmap_page_locked(space, virtual_address);
     spinlock_unlock_irqrestore(&address_space_lock, flags);
     return result;
+}
+
+int address_space_map_anonymous(address_space_t *space, uint64_t virtual_address,
+                                uint32_t pages, uint64_t flags) {
+    if (!space || pages == 0 || pages > ADDRESS_SPACE_MAX_ANONYMOUS_PAGES ||
+        virtual_address > UINT64_MAX - (uint64_t)pages * PAGE_SIZE ||
+        virtual_address < (1ULL << 39) ||
+        virtual_address + (uint64_t)pages * PAGE_SIZE > (1ULL << 48) ||
+        (virtual_address & (PAGE_SIZE - 1)) != 0 ||
+        (flags & ~(ADDRESS_SPACE_WRITABLE | ADDRESS_SPACE_EXECUTABLE)) != 0)
+        return 0;
+    uint64_t lock_flags = spinlock_lock_irqsave(&address_space_lock);
+    if (space->anonymous_count > ADDRESS_SPACE_MAX_ANONYMOUS_PAGES - pages) {
+        spinlock_unlock_irqrestore(&address_space_lock, lock_flags);
+        return 0;
+    }
+    uint32_t mapped = 0;
+    for (; mapped < pages; ++mapped) {
+        uint64_t frame = physical_alloc_frame();
+        uint64_t address = virtual_address + (uint64_t)mapped * PAGE_SIZE;
+        if (!frame || !address_space_map_page_locked(space, address, frame,
+                                                     flags | ADDRESS_SPACE_USER)) {
+            if (frame) physical_free_frame(frame);
+            while (mapped != 0) {
+                --mapped;
+                address = virtual_address + (uint64_t)mapped * PAGE_SIZE;
+                (void)address_space_unmap_page_locked(space, address);
+                physical_free_frame(space->anonymous_frames[space->anonymous_count - 1].physical_address);
+                --space->anonymous_count;
+            }
+            spinlock_unlock_irqrestore(&address_space_lock, lock_flags);
+            return 0;
+        }
+        space->anonymous_frames[space->anonymous_count].virtual_address = address;
+        space->anonymous_frames[space->anonymous_count].physical_address = frame;
+        ++space->anonymous_count;
+    }
+    spinlock_unlock_irqrestore(&address_space_lock, lock_flags);
+    return 1;
+}
+
+int address_space_unmap_anonymous(address_space_t *space, uint64_t virtual_address,
+                                  uint32_t pages) {
+    if (!space || pages == 0 || pages > ADDRESS_SPACE_MAX_ANONYMOUS_PAGES ||
+        virtual_address > UINT64_MAX - (uint64_t)pages * PAGE_SIZE ||
+        (virtual_address & (PAGE_SIZE - 1)) != 0)
+        return 0;
+    uint64_t lock_flags = spinlock_lock_irqsave(&address_space_lock);
+    for (uint32_t page = 0; page < pages; ++page) {
+        uint64_t address = virtual_address + (uint64_t)page * PAGE_SIZE;
+        uint32_t index = 0;
+        while (index < space->anonymous_count &&
+               space->anonymous_frames[index].virtual_address != address) ++index;
+        if (index == space->anonymous_count) {
+            spinlock_unlock_irqrestore(&address_space_lock, lock_flags);
+            return 0;
+        }
+    }
+    for (uint32_t page = 0; page < pages; ++page) {
+        uint64_t address = virtual_address + (uint64_t)page * PAGE_SIZE;
+        uint32_t index = 0;
+        while (space->anonymous_frames[index].virtual_address != address) ++index;
+        uint64_t frame = space->anonymous_frames[index].physical_address;
+        if (!address_space_unmap_page_locked(space, address)) {
+            spinlock_unlock_irqrestore(&address_space_lock, lock_flags);
+            return 0;
+        }
+        space->anonymous_frames[index] =
+            space->anonymous_frames[--space->anonymous_count];
+        physical_free_frame(frame);
+    }
+    spinlock_unlock_irqrestore(&address_space_lock, lock_flags);
+    return 1;
 }
 
 int address_space_page_executable(const address_space_t *space, uint64_t virtual_address) {

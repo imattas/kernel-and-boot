@@ -63,6 +63,7 @@ process_t *process_create(uint64_t id) {
     process->state = PROCESS_NEW;
     process->address_space.root = 0;
     process->address_space.owned_count = 0;
+    process->address_space.anonymous_count = 0;
     process->image.entry = 0;
     process->image.page_count = 0;
     security_context_initialize(&process->security, 1000, 1000, 0);

@@ -181,6 +181,9 @@ probe covers both boundary classes.
 User-copy helpers now hold the address-space lock across validation and byte
 access, preventing a concurrent map update or unmap from invalidating a
 validated syscall buffer before use.
+Bounded anonymous user mappings now allocate zeroed physical frames, track
+ownership in the address space, roll back partial ranges, and expose validated
+map/unmap syscall operations; userland launch remains deferred.
 ELF page mappings now carry the segment write policy, with a controlled flag
 update for shared pages; the QEMU image probe verifies a non-writable code
 page while the process stack remains writable.

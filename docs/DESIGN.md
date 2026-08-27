@@ -159,6 +159,9 @@ structures allocated by the address-space object.
 User-copy operations validate and access mapped ranges while holding the same
 address-space lock used by mapping and unmapping, closing the validation-to-use
 race at the syscall boundary.
+The address-space API also owns bounded anonymous user mappings, records their
+physical frames, rolls back partial allocation, and releases them on explicit
+unmap or address-space destruction.
 The initial user-image loader accepts only validated x86_64 ELF executables,
 reuses pages shared by load segments, rejects malformed ranges, allocates
 zeroed physical pages for PT_LOAD regions, and records executable entry points.

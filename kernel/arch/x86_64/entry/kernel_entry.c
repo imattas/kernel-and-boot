@@ -2736,6 +2736,20 @@ void kernel_main(void *boot_info) {
         serial_write("user process setup failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
+    static const uint64_t anonymous_probe_address = 0x8000100000ULL;
+    if (!address_space_map_anonymous(&runtime_process->address_space,
+                                      anonymous_probe_address, 2,
+                                      ADDRESS_SPACE_WRITABLE) ||
+        !address_space_user_range_valid(&runtime_process->address_space,
+                                        anonymous_probe_address, 2 * 0x1000ULL, 1) ||
+        !address_space_unmap_anonymous(&runtime_process->address_space,
+                                       anonymous_probe_address, 2) ||
+        address_space_user_range_valid(&runtime_process->address_space,
+                                       anonymous_probe_address, 2 * 0x1000ULL, 1)) {
+        serial_write("anonymous memory lifecycle failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("anonymous memory lifecycle ready\r\n");
     process_t *constructed_process = process_create_user(
         7, user_image_probe, sizeof(user_image_probe), 0x8000010000ULL,
         70, 4096);

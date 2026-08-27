@@ -361,6 +361,54 @@ static int fat32_write_file_unlocked(fat32_fs_t *fs, const char short_name[11],
     return remaining == 0;
 }
 
+int fat32_write_file_in_directory(fat32_fs_t *fs, uint32_t directory_cluster,
+                                  const char short_name[11], uint32_t offset,
+                                  const void *buffer, uint32_t size) {
+    uint32_t cluster = 0, file_size = 0; uint8_t is_directory = 0;
+    if (!fs || !fs->mounted || !buffer || size == 0 ||
+        !fat32_lookup_in_directory(fs, directory_cluster, short_name, &cluster,
+                                   &file_size, &is_directory) || is_directory ||
+        offset > file_size || size > file_size - offset) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&fs->write_lock);
+    uint32_t cluster_size = fs->sectors_per_cluster * FAT32_SECTOR_SIZE;
+    uint32_t skip = offset / cluster_size, inside = offset % cluster_size;
+    for (uint32_t i = 0; i < skip; ++i) {
+        uint32_t next;
+        if (!fat_next(fs, cluster, &next) || next >= 0x0ffffff8U ||
+            !cluster_valid(fs, next)) {
+            spinlock_unlock_irqrestore(&fs->write_lock, flags);
+            return 0;
+        }
+        cluster = next;
+    }
+    const uint8_t *input = (const uint8_t *)buffer;
+    uint8_t sector_data[FAT32_SECTOR_SIZE];
+    uint32_t remaining = size;
+    for (uint32_t hops = 0; remaining != 0 && hops < fs->data_clusters; ++hops) {
+        uint64_t sector = (uint64_t)fs->data_start +
+                          (uint64_t)(cluster - 2U) * fs->sectors_per_cluster +
+                          inside / FAT32_SECTOR_SIZE;
+        uint32_t sector_offset = inside % FAT32_SECTOR_SIZE;
+        uint32_t copy = FAT32_SECTOR_SIZE - sector_offset;
+        if (copy > remaining) copy = remaining;
+        if (sector > UINT32_MAX || !read_sector(fs->device, (uint32_t)sector,
+                                                sector_data)) break;
+        for (uint32_t i = 0; i < copy; ++i)
+            sector_data[sector_offset + i] = input[i];
+        if (!storage_write(fs->device, (uint32_t)sector, 1, sector_data)) break;
+        input += copy; remaining -= copy; inside += copy;
+        if (remaining != 0 && inside == cluster_size) {
+            uint32_t next;
+            if (!fat_next(fs, cluster, &next) || next >= 0x0ffffff8U ||
+                !cluster_valid(fs, next)) break;
+            cluster = next; inside = 0;
+        }
+    }
+    int result = remaining == 0;
+    spinlock_unlock_irqrestore(&fs->write_lock, flags);
+    return result;
+}
+
 int fat32_write_file(fat32_fs_t *fs, const char short_name[11],
                      uint32_t offset, const void *buffer, uint32_t size) {
     if (!fs) return 0;

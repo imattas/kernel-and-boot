@@ -13,6 +13,8 @@
 #define BTRFS_EXTENT_CSUM_TYPE 128U
 #define BTRFS_CSUM_TREE_OBJECTID 7ULL
 #define BTRFS_BLOCK_GROUP_RAID0 8ULL
+#define BTRFS_BLOCK_GROUP_RAID1 2ULL
+#define BTRFS_BLOCK_GROUP_DUP 16ULL
 #define BTRFS_BLOCK_GROUP_RAID10 64ULL
 #define BTRFS_BLOCK_GROUP_RAID5 128ULL
 #define BTRFS_BLOCK_GROUP_RAID6 256ULL
@@ -29,15 +31,19 @@ static uint64_t le64(const uint8_t *p) {
 }
 
 static int btrfs_map_at(const btrfs_fs_t *fs, uint64_t logical, uint32_t bytes,
-                        uint8_t mirror, uint64_t *physical) {
-    if (!fs || !physical || !bytes) return 0;
+                        uint8_t mirror, uint32_t *device, uint64_t *physical) {
+    if (!fs || !device || !physical || !bytes) return 0;
     for (uint32_t i = 0; i < fs->chunk_count; ++i) {
         const btrfs_chunk_t *chunk = &fs->chunks[i];
         if (logical >= chunk->logical && logical - chunk->logical <= chunk->length &&
             bytes <= chunk->length - (logical - chunk->logical)) {
             uint64_t delta = logical - chunk->logical;
-            uint64_t base = mirror && chunk->mirror_physical ? chunk->mirror_physical : chunk->physical;
+            uint32_t mapped_device = mirror && chunk->mirror_physical ?
+                                     chunk->mirror_device : chunk->device;
+            uint64_t base = mirror && chunk->mirror_physical ?
+                            chunk->mirror_physical : chunk->physical;
             if (base > UINT64_MAX - delta) return 0;
+            *device = mapped_device;
             *physical = base + delta;
             return 1;
         }
@@ -46,8 +52,8 @@ static int btrfs_map_at(const btrfs_fs_t *fs, uint64_t logical, uint32_t bytes,
 }
 
 static int btrfs_map(const btrfs_fs_t *fs, uint64_t logical, uint32_t bytes,
-                     uint64_t *physical) {
-    return btrfs_map_at(fs, logical, bytes, 0, physical);
+                     uint32_t *device, uint64_t *physical) {
+    return btrfs_map_at(fs, logical, bytes, 0, device, physical);
 }
 
 static uint32_t crc32c(const uint8_t *data, uint32_t length) {
@@ -58,6 +64,38 @@ static uint32_t crc32c(const uint8_t *data, uint32_t length) {
             crc = (crc >> 1) ^ (0x82f63b78U & (uint32_t)-(int32_t)(crc & 1U));
     }
     return ~crc;
+}
+
+static int btrfs_register_device(btrfs_fs_t *fs, uint64_t devid, uint32_t device) {
+    for (uint32_t i = 0; i < fs->device_count; ++i)
+        if (fs->devices[i].devid == devid) return fs->devices[i].storage_device == device;
+    if (fs->device_count >= BTRFS_MAX_DEVICES) return 0;
+    fs->devices[fs->device_count++] = (btrfs_device_t){devid, device};
+    return 1;
+}
+
+static int btrfs_resolve_device(btrfs_fs_t *fs, uint64_t devid, uint32_t *device) {
+    if (!fs || !device) return 0;
+    for (uint32_t i = 0; i < fs->device_count; ++i)
+        if (fs->devices[i].devid == devid) { *device = fs->devices[i].storage_device; return 1; }
+    uint8_t sb[4096];
+    for (uint32_t candidate = 0; candidate < storage_device_count(); ++candidate) {
+        const storage_device_t *storage = storage_device_at(candidate);
+        if (!storage || candidate == fs->device || storage->block_size != BTRFS_SECTOR_SIZE ||
+            storage->block_count < 136U || !storage_read(candidate, BTRFS_SUPERBLOCK_SECTOR, 8, sb) ||
+            le64(&sb[0x40]) != 0x4d5f53665248425fULL || le64(&sb[0x100]) != devid)
+            continue;
+        uint8_t same_fsid = 1;
+        for (uint32_t i = 0; i < sizeof(fs->fsid); ++i)
+            if (sb[0x20 + i] != fs->fsid[i]) same_fsid = 0;
+        uint32_t checksum = le32(sb);
+        sb[0] = sb[1] = sb[2] = sb[3] = 0;
+        if (!same_fsid || crc32c(&sb[32], sizeof(sb) - 32U) != checksum) continue;
+        if (!btrfs_register_device(fs, devid, candidate)) return 0;
+        *device = candidate;
+        return 1;
+    }
+    return 0;
 }
 
 static uint32_t name_hash(const char *name, uint32_t length) {
@@ -71,12 +109,12 @@ static uint32_t name_hash(const char *name, uint32_t length) {
 }
 
 static int btrfs_read_node(const btrfs_fs_t *fs, uint64_t bytenr, uint8_t *node) {
-    uint64_t physical;
+    uint32_t device; uint64_t physical;
     if (!fs || !fs->mounted || !node || bytenr % fs->sector_size != 0 ||
         bytenr > fs->total_bytes - fs->node_size ||
         fs->node_size / BTRFS_SECTOR_SIZE == 0 ||
-        !btrfs_map(fs, bytenr, fs->node_size, &physical)) return 0;
-    uint8_t primary_read = storage_read(fs->device, physical / BTRFS_SECTOR_SIZE,
+        !btrfs_map(fs, bytenr, fs->node_size, &device, &physical)) return 0;
+    uint8_t primary_read = storage_read(device, physical / BTRFS_SECTOR_SIZE,
                                         fs->node_size / BTRFS_SECTOR_SIZE, node);
     uint32_t checksum = 0; uint8_t valid = 0;
     if (primary_read) {
@@ -87,9 +125,9 @@ static int btrfs_read_node(const btrfs_fs_t *fs, uint64_t bytenr, uint8_t *node)
         if (le64(&node[48]) != bytenr || node[100] > 8) valid = 0;
     }
     if (valid) return 1;
-    if (!btrfs_map_at(fs, bytenr, fs->node_size, 1, &physical) ||
+    if (!btrfs_map_at(fs, bytenr, fs->node_size, 1, &device, &physical) ||
         physical % BTRFS_SECTOR_SIZE != 0 ||
-        !storage_read(fs->device, physical / BTRFS_SECTOR_SIZE,
+        !storage_read(device, physical / BTRFS_SECTOR_SIZE,
                       fs->node_size / BTRFS_SECTOR_SIZE, node)) return 0;
     checksum = le32(node); node[0] = node[1] = node[2] = node[3] = 0;
     if (crc32c(&node[32], fs->node_size - 32U) != checksum) return 0;
@@ -99,13 +137,23 @@ static int btrfs_read_node(const btrfs_fs_t *fs, uint64_t bytenr, uint8_t *node)
 }
 
 static int btrfs_add_chunk(btrfs_fs_t *fs, uint64_t logical, uint64_t length,
+                           uint64_t devid, uint64_t mirror_devid,
                            uint64_t physical, uint64_t mirror_physical) {
-    if (!length || logical > fs->total_bytes - length ||
-        physical > storage_device_at(fs->device)->block_count * (uint64_t)BTRFS_SECTOR_SIZE - length)
+    uint32_t device = 0, mirror_device = 0;
+    if (!btrfs_resolve_device(fs, devid, &device) ||
+        (mirror_physical && !btrfs_resolve_device(fs, mirror_devid, &mirror_device))) return 0;
+    const storage_device_t *primary = storage_device_at(device);
+    const storage_device_t *mirror = mirror_physical ? storage_device_at(mirror_device) : 0;
+    if (!length || length > fs->total_bytes || logical > fs->total_bytes - length ||
+        !primary || length > primary->block_count * (uint64_t)BTRFS_SECTOR_SIZE ||
+        physical > primary->block_count * (uint64_t)BTRFS_SECTOR_SIZE - length ||
+        (mirror_physical && (!mirror || length > mirror->block_count *
+         (uint64_t)BTRFS_SECTOR_SIZE || mirror_physical > mirror->block_count *
+         (uint64_t)BTRFS_SECTOR_SIZE - length)))
         return 0;
     for (uint32_t i = 0; i < fs->chunk_count; ++i)
         if (fs->chunks[i].logical == logical && fs->chunks[i].length == length &&
-            fs->chunks[i].physical == physical &&
+            fs->chunks[i].device == device && fs->chunks[i].physical == physical &&
             fs->chunks[i].mirror_physical == mirror_physical) return 1;
     for (uint32_t i = 0; i < fs->chunk_count; ++i) {
         const btrfs_chunk_t *existing = &fs->chunks[i];
@@ -113,23 +161,30 @@ static int btrfs_add_chunk(btrfs_fs_t *fs, uint64_t logical, uint64_t length,
             existing->logical < logical + length) return 0;
     }
     if (fs->chunk_count >= BTRFS_MAX_SYSTEM_CHUNKS) return 0;
-    fs->chunks[fs->chunk_count++] = (btrfs_chunk_t){logical, length, physical, mirror_physical};
+    fs->chunks[fs->chunk_count++] =
+        (btrfs_chunk_t){logical, length, device, mirror_physical ? mirror_device : 0,
+                        physical, mirror_physical};
     return 1;
 }
 
 static int btrfs_chunk_first_stripe(const uint8_t *chunk, uint16_t stripes,
+                                    uint64_t *devid, uint64_t *mirror_devid,
                                     uint64_t *physical, uint64_t *mirror_physical) {
-    if (!chunk || !physical || !mirror_physical || !stripes) return 0;
+    if (!chunk || !devid || !mirror_devid || !physical || !mirror_physical || !stripes) return 0;
     uint64_t flags = le64(&chunk[24]);
     if (
         (flags & (BTRFS_BLOCK_GROUP_RAID0 | BTRFS_BLOCK_GROUP_RAID10 |
                   BTRFS_BLOCK_GROUP_RAID5 | BTRFS_BLOCK_GROUP_RAID6 |
                   BTRFS_BLOCK_GROUP_RAID1C3 | BTRFS_BLOCK_GROUP_RAID1C4)) != 0)
         return 0;
-    uint64_t devid = le64(&chunk[48]);
-    for (uint16_t i = 1; i < stripes; ++i)
-        if (le64(&chunk[48U + i * 32U]) != devid) return 0;
+    if (stripes > 1 && (flags & (BTRFS_BLOCK_GROUP_RAID1 | BTRFS_BLOCK_GROUP_DUP)) == 0)
+        return 0;
+    *devid = le64(&chunk[48]);
+    if (*devid == 0) *devid = 1;
+    if (stripes > 2) return 0;
     *physical = le64(&chunk[56]);
+    *mirror_devid = stripes > 1 ? le64(&chunk[80]) : 0;
+    if (*mirror_devid == 0) *mirror_devid = *devid;
     *mirror_physical = stripes > 1 ? le64(&chunk[88]) : 0;
     return 1;
 }
@@ -148,10 +203,12 @@ static int btrfs_collect_chunks(btrfs_fs_t *fs, uint64_t bytenr, uint8_t depth) 
             const uint8_t *chunk = &node[offset];
             uint64_t length = le64(chunk);
             uint16_t stripes = le16(&chunk[44]);
-            uint64_t physical = 0, mirror_physical = 0;
-            if (!btrfs_chunk_first_stripe(chunk, stripes, &physical, &mirror_physical) ||
+            uint64_t devid = 0, mirror_devid = 0, physical = 0, mirror_physical = 0;
+            if (!btrfs_chunk_first_stripe(chunk, stripes, &devid, &mirror_devid,
+                                          &physical, &mirror_physical) ||
                 size < 48U + (uint32_t)stripes * 32U ||
-                !btrfs_add_chunk(fs, le64(&item[9]), length, physical, mirror_physical)) return 0;
+                !btrfs_add_chunk(fs, le64(&item[9]), length, devid, mirror_devid,
+                                 physical, mirror_physical)) return 0;
         }
         return 1;
     }
@@ -203,8 +260,11 @@ int btrfs_mount(btrfs_fs_t *fs, uint32_t device) {
         (root % sector_size) != 0 || (chunk_root % sector_size) != 0) return 0;
     fs->device = device; fs->sector_size = sector_size; fs->node_size = node_size;
     fs->total_bytes = total_bytes; fs->root_bytenr = root; fs->chunk_count = 0;
-    fs->chunk_root_bytenr = chunk_root; fs->mounted = 1;
+    fs->chunk_root_bytenr = chunk_root; fs->mounted = 1; fs->device_count = 0;
     for (uint32_t i = 0; i < sizeof(fs->fsid); ++i) fs->fsid[i] = sb[0x20 + i];
+    fs->primary_devid = le64(&sb[0x100]);
+    if (fs->primary_devid == 0) fs->primary_devid = 1;
+    if (!btrfs_register_device(fs, fs->primary_devid, device)) { fs->mounted = 0; return 0; }
     uint32_t array_size = le32(&sb[0xa0]);
     uint32_t position = 0;
     if (array_size > 2048U || 0x2c0U + array_size > sizeof(sb)) { fs->mounted = 0; return 0; }
@@ -213,16 +273,18 @@ int btrfs_mount(btrfs_fs_t *fs, uint32_t device) {
         uint64_t logical = le64(&key[9]);
         uint64_t length = le64(&key[17]);
         uint32_t num_stripes = le16(&key[17 + 44]);
-        uint64_t physical = 0, mirror_physical = 0;
+        uint64_t devid = 0, mirror_devid = 0, physical = 0, mirror_physical = 0;
         if (le64(key) != 1 || key[8] != BTRFS_CHUNK_ITEM_TYPE || !length || !num_stripes ||
             fs->chunk_count >= BTRFS_MAX_SYSTEM_CHUNKS || logical > total_bytes - length) {
             fs->mounted = 0; return 0;
         }
         if (position + 17U + 44U + num_stripes * 32U > array_size ||
-            !btrfs_chunk_first_stripe(&key[17], num_stripes, &physical, &mirror_physical)) {
+            !btrfs_chunk_first_stripe(&key[17], num_stripes, &devid, &mirror_devid,
+                                      &physical, &mirror_physical)) {
             fs->mounted = 0; return 0;
         }
-        if (!btrfs_add_chunk(fs, logical, length, physical, mirror_physical)) { fs->mounted = 0; return 0; }
+        if (!btrfs_add_chunk(fs, logical, length, devid, mirror_devid,
+                             physical, mirror_physical)) { fs->mounted = 0; return 0; }
         position += 17U + 44U + num_stripes * 32U;
     }
     if (position != array_size || fs->chunk_count == 0 ||
@@ -414,17 +476,17 @@ int btrfs_read_extent_data(btrfs_fs_t *fs, uint64_t tree_bytenr, uint64_t inode,
     uint64_t sector_logical = logical - logical % fs->sector_size;
     uint32_t in_sector = (uint32_t)(logical - sector_logical);
     uint32_t transfer = in_sector + size;
-    uint64_t physical = 0;
+    uint32_t device = 0; uint64_t physical = 0;
     uint32_t covered = (transfer + fs->sector_size - 1U) / fs->sector_size * fs->sector_size;
     if (transfer < size || covered < transfer || covered > sizeof(data) ||
-        !btrfs_map(fs, sector_logical, covered, &physical) ||
+        !btrfs_map(fs, sector_logical, covered, &device, &physical) ||
         physical % BTRFS_SECTOR_SIZE != 0) return 0;
-    uint8_t read_ok = storage_read(fs->device, physical / BTRFS_SECTOR_SIZE,
+    uint8_t read_ok = storage_read(device, physical / BTRFS_SECTOR_SIZE,
                                    covered / BTRFS_SECTOR_SIZE, data);
     if (!read_ok || !btrfs_validate_data(fs, sector_logical, data, covered)) {
-        if (!btrfs_map_at(fs, sector_logical, covered, 1, &physical) ||
+        if (!btrfs_map_at(fs, sector_logical, covered, 1, &device, &physical) ||
             physical % BTRFS_SECTOR_SIZE != 0 ||
-            !storage_read(fs->device, physical / BTRFS_SECTOR_SIZE,
+            !storage_read(device, physical / BTRFS_SECTOR_SIZE,
                           covered / BTRFS_SECTOR_SIZE, data) ||
             !btrfs_validate_data(fs, sector_logical, data, covered)) return 0;
     }

@@ -2,13 +2,21 @@
 #define OS_KERNEL_FS_BTRFS_H
 #include <stdint.h>
 #define BTRFS_MAX_SYSTEM_CHUNKS 64U
+#define BTRFS_MAX_DEVICES 8U
 
 typedef struct {
     uint64_t logical;
     uint64_t length;
+    uint32_t device;
+    uint32_t mirror_device;
     uint64_t physical;
     uint64_t mirror_physical;
 } btrfs_chunk_t;
+
+typedef struct {
+    uint64_t devid;
+    uint32_t storage_device;
+} btrfs_device_t;
 
 typedef struct {
     uint32_t device;
@@ -20,6 +28,9 @@ typedef struct {
     uint64_t fs_root_bytenr;
     uint64_t csum_root_bytenr;
     uint8_t fsid[16];
+    uint64_t primary_devid;
+    btrfs_device_t devices[BTRFS_MAX_DEVICES];
+    uint32_t device_count;
     btrfs_chunk_t chunks[BTRFS_MAX_SYSTEM_CHUNKS];
     uint32_t chunk_count;
     uint8_t mounted;

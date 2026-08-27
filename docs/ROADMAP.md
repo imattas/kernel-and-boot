@@ -1039,6 +1039,9 @@ extent and verifies both neighboring ranges remain zero-filled.
 XFS extent-backed truncation now zeroes the retained tail of the final data
 block, and growth validation searches the complete extent list rather than
 only the first record.
+XFS local-format directories now support bounded persistent entry insertion
+and removal while preserving the inline directory record layout; AG free-space
+allocation remains the next XFS metadata milestone.
 Btrfs regular-file truncation now accepts zero-length targets, updating the
 inode item through the checksum-protected tree-node path.
 Btrfs inline extents now support bounded growth when the leaf node has

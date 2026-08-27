@@ -21,6 +21,10 @@ int xfs_inode_size(xfs_fs_t *fs, uint64_t inode, uint64_t *size);
 int xfs_set_mode(xfs_fs_t *fs, uint64_t inode, uint16_t mode);
 int xfs_lookup(xfs_fs_t *fs, uint64_t directory_inode, const char *name,
                uint64_t *inode);
+int xfs_add_local_entry(xfs_fs_t *fs, uint64_t directory_inode,
+                        const char *name, uint64_t child_inode);
+int xfs_remove_local_entry(xfs_fs_t *fs, uint64_t directory_inode,
+                           const char *name);
 int xfs_read_file(xfs_fs_t *fs, uint64_t inode, uint64_t offset,
                   void *buffer, uint32_t size);
 int xfs_write_file(xfs_fs_t *fs, uint64_t inode, uint64_t offset,

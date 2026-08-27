@@ -718,6 +718,9 @@ payload would wrap configuration space, and MSI-X rejects table addresses that
 would leave the below-4-GiB identity-mapped MMIO window.
 PCI capability walking now rejects malformed, unaligned, and out-of-range next
 links instead of silently masking them into a different configuration offset.
+PCI MSI-X setup now validates the complete advertised table extent within its
+claimed BAR before enabling the vector, preventing a truncated table from
+being treated as a usable interrupt configuration.
 PCI configuration-port transactions are now serialized with an IRQ-safe lock,
 preventing concurrent SMP probes from interleaving `0xCF8/0xCFC` accesses.
 PCI enumeration now verifies that memory space, I/O space, and bus mastering

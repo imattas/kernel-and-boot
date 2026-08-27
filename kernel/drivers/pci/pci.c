@@ -105,19 +105,34 @@ int pci_enable_msix(const device_t *device, uint8_t vector) {
                                                  (uint8_t)(capability + 2));
             uint16_t control = (uint16_t)(control_word >> 16);
             uint32_t table_entries = (control & 0x07ffU) + 1U;
+            uint64_t table_bytes = (uint64_t)table_entries * 16U;
             uint32_t table = config_read(device->bus_number, device->slot,
                                          device->function,
                                          (uint8_t)(capability + 4));
+            uint32_t pba = config_read(device->bus_number, device->slot,
+                                       device->function,
+                                       (uint8_t)(capability + 8));
             uint32_t bir = table & 7U;
             uint64_t offset = table & ~7U;
+            uint32_t pba_bir = pba & 7U;
+            uint64_t pba_offset = pba & ~7U;
+            uint64_t pba_bytes = ((uint64_t)table_entries + 63U) / 64U * 8U;
             if (table_entries == 0 || bir >= 6 ||
                 (device->resources[bir].flags & 1U) != 0 ||
                 offset > device->resources[bir].size ||
-                device->resources[bir].size - offset < 16U ||
+                table_bytes > device->resources[bir].size - offset ||
+                pba_bir >= 6 || (device->resources[pba_bir].flags & 1U) != 0 ||
+                pba_offset > device->resources[pba_bir].size ||
+                pba_bytes > device->resources[pba_bir].size - pba_offset ||
                 device->resources[bir].address == 0 ||
                 device->resources[bir].address >= 0x100000000ULL ||
                 offset > UINT64_MAX - device->resources[bir].address ||
-                device->resources[bir].address + offset >= 0x100000000ULL) return 0;
+                device->resources[bir].address + offset >= 0x100000000ULL ||
+                device->resources[pba_bir].address == 0 ||
+                device->resources[pba_bir].address >= 0x100000000ULL ||
+                pba_offset > UINT64_MAX - device->resources[pba_bir].address ||
+                device->resources[pba_bir].address + pba_offset >= 0x100000000ULL)
+                return 0;
             volatile uint32_t *entry = (volatile uint32_t *)(uintptr_t)
                 (device->resources[bir].address + offset);
             uint16_t masked_control = (uint16_t)(control | (1U << 14));

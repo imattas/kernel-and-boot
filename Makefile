@@ -230,6 +230,7 @@ KERNEL_EXT4_VFS_OBJ := $(BUILD_DIR)/kernel/ext4_vfs.o
 KERNEL_XFS_OBJ := $(BUILD_DIR)/kernel/xfs.o
 KERNEL_XFS_VFS_OBJ := $(BUILD_DIR)/kernel/xfs_vfs.o
 KERNEL_BTRFS_OBJ := $(BUILD_DIR)/kernel/btrfs.o
+KERNEL_BTRFS_VFS_OBJ := $(BUILD_DIR)/kernel/btrfs_vfs.o
 KERNEL_INPUT_OBJ := $(BUILD_DIR)/kernel/input.o
 KERNEL_PS2_OBJ := $(BUILD_DIR)/kernel/ps2.o
 KERNEL_FRAMEBUFFER_OBJ := $(BUILD_DIR)/kernel/framebuffer.o
@@ -238,7 +239,7 @@ KERNEL_UHCI_OBJ := $(BUILD_DIR)/kernel/uhci.o
 KERNEL_AHCI_OBJ := $(BUILD_DIR)/kernel/ahci.o
 KERNEL_NVME_OBJ := $(BUILD_DIR)/kernel/nvme.o
 KERNEL_E1000_OBJ := $(BUILD_DIR)/kernel/e1000.o
-KERNEL_NVME_OBJ := $(KERNEL_NVME_OBJ) $(KERNEL_E1000_OBJ) $(KERNEL_EXFAT_VFS_OBJ) $(KERNEL_EXT4_OBJ) $(KERNEL_EXT4_VFS_OBJ) $(KERNEL_XFS_OBJ) $(KERNEL_XFS_VFS_OBJ) $(KERNEL_BTRFS_OBJ)
+KERNEL_NVME_OBJ := $(KERNEL_NVME_OBJ) $(KERNEL_E1000_OBJ) $(KERNEL_EXFAT_VFS_OBJ) $(KERNEL_EXT4_OBJ) $(KERNEL_EXT4_VFS_OBJ) $(KERNEL_XFS_OBJ) $(KERNEL_XFS_VFS_OBJ) $(KERNEL_BTRFS_OBJ) $(KERNEL_BTRFS_VFS_OBJ)
 KERNEL_DEBUG_OBJ := $(BUILD_DIR)/kernel/debug_assert.o
 KERNEL_CLOCK_OBJ := $(BUILD_DIR)/kernel/clock.o
 
@@ -323,6 +324,10 @@ $(KERNEL_XFS_VFS_OBJ): kernel/fs/xfs/xfs_vfs.c kernel/fs/xfs/xfs_vfs.h kernel/fs
 		-mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@
 
 $(KERNEL_BTRFS_OBJ): kernel/fs/btrfs/btrfs.c kernel/fs/btrfs/btrfs.h kernel/drivers/storage/storage.h | $(BUILD_DIR)/kernel
+	$(CC) -target x86_64-pc-none-elf -std=c11 -ffreestanding -fno-builtin -fno-stack-protector -fPIE -fno-plt \
+		-mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@
+
+$(KERNEL_BTRFS_VFS_OBJ): kernel/fs/btrfs/btrfs_vfs.c kernel/fs/btrfs/btrfs_vfs.h kernel/fs/btrfs/btrfs.h kernel/fs/vfs/vfs.h kernel/mm/heap/heap.h | $(BUILD_DIR)/kernel
 	$(CC) -target x86_64-pc-none-elf -std=c11 -ffreestanding -fno-builtin -fno-stack-protector -fPIE -fno-plt \
 		-mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@
 

@@ -306,6 +306,7 @@ now decodes bounded inline and uncompressed regular EXTENT_DATA records,
 extracts inode metadata, and reads mapped data. Compressed, encrypted, and
 multi-extent file reads remain before the filesystem milestone is complete.
 Btrfs now performs hashed DIR_ITEM lookup with variable-length entry checks;
+its multi-extent read path is integrated into a read-only VFS file adapter.
 complete file-read support must be completed before the driver phase resumes; a
 format is not considered complete merely because its superblock is recognized.
 

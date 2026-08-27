@@ -1083,6 +1083,9 @@ non-periodic scheduling changes are isolated from HID interrupt transfers.
 USB endpoint descriptor validation now rejects packet sizes that UHCI cannot
 represent and rejects nonstandard full-speed bulk packet sizes before endpoint
 metadata reaches a transfer driver.
+NVMe interrupt completion state is now published with atomic ordering, and
+interrupt accounting no longer races with SMP readers; command waiters clear
+the pending completion marker when consuming a CQ entry.
 The UEFI memory-map capture now rejects malformed successful firmware results
 unless descriptor size and map length satisfy the boot contract, and bounds
 replacement-map publication to the allocated buffer.

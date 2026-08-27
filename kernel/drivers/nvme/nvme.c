@@ -45,6 +45,7 @@ static spinlock_t nvme_lock;
 static device_driver_t nvme_driver;
 static int nvme_irq_enabled;
 static volatile uint32_t nvme_interrupts;
+static volatile uint32_t nvme_completion_pending;
 static int nvme_disabled;
 static uint64_t nvme_quarantined_prp;
 static uint64_t nvme_quarantined_prp_list;
@@ -196,7 +197,8 @@ typedef struct {
 
 void nvme_interrupt_handler(void) {
     if (!active_regs || nvme_disabled) return;
-    ++nvme_interrupts;
+    __atomic_fetch_add(&nvme_interrupts, 1U, __ATOMIC_RELAXED);
+    __atomic_store_n(&nvme_completion_pending, 1U, __ATOMIC_RELEASE);
 }
 
 static int nvme_submit_admin_words(uint8_t opcode, uint32_t namespace_id,
@@ -227,6 +229,7 @@ static int nvme_submit_admin_words(uint8_t opcode, uint32_t namespace_id,
         if ((status & 1U) != active_cq_phase) continue;
         if (completion->command_id != command_id) continue;
         *result = completion->result;
+        __atomic_store_n(&nvme_completion_pending, 0U, __ATOMIC_RELEASE);
         int success = (status >> 1) == 0;
         ++active_cq_head;
         if (active_cq_head == active_queue_entries) {
@@ -383,6 +386,7 @@ static int nvme_io(uint64_t lba, void *buffer, uint32_t count, int write) {
         if ((status & 1U) != active_io_cq_phase ||
             completion->command_id != command_id) continue;
         success = (status >> 1) == 0;
+        __atomic_store_n(&nvme_completion_pending, 0U, __ATOMIC_RELEASE);
         completed = 1;
         ++active_io_cq_head;
         if (active_io_cq_head == active_queue_entries) {
@@ -453,6 +457,7 @@ static int nvme_flush(void) {
         if ((status & 1U) != active_io_cq_phase ||
             completion->command_id != command_id) continue;
         success = (status >> 1) == 0;
+        __atomic_store_n(&nvme_completion_pending, 0U, __ATOMIC_RELEASE);
         completed = 1;
         ++active_io_cq_head;
         if (active_io_cq_head == active_queue_entries) {
@@ -496,6 +501,7 @@ int nvme_initialize(void) {
     active_queue_entries = 0;
     nvme_irq_enabled = 0;
     nvme_interrupts = 0;
+    nvme_completion_pending = 0;
     nvme_disabled = 0;
     nvme_quarantined_prp = 0;
     active_namespace_sectors = 0;

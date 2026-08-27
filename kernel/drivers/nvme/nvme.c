@@ -25,6 +25,14 @@
 
 extern void arch_nvme_irq_stub(void);
 
+static void nvme_dma_write_barrier(void) {
+    __asm__ volatile ("sfence" ::: "memory");
+}
+
+static void nvme_dma_read_barrier(void) {
+    __asm__ volatile ("lfence" ::: "memory");
+}
+
 static uint32_t controllers;
 static volatile uint32_t *active_regs;
 static uint64_t active_asq;
@@ -282,8 +290,10 @@ static int nvme_submit_admin_words(uint8_t opcode, uint32_t namespace_id,
     active_sq_tail = (uint16_t)((active_sq_tail + 1U) % active_queue_entries);
     volatile uint32_t *sq_tail_doorbell =
         (volatile uint32_t *)((uintptr_t)active_regs + NVME_ADMIN_SQ_DOORBELL);
+    nvme_dma_write_barrier();
     *sq_tail_doorbell = active_sq_tail;
     for (uint32_t wait = 0; wait < NVME_TIMEOUT_ATTEMPTS; ++wait) {
+        nvme_dma_read_barrier();
         volatile nvme_completion_t *completion = &cq[active_cq_head];
         uint16_t status = completion->status;
         if ((status & 1U) != active_cq_phase) continue;
@@ -443,10 +453,12 @@ static int nvme_io(uint64_t lba, void *buffer, uint32_t count, int write) {
     volatile uint32_t *sq_doorbell =
         (volatile uint32_t *)((uintptr_t)active_regs +
                               NVME_ADMIN_SQ_DOORBELL + 2U * active_doorbell_stride);
+    nvme_dma_write_barrier();
     *sq_doorbell = active_io_sq_tail;
     int success = 0;
     int completed = 0;
     for (uint32_t wait = 0; wait < NVME_TIMEOUT_ATTEMPTS; ++wait) {
+        nvme_dma_read_barrier();
         volatile nvme_completion_t *completion = &cq[active_io_cq_head];
         uint16_t status = completion->status;
         if ((status & 1U) != active_io_cq_phase ||
@@ -518,10 +530,12 @@ static int nvme_flush(void) {
     volatile uint32_t *sq_doorbell =
         (volatile uint32_t *)((uintptr_t)active_regs +
                               NVME_ADMIN_SQ_DOORBELL + 2U * active_doorbell_stride);
+    nvme_dma_write_barrier();
     *sq_doorbell = active_io_sq_tail;
     int success = 0;
     int completed = 0;
     for (uint32_t wait = 0; wait < NVME_TIMEOUT_ATTEMPTS; ++wait) {
+        nvme_dma_read_barrier();
         volatile nvme_completion_t *completion = &cq[active_io_cq_head];
         uint16_t status = completion->status;
         if ((status & 1U) != active_io_cq_phase ||

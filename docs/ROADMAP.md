@@ -1017,8 +1017,9 @@ Ext4 growth now also supports a single-indirect block table, including table
 allocation, pointer updates, zero-filled data blocks, and readback across the
 indirect boundary.
 Ext4 growth now creates double-indirect and second-level tables as needed;
-zero-length truncation recursively releases direct and deep indirect metadata
-trees, while partial deep-tree shrink remains guarded.
+truncation recursively trims direct, single-, double-, and triple-indirect
+trees, releases empty metadata tables, and updates the inode size without
+leaving partial deep-tree shrink guarded.
 XFS local-format regular files now support bounded append growth within the
 inode payload and zero-length truncation with inline data clearing; extent
 allocation remains a separate XFS metadata milestone.

@@ -208,17 +208,53 @@ static int ext4_alloc_block(ext4_fs_t *fs, uint64_t *block) {
     return 0;
 }
 
-static int ext4_release_tree(ext4_fs_t *fs, uint32_t block, uint32_t depth) {
+static int ext4_trim_tree(ext4_fs_t *fs, uint32_t block, uint32_t depth,
+                          uint64_t keep, uint8_t *empty) {
     uint8_t table[4096];
     uint64_t pointers = fs->block_size / 4U;
-    if (!block) return 0;
-    if (depth == 0) return ext4_set_block_used(fs, block, 0);
-    if (!read_block(fs, block, table)) return 0;
-    for (uint64_t i = 0; i < pointers; ++i) {
-        uint32_t child = load32(&table[i * 4U]);
-        if (child && !ext4_release_tree(fs, child, depth - 1U)) return 0;
+    if (!fs || !block || !empty || depth == 0 ||
+        depth > 3 || !read_block(fs, block, table)) return 0;
+    uint64_t span = 1;
+    for (uint32_t level = 1; level < depth; ++level) {
+        if (span > UINT64_MAX / pointers) return 0;
+        span *= pointers;
     }
-    return ext4_set_block_used(fs, block, 0);
+    int changed = 0;
+    uint8_t has_child = 0;
+    for (uint64_t index = 0; index < pointers; ++index) {
+        uint32_t child = load32(&table[index * 4U]);
+        if (!child) continue;
+        uint64_t begin = index * span;
+        uint64_t child_keep = keep > begin ? keep - begin : 0;
+        if (child_keep > span) child_keep = span;
+        uint8_t child_empty = 0;
+        if (depth == 1) {
+            if (child_keep == 0) {
+                if (!ext4_set_block_used(fs, child, 0)) return 0;
+                store32(&table[index * 4U], 0);
+                changed = 1;
+            } else {
+                has_child = 1;
+            }
+        } else {
+            if (!ext4_trim_tree(fs, child, depth - 1U, child_keep,
+                                &child_empty)) return 0;
+            if (child_empty) {
+                store32(&table[index * 4U], 0);
+                changed = 1;
+            } else {
+                has_child = 1;
+            }
+        }
+    }
+    if (changed && !write_block(fs, block, table)) return 0;
+    if (!has_child) {
+        if (!ext4_set_block_used(fs, block, 0)) return 0;
+        *empty = 1;
+    } else {
+        *empty = 0;
+    }
+    return 1;
 }
 
 static int ext4_resize_blocks(ext4_fs_t *fs, uint32_t inode_number,
@@ -231,7 +267,6 @@ static int ext4_resize_blocks(ext4_fs_t *fs, uint32_t inode_number,
     uint64_t triple_limit = double_limit + pointers * pointers * pointers;
     if (new_blocks > triple_limit ||
         (new_size > UINT32_MAX && !fs->has_64bit)) return 0;
-    if (new_blocks < old_blocks && old_blocks > 12U + pointers && new_blocks != 0) return 0;
     uint32_t indirect = load32(&inode[88]);
     uint32_t double_indirect = load32(&inode[92]);
     uint32_t triple_indirect = load32(&inode[96]);
@@ -311,33 +346,32 @@ static int ext4_resize_blocks(ext4_fs_t *fs, uint32_t inode_number,
             }
         }
     } else if (new_blocks < old_blocks) {
-        if (new_blocks == 0 && old_blocks > 12U + pointers) {
-            for (uint32_t i = 0; i < 12U; ++i) {
-                uint32_t block = load32(&inode[40U + i * 4U]);
-                if (block && !ext4_set_block_used(fs, block, 0)) return 0;
-                store32(&inode[40U + i * 4U], 0);
-            }
-            if (indirect && !ext4_release_tree(fs, indirect, 1U)) return 0;
-            if (double_indirect && !ext4_release_tree(fs, double_indirect, 2U)) return 0;
-            if (triple_indirect && !ext4_release_tree(fs, triple_indirect, 3U)) return 0;
-            store32(&inode[88], 0); store32(&inode[92], 0); store32(&inode[96], 0);
-            goto resize_inode;
-        }
-        if (indirect && !read_block(fs, indirect, table)) return 0;
-        for (uint64_t i = new_blocks; i < old_blocks; ++i) {
-            uint64_t block = i < 12U ? load32(&inode[40 + i * 4U]) :
-                              load32(&table[(i - 12U) * 4U]);
+        for (uint64_t i = new_blocks; i < 12U && i < old_blocks; ++i) {
+            uint32_t block = load32(&inode[40U + i * 4U]);
             if (block && !ext4_set_block_used(fs, block, 0)) return 0;
-            if (i < 12U) store32(&inode[40 + i * 4U], 0);
-            else store32(&table[(i - 12U) * 4U], 0);
+            store32(&inode[40U + i * 4U], 0);
         }
-        if (indirect && new_blocks > 12U && !write_block(fs, indirect, table)) return 0;
-        if (indirect && new_blocks <= 12U) {
-            if (!ext4_set_block_used(fs, indirect, 0)) return 0;
-            store32(&inode[88], 0);
-        }
+        uint8_t empty = 0;
+        uint64_t indirect_keep = new_blocks > 12U ? new_blocks - 12U : 0;
+        if (indirect && !ext4_trim_tree(fs, indirect, 1U,
+                                        indirect_keep > pointers ? pointers : indirect_keep,
+                                        &empty)) return 0;
+        if (empty) store32(&inode[88], 0);
+        uint64_t double_start = 12U + pointers;
+        uint64_t double_keep = new_blocks > double_start ? new_blocks - double_start : 0;
+        if (double_indirect && !ext4_trim_tree(fs, double_indirect, 2U,
+                                                double_keep > pointers * pointers ?
+                                                pointers * pointers : double_keep,
+                                                &empty)) return 0;
+        if (empty) store32(&inode[92], 0);
+        uint64_t triple_keep = new_blocks > double_limit ?
+                               new_blocks - double_limit : 0;
+        if (triple_indirect && !ext4_trim_tree(fs, triple_indirect, 3U,
+                                                triple_keep > pointers * pointers * pointers ?
+                                                pointers * pointers * pointers : triple_keep,
+                                                &empty)) return 0;
+        if (empty) store32(&inode[96], 0);
     }
-resize_inode:
     store32(&inode[4], (uint32_t)new_size);
     store32(&inode[108], (uint32_t)(new_size >> 32));
     return write_inode(fs, inode_number, inode);

@@ -8,6 +8,7 @@
 #include "ipv4.h"
 #include "udp.h"
 #include "tcp.h"
+#include "tcp_endpoint.h"
 #include "icmp.h"
 #include "udp_endpoint.h"
 #include "reassembly.h"
@@ -51,5 +52,8 @@ uint32_t network_service(network_packet_queue_t *queue,
                          uint16_t reassembly_capacity);
 int network_deliver_frame(const void *frame, uint16_t length,
                           udp_endpoint_table_t *udp_table);
+int network_deliver_tcp_frame(const void *frame, uint16_t length,
+                              tcp_endpoint_table_t *tcp_table,
+                              tcp_connection_result_t *result);
 
 #endif

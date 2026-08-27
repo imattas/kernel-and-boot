@@ -191,6 +191,17 @@ int network_deliver_frame(const void *frame, uint16_t length,
                                 view.udp.payload, view.udp.payload_length);
 }
 
+int network_deliver_tcp_frame(const void *frame, uint16_t length,
+                              tcp_endpoint_table_t *tcp_table,
+                              tcp_connection_result_t *result) {
+    if (!tcp_table || !result) return 0;
+    network_frame_view_t view;
+    if (!network_decode_frame(frame, length, &view) ||
+        view.kind != NETWORK_FRAME_TCP) return 0;
+    return tcp_endpoint_deliver(tcp_table, view.ipv4.destination,
+                                view.ipv4.source, &view.tcp, result);
+}
+
 int network_e1000_transmit(const void *frame, uint16_t length) {
     ethernet_frame_view_t view;
     if (!frame || !ethernet_frame_parse(frame, length, &view)) return 0;

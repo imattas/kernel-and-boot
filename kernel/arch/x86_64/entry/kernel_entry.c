@@ -944,6 +944,103 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("TCP transport ready\r\n");
+    static tcp_endpoint_table_t tcp_endpoint_probe_table;
+    static uint8_t tcp_endpoint_probe_ip[ETHERNET_MAX_PAYLOAD_SIZE];
+    static uint8_t tcp_endpoint_probe_frame[ETHERNET_MAX_FRAME_SIZE];
+    static uint8_t tcp_endpoint_probe_payload[8];
+    static uint8_t tcp_endpoint_probe_source_address[4];
+    tcp_endpoint_handle_t tcp_endpoint_probe_handle = 0;
+    tcp_connection_result_t tcp_endpoint_probe_result;
+    uint16_t tcp_endpoint_probe_tcp_length = 0;
+    uint16_t tcp_endpoint_probe_ip_length = 0;
+    uint16_t tcp_endpoint_probe_frame_length = 0;
+    tcp_endpoint_table_initialize(&tcp_endpoint_probe_table);
+    if (!tcp_endpoint_listen(&tcp_endpoint_probe_table, ipv4_probe_destination,
+                             6001, 4096, &tcp_endpoint_probe_handle)) {
+        serial_write("TCP endpoint failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    if (
+        !tcp_segment_build(tcp_probe_packet, sizeof(tcp_probe_packet),
+                           ipv4_probe_source, ipv4_probe_destination, 6000,
+                           6001, 100, 0, TCP_FLAG_SYN, 4096, 0, 0,
+                           &tcp_endpoint_probe_tcp_length) ||
+        !ipv4_packet_build(tcp_endpoint_probe_ip, sizeof(tcp_endpoint_probe_ip),
+                           ipv4_probe_source, ipv4_probe_destination, 6, 64,
+                           0x5321, tcp_probe_packet,
+                           tcp_endpoint_probe_tcp_length,
+                           &tcp_endpoint_probe_ip_length) ||
+        !ethernet_frame_build(tcp_endpoint_probe_frame,
+                              sizeof(tcp_endpoint_probe_frame),
+                              ethernet_probe_destination,
+                              ethernet_probe_source, 0x0800,
+                              tcp_endpoint_probe_ip, tcp_endpoint_probe_ip_length,
+                              &tcp_endpoint_probe_frame_length) ||
+        !network_deliver_tcp_frame(tcp_endpoint_probe_frame,
+                                   tcp_endpoint_probe_frame_length,
+                                   &tcp_endpoint_probe_table,
+                                   &tcp_endpoint_probe_result) ||
+        tcp_endpoint_probe_result.response_flags !=
+            (TCP_FLAG_SYN | TCP_FLAG_ACK)) {
+        serial_write("TCP endpoint failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    if (
+        !tcp_segment_build(tcp_probe_packet, sizeof(tcp_probe_packet),
+                           ipv4_probe_source, ipv4_probe_destination, 6000,
+                           6001, 101, 1, TCP_FLAG_ACK, 4096, 0, 0,
+                           &tcp_endpoint_probe_tcp_length) ||
+        !ipv4_packet_build(tcp_endpoint_probe_ip, sizeof(tcp_endpoint_probe_ip),
+                           ipv4_probe_source, ipv4_probe_destination, 6, 64,
+                           0x5322, tcp_probe_packet,
+                           tcp_endpoint_probe_tcp_length,
+                           &tcp_endpoint_probe_ip_length) ||
+        !ethernet_frame_build(tcp_endpoint_probe_frame,
+                              sizeof(tcp_endpoint_probe_frame),
+                              ethernet_probe_destination,
+                              ethernet_probe_source, 0x0800,
+                              tcp_endpoint_probe_ip, tcp_endpoint_probe_ip_length,
+                              &tcp_endpoint_probe_frame_length) ||
+        !network_deliver_tcp_frame(tcp_endpoint_probe_frame,
+                                   tcp_endpoint_probe_frame_length,
+                                   &tcp_endpoint_probe_table,
+                                   &tcp_endpoint_probe_result)) {
+        serial_write("TCP endpoint failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    if (
+        !tcp_segment_build(tcp_probe_packet, sizeof(tcp_probe_packet),
+                           ipv4_probe_source, ipv4_probe_destination, 6000,
+                           6001, 101, 1, TCP_FLAG_ACK | TCP_FLAG_PSH, 4096,
+                           tcp_endpoint_probe_payload,
+                           sizeof(tcp_endpoint_probe_payload),
+                           &tcp_endpoint_probe_tcp_length) ||
+        !ipv4_packet_build(tcp_endpoint_probe_ip, sizeof(tcp_endpoint_probe_ip),
+                           ipv4_probe_source, ipv4_probe_destination, 6, 64,
+                           0x5323, tcp_probe_packet,
+                           tcp_endpoint_probe_tcp_length,
+                           &tcp_endpoint_probe_ip_length) ||
+        !ethernet_frame_build(tcp_endpoint_probe_frame,
+                              sizeof(tcp_endpoint_probe_frame),
+                              ethernet_probe_destination,
+                              ethernet_probe_source, 0x0800,
+                              tcp_endpoint_probe_ip, tcp_endpoint_probe_ip_length,
+                              &tcp_endpoint_probe_frame_length) ||
+        !network_deliver_tcp_frame(tcp_endpoint_probe_frame,
+                                   tcp_endpoint_probe_frame_length,
+                                   &tcp_endpoint_probe_table,
+                                   &tcp_endpoint_probe_result) ||
+        !tcp_endpoint_receive(&tcp_endpoint_probe_table,
+                              tcp_endpoint_probe_handle,
+                              tcp_endpoint_probe_source_address,
+                              tcp_endpoint_probe_payload,
+                              sizeof(tcp_endpoint_probe_payload),
+                              &tcp_endpoint_probe_tcp_length) ||
+        tcp_endpoint_probe_tcp_length != sizeof(tcp_endpoint_probe_payload)) {
+        serial_write("TCP endpoint data failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("TCP endpoint ready\r\n");
     static uint8_t arp_reply_probe_request[ETHERNET_MAX_FRAME_SIZE];
     static uint8_t arp_reply_probe_reply[ETHERNET_MAX_FRAME_SIZE];
     uint16_t arp_reply_probe_request_length = 0;

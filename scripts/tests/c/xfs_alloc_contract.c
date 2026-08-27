@@ -43,7 +43,10 @@ int main(void) {
     assert(xfs_allocate_extent(&fs, 0, 2, &start) && start == 10);
     assert(g32(&bno[8]) == 1 && g32(&bno[16]) == 12 && g32(&bno[20]) == 1);
     assert(g32(&agf[40]) == 1 && g32(&agf[44]) == 1);
-    assert(xfs_allocate_extent(&fs, 0, 1, &start) && start == 12);
+    assert(xfs_free_extent(&fs, 10, 2));
+    assert(g32(&bno[8]) == 1 && g32(&bno[16]) == 10 && g32(&bno[20]) == 3);
+    assert(g32(&agf[40]) == 3 && g32(&agf[44]) == 3);
+    assert(xfs_allocate_extent(&fs, 0, 3, &start) && start == 10);
     assert(g32(&bno[8]) == 0 && g32(&agf[40]) == 0 && g32(&agf[44]) == 0);
     return 0;
 }

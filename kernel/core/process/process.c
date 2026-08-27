@@ -169,6 +169,12 @@ int process_activate(process_t *process) {
 int process_destroy(process_t *process) {
     if (!process) return 0;
     uint64_t process_flags = spinlock_lock_irqsave(&process->lock);
+    for (process_thread_t *thread = process->threads; thread;
+         thread = thread->next)
+        if (thread->references > 1) {
+            spinlock_unlock_irqrestore(&process->lock, process_flags);
+            return 0;
+        }
     if (process_current() == process || process->state == PROCESS_RUNNING ||
         task_wait_queue_count(&process->signal_waiters) != 0 ||
         !process_thread_destroy_all_locked(process)) {

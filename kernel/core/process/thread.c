@@ -33,6 +33,7 @@ process_thread_t *process_thread_create(struct process *process, uint32_t id,
     }
     thread->process = process;
     thread->next = process->threads;
+    thread->references = 1;
     process->threads = thread;
     ++process->thread_count;
     spinlock_unlock_irqrestore(&process->lock, flags);
@@ -44,8 +45,20 @@ process_thread_t *process_thread_lookup(const struct process *process,
     if (!process || id == 0) return 0;
     uint64_t flags = spinlock_lock_irqsave((spinlock_t *)&process->lock);
     process_thread_t *result = process_thread_lookup_locked(process, id);
+    if (result) ++result->references;
     spinlock_unlock_irqrestore((spinlock_t *)&process->lock, flags);
     return result;
+}
+
+void process_thread_release(process_thread_t *thread) {
+    if (!thread || !thread->process) return;
+    process_t *process = thread->process;
+    uint64_t flags = spinlock_lock_irqsave(&process->lock);
+    if (thread->references != 0) {
+        --thread->references;
+        if (thread->references == 0) kfree(thread);
+    }
+    spinlock_unlock_irqrestore(&process->lock, flags);
 }
 
 int process_thread_start(process_thread_t *thread) {
@@ -72,7 +85,11 @@ static int process_thread_destroy_locked(process_thread_t *thread) {
     if (!task_destroy_kernel(thread->task)) return 0;
     *link = thread->next;
     --process->thread_count;
-    kfree(thread);
+    thread->next = 0;
+    if (thread->references != 0) {
+        --thread->references;
+        if (thread->references == 0) kfree(thread);
+    }
     return 1;
 }
 

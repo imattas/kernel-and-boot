@@ -706,6 +706,11 @@ Design and implement syscall entry/exit, ABI validation, process address spaces,
 Process thread ownership now enforces nonzero per-process thread IDs and
 rejects duplicate IDs before allocation; callers can resolve an owned thread
 through `process_thread_lookup`.
+Thread lookup now returns a retained reference and exposes an explicit release
+operation, allowing thread teardown to unlink and destroy its task without
+freeing a concurrently looked-up thread object.
+Process destruction refuses to reclaim a process while any retained thread
+lookup remains, preserving the owning process lifetime until thread release.
 
 AP IDT gates now use the selector belonging to the active AP trampoline code
 segment, while the BSP retains its kernel selector; the two-CPU QEMU gate

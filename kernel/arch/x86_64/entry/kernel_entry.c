@@ -1839,7 +1839,9 @@ void kernel_main(void *boot_info) {
     process_t *thread_process = process_create(2);
     process_thread_t *thread_probe = thread_process ?
         process_thread_create(thread_process, 200, process_thread_probe, 0, 4096) : 0;
-    if (!thread_probe || process_thread_lookup(thread_process, 200) != thread_probe ||
+    process_thread_t *looked_up_thread = thread_process ?
+        process_thread_lookup(thread_process, 200) : 0;
+    if (!thread_probe || looked_up_thread != thread_probe ||
         process_thread_create(thread_process, 200, process_thread_probe, 0, 4096) ||
         process_thread_create(thread_process, 0, process_thread_probe, 0, 4096) ||
         thread_process->thread_count != 1 ||
@@ -1849,6 +1851,7 @@ void kernel_main(void *boot_info) {
         serial_write("process thread lifecycle failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
+    process_thread_release(looked_up_thread);
     process_t *owned_thread_process = process_create(3);
     process_thread_t *owned_thread = owned_thread_process ?
         process_thread_create(owned_thread_process, 201, process_thread_probe, 0, 4096) : 0;

@@ -462,6 +462,9 @@ modifier bits using stable modifier key codes.
 The shared input queue now supports atomic bounded event batches, so one
 decoded mouse or HID report cannot be partially published when the queue is
 near capacity.
+Framebuffer initialization and pixel operations now share an IRQ-safe lock,
+so console and display callers cannot interleave writes to the firmware GOP
+surface on SMP systems.
 USB HID keyboard and mouse events now sample one monotonic kernel tick per
 report, matching PS/2 event timestamp semantics.
 PS/2 mouse initialization now verifies the controller auxiliary-port test

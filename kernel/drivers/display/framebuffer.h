@@ -2,8 +2,10 @@
 #define OS_KERNEL_DRIVERS_FRAMEBUFFER_H
 
 #include <stdint.h>
+#include "../../core/sync/spinlock.h"
 
 typedef struct {
+    spinlock_t lock;
     uint32_t *pixels;
     uint32_t width;
     uint32_t height;

@@ -345,6 +345,8 @@ the x86_64 memory architecture boundary, and the paging primitive is now
 independently compiled instead of embedded in the virtual-address-space layer.
 The unused BIOS scaffold directory
 was removed; BIOS remains a separate later boot path.
+The kernel heap now serializes allocation, page commitment, split/coalesce, and
+free validation with an IRQ-safe lock for SMP-safe ownership of its block list.
 UEFI memory-map retries now release rejected candidate pools and validate boot
 services before dereferencing them, keeping ExitBootServices preparation
 bounded without leaking retry buffers.

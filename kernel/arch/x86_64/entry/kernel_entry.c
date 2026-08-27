@@ -2328,6 +2328,23 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("file syscalls ready\r\n");
+    uint64_t directory_syscall_handle = syscall_dispatch(OS_SYSCALL_OPEN,
+        0x8000002000ULL, 1, VFS_FILE_READ);
+    os_syscall_dirent_t syscall_dirent = {0};
+    if (directory_syscall_handle == OS_SYSCALL_ERROR ||
+        syscall_dispatch(OS_SYSCALL_READDIR, directory_syscall_handle,
+                         0x8000005000ULL, 0) != 1 ||
+        !syscall_copy_from_user(&syscall_dirent, 0x8000005000ULL,
+                                sizeof(syscall_dirent)) ||
+        syscall_dirent.type != VFS_NODE_REGULAR || syscall_dirent.name[0] != 'w' ||
+        syscall_dispatch(OS_SYSCALL_SEEK, directory_syscall_handle, 0, 0) != 0 ||
+        syscall_dispatch(OS_SYSCALL_READ, directory_syscall_handle,
+                         0x8000004000ULL, 1) != OS_SYSCALL_ERROR ||
+        syscall_dispatch(OS_SYSCALL_CLOSE, directory_syscall_handle, 0, 0) != 0) {
+        serial_write("directory syscall failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("directory syscalls ready\r\n");
     if (!kernel_init_state_advance(&init_state, KERNEL_INIT_SERVICES))
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     serial_write("user mode deferred until kernel completion\r\n");

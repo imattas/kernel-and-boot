@@ -16,11 +16,18 @@ enum {
     OS_SYSCALL_OPEN = 9,
     OS_SYSCALL_READ = 10,
     OS_SYSCALL_WRITE_FILE = 11,
-    OS_SYSCALL_CLOSE = 12
+    OS_SYSCALL_CLOSE = 12,
+    OS_SYSCALL_SEEK = 13,
+    OS_SYSCALL_READDIR = 14
 };
 
 #define OS_SYSCALL_ERROR UINT64_MAX
 #define OS_SYSCALL_MAX_WRITE 256U
 #define OS_SYSCALL_MAX_PATH 256U
+
+typedef struct {
+    char name[32];
+    uint32_t type;
+} os_syscall_dirent_t;
 
 #endif

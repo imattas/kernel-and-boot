@@ -132,6 +132,32 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
             return process_current() && process_handle_close(&process_current()->handles,
                                                              (uint32_t)arg1) ? 0 :
                    OS_SYSCALL_ERROR;
+        case OS_SYSCALL_SEEK: {
+            process_t *process = process_current();
+            process_handle_ref_t ref = {0};
+            if (!process || !process_handle_get_retain(&process->handles,
+                    (uint32_t)arg1, PROCESS_HANDLE_READ, &ref) ||
+                !vfs_file_seek((vfs_file_t *)ref.object, arg2)) {
+                process_handle_release_ref(&ref);
+                return OS_SYSCALL_ERROR;
+            }
+            process_handle_release_ref(&ref);
+            return 0;
+        }
+        case OS_SYSCALL_READDIR: {
+            process_t *process = process_current();
+            process_handle_ref_t ref = {0};
+            vfs_dirent_t entry = {0};
+            if (!process || !process_handle_get_retain(&process->handles,
+                    (uint32_t)arg1, PROCESS_HANDLE_READ, &ref) ||
+                !vfs_file_readdir((vfs_file_t *)ref.object, &entry) ||
+                !syscall_copy_to_user(arg2, &entry, sizeof(entry))) {
+                process_handle_release_ref(&ref);
+                return OS_SYSCALL_ERROR;
+            }
+            process_handle_release_ref(&ref);
+            return 1;
+        }
         case OS_SYSCALL_SIGNAL_NEXT: {
             uint32_t signal = 0;
             if (!user_range(arg1, sizeof(signal), 1) ||

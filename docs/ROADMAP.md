@@ -242,6 +242,8 @@ bounded `readdir` contract while regular-file reads remain type-safe.
 Processes now own a retained root/working-directory namespace, and the kernel
 ABI provides validated `open`, `read`, `write`, and `close` operations over VFS
 file descriptions without starting ring 3.
+The ABI now also provides validated descriptor seek and directory enumeration,
+including typed dirent copyout and directory/file operation separation.
 The process registry now serializes duplicate-ID checks, insertion, lookup,
 and removal across concurrent lifecycle operations.
 The bootable `dist/os.img` is now a standards-compliant FAT32 superfloppy

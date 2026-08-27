@@ -442,6 +442,9 @@ Bounded TCP endpoints now bind local addresses and ports, match established
 peers, queue validated in-order stream payloads, expose overflow accounting,
 and return connection-control results to the network boundary. The QEMU probe
 delivers a complete framed handshake and reads the queued stream data back.
+TCP endpoints now generate checksummed outbound ACK/PSH data and FIN segments,
+advance send sequence space only after successful construction, and track
+FIN-WAIT/LAST-ACK transitions with bounded acknowledgment validation.
 The network service loop now forwards validated UDP frames from the hardware
 packet queue into bound endpoint tables, and the QEMU boot probe exercises that
 end-to-end queue-to-endpoint delivery path.

@@ -77,5 +77,12 @@ int tcp_connection_open(tcp_connection_t *connection, uint32_t sequence,
 int tcp_connection_receive(tcp_connection_t *connection,
                             const tcp_segment_view_t *segment,
                             tcp_connection_result_t *result);
+int tcp_connection_build(tcp_connection_t *connection,
+                          const uint8_t source_address[4],
+                          const uint8_t destination_address[4],
+                          uint8_t flags, const void *payload,
+                          uint16_t payload_length, void *packet,
+                          uint16_t capacity, uint16_t *packet_length);
+int tcp_connection_close(tcp_connection_t *connection);
 
 #endif

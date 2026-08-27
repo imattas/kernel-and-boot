@@ -948,12 +948,14 @@ void kernel_main(void *boot_info) {
     static uint8_t tcp_endpoint_probe_ip[ETHERNET_MAX_PAYLOAD_SIZE];
     static uint8_t tcp_endpoint_probe_frame[ETHERNET_MAX_FRAME_SIZE];
     static uint8_t tcp_endpoint_probe_payload[8];
+    static uint8_t tcp_endpoint_probe_outbound[TCP_MAX_PACKET_SIZE];
     static uint8_t tcp_endpoint_probe_source_address[4];
     tcp_endpoint_handle_t tcp_endpoint_probe_handle = 0;
     tcp_connection_result_t tcp_endpoint_probe_result;
     uint16_t tcp_endpoint_probe_tcp_length = 0;
     uint16_t tcp_endpoint_probe_ip_length = 0;
     uint16_t tcp_endpoint_probe_frame_length = 0;
+    uint16_t tcp_endpoint_probe_outbound_length = 0;
     tcp_endpoint_table_initialize(&tcp_endpoint_probe_table);
     if (!tcp_endpoint_listen(&tcp_endpoint_probe_table, ipv4_probe_destination,
                              6001, 4096, &tcp_endpoint_probe_handle)) {
@@ -1038,6 +1040,40 @@ void kernel_main(void *boot_info) {
                               &tcp_endpoint_probe_tcp_length) ||
         tcp_endpoint_probe_tcp_length != sizeof(tcp_endpoint_probe_payload)) {
         serial_write("TCP endpoint data failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    tcp_segment_view_t tcp_endpoint_probe_outbound_view;
+    if (!tcp_endpoint_send_segment(&tcp_endpoint_probe_table,
+                                   tcp_endpoint_probe_handle,
+                                   tcp_endpoint_probe_payload,
+                                   sizeof(tcp_endpoint_probe_payload), 0,
+                                   tcp_endpoint_probe_outbound,
+                                   sizeof(tcp_endpoint_probe_outbound),
+                                   &tcp_endpoint_probe_outbound_length) ||
+        !tcp_segment_parse(tcp_endpoint_probe_outbound,
+                           tcp_endpoint_probe_outbound_length,
+                           ipv4_probe_destination, ipv4_probe_source,
+                           &tcp_endpoint_probe_outbound_view) ||
+        tcp_endpoint_probe_outbound_view.sequence != 1 ||
+        tcp_endpoint_probe_outbound_view.acknowledgment != 109 ||
+        tcp_endpoint_probe_outbound_view.payload_length !=
+            sizeof(tcp_endpoint_probe_payload)) {
+        serial_write("TCP endpoint transmit failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    if (!tcp_endpoint_send_segment(&tcp_endpoint_probe_table,
+                                   tcp_endpoint_probe_handle, 0, 0,
+                                   TCP_FLAG_FIN, tcp_endpoint_probe_outbound,
+                                   sizeof(tcp_endpoint_probe_outbound),
+                                   &tcp_endpoint_probe_outbound_length) ||
+        !tcp_segment_parse(tcp_endpoint_probe_outbound,
+                           tcp_endpoint_probe_outbound_length,
+                           ipv4_probe_destination, ipv4_probe_source,
+                           &tcp_endpoint_probe_outbound_view) ||
+        tcp_endpoint_probe_outbound_view.sequence != 9 ||
+        (tcp_endpoint_probe_outbound_view.flags &
+         (TCP_FLAG_FIN | TCP_FLAG_ACK)) != (TCP_FLAG_FIN | TCP_FLAG_ACK)) {
+        serial_write("TCP endpoint close failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("TCP endpoint ready\r\n");

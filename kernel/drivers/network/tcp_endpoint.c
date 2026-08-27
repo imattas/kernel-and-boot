@@ -96,6 +96,22 @@ int tcp_endpoint_deliver(tcp_endpoint_table_t *table,
     spinlock_unlock_irqrestore(&table->lock, flags); return 1;
 }
 
+int tcp_endpoint_send_segment(tcp_endpoint_table_t *table,
+                              tcp_endpoint_handle_t handle,
+                              const void *payload, uint16_t payload_length,
+                              uint8_t flags, void *segment, uint16_t capacity,
+                              uint16_t *segment_length) {
+    if (!table || !segment || !segment_length) return 0;
+    uint64_t lock_flags = spinlock_lock_irqsave(&table->lock);
+    tcp_endpoint_t *endpoint = endpoint_for(table, handle);
+    int result = endpoint && endpoint->connection.remote_port != 0 &&
+        tcp_connection_build(&endpoint->connection, endpoint->local_address,
+                             endpoint->remote_address, flags, payload,
+                             payload_length, segment, capacity, segment_length);
+    spinlock_unlock_irqrestore(&table->lock, lock_flags);
+    return result;
+}
+
 int tcp_endpoint_receive(tcp_endpoint_table_t *table, tcp_endpoint_handle_t handle,
                          uint8_t source_address[4], void *payload,
                          uint16_t capacity, uint16_t *length) {

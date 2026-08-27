@@ -153,10 +153,31 @@ int tcp_connection_receive(tcp_connection_t *connection,
         connection->state = TCP_CONNECTION_ESTABLISHED;
         return 1;
     }
+    if (connection->state == TCP_CONNECTION_FIN_WAIT_1 &&
+        (segment->flags & TCP_FLAG_ACK) != 0 &&
+        segment->acknowledgment == connection->send_next) {
+        connection->state = TCP_CONNECTION_FIN_WAIT_2;
+        return 1;
+    }
+    if (connection->state == TCP_CONNECTION_FIN_WAIT_2 &&
+        (segment->flags & TCP_FLAG_FIN) != 0 &&
+        segment->sequence == connection->receive_next) {
+        ++connection->receive_next; connection->state = TCP_CONNECTION_TIME_WAIT;
+        result->response_flags = TCP_FLAG_ACK;
+        result->response_sequence = connection->send_next;
+        result->response_acknowledgment = connection->receive_next;
+        return 1;
+    }
+    if (connection->state == TCP_CONNECTION_LAST_ACK &&
+        (segment->flags & TCP_FLAG_ACK) != 0 &&
+        segment->acknowledgment == connection->send_next) {
+        connection->state = TCP_CONNECTION_CLOSED; return 1;
+    }
     if (connection->state != TCP_CONNECTION_ESTABLISHED &&
         connection->state != TCP_CONNECTION_CLOSE_WAIT) return 0;
     if (segment->sequence != connection->receive_next ||
-        (segment->flags & TCP_FLAG_ACK) == 0) return 0;
+        (segment->flags & TCP_FLAG_ACK) == 0 ||
+        segment->acknowledgment > connection->send_next) return 0;
     uint32_t advance = segment->payload_length +
                        ((segment->flags & TCP_FLAG_FIN) != 0);
     connection->receive_next += advance;
@@ -167,4 +188,36 @@ int tcp_connection_receive(tcp_connection_t *connection,
     result->response_acknowledgment = connection->receive_next;
     result->accepted_payload = segment->payload_length;
     return 1;
+}
+
+int tcp_connection_build(tcp_connection_t *connection,
+                          const uint8_t source_address[4],
+                          const uint8_t destination_address[4],
+                          uint8_t flags, const void *payload,
+                          uint16_t payload_length, void *packet,
+                          uint16_t capacity, uint16_t *packet_length) {
+    if (!connection || !source_address || !destination_address || !packet ||
+        !packet_length || (connection->state != TCP_CONNECTION_ESTABLISHED &&
+                           connection->state != TCP_CONNECTION_CLOSE_WAIT) ||
+        (flags & (TCP_FLAG_SYN | TCP_FLAG_RST)) != 0 ||
+        (payload_length != 0 && !payload)) return 0;
+    if (payload_length != 0) flags |= TCP_FLAG_ACK | TCP_FLAG_PSH;
+    if ((flags & TCP_FLAG_FIN) != 0) flags |= TCP_FLAG_ACK;
+    uint32_t sequence = connection->send_next;
+    if (!tcp_segment_build(packet, capacity, source_address, destination_address,
+                           connection->local_port, connection->remote_port,
+                           sequence, connection->receive_next, flags,
+                           connection->window, payload, payload_length,
+                           packet_length)) return 0;
+    connection->send_next += payload_length +
+                             ((flags & TCP_FLAG_FIN) != 0);
+    if ((flags & TCP_FLAG_FIN) != 0)
+        connection->state = connection->state == TCP_CONNECTION_CLOSE_WAIT ?
+            TCP_CONNECTION_LAST_ACK : TCP_CONNECTION_FIN_WAIT_1;
+    return 1;
+}
+
+int tcp_connection_close(tcp_connection_t *connection) {
+    return connection && (connection->state == TCP_CONNECTION_ESTABLISHED ||
+                          connection->state == TCP_CONNECTION_CLOSE_WAIT);
 }

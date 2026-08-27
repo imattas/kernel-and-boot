@@ -102,6 +102,26 @@ int tcp_endpoint_unbind(tcp_endpoint_table_t *table, tcp_endpoint_handle_t handl
     spinlock_unlock_irqrestore(&table->lock, flags); return 1;
 }
 
+int tcp_endpoint_accept(tcp_endpoint_table_t *table,
+                        tcp_endpoint_handle_t listener,
+                        tcp_endpoint_handle_t *accepted) {
+    if (!table || !accepted) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&table->lock);
+    tcp_endpoint_t *parent = endpoint_for(table, listener);
+    if (!parent || parent->connection.state != TCP_CONNECTION_LISTEN) {
+        spinlock_unlock_irqrestore(&table->lock, flags); return 0;
+    }
+    for (uint32_t i = 0; i < TCP_ENDPOINT_CAPACITY; ++i) {
+        tcp_endpoint_t *endpoint = &table->endpoints[i];
+        if (!endpoint->valid || endpoint == parent ||
+            endpoint->connection.local_port != parent->connection.local_port ||
+            endpoint->connection.state != TCP_CONNECTION_SYN_RECEIVED) continue;
+        *accepted = i + 1U;
+        spinlock_unlock_irqrestore(&table->lock, flags); return 1;
+    }
+    spinlock_unlock_irqrestore(&table->lock, flags); return 0;
+}
+
 int tcp_endpoint_deliver(tcp_endpoint_table_t *table,
                          const uint8_t destination_address[4],
                          const uint8_t source_address[4],
@@ -111,20 +131,61 @@ int tcp_endpoint_deliver(tcp_endpoint_table_t *table,
         segment->payload_length > TCP_ENDPOINT_PAYLOAD_MAX) return 0;
     uint64_t flags = spinlock_lock_irqsave(&table->lock);
     tcp_endpoint_t *endpoint = 0;
+    int created_child = 0;
+    uint32_t endpoint_handle = 0;
     for (uint32_t i = 0; i < TCP_ENDPOINT_CAPACITY; ++i) {
         tcp_endpoint_t *candidate = &table->endpoints[i];
         if (!candidate->valid || candidate->connection.local_port != segment->destination_port ||
             (!wildcard(candidate->local_address) &&
              !address_equal(candidate->local_address, destination_address))) continue;
-        if (candidate->connection.remote_port == 0 ||
-            (candidate->connection.remote_port == segment->source_port &&
-             address_equal(candidate->remote_address, source_address))) {
+        if (candidate->connection.remote_port != 0 &&
+            candidate->connection.remote_port == segment->source_port &&
+            address_equal(candidate->remote_address, source_address)) {
             endpoint = candidate; break;
         }
     }
+    if (!endpoint && (segment->flags & TCP_FLAG_SYN) != 0)
+        for (uint32_t i = 0; i < TCP_ENDPOINT_CAPACITY; ++i) {
+            tcp_endpoint_t *candidate = &table->endpoints[i];
+            if (!candidate->valid || candidate->connection.state != TCP_CONNECTION_LISTEN ||
+                candidate->connection.local_port != segment->destination_port ||
+                (!wildcard(candidate->local_address) &&
+                 !address_equal(candidate->local_address, destination_address))) continue;
+            endpoint = candidate; break;
+        }
+    if (endpoint && endpoint->connection.state == TCP_CONNECTION_LISTEN &&
+        (segment->flags & TCP_FLAG_SYN) != 0) {
+        tcp_endpoint_t *child = 0;
+        for (uint32_t i = 0; i < TCP_ENDPOINT_CAPACITY; ++i)
+            if (!table->endpoints[i].valid) {
+                child = &table->endpoints[i];
+                endpoint_handle = i + 1U;
+                break;
+            }
+        if (!child) {
+            spinlock_unlock_irqrestore(&table->lock, flags); return 0;
+        }
+        child->valid = 1;
+        for (uint32_t i = 0; i < 4; ++i)
+            child->local_address[i] = endpoint->local_address[i];
+        tcp_connection_initialize(&child->connection,
+                                  endpoint->connection.local_port,
+                                  endpoint->connection.window);
+        if (!tcp_connection_listen(&child->connection)) {
+            child->valid = 0;
+            spinlock_unlock_irqrestore(&table->lock, flags); return 0;
+        }
+        child->head = 0; child->tail = 0; child->count = 0; child->dropped = 0;
+        endpoint = child;
+        created_child = 1;
+    } else if (endpoint) {
+        endpoint_handle = (uint32_t)(endpoint - table->endpoints) + 1U;
+    }
     if (!endpoint || !tcp_connection_receive(&endpoint->connection, segment, result)) {
+        if (created_child) endpoint->valid = 0;
         spinlock_unlock_irqrestore(&table->lock, flags); return 0;
     }
+    result->endpoint_handle = endpoint_handle;
     if (endpoint->connection.remote_port == segment->source_port)
         for (uint32_t i = 0; i < 4; ++i) endpoint->remote_address[i] = source_address[i];
     if (result->accepted_payload != 0) {

@@ -73,6 +73,7 @@ typedef struct {
 } tcp_connection_t;
 
 typedef struct {
+    uint32_t endpoint_handle;
     uint8_t response_flags;
     uint32_t response_sequence;
     uint32_t response_acknowledgment;

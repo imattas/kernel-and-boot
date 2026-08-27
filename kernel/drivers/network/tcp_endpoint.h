@@ -42,6 +42,9 @@ int tcp_endpoint_connect(tcp_endpoint_table_t *table,
                          uint16_t capacity, uint16_t *segment_length);
 int tcp_endpoint_unbind(tcp_endpoint_table_t *table,
                         tcp_endpoint_handle_t handle);
+int tcp_endpoint_accept(tcp_endpoint_table_t *table,
+                        tcp_endpoint_handle_t listener,
+                        tcp_endpoint_handle_t *accepted);
 int tcp_endpoint_deliver(tcp_endpoint_table_t *table,
                          const uint8_t destination_address[4],
                          const uint8_t source_address[4],

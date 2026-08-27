@@ -1108,6 +1108,27 @@ void kernel_main(void *boot_info) {
         serial_write("TCP endpoint failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
+    tcp_endpoint_handle_t tcp_listener_probe_handle = tcp_endpoint_probe_handle;
+    tcp_endpoint_probe_handle = tcp_endpoint_probe_result.endpoint_handle;
+    tcp_connection_result_t tcp_second_result;
+    tcp_segment_view_t tcp_second_view;
+    if (!tcp_segment_build(tcp_probe_packet, sizeof(tcp_probe_packet),
+                           ipv4_probe_source, ipv4_probe_destination, 6002,
+                           6001, 200, 0, TCP_FLAG_SYN, 4096, 0, 0,
+                           &tcp_probe_length) ||
+        !tcp_segment_parse(tcp_probe_packet, tcp_probe_length,
+                           ipv4_probe_source, ipv4_probe_destination,
+                           &tcp_second_view) ||
+        !tcp_endpoint_deliver(&tcp_endpoint_probe_table,
+                              ipv4_probe_destination, ipv4_probe_source,
+                              &tcp_second_view, &tcp_second_result) ||
+        tcp_second_result.endpoint_handle == 0 ||
+        tcp_second_result.endpoint_handle == tcp_listener_probe_handle ||
+        tcp_second_result.endpoint_handle == tcp_endpoint_probe_handle ||
+        tcp_second_result.response_flags != (TCP_FLAG_SYN | TCP_FLAG_ACK)) {
+        serial_write("TCP listener backlog failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
     if (
         !tcp_segment_build(tcp_probe_packet, sizeof(tcp_probe_packet),
                            ipv4_probe_source, ipv4_probe_destination, 6000,
@@ -1487,6 +1508,9 @@ void kernel_main(void *boot_info) {
                         3, 4, &network_reassembly_probe_table,
                         network_reassembly_probe_output,
                         sizeof(network_reassembly_probe_output)) != 1 ||
+        !tcp_endpoint_accept(&network_tcp_runtime_table,
+                             network_tcp_probe_handle,
+                             &network_tcp_probe_handle) ||
         !tcp_segment_build(network_tcp_probe_segment,
                            sizeof(network_tcp_probe_segment),
                            ipv4_probe_source, ipv4_probe_destination, 6200,

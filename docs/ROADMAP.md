@@ -448,6 +448,11 @@ FIN-WAIT/LAST-ACK transitions with bounded acknowledgment validation.
 TCP endpoint tables now support active opens, generating SYN segments and
 accepting a validated SYN-ACK with the correct ACK response and sequence state.
 The QEMU probe covers the client-side handshake path.
+Listening endpoints now remain available while each SYN allocates a bounded
+child connection, and the endpoint API reports accepted children through
+`tcp_endpoint_accept`. Exact established-peer matching takes precedence over
+the listener; the QEMU probe covers two passive opens and service delivery
+through the accepted child.
 TCP connections now track the unacknowledged send edge and peer-advertised
 window, advance it only on valid acknowledgements, and reject transmissions
 that exceed the bounded flow-control window.

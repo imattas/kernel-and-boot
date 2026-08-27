@@ -32,6 +32,7 @@ int vfs_file_write(vfs_file_t *file, const void *buffer, uint32_t size);
 int vfs_file_readdir(vfs_file_t *file, vfs_dirent_t *entry);
 int vfs_file_stat(vfs_file_t *file, vfs_stat_t *stat);
 int vfs_file_seek(vfs_file_t *file, uint64_t offset);
+int vfs_file_truncate(vfs_file_t *file, uint32_t size);
 uint64_t vfs_file_offset(const vfs_file_t *file);
 
 #endif

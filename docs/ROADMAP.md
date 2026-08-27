@@ -255,6 +255,8 @@ The namespace ABI now reconstructs and validates the current path through a
 root-bounded `getcwd` syscall, including retained ancestry during traversal.
 The descriptor ABI now exposes retained-handle `fstat`, returning a locked
 snapshot of VFS type, mode, and owner metadata through validated copyout.
+Write-capable descriptors now support a validated `truncate` syscall; the
+filesystem callback updates persistent size and clamps the shared file offset.
 VFS file descriptions now support retained descriptor duplication, preserving
 shared offsets and object lifetime after either descriptor is closed.
 VFS path resolution now distinguishes absolute root paths from working-directory

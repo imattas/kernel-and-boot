@@ -181,6 +181,12 @@ static int vfs_probe_read(vfs_node_t *node, uint64_t offset,
     for (uint32_t i = 0; i < size; ++i) ((uint8_t *)buffer)[i] = storage[offset + i];
     return (int)size;
 }
+static int vfs_probe_truncate(vfs_node_t *node, uint32_t size) {
+    uint8_t *storage = node ? (uint8_t *)node->private_data : 0;
+    if (!storage || size > 16) return 0;
+    for (uint32_t i = size; i < 16; ++i) storage[i] = 0;
+    return 1;
+}
 
 static void preempt_task_a(void *argument) {
     uint64_t deadline = *(uint64_t *)argument;
@@ -1602,6 +1608,7 @@ void kernel_main(void *boot_info) {
     if (!vfs_write_node || !vfs_node_set_write(vfs_write_node, vfs_probe_write,
                                                vfs_write_storage) ||
         !vfs_node_set_read(vfs_write_node, vfs_probe_read, vfs_write_storage) ||
+        !vfs_node_set_truncate(vfs_write_node, vfs_probe_truncate) ||
         !vfs_node_add_child(vfs_root, vfs_write_node) ||
         vfs_node_write(vfs_write_node, 4, vfs_write_data,
                        sizeof(vfs_write_data)) != sizeof(vfs_write_data) ||
@@ -2377,18 +2384,18 @@ void kernel_main(void *boot_info) {
         syscall_dispatch(OS_SYSCALL_WRITE_FILE, file_syscall_handle,
                          0x8000003000ULL, sizeof(file_syscall_data) - 1) !=
             sizeof(file_syscall_data) - 1 ||
+        syscall_dispatch(OS_SYSCALL_TRUNCATE, file_syscall_handle, 2, 0) != 0 ||
         syscall_dispatch(OS_SYSCALL_CLOSE, file_syscall_handle, 0, 0) != 0 ||
         (file_syscall_handle = syscall_dispatch(OS_SYSCALL_OPEN,
             0x8000002000ULL, sizeof(file_syscall_path) - 1,
             VFS_FILE_READ)) == OS_SYSCALL_ERROR ||
         syscall_dispatch(OS_SYSCALL_READ, file_syscall_handle,
-                         0x8000004000ULL, sizeof(file_syscall_data) - 1) !=
-            sizeof(file_syscall_data) - 1 ||
+                         0x8000004000ULL, 2) != 2 ||
         syscall_dispatch(OS_SYSCALL_CLOSE, file_syscall_handle, 0, 0) != 0 ||
         !syscall_copy_from_user(file_syscall_read, 0x8000004000ULL,
                                 sizeof(file_syscall_read) - 1) ||
-        file_syscall_read[0] != 'f' || file_syscall_read[3] != 'e' ||
-        vfs_write_storage[0] != 'f' || vfs_write_storage[3] != 'e') {
+        file_syscall_read[0] != 'f' || file_syscall_read[1] != 'i' ||
+        vfs_write_storage[0] != 'f' || vfs_write_storage[2] != 0) {
         serial_write("file syscall failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
@@ -2417,11 +2424,11 @@ void kernel_main(void *boot_info) {
     if (duplicate_source == OS_SYSCALL_ERROR || duplicate_handle == OS_SYSCALL_ERROR ||
         syscall_dispatch(OS_SYSCALL_CLOSE, duplicate_source, 0, 0) != 0 ||
         syscall_dispatch(OS_SYSCALL_READ, (uint32_t)duplicate_handle,
-                         0x8000004000ULL, sizeof(file_syscall_data) - 1) !=
-            sizeof(file_syscall_data) - 1 ||
+                         0x8000004000ULL, 2) != 2 ||
         !syscall_copy_from_user(duplicate_read, 0x8000004000ULL,
                                 sizeof(duplicate_read) - 1) ||
-        duplicate_read[0] != 'f' || duplicate_read[3] != 'e') {
+        duplicate_read[0] != 'f' || duplicate_read[1] != 'i' ||
+        duplicate_read[2] != 0) {
         serial_write("dup syscall failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }

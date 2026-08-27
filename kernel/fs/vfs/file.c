@@ -147,6 +147,18 @@ int vfs_file_seek(vfs_file_t *file, uint64_t offset) {
     return 1;
 }
 
+int vfs_file_truncate(vfs_file_t *file, uint32_t size) {
+    if (!file) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&file->lock);
+    if (!(file->flags & VFS_FILE_WRITE) || !vfs_node_truncate(file->node, size)) {
+        spinlock_unlock_irqrestore(&file->lock, flags);
+        return 0;
+    }
+    if (file->offset > size) file->offset = size;
+    spinlock_unlock_irqrestore(&file->lock, flags);
+    return 1;
+}
+
 uint64_t vfs_file_offset(const vfs_file_t *file) {
     if (!file) return 0;
     vfs_file_t *mutable_file = (vfs_file_t *)file;

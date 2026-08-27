@@ -69,6 +69,23 @@ int vfs_node_set_read(vfs_node_t *node, vfs_read_fn read, void *private_data) {
     return 1;
 }
 
+static void try_destroy(vfs_node_t *node) {
+    if (!node) return;
+    uint64_t flags = spinlock_lock_irqsave(&node->lock);
+    if (node->destroying || node->references != 0 || node->child_count != 0) {
+        spinlock_unlock_irqrestore(&node->lock, flags);
+        return;
+    }
+    node->destroying = 1;
+    vfs_private_destroy_fn destroy = node->private_destroy;
+    void *private_data = node->private_data;
+    node->private_destroy = 0;
+    node->private_data = 0;
+    spinlock_unlock_irqrestore(&node->lock, flags);
+    if (destroy) destroy(private_data);
+    kfree(node);
+}
+
 int vfs_node_read(vfs_node_t *node, uint64_t offset, void *buffer, uint32_t size) {
     if (!node || !buffer || size == 0) return 0;
     uint64_t flags = spinlock_lock_irqsave(&node->lock);
@@ -182,19 +199,8 @@ void vfs_node_release(vfs_node_t *node) {
         return;
     }
     --node->references;
-    int free_node = node->references == 0 && node->child_count == 0;
-    if (free_node) node->destroying = 1;
-    vfs_private_destroy_fn destroy = free_node ? node->private_destroy : 0;
-    void *private_data = free_node ? node->private_data : 0;
-    if (free_node) {
-        node->private_destroy = 0;
-        node->private_data = 0;
-    }
     spinlock_unlock_irqrestore(&node->lock, flags);
-    if (free_node) {
-        if (destroy) destroy(private_data);
-        kfree(node);
-    }
+    try_destroy(node);
 }
 
 int vfs_node_remove(vfs_node_t *parent, vfs_node_t *child) {
@@ -220,5 +226,6 @@ int vfs_node_remove(vfs_node_t *parent, vfs_node_t *child) {
     spinlock_unlock_irqrestore(&child->lock, child_flags);
     spinlock_unlock_irqrestore(&parent->lock, flags);
     vfs_node_release(child);
+    try_destroy(parent);
     return 1;
 }

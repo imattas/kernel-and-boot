@@ -246,6 +246,34 @@ static int exfat_locate_entry(exfat_fs_t *fs, uint32_t directory_cluster,
     return 0;
 }
 
+static int exfat_directory_empty(exfat_fs_t *fs, uint32_t directory_cluster) {
+    uint8_t directory[EXFAT_MAX_CLUSTER_BYTES];
+    uint32_t cluster = directory_cluster;
+    if (!fs || !cluster_valid(fs, cluster)) return 0;
+    for (uint32_t visited = 0; visited < fs->cluster_count; ++visited) {
+        if (!exfat_read_cluster(fs, cluster, directory)) return 0;
+        uint32_t entries = fs->sectors_per_cluster * EXFAT_SECTOR_SIZE / 32U;
+        for (uint32_t i = 0; i < entries; ++i) {
+            uint8_t type = directory[i * 32U];
+            if (type == 0x00) return 1;
+            if (type == 0x05) {
+                uint32_t secondary = directory[i * 32U + 1U];
+                if (secondary == 0 || secondary >= entries - i) return 0;
+                i += secondary;
+                continue;
+            }
+            /* Any active entry, including malformed metadata, makes the
+               directory unsafe to remove. */
+            return 0;
+        }
+        uint32_t next = 0;
+        if (!fat_next(fs, cluster, &next) || next >= EXFAT_END ||
+            next == EXFAT_BAD || !cluster_valid(fs, next)) return 0;
+        cluster = next;
+    }
+    return 0;
+}
+
 int exfat_lookup_in_directory(exfat_fs_t *fs, uint32_t directory_cluster,
                               const char *name, uint32_t *first_cluster,
                               uint64_t *size, uint8_t *no_fat_chain) {
@@ -622,6 +650,8 @@ int exfat_unlink_file_in_directory(exfat_fs_t *fs, uint32_t directory_cluster,
                                                    &cluster)) return 0;
     uint8_t *stream = &directory[(index + 1U) * 32U];
     uint32_t first = load32(&stream[20]); uint8_t no_fat = (stream[1] & 2U) != 0;
+    if ((load16(&directory[index * 32U + 4]) & 0x0010U) != 0 &&
+        (!first || !exfat_directory_empty(fs, first))) return 0;
     for (uint32_t n = 0; n <= secondary; ++n) directory[(index + n) * 32U] &= 0x7fU;
     uint64_t lba = fs->heap_start + (uint64_t)(cluster - 2U) * fs->sectors_per_cluster;
     if (!storage_write(fs->device, lba, fs->sectors_per_cluster, directory)) return 0;

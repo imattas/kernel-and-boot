@@ -604,7 +604,11 @@ static int ahci_storage_write_context(uint64_t lba, uint32_t count,
 }
 
 int ahci_register_storage_devices(void) {
-    if (ahci_storage_registered) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&ahci_lock);
+    if (ahci_storage_registered) {
+        spinlock_unlock_irqrestore(&ahci_lock, flags);
+        return 0;
+    }
     static char names[32][8];
     uint32_t ordinal = 0;
     for (uint32_t port = 0; port < 32; ++port) {
@@ -628,11 +632,20 @@ int ahci_register_storage_devices(void) {
             .read_context = ahci_storage_read_context,
             .write_context = ahci_storage_write_context
         };
-        if (!storage_register(&device)) return 0;
+        if (!storage_register(&device)) {
+            /* The storage registry has no rollback operation.  Freeze the
+               publication state after a partial batch so a retry cannot
+               duplicate the devices already accepted. */
+            ahci_storage_registered = ordinal != 0;
+            spinlock_unlock_irqrestore(&ahci_lock, flags);
+            return 0;
+        }
         ++ordinal;
     }
     ahci_storage_registered = ordinal != 0;
-    return ahci_storage_registered;
+    int result = ahci_storage_registered;
+    spinlock_unlock_irqrestore(&ahci_lock, flags);
+    return result;
 }
 
 int ahci_identify(uint16_t *words) {

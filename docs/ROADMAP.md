@@ -717,6 +717,8 @@ completion-error count after identify and read/write coverage.
 The storage interface now supports optional per-device contexts, and AHCI
 registers each identified port as an independently routable block device;
 QEMU verifies secondary-disk read/write through the generic storage layer.
+AHCI storage-device publication is now serialized with driver state, preventing
+concurrent registration callers from publishing duplicate port devices.
 The scheduler now has an explicit core boundary
 and round-robin policy module. Process pending/blocked signal state and explicit
 termination status are now implemented; signal delivery policy remains bounded

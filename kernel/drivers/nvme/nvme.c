@@ -2,6 +2,7 @@
 #include "../../device/device.h"
 #include "../pci/pci.h"
 #include "../../mm/physical/frame.h"
+#include "../../core/sync/spinlock.h"
 
 #define NVME_BAR_INDEX 0
 #define NVME_CAP 0x00
@@ -34,6 +35,7 @@ static uint16_t active_io_sq_tail;
 static uint16_t active_io_cq_head;
 static uint8_t active_io_cq_phase;
 static uint8_t active_io_ready;
+static spinlock_t nvme_lock;
 static device_driver_t nvme_driver;
 
 static int nvme_submit_admin_words(uint8_t opcode, uint32_t namespace_id,
@@ -50,6 +52,13 @@ static int nvme_wait_ready(volatile uint32_t *regs, uint32_t expected) {
     for (uint32_t i = 0; i < 1000000; ++i)
         if ((regs[NVME_CSTS / 4] & NVME_CSTS_RDY) == expected) return 1;
     return 0;
+}
+
+static void nvme_abort_controller(void) {
+    if (!active_regs) return;
+    active_regs[NVME_CC / 4] &= ~NVME_CC_EN;
+    (void)nvme_wait_ready(active_regs, 0);
+    active_io_ready = 0;
 }
 
 static int nvme_probe(device_t *device) {
@@ -129,6 +138,7 @@ static int nvme_submit_admin_words(uint8_t opcode, uint32_t namespace_id,
                                    uint32_t *result) {
     if (!active_regs || !active_asq || !active_acq || !active_queue_entries ||
         !result) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&nvme_lock);
     volatile nvme_command_t *sq = (volatile nvme_command_t *)(uintptr_t)active_asq;
     volatile nvme_completion_t *cq =
         (volatile nvme_completion_t *)(uintptr_t)active_acq;
@@ -161,8 +171,11 @@ static int nvme_submit_admin_words(uint8_t opcode, uint32_t namespace_id,
             (volatile uint32_t *)((uintptr_t)active_regs +
                                   NVME_ADMIN_SQ_DOORBELL + active_doorbell_stride);
         *cq_head_doorbell = active_cq_head;
+        spinlock_unlock_irqrestore(&nvme_lock, flags);
         return success;
     }
+    nvme_abort_controller();
+    spinlock_unlock_irqrestore(&nvme_lock, flags);
     return 0;
 }
 
@@ -238,8 +251,12 @@ fail:
 
 static int nvme_io(uint64_t lba, void *buffer, uint32_t count, int write) {
     if (!active_io_ready || !buffer || count == 0 || count > 8) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&nvme_lock);
     uint64_t data_frame = physical_alloc_frame();
-    if (!data_frame) return 0;
+    if (!data_frame) {
+        spinlock_unlock_irqrestore(&nvme_lock, flags);
+        return 0;
+    }
     volatile nvme_command_t *sq =
         (volatile nvme_command_t *)(uintptr_t)active_io_sq;
     volatile nvme_completion_t *cq =
@@ -289,7 +306,9 @@ static int nvme_io(uint64_t lba, void *buffer, uint32_t count, int write) {
         uint8_t *destination = (uint8_t *)buffer;
         for (uint32_t i = 0; i < count * 512U; ++i) destination[i] = source[i];
     }
+    if (!success) nvme_abort_controller();
     physical_free_frame(data_frame);
+    spinlock_unlock_irqrestore(&nvme_lock, flags);
     return success;
 }
 
@@ -315,6 +334,7 @@ int nvme_initialize(void) {
     active_asq = 0;
     active_acq = 0;
     active_queue_entries = 0;
+    spinlock_init(&nvme_lock);
     nvme_driver.name = "nvme";
     nvme_driver.bus = DEVICE_BUS_PCI;
     nvme_driver.match = nvme_match;

@@ -25,6 +25,66 @@ static void store_be64(uint8_t *p, uint64_t value) {
     p[4] = (uint8_t)(value >> 24); p[5] = (uint8_t)(value >> 16);
     p[6] = (uint8_t)(value >> 8); p[7] = (uint8_t)value;
 }
+static void store_be32(uint8_t *p, uint32_t value) {
+    p[0] = (uint8_t)(value >> 24); p[1] = (uint8_t)(value >> 16);
+    p[2] = (uint8_t)(value >> 8); p[3] = (uint8_t)value;
+}
+
+static void xfs_store_extent(uint8_t *record, uint64_t logical,
+                             uint64_t physical, uint64_t length,
+                             uint8_t unwritten) {
+    uint64_t high = (logical << 9) | (unwritten ? (1ULL << 63) : 0);
+    high |= physical >> 43;
+    uint64_t low = (physical << 21) | length;
+    store_be64(record, high);
+    store_be64(record + 8, low);
+}
+
+static int xfs_split_unwritten_extent(uint8_t *data, uint32_t core,
+                                      uint32_t *extent_count,
+                                      uint32_t capacity, uint32_t index,
+                                      uint64_t logical, uint64_t physical,
+                                      uint64_t length) {
+    if (!data || !extent_count || index >= *extent_count || length == 0)
+        return 0;
+    uint64_t record_high = be64(&data[core + index * 16U]);
+    uint64_t start = (record_high & 0x7fffffffffffffffULL) >> 9;
+    uint64_t original_length = be64(&data[core + index * 16U + 8U]) &
+                               0x1fffffULL;
+    if (!original_length || logical < start ||
+        logical - start >= original_length) return 0;
+    uint64_t prefix_length = logical - start;
+    uint64_t suffix_length = original_length - prefix_length - 1U;
+    if (original_length == 1) {
+        uint64_t high = be64(&data[core + index * 16U]);
+        store_be64(&data[core + index * 16U], high & 0x7fffffffffffffffULL);
+        return 1;
+    }
+    if (*extent_count > capacity - 2U || physical < prefix_length ||
+        physical > UINT64_MAX - original_length + prefix_length + 1U)
+        return 0;
+    uint8_t records[4096];
+    uint32_t output = 0;
+    for (uint32_t i = 0; i < *extent_count; ++i) {
+        if (i != index) {
+            for (uint32_t byte = 0; byte < 16; ++byte)
+                records[output * 16U + byte] = data[core + i * 16U + byte];
+            ++output;
+            continue;
+        }
+        if (prefix_length)
+            xfs_store_extent(&records[output++ * 16U], start,
+                             physical - prefix_length, prefix_length, 1);
+        xfs_store_extent(&records[output++ * 16U], logical, physical, 1, 0);
+        if (suffix_length)
+            xfs_store_extent(&records[output++ * 16U], logical + 1U,
+                             physical + 1U, suffix_length, 1);
+    }
+    for (uint32_t i = 0; i < output * 16U; ++i)
+        data[core + i] = records[i];
+    *extent_count = output;
+    return 1;
+}
 
 int xfs_mount(xfs_fs_t *fs, uint32_t device) {
     if (!fs || !storage_device_at(device) ||
@@ -237,17 +297,24 @@ int xfs_write_file(xfs_fs_t *fs, uint64_t inode, uint64_t offset,
             block[in_block + i] = source[i];
         if (!xfs_write_block(fs, physical, block)) return 0;
         if (unwritten) {
-            for (uint32_t i = 0; i < extent_count; ++i) {
+            uint32_t record_index = 0;
+            int record_found = 0;
+            for (; record_index < extent_count; ++record_index) {
                 uint64_t candidate = 0, candidate_length = 0;
                 uint8_t candidate_unwritten = 0;
-                if (xfs_extent(&data[core + i * 16U], logical, &candidate,
-                               &candidate_length, &candidate_unwritten) &&
+                if (xfs_extent(&data[core + record_index * 16U], logical,
+                               &candidate, &candidate_length,
+                               &candidate_unwritten) &&
                     candidate == physical && candidate_unwritten) {
-                    store_be64(&data[core + i * 16U],
-                               be64(&data[core + i * 16U]) & 0x7fffffffffffffffULL);
+                    record_found = 1;
                     break;
                 }
             }
+            if (!record_found || !xfs_split_unwritten_extent(
+                    data, core, &extent_count,
+                    (fs->inode_size - core) / 16U, record_index, logical,
+                    physical, extent_length)) return 0;
+            store_be32(&data[76], extent_count);
         }
         source += chunk; remaining -= chunk; ++logical; in_block = 0;
     }

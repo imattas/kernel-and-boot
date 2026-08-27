@@ -410,6 +410,9 @@ can place UHCI and e1000 on one legacy GSI; the dispatcher explicitly services
 both device handlers before issuing APIC EOI.
 UHCI control and interrupt transfers now reclaim all allocated DMA frames on
 controller stop/restart failures and treat restart failure as a transfer error.
+UHCI interrupt transfers now accept standards-compliant short IN packets,
+zero unread input bytes, and advance data toggles only across packets actually
+completed before the short transfer.
 The shared legacy ISR now increments e1000 delivery accounting only when an
 enabled e1000 interrupt cause is present, so UHCI-only interrupts cannot be
 mistaken for network interrupt delivery.

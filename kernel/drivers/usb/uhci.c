@@ -22,6 +22,7 @@
 #define UHCI_TD_IOC (1U << 24)
 #define UHCI_TD_LOW_SPEED (1U << 26)
 #define UHCI_TD_ERROR_MASK (0x3fU << 17)
+#define UHCI_TD_ACTLEN_MASK 0x7ffU
 #define UHCI_PORT_BASE 0x10
 #define UHCI_PORT_COUNT 2
 #define UHCI_PORT_CONNECT 0x0001
@@ -64,6 +65,7 @@ static uint64_t uhci_async_td_frame;
 static uint64_t uhci_async_data_frame;
 static uint8_t *uhci_async_data;
 static uint16_t uhci_async_length;
+static uint16_t uhci_async_max_packet;
 static uint8_t *uhci_async_toggle;
 static uint16_t uhci_async_packet_count;
 static uint32_t uhci_async_td_pages;
@@ -105,6 +107,29 @@ static uint32_t uhci_token(uint8_t pid, uint8_t address, uint8_t endpoint,
 static int uhci_td_complete(const uhci_td_t *td) {
     return (td->status & UHCI_TD_ACTIVE) == 0 &&
            (td->status & UHCI_TD_ERROR_MASK) == 0;
+}
+
+/* Return 1 for complete, 0 for pending, and -1 for a transfer error.  UHCI
+ * stops a queue after a short IN packet, leaving later TDs active; that is a
+ * successful transfer rather than a timeout. */
+static int uhci_transfer_status(const uhci_td_t *td, uint32_t packet_count,
+                                uint16_t length, uint16_t max_packet,
+                                int input, uint32_t *completed_packets) {
+    if (!td || !packet_count || !max_packet || !completed_packets) return -1;
+    *completed_packets = 0;
+    for (uint32_t i = 0; i < packet_count; ++i) {
+        uint16_t requested = (uint16_t)(length - i * max_packet);
+        if (requested > max_packet) requested = max_packet;
+        uint32_t status = td[i].status;
+        if (status & UHCI_TD_ACTIVE) return 0;
+        if (status & UHCI_TD_ERROR_MASK) return -1;
+        uint32_t encoded = status & UHCI_TD_ACTLEN_MASK;
+        uint32_t actual = encoded == UHCI_TD_ACTLEN_MASK ? 0 : encoded + 1U;
+        if (actual > requested) return -1;
+        *completed_packets = i + 1U;
+        if (input && actual < requested) return 1;
+    }
+    return 1;
 }
 
 static uint32_t uhci_td_status(int interrupt_on_complete) {
@@ -355,8 +380,12 @@ static int uhci_data_transfer_locked(uint8_t address, uint8_t endpoint, void *da
     uhci_td_t *td = (uhci_td_t *)(uintptr_t)td_frame;
     uint8_t *transfer = (uint8_t *)(uintptr_t)data_frame;
     int input = (endpoint & 0x80U) != 0;
-    if (!input)
+    if (input) {
+        for (uint16_t i = 0; i < length; ++i)
+            transfer[i] = 0;
+    } else {
         for (uint16_t i = 0; i < length; ++i) transfer[i] = ((uint8_t *)data)[i];
+    }
     for (uint32_t i = 0; i < td_pages * 4096U / 4U; ++i)
         ((uint32_t *)td)[i] = 0;
     qh->head = 1U;
@@ -402,14 +431,12 @@ static int uhci_data_transfer_locked(uint8_t address, uint8_t endpoint, void *da
         return 0;
     }
     int complete = 0;
+    uint32_t completed_packets = 0;
     for (uint32_t wait = 0; wait < 1000000; ++wait) {
         uhci_dma_read_barrier();
-        if ((td[packet_count - 1U].status & UHCI_TD_ACTIVE) == 0) {
-            complete = 1;
-            for (uint32_t i = 0; i < packet_count; ++i)
-                complete = complete && uhci_td_complete(&td[i]);
-            break;
-        }
+        int state = uhci_transfer_status(td, packet_count, length, max_packet,
+                                         input, &completed_packets);
+        if (state != 0) { complete = state > 0; break; }
         __asm__ volatile ("pause");
     }
     if (!uhci_set_running(0)) {
@@ -439,6 +466,7 @@ static int uhci_data_transfer_locked(uint8_t address, uint8_t endpoint, void *da
     if (complete) {
         if (input)
             for (uint16_t i = 0; i < length; ++i) ((uint8_t *)data)[i] = transfer[i];
+        for (uint32_t i = 0; i < completed_packets; ++i) current_toggle ^= 1U;
         *toggle = current_toggle;
     }
     uhci_release_transfer_frames(qh_frame, td_frame, 0, td_pages, data_frame);
@@ -518,6 +546,7 @@ static int uhci_interrupt_submit_locked(uint8_t address, uint8_t endpoint,
     uhci_async_td_pages = td_pages;
     uhci_async_data_frame = data_frame; uhci_async_data = (uint8_t *)data;
     uhci_async_length = length;
+    uhci_async_max_packet = max_packet;
     uhci_async_toggle = toggle; uhci_async_packet_count = (uint16_t)packet_count;
     uhci_async_input = (uint8_t)input;
     uhci_async_completion = 0;
@@ -535,10 +564,13 @@ static int uhci_interrupt_poll_locked(void) {
     uint32_t last_td_status = td[uhci_async_packet_count - 1U].status;
     __atomic_store_n(&uhci_last_td_status_value, last_td_status,
                      __ATOMIC_RELEASE);
-    if (last_td_status & UHCI_TD_ACTIVE) return 0;
-    int complete = 1;
-    for (uint32_t i = 0; i < uhci_async_packet_count; ++i)
-        complete = complete && uhci_td_complete(&td[i]);
+    uint32_t completed_packets = 0;
+    int transfer_state = uhci_transfer_status(
+        td, uhci_async_packet_count, uhci_async_length,
+        uhci_async_max_packet,
+        uhci_async_input, &completed_packets);
+    if (transfer_state == 0) return 0;
+    int complete = transfer_state > 0;
     uint16_t controller_status = uhci_status();
     __atomic_store_n(&uhci_last_status_value, controller_status,
                      __ATOMIC_RELEASE);
@@ -554,7 +586,7 @@ static int uhci_interrupt_poll_locked(void) {
         for (uint16_t i = 0; i < uhci_async_length; ++i)
             uhci_async_data[i] = transfer[i];
         uint8_t next_toggle = *uhci_async_toggle;
-        for (uint32_t i = 0; i < uhci_async_packet_count; ++i) next_toggle ^= 1U;
+        for (uint32_t i = 0; i < completed_packets; ++i) next_toggle ^= 1U;
         *uhci_async_toggle = next_toggle;
     }
     uhci_release_transfer_frames(uhci_async_qh_frame, uhci_async_td_frame,

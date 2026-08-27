@@ -44,7 +44,12 @@ int arch_percpu_initialize(void) {
     return 1;
 }
 
-const arch_percpu_t *arch_percpu_current(void) { return current; }
+const arch_percpu_t *arch_percpu_current(void) {
+    uint32_t apic_id = arch_apic_id();
+    for (uint32_t i = 0; i < present_count; ++i)
+        if (cpus[i].apic_id == apic_id) return &cpus[i];
+    return 0;
+}
 uint32_t arch_percpu_present_count(void) { return present_count; }
 uint32_t arch_percpu_online_count(void) { return online_count; }
 
@@ -53,7 +58,6 @@ void arch_percpu_ap_entry(uint32_t apic_id) {
         if (cpus[i].apic_id == apic_id) {
             __atomic_store_n(&cpus[i].online, 1, __ATOMIC_RELEASE);
             __atomic_fetch_add(&online_count, 1, __ATOMIC_RELEASE);
-            current = &cpus[i];
             break;
         }
     }

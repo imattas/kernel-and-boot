@@ -1,7 +1,7 @@
 #ifndef OS_KERNEL_FS_BTRFS_H
 #define OS_KERNEL_FS_BTRFS_H
 #include <stdint.h>
-#define BTRFS_MAX_SYSTEM_CHUNKS 16U
+#define BTRFS_MAX_SYSTEM_CHUNKS 64U
 
 typedef struct {
     uint64_t logical;

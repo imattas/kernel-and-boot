@@ -70,6 +70,44 @@ static int btrfs_read_node(const btrfs_fs_t *fs, uint64_t bytenr, uint8_t *node)
     return le64(&node[48]) == bytenr && node[100] <= 8;
 }
 
+static int btrfs_add_chunk(btrfs_fs_t *fs, uint64_t logical, uint64_t length,
+                           uint64_t physical) {
+    if (!length || logical > fs->total_bytes - length ||
+        physical > storage_device_at(fs->device)->block_count * (uint64_t)BTRFS_SECTOR_SIZE - length)
+        return 0;
+    for (uint32_t i = 0; i < fs->chunk_count; ++i)
+        if (fs->chunks[i].logical == logical && fs->chunks[i].length == length &&
+            fs->chunks[i].physical == physical) return 1;
+    if (fs->chunk_count >= BTRFS_MAX_SYSTEM_CHUNKS) return 0;
+    fs->chunks[fs->chunk_count++] = (btrfs_chunk_t){logical, length, physical};
+    return 1;
+}
+
+static int btrfs_collect_chunks(btrfs_fs_t *fs, uint64_t bytenr, uint8_t depth) {
+    uint8_t node[65536];
+    if (depth > 8 || fs->node_size > sizeof(node) || !btrfs_read_node(fs, bytenr, node)) return 0;
+    uint32_t count = le32(&node[96]);
+    if (node[100] == 0) {
+        if (count > (fs->node_size - 101U) / 25U) return 0;
+        for (uint32_t i = 0; i < count; ++i) {
+            const uint8_t *item = &node[101U + i * 25U];
+            if (le64(item) != 1 || item[8] != BTRFS_CHUNK_ITEM_TYPE) continue;
+            uint32_t offset = le32(&item[17]), size = le32(&item[21]);
+            if (size < 80U || offset > fs->node_size || size > fs->node_size - offset) return 0;
+            const uint8_t *chunk = &node[offset];
+            uint64_t length = le64(chunk);
+            uint16_t stripes = le16(&chunk[44]);
+            uint64_t physical = le64(&chunk[56]);
+            if (stripes != 1 || !btrfs_add_chunk(fs, le64(&item[9]), length, physical)) return 0;
+        }
+        return 1;
+    }
+    if (node[100] > 8 || count == 0 || count > (fs->node_size - 101U) / 33U) return 0;
+    for (uint32_t i = 0; i < count; ++i)
+        if (!btrfs_collect_chunks(fs, le64(&node[118U + i * 33U]), (uint8_t)(depth + 1U))) return 0;
+    return 1;
+}
+
 static int key_compare(const uint8_t *key, uint64_t objectid, uint8_t type,
                        uint64_t offset) {
     uint64_t key_objectid = le64(key), key_offset = le64(&key[9]);
@@ -115,17 +153,13 @@ int btrfs_mount(btrfs_fs_t *fs, uint32_t device) {
             fs->chunk_count >= BTRFS_MAX_SYSTEM_CHUNKS || logical > total_bytes - length) {
             fs->mounted = 0; return 0;
         }
-        fs->chunks[fs->chunk_count].logical = logical;
-        fs->chunks[fs->chunk_count].length = length;
-        fs->chunks[fs->chunk_count].physical = le64(&key[17 + 44 + 8]);
-        if (fs->chunks[fs->chunk_count].physical >
-            storage_device_at(device)->block_count * (uint64_t)BTRFS_SECTOR_SIZE - length) {
+        if (!btrfs_add_chunk(fs, logical, length, le64(&key[17 + 44 + 8]))) {
             fs->mounted = 0; return 0;
         }
-        ++fs->chunk_count;
         position += 17U + 44U + num_stripes * 32U;
     }
-    if (position != array_size || fs->chunk_count == 0) { fs->mounted = 0; return 0; }
+    if (position != array_size || fs->chunk_count == 0 ||
+        !btrfs_collect_chunks(fs, fs->chunk_root_bytenr, 0)) { fs->mounted = 0; return 0; }
     return 1;
 }
 

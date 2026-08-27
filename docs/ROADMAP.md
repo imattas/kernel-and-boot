@@ -1069,8 +1069,9 @@ capacity, append to the current last leaf when space remains, and multi-leaf
 shrink releases detached data and leaf metadata.
 Depth-1 extent trees now also support bounded shrink: detached leaf data blocks
 are released, empty leaf metadata is removed, and the root index is cleared.
-Ext4 depth-2 extent trees now support bounded growth through validated root,
-intermediate-index, and leaf nodes, including persistent leaf updates.
+Ext4 depth-2 extent trees now support bounded growth and shrink through
+validated root, intermediate-index, and leaf nodes, including persistent leaf
+updates and release of detached metadata.
 Ext4 extent-root truncation now bounds and releases detached leaf blocks,
 removes empty extent records, and zeroes the retained partial block before
 persisting the reduced inode size.

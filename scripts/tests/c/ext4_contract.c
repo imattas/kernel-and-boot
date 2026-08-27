@@ -71,6 +71,10 @@ int main(void) {
     assert(ext4_write_file(&fs, 11, 1024, "deep2", 5));
     memset(output, 0, sizeof(output));
     assert(ext4_read_file(&fs, 11, 1024, output, 5) && memcmp(output, "deep2", 5) == 0);
+    assert(ext4_truncate_file(&fs, 11, 1024));
+    assert(ext4_truncate_file(&fs, 11, 0));
+    assert(extent_deep_inode[42] == 0 &&
+           (image[3 * 1024 + 29 / 8] & (1U << (29 & 7))) == 0);
     uint8_t growth[5000]; memset(growth, 'x', sizeof(growth));
     assert(ext4_write_file(&fs, inode, 5, growth, sizeof(growth)));
     assert(ext4_inode_size(&fs, inode, &size) && size == 5005);

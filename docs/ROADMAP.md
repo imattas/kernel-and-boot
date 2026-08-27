@@ -348,6 +348,8 @@ validates the configured-device path.
 The UHCI driver now exposes bounded interrupt-transfer scheduling with
 endpoint toggles; the boot path discovers an interrupt-IN endpoint from the
 configuration descriptors and exercises the USB HID polling path.
+UHCI interrupt transfers now reject endpoint values before token bit-packing,
+preventing invalid endpoint numbers from being silently truncated.
 The boot path now attempts a HID interrupt poll, tolerates an idle keyboard’s
 valid no-report response, and feeds any completed decoded report into the
 shared input event queue.

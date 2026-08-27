@@ -349,6 +349,9 @@ signature, and releases the BAR instead of exposing an unusable controller.
 AHCI probe validation now rejects I/O BARs before treating the ABAR as MMIO.
 AHCI port discovery now verifies that every implemented port’s register block
 fits inside the published ABAR size before dereferencing its MMIO registers.
+AHCI IDENTIFY now supplies the ATA device/LBA-mode field consistently with the
+DMA read/write commands, preventing firmware or devices that require the
+explicit device selection from rejecting identification.
 The generic storage registry now serializes registration, enumeration, and
 backend dispatch, rejects duplicate device names, and has hosted contract-test
 build support without executing privileged interrupt-state instructions.

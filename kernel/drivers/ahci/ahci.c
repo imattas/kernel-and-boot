@@ -357,6 +357,7 @@ static int ahci_identify_locked(uint16_t *words) {
     table->command_fis.fis_type = 0x27;
     table->command_fis.flags = 0x80;
     table->command_fis.command = 0xec;
+    table->command_fis.device = 0x40;
     table->data_base = (uint32_t)active_data;
     table->data_base_high = 0;
     table->byte_count = 511U | (1U << 31);

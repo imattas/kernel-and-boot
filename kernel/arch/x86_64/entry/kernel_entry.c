@@ -2077,7 +2077,9 @@ void kernel_main(void *boot_info) {
     if (!runtime_process ||
         !process_load_image(runtime_process, user_image_probe,
                             sizeof(user_image_probe)) ||
-        !process_map_user_stack(runtime_process, 0x8000002000ULL)) {
+        !process_map_user_stack(runtime_process, 0x8000002000ULL) ||
+        !address_space_user_range_valid(&runtime_process->address_space,
+                                        0x8000002000ULL, 8 * 0x1000ULL, 1)) {
         serial_write("user process setup failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
@@ -2161,8 +2163,8 @@ void kernel_main(void *boot_info) {
         !syscall_copy_from_user(syscall_copy, 0x8000002000ULL,
                                 sizeof(syscall_marker)) ||
         !syscall_copy_from_user(0, 0, 0) || !syscall_copy_to_user(0, 0, 0) ||
-        syscall_copy_from_user(syscall_copy, 0x8000002fffULL, 2) ||
-        syscall_copy_to_user(0x8000002fffULL, syscall_marker, 2) ||
+        syscall_copy_from_user(syscall_copy, 0x8000009fffULL, 2) ||
+        syscall_copy_to_user(0x8000009fffULL, syscall_marker, 2) ||
         syscall_copy[0] != 'o' || syscall_copy[1] != 'k' ||
         syscall_copy[2] != '\0' || process_lookup(1) != runtime_process ||
         syscall_dispatch(OS_SYSCALL_SIGNAL_SEND_TO, 1, 3, 0) != 0 ||
@@ -2181,7 +2183,7 @@ void kernel_main(void *boot_info) {
     serial_write("syscall ABI ready\r\n");
     uint32_t signal_result = 0;
     if (syscall_dispatch(OS_SYSCALL_SIGNAL_SEND, 3, 0, 0) != 0 ||
-        syscall_dispatch(OS_SYSCALL_SIGNAL_NEXT, 0x8000002fffULL, 0, 0) !=
+        syscall_dispatch(OS_SYSCALL_SIGNAL_NEXT, 0x8000009fffULL, 0, 0) !=
             OS_SYSCALL_ERROR ||
         syscall_dispatch(OS_SYSCALL_SIGNAL_NEXT, 0x8000002000ULL, 0, 0) != 3 ||
         syscall_dispatch(OS_SYSCALL_SIGNAL_MASK, 1U << 4, 0, 0) != 0 ||

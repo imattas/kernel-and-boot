@@ -44,7 +44,9 @@ process_t *process_create(uint64_t id) {
     process->image.entry = 0;
     process->image.page_count = 0;
     security_context_initialize(&process->security, 1000, 1000, 0);
-    process->user_stack_page = 0;
+    for (uint32_t page = 0; page < PROCESS_USER_STACK_PAGES; ++page)
+        process->user_stack_pages[page] = 0;
+    process->user_stack_page_count = 0;
     process->user_stack_top = 0;
     process->pending_signals = 0;
     process->blocked_signals = 0;
@@ -133,20 +135,34 @@ int process_map_user_stack(process_t *process, uint64_t page_address) {
     uint64_t flags = spinlock_lock_irqsave(&process->lock);
     if (process->state != PROCESS_READY ||
         (page_address & (PAGE_SIZE - 1)) != 0 ||
-        page_address < (1ULL << 39) || page_address >= (1ULL << 48) ||
-        process->user_stack_page != 0) {
+        page_address < (1ULL << 39) ||
+        page_address > (1ULL << 48) -
+                       PROCESS_USER_STACK_PAGES * PAGE_SIZE ||
+        process->user_stack_page_count != 0) {
         spinlock_unlock_irqrestore(&process->lock, flags);
         return 0;
     }
-    uint64_t frame = physical_alloc_frame();
-    if (!frame || !address_space_map_page(&process->address_space, page_address,
-                                          frame, ADDRESS_SPACE_WRITABLE | ADDRESS_SPACE_USER)) {
-        if (frame) physical_free_frame(frame);
-        spinlock_unlock_irqrestore(&process->lock, flags);
-        return 0;
+    for (uint32_t page = 0; page < PROCESS_USER_STACK_PAGES; ++page) {
+        uint64_t frame = physical_alloc_frame();
+        uint64_t address = page_address + (uint64_t)page * PAGE_SIZE;
+        if (!frame || !address_space_map_page(&process->address_space, address,
+                                              frame, ADDRESS_SPACE_WRITABLE | ADDRESS_SPACE_USER)) {
+            if (frame) physical_free_frame(frame);
+            while (page != 0) {
+                --page;
+                address_space_unmap_page(&process->address_space,
+                                         page_address + (uint64_t)page * PAGE_SIZE);
+                physical_free_frame(process->user_stack_pages[page]);
+                process->user_stack_pages[page] = 0;
+            }
+            spinlock_unlock_irqrestore(&process->lock, flags);
+            return 0;
+        }
+        process->user_stack_pages[page] = frame;
     }
-    process->user_stack_page = frame;
-    process->user_stack_top = page_address + PAGE_SIZE;
+    process->user_stack_page_count = PROCESS_USER_STACK_PAGES;
+    process->user_stack_top = page_address +
+                              PROCESS_USER_STACK_PAGES * PAGE_SIZE;
     spinlock_unlock_irqrestore(&process->lock, flags);
     return 1;
 }
@@ -154,7 +170,7 @@ int process_map_user_stack(process_t *process, uint64_t page_address) {
 int process_activate(process_t *process) {
     if (!process) return 0;
     uint64_t flags = spinlock_lock_irqsave(&process->lock);
-    if (process->state != PROCESS_READY || !process->user_stack_page ||
+    if (process->state != PROCESS_READY || process->user_stack_page_count == 0 ||
         !address_space_activate(&process->address_space)) {
         spinlock_unlock_irqrestore(&process->lock, flags);
         return 0;
@@ -191,7 +207,9 @@ int process_destroy(process_t *process) {
         spinlock_unlock_irqrestore(&process->lock, process_flags);
         return 0;
     }
-    if (process->user_stack_page) physical_free_frame(process->user_stack_page);
+    for (uint32_t page = 0; page < process->user_stack_page_count; ++page)
+        physical_free_frame(process->user_stack_pages[page]);
+    process->user_stack_page_count = 0;
     process->state = PROCESS_EXITED;
     process_handle_table_close_all(&process->handles);
     uint64_t flags = spinlock_lock_irqsave(&process_table_lock);

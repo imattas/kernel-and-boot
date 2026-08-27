@@ -19,6 +19,7 @@ typedef enum {
 
 #define PROCESS_SIGNAL_MAX 32U
 #define PROCESS_MAX 64U
+#define PROCESS_USER_STACK_PAGES 8U
 
 typedef struct process {
     spinlock_t lock;
@@ -31,7 +32,8 @@ typedef struct process {
     process_thread_t *threads;
     uint32_t thread_count;
     uint32_t retained_thread_references;
-    uint64_t user_stack_page;
+    uint64_t user_stack_pages[PROCESS_USER_STACK_PAGES];
+    uint32_t user_stack_page_count;
     uint64_t user_stack_top;
     uint32_t pending_signals;
     uint32_t blocked_signals;

@@ -387,7 +387,7 @@ $(KERNEL_HID_OBJ): kernel/drivers/usb/hid.c kernel/drivers/usb/hid.h kernel/driv
 	$(CC) -target x86_64-pc-none-elf -std=c11 -ffreestanding -fno-builtin -fno-stack-protector -fPIE -fno-plt \
 		-mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@
 
-$(KERNEL_UHCI_OBJ): kernel/drivers/usb/uhci.c kernel/drivers/usb/uhci.h kernel/device/device.h kernel/drivers/pci/pci.h kernel/mm/physical/frame.h | $(BUILD_DIR)/kernel
+$(KERNEL_UHCI_OBJ): kernel/drivers/usb/uhci.c kernel/drivers/usb/uhci.h kernel/device/device.h kernel/drivers/pci/pci.h kernel/mm/physical/frame.h kernel/arch/x86_64/cpu/tables.h | $(BUILD_DIR)/kernel
 	$(CC) -target x86_64-pc-none-elf -std=c11 -ffreestanding -fno-builtin -fno-stack-protector -fPIE -fno-plt \
 		-mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@
 
@@ -405,6 +405,7 @@ $(KERNEL_E1000_OBJ): kernel/drivers/network/e1000.c kernel/drivers/network/e1000
 
 $(KERNEL_E1000_IRQ_OBJ): kernel/arch/x86_64/interrupts/e1000.asm kernel/drivers/network/e1000.h | $(BUILD_DIR)/kernel
 	$(NASM) -f elf64 $< -o $@
+
 
 
 $(KERNEL_DEBUG_OBJ): kernel/debug/assert.c kernel/debug/assert.h kernel/core/panic/panic.h | $(BUILD_DIR)/kernel

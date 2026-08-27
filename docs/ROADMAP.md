@@ -281,6 +281,10 @@ UHCI control and interrupt transfers also validate controller-level USB error
 status after quiescence instead of trusting TD status alone.
 USB HID decoding is now an independently compiled and linked driver component;
 the USB descriptor parser no longer embeds another source file.
+UHCI now programs its PCI legacy IRQ through the shared e1000/UHCI ISR and
+enables completion/error causes when ACPI routing is available. The current
+QEMU synchronous HID transfer does not expose a completion cause, so UHCI
+interrupt delivery remains unverified and polling remains the tested path.
 UHCI TD status handling now uses the controller’s low-speed and error-bit
 definitions; the QEMU gate performs a real USB keyboard device-descriptor
 control transfer and validates the returned descriptor.

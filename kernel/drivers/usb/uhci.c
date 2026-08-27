@@ -2,6 +2,7 @@
 #include "../../device/device.h"
 #include "../pci/pci.h"
 #include "../../mm/physical/frame.h"
+#include "../../arch/x86_64/cpu/tables.h"
 
 #define UHCI_BAR_INDEX 4
 #define UHCI_USBCMD 0x00
@@ -27,12 +28,18 @@
 #define UHCI_USBLEGSUP 0xc0
 #define UHCI_LEGACY_BIOS_OWNED 0x0001U
 #define UHCI_LEGACY_OS_OWNED 0x0002U
+#define UHCI_IRQ_VECTOR 0x51
+#define UHCI_INTR_MASK 0x0007U
+
+extern void arch_e1000_irq_stub(void);
 
 static uint32_t controllers;
 static uint32_t root_ports;
 static uint16_t controller_base;
 static uint64_t controller_frame_list;
 static device_driver_t uhci_driver;
+static int uhci_irq_enabled;
+static volatile uint32_t uhci_interrupts;
 
 typedef struct {
     uint32_t link;
@@ -141,7 +148,10 @@ static int uhci_probe(device_t *device) {
     __asm__ volatile ("outl %0, %1" :: "a"((uint32_t)frame_list),
                       "Nd"((uint16_t)(base + UHCI_FLBASEADD)));
     __asm__ volatile ("outb %0, %1" :: "a"((uint8_t)64), "Nd"((uint16_t)(base + UHCI_SOFMOD)));
-    __asm__ volatile ("outw %0, %1" :: "a"((uint16_t)0), "Nd"((uint16_t)(base + UHCI_USBINTR)));
+    arch_set_interrupt_gate(UHCI_IRQ_VECTOR, arch_e1000_irq_stub);
+    uhci_irq_enabled = pci_enable_legacy_irq(device, UHCI_IRQ_VECTOR);
+    __asm__ volatile ("outw %0, %1" :: "a"((uint16_t)(uhci_irq_enabled ? UHCI_INTR_MASK : 0)),
+                      "Nd"((uint16_t)(base + UHCI_USBINTR)));
     __asm__ volatile ("outw %0, %1" :: "a"((uint16_t)(UHCI_CMD_RUN | UHCI_CMD_CONFIGURE)),
                       "Nd"((uint16_t)(base + UHCI_USBCMD)));
     controller_base = base;
@@ -327,6 +337,8 @@ int uhci_initialize(void) {
     root_ports = 0;
     controller_base = 0;
     controller_frame_list = 0;
+    uhci_irq_enabled = 0;
+    uhci_interrupts = 0;
     uhci_driver.name = "uhci";
     uhci_driver.bus = DEVICE_BUS_PCI;
     uhci_driver.match = uhci_match;
@@ -336,3 +348,12 @@ int uhci_initialize(void) {
 
 uint32_t uhci_controller_count(void) { return controllers; }
 uint32_t uhci_root_port_count(void) { return root_ports; }
+int uhci_interrupt_enabled(void) { return uhci_irq_enabled; }
+uint32_t uhci_interrupt_count(void) { return uhci_interrupts; }
+void uhci_interrupt_handler(void) {
+    if (!controller_base) return;
+    uint16_t status = uhci_status();
+    if ((status & UHCI_INTR_MASK) == 0) return;
+    ++uhci_interrupts;
+    uhci_acknowledge_status(status & 0x001fU);
+}

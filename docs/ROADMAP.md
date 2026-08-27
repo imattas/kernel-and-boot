@@ -776,6 +776,9 @@ does not raise reliably.
 The UEFI memory-map capture now rejects malformed successful firmware results
 unless descriptor size and map length satisfy the boot contract, and bounds
 replacement-map publication to the allocated buffer.
+The UEFI loader now retries the final `ExitBootServices` handoff across a
+bounded series of freshly captured memory-map keys, covering transient map-key
+invalidation without looping indefinitely.
 
 ## Phase 10 — Userland begins after the kernel gate
 

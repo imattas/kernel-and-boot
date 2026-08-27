@@ -70,13 +70,18 @@ efi_status_t efi_main(efi_handle_t image_handle, efi_system_table_t *st) {
     boot_info->kernel_size = image_size;
     boot_info->acpi_rsdp = uefi_find_acpi_rsdp(st);
     uefi_find_framebuffer(bs, boot_info);
-    efi_status_t exit_status = bs->exit_boot_services(image_handle, map_key);
+    efi_status_t exit_status = 1;
+    for (uint32_t attempt = 0; attempt < 4; ++attempt) {
+        if (attempt != 0 &&
+            uefi_capture_memory_map(bs, &memory_map, &memory_map_capacity,
+                                     boot_info, &map_key) != 0)
+            break;
+        exit_status = bs->exit_boot_services(image_handle, map_key);
+        if (exit_status == 0) break;
+    }
     if (exit_status != 0) {
-        if (uefi_capture_memory_map(bs, &memory_map, &memory_map_capacity, boot_info, &map_key) != 0 ||
-            bs->exit_boot_services(image_handle, map_key) != 0) {
-            free_pool(bs, memory_map); free_pool(bs, boot_info);
-            return uefi_fail(st, 'F', 15);
-        }
+        free_pool(bs, memory_map); free_pool(bs, boot_info);
+        return uefi_fail(st, 'F', 15);
     }
     entry(boot_info);
     return 13;

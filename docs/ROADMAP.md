@@ -178,6 +178,9 @@ two load segments sharing one page.
 User-copy helpers now define zero-length operations as safe no-ops and reject
 copies crossing into an unmapped or non-writable user page; the QEMU syscall
 probe covers both boundary classes.
+User-copy helpers now hold the address-space lock across validation and byte
+access, preventing a concurrent map update or unmap from invalidating a
+validated syscall buffer before use.
 ELF page mappings now carry the segment write policy, with a controlled flag
 update for shared pages; the QEMU image probe verifies a non-writable code
 page while the process stack remains writable.

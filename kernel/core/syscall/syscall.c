@@ -26,21 +26,11 @@ static int valid_signal_number(uint64_t value) {
 }
 
 int syscall_copy_from_user(void *destination, uint64_t source, uint64_t size) {
-    if (size == 0) return 1;
-    if (!destination || !user_range(source, size, 0)) return 0;
-    uint8_t *out = (uint8_t *)destination;
-    const uint8_t *in = (const uint8_t *)(uintptr_t)source;
-    for (uint64_t i = 0; i < size; ++i) out[i] = in[i];
-    return 1;
+    return address_space_copy_from_user(destination, source, size);
 }
 
 int syscall_copy_to_user(uint64_t destination, const void *source, uint64_t size) {
-    if (size == 0) return 1;
-    if (!source || !user_range(destination, size, 1)) return 0;
-    uint8_t *out = (uint8_t *)(uintptr_t)destination;
-    const uint8_t *in = (const uint8_t *)source;
-    for (uint64_t i = 0; i < size; ++i) out[i] = in[i];
-    return 1;
+    return address_space_copy_to_user(destination, source, size);
 }
 
 uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,

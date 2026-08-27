@@ -156,6 +156,9 @@ Address-space objects own their root and intermediate user-range paging frames,
 inherit the kernel mappings, and expose explicit CR3 activation. Mapped user
 pages are caller-owned physical frames; destruction reclaims only paging
 structures allocated by the address-space object.
+User-copy operations validate and access mapped ranges while holding the same
+address-space lock used by mapping and unmapping, closing the validation-to-use
+race at the syscall boundary.
 The initial user-image loader accepts only validated x86_64 ELF executables,
 reuses pages shared by load segments, rejects malformed ranges, allocates
 zeroed physical pages for PT_LOAD regions, and records executable entry points.

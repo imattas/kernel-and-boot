@@ -30,5 +30,7 @@ int address_space_page_executable(const address_space_t *space, uint64_t virtual
 const address_space_t *address_space_active(void);
 int address_space_user_range_valid(const address_space_t *space, uint64_t address,
                                    uint64_t size, int writable);
+int address_space_copy_from_user(void *destination, uint64_t source, uint64_t size);
+int address_space_copy_to_user(uint64_t destination, const void *source, uint64_t size);
 
 #endif

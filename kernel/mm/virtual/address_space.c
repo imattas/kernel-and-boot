@@ -421,3 +421,31 @@ int address_space_user_range_valid(const address_space_t *space, uint64_t addres
     spinlock_unlock_irqrestore(&address_space_lock, flags);
     return result;
 }
+
+int address_space_copy_from_user(void *destination, uint64_t source, uint64_t size) {
+    if (size == 0) return 1;
+    if (!destination) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&address_space_lock);
+    int valid = address_space_user_range_valid_locked(active_space, source, size, 0);
+    if (valid) {
+        uint8_t *out = (uint8_t *)destination;
+        const uint8_t *in = (const uint8_t *)(uintptr_t)source;
+        for (uint64_t i = 0; i < size; ++i) out[i] = in[i];
+    }
+    spinlock_unlock_irqrestore(&address_space_lock, flags);
+    return valid;
+}
+
+int address_space_copy_to_user(uint64_t destination, const void *source, uint64_t size) {
+    if (size == 0) return 1;
+    if (!source) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&address_space_lock);
+    int valid = address_space_user_range_valid_locked(active_space, destination, size, 1);
+    if (valid) {
+        uint8_t *out = (uint8_t *)(uintptr_t)destination;
+        const uint8_t *in = (const uint8_t *)source;
+        for (uint64_t i = 0; i < size; ++i) out[i] = in[i];
+    }
+    spinlock_unlock_irqrestore(&address_space_lock, flags);
+    return valid;
+}

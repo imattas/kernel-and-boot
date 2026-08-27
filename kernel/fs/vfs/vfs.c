@@ -144,7 +144,7 @@ vfs_node_t *vfs_lookup_path(vfs_node_t *root, const char *path) {
             next = current;
             vfs_node_retain(next);
         } else if (string_equal(component, "..")) {
-            next = current->parent ? current->parent : current;
+            next = current != root && current->parent ? current->parent : current;
             vfs_node_retain(next);
         } else {
             next = vfs_node_lookup(current, component);

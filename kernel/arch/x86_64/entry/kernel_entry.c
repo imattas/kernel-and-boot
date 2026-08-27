@@ -666,10 +666,14 @@ void kernel_main(void *boot_info) {
                                               0, 0, 0600);
     vfs_node_t *vfs_etc = vfs_node_create("etc", VFS_NODE_DIRECTORY,
                                           0, 0, 0755);
+    vfs_node_t *vfs_outer = vfs_node_create("outer", VFS_NODE_DIRECTORY,
+                                            0, 0, 0755);
     if (!vfs_root || !vfs_dev || !vfs_console || !vfs_etc ||
+        !vfs_outer ||
         !vfs_node_add_child(vfs_root, vfs_dev) ||
         !vfs_node_add_child(vfs_root, vfs_etc) ||
         !vfs_node_add_child(vfs_dev, vfs_console) ||
+        !vfs_node_add_child(vfs_outer, vfs_root) ||
         vfs_node_add_child(vfs_root, vfs_dev)) {
         serial_write("VFS hierarchy failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
@@ -677,6 +681,14 @@ void kernel_main(void *boot_info) {
     vfs_node_release(vfs_dev);
     vfs_node_release(vfs_console);
     vfs_node_release(vfs_etc);
+    vfs_node_release(vfs_outer);
+    vfs_node_t *vfs_confined = vfs_lookup_path(vfs_root, "/..");
+    if (!vfs_confined || vfs_confined != vfs_root) {
+        if (vfs_confined) vfs_node_release(vfs_confined);
+        serial_write("VFS root confinement failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    vfs_node_release(vfs_confined);
     vfs_mount_table_t vfs_mounts;
     vfs_node_t *vfs_mounted_root = vfs_node_create("mounted", VFS_NODE_DIRECTORY,
                                                    0, 0, 0755);

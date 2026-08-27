@@ -378,6 +378,9 @@ VFS node read callbacks and private destructors now publish through the node
 lock, preventing concurrent metadata readers from observing partial setup.
 VFS child removal now revalidates parent ownership and child emptiness while
 holding the parent lock, closing a concurrent mutation window.
+VFS path traversal now confines `..` resolution to the caller-supplied root,
+including mounted lookups, preventing absolute paths from escaping their VFS
+namespace.
 Credential access checks now reject permission values outside the supported
 Unix mode mask instead of silently ignoring malformed bits.
 The signal-next syscall now validates its writable user destination before

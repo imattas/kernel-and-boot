@@ -25,6 +25,52 @@ static int valid_signal_number(uint64_t value) {
     return value >= 1 && value <= PROCESS_SIGNAL_MAX;
 }
 
+static vfs_node_t *syscall_parent(process_t *process, char *path,
+                                  uint64_t length, char leaf[32],
+                                  security_context_t *security) {
+    if (!process || !path || !leaf || !security || length == 0 ||
+        length > OS_SYSCALL_MAX_PATH) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&process->lock);
+    vfs_node_t *root = process->root_directory;
+    vfs_node_t *working = process->working_directory;
+    *security = process->security;
+    if (root) vfs_node_retain(root);
+    if (working) vfs_node_retain(working);
+    spinlock_unlock_irqrestore(&process->lock, flags);
+    if (!root || !working) {
+        if (working) vfs_node_release(working);
+        if (root) vfs_node_release(root);
+        return 0;
+    }
+    uint32_t slash = UINT32_MAX;
+    for (uint32_t i = 0; i < length; ++i)
+        if (path[i] == '/') slash = i;
+    uint32_t leaf_start = slash == UINT32_MAX ? 0 : slash + 1U;
+    uint32_t leaf_length = (uint32_t)length - leaf_start;
+    if (leaf_length == 0 || leaf_length >= 32U ||
+        (leaf_length == 1 && path[leaf_start] == '.') ||
+        (leaf_length == 2 && path[leaf_start] == '.' &&
+         path[leaf_start + 1U] == '.')) {
+        vfs_node_release(working); vfs_node_release(root); return 0;
+    }
+    for (uint32_t i = 0; i < leaf_length; ++i) leaf[i] = path[leaf_start + i];
+    leaf[leaf_length] = '\0';
+    if (slash == UINT32_MAX) {
+        path[0] = '.'; path[1] = '\0';
+    } else if (slash == 0) {
+        path[0] = '/'; path[1] = '\0';
+    } else {
+        path[slash] = '\0';
+    }
+    vfs_node_t *parent = vfs_lookup_path_at_access(root, working, path, security);
+    if (!parent || !vfs_node_access(parent, security, 3)) {
+        if (parent) vfs_node_release(parent);
+        vfs_node_release(working); vfs_node_release(root); return 0;
+    }
+    vfs_node_release(working); vfs_node_release(root);
+    return parent;
+}
+
 int syscall_copy_from_user(void *destination, uint64_t source, uint64_t size) {
     return address_space_copy_from_user(destination, source, size);
 }
@@ -371,6 +417,47 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
             return process_handle_set_inheritable(&process->handles,
                                                   (uint32_t)arg1,
                                                   (int)arg2) ? 0 :
+                   OS_SYSCALL_ERROR;
+        }
+        case OS_SYSCALL_CREATE:
+        case OS_SYSCALL_MKDIR:
+        case OS_SYSCALL_UNLINK: {
+            process_t *process = process_current();
+            if (!process || arg2 == 0 || arg2 > OS_SYSCALL_MAX_PATH ||
+                (number == OS_SYSCALL_CREATE &&
+                 (arg3 == 0 || (arg3 & ~(VFS_FILE_READ | VFS_FILE_WRITE)) != 0)) ||
+                (number == OS_SYSCALL_MKDIR && (arg3 & ~0777U) != 0) ||
+                (number == OS_SYSCALL_UNLINK && arg3 != 0))
+                return OS_SYSCALL_ERROR;
+            char path[OS_SYSCALL_MAX_PATH + 1];
+            char leaf[32];
+            security_context_t security;
+            if (!syscall_copy_from_user(path, arg1, arg2)) return OS_SYSCALL_ERROR;
+            path[arg2] = '\0';
+            vfs_node_t *parent = syscall_parent(process, path, arg2, leaf, &security);
+            if (!parent) return OS_SYSCALL_ERROR;
+            if (number == OS_SYSCALL_UNLINK) {
+                vfs_node_t *child = vfs_node_lookup(parent, leaf);
+                int result = child && vfs_node_remove(parent, child);
+                if (child) vfs_node_release(child);
+                vfs_node_release(parent);
+                return result ? 0 : OS_SYSCALL_ERROR;
+            }
+            vfs_node_type_t type = number == OS_SYSCALL_MKDIR ?
+                VFS_NODE_DIRECTORY : VFS_NODE_REGULAR;
+            uint32_t mode = number == OS_SYSCALL_MKDIR ? (uint32_t)arg3 : 0666U;
+            vfs_node_t *node = vfs_node_create(leaf, type, security.uid,
+                                                security.gid, mode);
+            int result = node && vfs_node_add_child(parent, node);
+            if (result && number == OS_SYSCALL_CREATE) {
+                result = vfs_file_open_handle(&process->handles, node,
+                                              (uint32_t)arg3);
+                if (!result) (void)vfs_node_remove(parent, node);
+            }
+            if (node) vfs_node_release(node);
+            vfs_node_release(parent);
+            return result ? (number == OS_SYSCALL_CREATE ?
+                             (uint64_t)(uint32_t)result : 0) :
                    OS_SYSCALL_ERROR;
         }
         case OS_SYSCALL_SIGNAL_NEXT: {

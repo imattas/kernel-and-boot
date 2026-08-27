@@ -287,6 +287,9 @@ VFS path resolution now distinguishes absolute root paths from working-directory
 relative paths, with `..` confined at the process namespace root.
 VFS-backed `open` and `chdir` now enforce Unix owner/group/other mode bits
 against the calling process credentials, including directory search permission.
+The ABI now provides permission-checked `create`, `mkdir`, and `unlink`
+operations with safe parent-path resolution; the QEMU syscall probe exercises
+creation, descriptor closure, directory creation, and removal.
 Access-aware VFS path traversal now requires search permission on every
 directory crossed, preventing inaccessible parent directories from being used
 as a path-resolution side channel.

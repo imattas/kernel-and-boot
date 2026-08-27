@@ -83,6 +83,7 @@ grep -E 'time ns=0x[0-9a-fA-F]*[1-9a-fA-F]' "$log" >/dev/null
 grep -F 'generic clock ready' "$log" >/dev/null
 grep -F 'os kernel entry ok' "$log" >/dev/null
 grep -F 'syscall ABI ready' "$log" >/dev/null
+grep -F 'filesystem mutation syscalls ready' "$log" >/dev/null
 grep -F 'signal syscalls ready' "$log" >/dev/null
 grep -F 'process lifecycle ready' "$log" >/dev/null
 grep -F 'user process clone ready' "$log" >/dev/null

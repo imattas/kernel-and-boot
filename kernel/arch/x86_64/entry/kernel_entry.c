@@ -2197,6 +2197,14 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     vfs_node_release(vfs_private_directory);
+    vfs_node_t *vfs_user_directory = vfs_node_create("user", VFS_NODE_DIRECTORY,
+                                                     1000, 1000, 0700);
+    if (!vfs_user_directory || !vfs_node_add_child(vfs_root, vfs_user_directory)) {
+        if (vfs_user_directory) vfs_node_release(vfs_user_directory);
+        serial_write("VFS user directory setup failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    vfs_node_release(vfs_user_directory);
     uint8_t vfs_write_storage[16] = {0};
     static const uint8_t vfs_write_data[4] = {'v', 'f', 's', '!'};
     vfs_node_t *vfs_write_node = vfs_node_create("write_probe", VFS_NODE_REGULAR,
@@ -3155,6 +3163,32 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("file syscalls ready\r\n");
+    static const char create_syscall_path[] = "/user/syscall_create_probe";
+    static const char mkdir_syscall_path[] = "/user/syscall_dir_probe";
+    uint64_t create_syscall_handle = OS_SYSCALL_ERROR;
+    if (!syscall_copy_to_user(0x8000002000ULL, create_syscall_path,
+                              sizeof(create_syscall_path)) ||
+        !syscall_copy_to_user(0x8000003000ULL, mkdir_syscall_path,
+                              sizeof(mkdir_syscall_path)) ||
+        (create_syscall_handle = syscall_dispatch(OS_SYSCALL_CREATE,
+            0x8000002000ULL, sizeof(create_syscall_path) - 1,
+            VFS_FILE_READ | VFS_FILE_WRITE)) == OS_SYSCALL_ERROR ||
+        syscall_dispatch(OS_SYSCALL_CLOSE, create_syscall_handle, 0, 0) != 0 ||
+        syscall_dispatch(OS_SYSCALL_MKDIR, 0x8000003000ULL,
+                         sizeof(mkdir_syscall_path) - 1, 0755) != 0 ||
+        syscall_dispatch(OS_SYSCALL_UNLINK, 0x8000002000ULL,
+                         sizeof(create_syscall_path) - 1, 0) != 0 ||
+        syscall_dispatch(OS_SYSCALL_UNLINK, 0x8000003000ULL,
+                         sizeof(mkdir_syscall_path) - 1, 0) != 0) {
+        serial_write("filesystem mutation syscall failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("filesystem mutation syscalls ready\r\n");
+    if (!syscall_copy_to_user(0x8000002000ULL, file_syscall_path,
+                              sizeof(file_syscall_path))) {
+        serial_write("filesystem syscall path restore failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
     os_syscall_stat_t file_stat = {0};
     if ((file_syscall_handle = syscall_dispatch(OS_SYSCALL_OPEN,
                          0x8000002000ULL, sizeof(file_syscall_path) - 1,

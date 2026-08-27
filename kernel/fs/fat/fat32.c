@@ -82,11 +82,13 @@ int fat32_read_cluster(fat32_fs_t *fs, uint32_t cluster, void *buffer) {
     return storage_read(fs->device, sector, fs->sectors_per_cluster, buffer);
 }
 
-int fat32_lookup(fat32_fs_t *fs, const char short_name[11],
-                 uint32_t *first_cluster, uint32_t *size) {
-    if (!fs || !fs->mounted || !short_name || !first_cluster || !size) return 0;
+int fat32_lookup_in_directory(fat32_fs_t *fs, uint32_t directory_cluster,
+                              const char short_name[11], uint32_t *first_cluster,
+                              uint32_t *size, uint8_t *is_directory) {
+    if (!fs || !fs->mounted || !cluster_valid(fs, directory_cluster) || !short_name ||
+        !first_cluster || !size || !is_directory) return 0;
     uint8_t directory[FAT32_MAX_SECTORS_PER_CLUSTER * FAT32_SECTOR_SIZE];
-    uint32_t cluster = fs->root_cluster;
+    uint32_t cluster = directory_cluster;
     for (uint32_t hops = 0; hops < fs->data_clusters; ++hops) {
         if (!fat32_read_cluster(fs, cluster, directory)) return 0;
         for (uint32_t offset = 0;
@@ -94,8 +96,7 @@ int fat32_lookup(fat32_fs_t *fs, const char short_name[11],
             uint8_t first = directory[offset];
             uint8_t attributes = directory[offset + 11];
             if (first == 0x00) return 0;
-            if (first == 0xe5 || attributes == 0x0f || (attributes & 0x08) != 0 ||
-                (attributes & 0x10) != 0) continue;
+            if (first == 0xe5 || attributes == 0x0f || (attributes & 0x08) != 0) continue;
             uint8_t match = 1;
             for (uint32_t byte = 0; byte < 11; ++byte)
                 if (directory[offset + byte] != (uint8_t)short_name[byte]) match = 0;
@@ -103,7 +104,8 @@ int fat32_lookup(fat32_fs_t *fs, const char short_name[11],
                 *first_cluster = ((load32(&directory[offset + 20]) & 0x0fffU) << 16) |
                                   load16(&directory[offset + 26]);
                 *size = load32(&directory[offset + 28]);
-                return cluster_valid(fs, *first_cluster) || *size == 0;
+                *is_directory = (uint8_t)((attributes & 0x10) != 0);
+                return cluster_valid(fs, *first_cluster) || (!*is_directory && *size == 0);
             }
         }
         uint32_t next;
@@ -114,11 +116,16 @@ int fat32_lookup(fat32_fs_t *fs, const char short_name[11],
     return 0;
 }
 
-int fat32_read_file(fat32_fs_t *fs, const char short_name[11],
-                    uint32_t offset, void *buffer, uint32_t size) {
-    if (!fs || !buffer || !short_name) return 0;
-    uint32_t cluster, file_size;
-    if (!fat32_lookup(fs, short_name, &cluster, &file_size) ||
+int fat32_lookup(fat32_fs_t *fs, const char short_name[11],
+                 uint32_t *first_cluster, uint32_t *size) {
+    uint8_t is_directory = 0;
+    return fat32_lookup_in_directory(fs, fs ? fs->root_cluster : 0, short_name,
+                                     first_cluster, size, &is_directory) && !is_directory;
+}
+
+static int fat32_read_file_cluster(fat32_fs_t *fs, uint32_t cluster, uint32_t file_size,
+                                   uint32_t offset, void *buffer, uint32_t size) {
+    if (!fs || !fs->mounted || !buffer || !cluster_valid(fs, cluster) ||
         offset > file_size || size > file_size - offset) return 0;
     if (size == 0) return 1;
     uint32_t cluster_size = fs->sectors_per_cluster * FAT32_SECTOR_SIZE;
@@ -149,4 +156,20 @@ int fat32_read_file(fat32_fs_t *fs, const char short_name[11],
         }
     }
     return remaining == 0;
+}
+
+int fat32_read_file(fat32_fs_t *fs, const char short_name[11],
+                    uint32_t offset, void *buffer, uint32_t size) {
+    uint32_t cluster, file_size;
+    if (!fat32_lookup(fs, short_name, &cluster, &file_size)) return 0;
+    return fat32_read_file_cluster(fs, cluster, file_size, offset, buffer, size);
+}
+
+int fat32_read_file_in_directory(fat32_fs_t *fs, uint32_t directory_cluster,
+                                 const char short_name[11], uint32_t offset,
+                                 void *buffer, uint32_t size) {
+    uint32_t cluster, file_size; uint8_t is_directory = 0;
+    if (!fat32_lookup_in_directory(fs, directory_cluster, short_name, &cluster,
+                                   &file_size, &is_directory) || is_directory) return 0;
+    return fat32_read_file_cluster(fs, cluster, file_size, offset, buffer, size);
 }

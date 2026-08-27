@@ -189,9 +189,10 @@ Mounted VFS lookup now handles `.`, `..`, and paths ending at a mountpoint,
 returning the mounted root with correct reference ownership; the QEMU VFS
 probe covers mountpoint-root traversal.
 FAT32 filesystem support now includes BPB validation, cluster-chain traversal,
-8.3 root-directory lookup, bounded file reads, and a VFS read-only file
-adapter through the existing storage-device interface; the FAT12 path remains
-unchanged.
+8.3 directory lookup, bounded file reads, and a VFS read-only file adapter
+through the existing storage-device interface. Directory-relative lookup and
+file reads now traverse validated subdirectory cluster chains; the FAT12 path
+remains unchanged.
 VFS nodes now support an explicit private-data destructor, and both FAT VFS
 adapters release their per-file state with the node lifetime.
 VFS read handlers and private data are now single-assignment, and node release

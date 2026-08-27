@@ -358,6 +358,9 @@ fabricated source address.
 The e1000 probe now requires a BAR large enough to contain every register it
 accesses, including the receive-address registers, and rejects BAR ranges that
 cross the supported below-4-GiB MMIO window.
+The e1000 matcher now binds only known legacy 82540/82545-compatible device
+IDs, preventing unsupported Intel Ethernet generations from entering the
+legacy register and descriptor path.
 PCI BAR-size probing now preserves 32-bit mask width instead of sign-extending
 it into a bogus 64-bit size, allowing valid below-4-GiB devices to bind to the
 correct bounded MMIO window.

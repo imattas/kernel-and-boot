@@ -78,8 +78,13 @@ static volatile uint32_t e1000_link_events;
 static volatile uint32_t e1000_rx_overruns;
 
 static int e1000_match(const device_t *device) {
-    return device && device->bus == DEVICE_BUS_PCI && device->class_code == 0x02 &&
-           device->vendor_id == 0x8086;
+    if (!device || device->bus != DEVICE_BUS_PCI || device->class_code != 0x02 ||
+        device->vendor_id != 0x8086) return 0;
+    /* This driver implements the 82540/82545 legacy register and descriptor
+       layout. Do not bind newer Intel NICs until their contracts are added. */
+    return device->device_id == 0x100e || device->device_id == 0x100f ||
+           device->device_id == 0x1010 || device->device_id == 0x1011 ||
+           device->device_id == 0x1026;
 }
 
 static int e1000_probe(device_t *device) {

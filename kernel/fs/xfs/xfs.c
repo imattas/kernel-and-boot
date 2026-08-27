@@ -372,7 +372,13 @@ static int xfs_allocate_real_bno(xfs_fs_t *fs, uint32_t allocation_group,
     uint32_t selected = UINT32_MAX, selected_leaf = 0;
     uint32_t selected_start = 0, selected_count = 0;
     uint64_t total_free = 0;
+    uint32_t previous_key = 0;
     for (uint32_t i = 0; i < root_records; ++i) {
+        uint32_t key_start = be32(&root[16U + i * 8U]);
+        uint32_t key_count = be32(&root[20U + i * 8U]);
+        if (key_count == 0 || key_start > fs->ag_blocks - key_count ||
+            (i != 0 && key_start < previous_key)) return 0;
+        previous_key = key_start;
         uint32_t child = be32(&root[pointer_offset + i * 4U]);
         if (child == 0 || child >= fs->ag_blocks ||
             !xfs_read_block(fs, ag_base + child, leaf) ||
@@ -486,7 +492,13 @@ static int xfs_free_real_bno(xfs_fs_t *fs, uint64_t start, uint32_t blocks) {
     uint32_t pointer_offset = 16U + capacity * 8U;
     uint32_t selected = UINT32_MAX, selected_leaf = 0;
     uint64_t total_free = 0;
+    uint32_t previous_key = 0;
     for (uint32_t i = 0; i < root_records; ++i) {
+        uint32_t key_start = be32(&root[16U + i * 8U]);
+        uint32_t key_count = be32(&root[20U + i * 8U]);
+        if (key_count == 0 || key_start > fs->ag_blocks - key_count ||
+            (i != 0 && key_start < previous_key)) return 0;
+        previous_key = key_start;
         uint32_t child = be32(&root[pointer_offset + i * 4U]);
         if (child == 0 || child >= fs->ag_blocks ||
             !xfs_read_block(fs, ag_base + child, scan) ||

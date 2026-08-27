@@ -7,6 +7,7 @@
 #define PCI_CONFIG_ADDRESS 0xcf8
 #define PCI_CONFIG_DATA 0xcfc
 #define PCI_HEADER_TYPE 0x0e
+#define PCI_PRIMARY_BUS 0x18
 #define PCI_SECONDARY_BUS 0x19
 #define PCI_SUBORDINATE_BUS 0x1a
 
@@ -299,11 +300,14 @@ static void scan_function(uint8_t bus, uint8_t slot, uint8_t function) {
 
     if ((header & 0x7fu) == 1u && device.class_code == 0x06u &&
         device.subclass == 0x04u) {
+        uint8_t primary = config_read8(bus, slot, function,
+                                       PCI_PRIMARY_BUS);
         uint8_t secondary = config_read8(bus, slot, function,
                                          PCI_SECONDARY_BUS);
         uint8_t subordinate = config_read8(bus, slot, function,
                                            PCI_SUBORDINATE_BUS);
-        if (secondary != 0 && secondary != 0xff && secondary != bus &&
+        if (primary == bus && secondary != 0 && secondary != 0xff &&
+            secondary != bus &&
             subordinate >= secondary) {
             for (uint16_t child_bus = secondary; child_bus <= subordinate;
                  ++child_bus)

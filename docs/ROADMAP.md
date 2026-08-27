@@ -1089,6 +1089,9 @@ the pending completion marker when consuming a CQ entry.
 PCI bridge enumeration now walks each validated secondary-to-subordinate bus
 range with the existing cycle guard, instead of probing only the first child
 bus and silently missing devices behind deeper bridge topologies.
+Bridge traversal also validates the bridge's primary-bus field against the
+currently scanned bus before following child ranges, rejecting malformed
+firmware topology metadata without probing an unrelated bus.
 The UEFI memory-map capture now rejects malformed successful firmware results
 unless descriptor size and map length satisfy the boot contract, and bounds
 replacement-map publication to the allocated buffer.

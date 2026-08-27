@@ -359,6 +359,8 @@ ranges before reserving kernel frames, avoiding bitmap corruption from a bad
 firmware boot contract.
 VFS node read callbacks and private destructors now publish through the node
 lock, preventing concurrent metadata readers from observing partial setup.
+VFS child removal now revalidates parent ownership and child emptiness while
+holding the parent lock, closing a concurrent mutation window.
 APIC PIT calibration now uses a bounded wait budget and retains a validated
 fallback count, preventing slow firmware emulation from blocking kernel boot.
 UEFI memory-map retries now release rejected candidate pools and validate boot

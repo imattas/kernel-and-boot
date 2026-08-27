@@ -172,9 +172,13 @@ void vfs_node_release(vfs_node_t *node) {
 }
 
 int vfs_node_remove(vfs_node_t *parent, vfs_node_t *child) {
-    if (!parent || !child || child->parent != parent || child->child_count != 0)
-        return 0;
+    if (!parent || !child) return 0;
     uint64_t flags = spinlock_lock_irqsave(&parent->lock);
+    if (parent->type != VFS_NODE_DIRECTORY || child->parent != parent ||
+        child->child_count != 0) {
+        spinlock_unlock_irqrestore(&parent->lock, flags);
+        return 0;
+    }
     vfs_node_t **link = &parent->first_child;
     while (*link && *link != child) link = &(*link)->next_sibling;
     if (!*link) {

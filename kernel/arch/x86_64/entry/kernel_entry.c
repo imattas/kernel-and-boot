@@ -64,6 +64,8 @@ static address_space_t kernel_space;
 static uint8_t user_image_probe[256];
 static volatile uint64_t preempt_task_a_ticks;
 static volatile uint64_t preempt_task_b_ticks;
+static ipc_channel_t ipc_block_probe_channel;
+static volatile uint8_t ipc_block_probe_result;
 static uint8_t ahci_read_probe[512];
 static void process_thread_probe(void *argument) { (void)argument; }
 static int block_probe_read(void *context, uint64_t sector, uint32_t count,
@@ -96,6 +98,28 @@ static void preempt_task_b(void *argument) {
     while (timer_ticks() < deadline) {
         ++preempt_task_b_ticks;
     }
+    scheduler_task_exit();
+}
+
+static void ipc_block_receiver(void *argument) {
+    (void)argument;
+    char data[4] = {0};
+    uint64_t sender = 0;
+    uint32_t size = 0;
+    if (ipc_channel_receive_wait(&ipc_block_probe_channel, 2, data,
+                                 sizeof(data), &sender, &size) &&
+        sender == 1 && size == 4 && data[0] == 'p' && data[1] == 'i' &&
+        data[2] == 'n' && data[3] == 'g') {
+        ipc_block_probe_result |= 2U;
+    }
+    scheduler_task_exit();
+}
+
+static void ipc_block_sender(void *argument) {
+    (void)argument;
+    static const char message[4] = {'p', 'i', 'n', 'g'};
+    if (ipc_channel_send_wait(&ipc_block_probe_channel, 1, message,
+                              sizeof(message))) ipc_block_probe_result |= 1U;
     scheduler_task_exit();
 }
 
@@ -1041,6 +1065,23 @@ void kernel_main(void *boot_info) {
                             task_demo_entry, 0);
     task_context_switch(&task_demo_main, &task_demo_worker);
     serial_write("task context returned\r\n");
+    scheduler_set_idle(0);
+    ipc_channel_initialize(&ipc_block_probe_channel);
+    ipc_block_probe_result = 0;
+    task_t *ipc_receiver = task_create_kernel(300, ipc_block_receiver, 0, 4096);
+    task_t *ipc_sender_task = task_create_kernel(301, ipc_block_sender, 0, 4096);
+    if (!ipc_receiver || !ipc_sender_task ||
+        !scheduler_enqueue(ipc_receiver) || !scheduler_enqueue(ipc_sender_task) ||
+        !scheduler_start() || ipc_block_probe_result != 3 ||
+        !task_destroy_kernel(ipc_receiver) || !task_destroy_kernel(ipc_sender_task)) {
+        serial_write("IPC blocking failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    if (!ipc_channel_close(&ipc_block_probe_channel)) {
+        serial_write("IPC blocking close failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("ipc blocking ready\r\n");
     interrupts_initialize();
     if (uhci_controller_count() != 0 && uhci_interrupt_enabled() != 0) {
         static const uint8_t uhci_irq_probe_setup[8] =

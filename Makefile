@@ -582,6 +582,7 @@ qemu-test: $(IMAGE)
 	cp "$(OVMF_VARS)" $(BUILD_DIR)/OVMF_VARS.4m.fd
 	cp "$(IMAGE)" $(BUILD_DIR)/ahci-test.img
 	cp "$(IMAGE)" $(BUILD_DIR)/nvme-test.img
+	: > $(QEMU_LOG)
 	timeout 20s qemu-system-x86_64 -machine pc -smp 2 -m 128M \
 		-drive if=pflash,format=raw,readonly=on,file="$(OVMF_CODE)" \
 		-drive if=pflash,format=raw,file=$(BUILD_DIR)/OVMF_VARS.4m.fd \

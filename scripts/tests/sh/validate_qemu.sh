@@ -43,6 +43,7 @@ grep -F 'FAT32 VFS adapter ready' "$log" >/dev/null
 grep -F 'driver resource ownership ready' "$log" >/dev/null
 grep -F 'synchronization primitives ready' "$log" >/dev/null
 grep -F 'ipc channels ready' "$log" >/dev/null
+grep -F 'ipc blocking ready' "$log" >/dev/null
 grep -F 'security policy ready' "$log" >/dev/null
 grep -F 'VFS core ready' "$log" >/dev/null
 grep -F 'devfs ready' "$log" >/dev/null

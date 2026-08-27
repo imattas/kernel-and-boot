@@ -181,6 +181,10 @@ rolls back newly installed table links and owned frames.
 IPC channels now integrate with scheduler wait queues: blocking senders and
 receivers sleep on full/empty queues, successful transfers wake the opposite
 side, and close wakes all waiters while queued messages remain drainable.
+QEMU now exercises a real blocked receiver and producer task across a context
+switch, including wakeup, payload delivery, task exit, and channel close.
+The QEMU target now truncates its serial log before each run so validation
+cannot pass from stale output left by an earlier boot.
 
 ## Phase 7 — VFS and kernel abstractions
 

@@ -2905,6 +2905,16 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("automatic process allocation ready\r\n");
+    process_t *namespace_child = process_create_auto();
+    if (!namespace_child || !process_inherit_namespace(namespace_child,
+                                                        runtime_process) ||
+        namespace_child->root_directory != vfs_root ||
+        namespace_child->working_directory != vfs_root ||
+        !process_destroy(namespace_child)) {
+        serial_write("process namespace inheritance failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("process namespace inheritance ready\r\n");
     syscall_initialize();
     if (!process_activate(runtime_process)) {
         serial_write("user address space activation failure\r\n");

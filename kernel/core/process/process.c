@@ -154,6 +154,35 @@ int process_set_namespace(process_t *process, vfs_node_t *root,
     return 1;
 }
 
+int process_inherit_namespace(process_t *child, process_t *parent) {
+    if (!child || !parent || child == parent) return 0;
+    vfs_node_t *root;
+    vfs_node_t *working;
+    uint64_t flags = spinlock_lock_irqsave(&parent->lock);
+    if (parent->state == PROCESS_EXITED || !parent->root_directory ||
+        !parent->working_directory) {
+        spinlock_unlock_irqrestore(&parent->lock, flags);
+        return 0;
+    }
+    root = parent->root_directory;
+    working = parent->working_directory;
+    vfs_node_retain(root);
+    vfs_node_retain(working);
+    spinlock_unlock_irqrestore(&parent->lock, flags);
+
+    flags = spinlock_lock_irqsave(&child->lock);
+    if (child->state != PROCESS_NEW) {
+        spinlock_unlock_irqrestore(&child->lock, flags);
+        vfs_node_release(working);
+        vfs_node_release(root);
+        return 0;
+    }
+    child->root_directory = root;
+    child->working_directory = working;
+    spinlock_unlock_irqrestore(&child->lock, flags);
+    return 1;
+}
+
 int process_set_working_directory(process_t *process, vfs_node_t *directory) {
     if (!process || !directory || directory->type != VFS_NODE_DIRECTORY) return 0;
     vfs_node_retain(directory);

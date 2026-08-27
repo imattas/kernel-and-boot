@@ -288,6 +288,9 @@ and removal across concurrent lifecycle operations.
 Kernel process creation now provides bounded automatic PID allocation with
 collision-safe reuse and a QEMU lifecycle probe; explicit-ID creation remains
 available for controlled kernel tests.
+New processes can now inherit a retained root and working-directory namespace
+from a live parent while remaining in the NEW state; the kernel gate exercises
+the ownership and teardown path without entering userland.
 The bootable `dist/os.img` is now a standards-compliant FAT32 superfloppy
 with two FAT copies, backup boot/FSInfo sectors, and valid directory metadata;
 `fsck.fat`, `mdir`, and the QEMU UEFI/AHCI/NVMe paths all validate the same

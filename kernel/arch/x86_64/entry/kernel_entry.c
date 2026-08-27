@@ -421,6 +421,9 @@ void kernel_main(void *boot_info) {
     if (e1000_controller_count() != 0) {
         (void)e1000_service();
         serial_write("e1000 completion service ready\r\n");
+        serial_write(e1000_interrupt_enabled() ?
+                     "e1000 interrupt path ready\r\n" :
+                     "e1000 polling fallback ready\r\n");
     }
     if (!ahci_initialize()) {
         serial_write("AHCI initialization failure\r\n");

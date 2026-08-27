@@ -944,6 +944,14 @@ void kernel_main(void *boot_info) {
         serial_write("TCP transport failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
+    tcp_probe_connection.peer_window = 2;
+    if (tcp_connection_build(&tcp_probe_connection, ipv4_probe_source,
+                             ipv4_probe_destination, 0, tcp_probe_payload,
+                             sizeof(tcp_probe_payload), tcp_probe_packet,
+                             sizeof(tcp_probe_packet), &tcp_probe_length)) {
+        serial_write("TCP window enforcement failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
     serial_write("TCP transport ready\r\n");
     static tcp_endpoint_table_t tcp_endpoint_probe_table;
     static uint8_t tcp_endpoint_probe_ip[ETHERNET_MAX_PAYLOAD_SIZE];

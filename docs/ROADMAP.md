@@ -998,6 +998,10 @@ reads and writes with per-file IRQ-safe locks, so concurrent filesystem users
 cannot interleave adapter operations.
 ExFAT lookup now accepts zero-length regular files, including files with no
 allocated data cluster, and the contract covers this case.
+Ext4 direct-block regular files now support bounded growth through the group
+block bitmap, zero-filled newly allocated blocks, inode pointer updates, and
+block release during shrink/truncate; the contract covers multi-block growth
+and readback.
 validates the primary and backup boot-region checksums, supports bounded
 directory-relative lookup and reads, validates directory entry-set checksums,
 and compares validated UTF-8 names with their on-disk UTF-16 names. Ext4 now has

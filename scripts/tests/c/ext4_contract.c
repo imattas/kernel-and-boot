@@ -69,6 +69,9 @@ int main(void) {
     uint8_t indirect_readback[1024]; memset(indirect_readback, 0, sizeof(indirect_readback));
     assert(ext4_read_file(&fs, 4, 12293, indirect_readback, sizeof(indirect_readback)) &&
            memcmp(indirect_readback, indirect_growth, sizeof(indirect_growth)) == 0);
+    assert(ext4_write_file(&fs, 5, 1024, "grow", 4));
+    assert(ext4_inode_size(&fs, 5, &size) && size == 1028);
+    memset(output, 0, sizeof(output)); assert(ext4_read_file(&fs, 5, 1024, output, 4) && memcmp(output, "grow", 4) == 0);
     assert(ext4_truncate_file(&fs, 7, (12U + 256U + 1U) * 1024U));
     assert(ext4_inode_size(&fs, 7, &size) && size == (12U + 256U + 1U) * 1024U);
     assert((image[3 * 1024 + 18 / 8] & (1U << (18 & 7))) == 0);

@@ -14,8 +14,7 @@ Establish deterministic Make-driven builds, freestanding compiler/linker configu
 
 The loader-to-kernel path is runtime-proven under OVMF. The kernel's first
 architectural slice now prepares a flat GDT and installs a 256-entry IDT with
-a default halt handler; activation of the new GDT/CS transition is the next
-architecture-entry slice.
+a default halt handler, and per-CPU GDT/TSS activation after SMP startup.
 
 Complete. The root Makefile compiles and links a freestanding x86_64 C/NASM contract test entirely under `build/tests/`, builds a first-party PE32+ UEFI loader, builds a relocatable kernel ELF, and packages both into a validated FAT32 `dist/os.img`. The loader uses shared UEFI protocol/context declarations, independently linked console, firmware, file, ELF, and memory-map modules, a controlled NASM entry shim, firmware-sized file reads, watchdog disable, strong ELF validation, and growable memory-map capture before `ExitBootServices`. `make test` verifies the complete loader-to-kernel serial path under OVMF.
 UEFI console diagnostics are now independently built and linked under `build/uefi/`, while the loader retains a minimal orchestration entry point. The OVMF gate continues to pass after this extraction.
@@ -78,13 +77,14 @@ tick accounting is BSP-owned. Tick counts are exposed as a monotonic
 nanosecond clock with overflow-safe waits and BSP-owned global tick accounting;
 the BSP and AP now calibrate their periodic APIC timer against the PIT with a
 bounded fallback;
-richer per-CPU execution stacks, and scheduler policy remain in progress. The
+richer per-CPU execution stacks and address-space-backed threads remain later
+work. The
 kernel now has intrusive, spinlock-protected FIFO wait queues with duplicate
 enqueue rejection, removal, dequeue, and task-state definitions. The scheduler
 core now owns a ready queue and transitions task descriptors between ready and
 running states while remaining independent of scheduling policy.
-Current-task ownership and a cooperative yield/dispatch path now sit above the
-queue; timer preemption remains next. Kernel task objects can
+Current-task ownership, cooperative yield/dispatch, and timer preemption now
+sit above the queue. Kernel task objects can
 now own heap-backed stacks and initialized architecture contexts, with safe
 rejection of queued or running destruction; address-space-backed threads remain
 later work.
@@ -217,7 +217,8 @@ The filesystem expansion phase has started after the completed UEFI milestone:
 the kernel now contains a bounded read-only exFAT parser and VFS adapter with
 boot-region validation, FAT/no-FAT-chain traversal, UTF-16 directory-name
 decoding, and file reads, backed by an independent in-memory contract test.
-ext4, XFS, and Btrfs filesystem work is in progress before drivers resume.
+The ext4, XFS, and Btrfs read-only filesystem milestones are complete; further
+filesystem expansion is tracked separately from the kernel completion gate.
 
 ## Phase 8 — Kernel drivers
 
@@ -331,11 +332,11 @@ adapter. Redundant same-device chunk layouts are now accepted by selecting a
 validated mirror stripe with read fallback after checksum failure. Btrfs now
 resolves matching filesystem devices by device ID and maps bounded RAID1
 mirrors across separate registered storage devices, with the same read
-fallback behavior. Encryption and additional compression edge cases remain
-before the filesystem milestone is complete. Btrfs regular extents now support bounded zlib-wrapped
+fallback behavior. Encryption remains outside the current read-only filesystem
+milestone. Btrfs regular extents now support bounded zlib-wrapped
 DEFLATE streams, including stored, fixed-Huffman, and dynamic-Huffman blocks,
-with Adler-32 validation and sector-checksum-protected input. The remaining
-compression edge cases remain before the filesystem milestone is complete.
+with Adler-32 validation and sector-checksum-protected input. Additional
+compression formats remain bounded and read-only by design.
 Btrfs regular extents now also support native LZO length-header and
 sector-segment framing with bounded LZO1X decoding. A
 format is not considered complete merely because its superblock is recognized.

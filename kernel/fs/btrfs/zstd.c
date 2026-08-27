@@ -73,6 +73,34 @@ int btrfs_zstd_copy_match(uint8_t *output, uint32_t capacity,
     return 1;
 }
 
+int btrfs_zstd_expand_sequence(uint8_t literal_length_code,
+                               uint32_t literal_length_extra,
+                               uint8_t match_length_code,
+                               uint32_t match_length_extra,
+                               uint8_t offset_code, uint32_t offset_extra,
+                               btrfs_zstd_sequence_t *sequence) {
+    static const uint32_t literal_base[36] = {
+        0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,18,20,22,24,28,32,40,48,64,
+        128,256,512,1024,2048,4096,8192,16384,32768,65536};
+    static const uint8_t literal_bits[36] = {
+        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,2,2,3,3,4,6,7,8,9,10,11,12,13,14,15,16};
+    static const uint32_t match_base[53] = {
+        3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,
+        29,30,31,32,33,34,35,37,39,41,43,47,51,59,67,83,99,131,259,515,1027,2051,
+        4099,8195,16387,32771,65539};
+    static const uint8_t match_bits[53] = {
+        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,
+        2,2,3,3,4,4,5,7,8,9,10,11,12,13,14,15,16};
+    if (!sequence || literal_length_code >= 36U || match_length_code >= 53U ||
+        offset_code > 31U || literal_length_extra >= (1U << literal_bits[literal_length_code]) ||
+        match_length_extra >= (1U << match_bits[match_length_code]) ||
+        (offset_code && offset_extra >= (1U << offset_code))) return 0;
+    sequence->literal_length = literal_base[literal_length_code] + literal_length_extra;
+    sequence->match_length = match_base[match_length_code] + match_length_extra;
+    sequence->offset = (1U << offset_code) + offset_extra;
+    return sequence->offset != 0;
+}
+
 static uint32_t zstd_stream_bits(const uint8_t *source, uint32_t bits,
                                  int64_t *offset) {
     int64_t start = *offset - (int64_t)bits;

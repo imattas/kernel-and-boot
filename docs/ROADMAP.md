@@ -342,6 +342,9 @@ Zstandard sequence-section count/mode header parsing is now implemented and
 contracted; FSE symbol tables and literal/match sequence execution remain
 before Btrfs exposure. The bounded overlap-safe match-copy primitive is now
 implemented and contracted, including destination-underflow rejection.
+Zstandard sequence code expansion for literal lengths, match lengths, and
+offsets is now implemented and contracted; FSE symbol wiring and complete
+sequence execution remain.
 
 ## Phase 10 — Userland begins after the kernel gate
 

@@ -1005,6 +1005,9 @@ and readback.
 Ext4 growth now also supports a single-indirect block table, including table
 allocation, pointer updates, zero-filled data blocks, and readback across the
 indirect boundary.
+Ext4 growth now creates double-indirect and second-level tables as needed;
+deeper-tree shrink reclamation remains guarded until its metadata walk is
+implemented.
 XFS local-format regular files now support bounded append growth within the
 inode payload and zero-length truncation with inline data clearing; extent
 allocation remains a separate XFS metadata milestone.

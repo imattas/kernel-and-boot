@@ -127,5 +127,11 @@ void arch_set_user_interrupt_gate(uint8_t vector, void (*handler)(void)) {
     }
 }
 
+void arch_set_kernel_stack(uint32_t logical_id, uint64_t stack_top) {
+    if (logical_id >= 64 || stack_top < 4096 || (stack_top & 0xfULL) != 0)
+        return;
+    tss[logical_id].rsp0 = stack_top;
+}
+
 uint16_t arch_user_code_selector(void) { return 5 * 8 + 3; }
 uint16_t arch_user_data_selector(void) { return 6 * 8 + 3; }

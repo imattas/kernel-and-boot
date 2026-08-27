@@ -126,8 +126,10 @@ continues. Richer per-CPU
 execution state remains a follow-on component. Each logical CPU owns a
 separate 256-entry IDT; the early timer gate is installed in every initialized
 table before local APIC timers are enabled.
-The DPL3 GDT and TSS/RSP0 are currently loaded on the BSP; AP user-entry state
-is deferred until per-CPU privilege-entry routing is implemented.
+The DPL3 GDT and TSS/RSP0 are loaded on every online CPU. Scheduler activation
+updates the local CPU's TSS RSP0 to the selected task's aligned kernel stack,
+so privilege entry does not reuse another task's stack. User entry remains a
+kernel-only boundary until the completion gate authorizes a userland launch.
 
 The task foundation provides an architecture-neutral saved context backed by
 an x86_64 callee-saved register switch and a bootstrap entry trampoline.

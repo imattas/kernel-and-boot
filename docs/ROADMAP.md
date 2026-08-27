@@ -116,7 +116,8 @@ tables safely. A strict ELF64 executable loader now validates PT_LOAD ranges,
 maps private user pages, zero-fills memory, records the entry point, and
 reclaims image pages; privilege transition and isolation policy remain later.
 BSP and AP DPL3 descriptors now load per-CPU GDTs and TSS/RSP0 state after
-SMP trampoline entry; actual privilege transition remains later.
+SMP trampoline entry. Scheduler activation routes each selected task's aligned
+kernel stack into the local TSS RSP0; actual userland launch remains later.
 The BSP now enters a validated user image through `iretq`; a DPL3 `int 0x80`
 gate dispatches a first syscall and returns to ring 3. Argument validation,
 copy-to/from-user, and a minimal defined ABI now validate mapped user pages and

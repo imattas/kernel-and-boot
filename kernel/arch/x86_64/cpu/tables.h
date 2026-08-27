@@ -7,6 +7,7 @@ void arch_init_tables(void);
 void arch_init_tables_for_cpu(uint32_t logical_id);
 void arch_set_interrupt_gate(uint8_t vector, void (*handler)(void));
 void arch_set_user_interrupt_gate(uint8_t vector, void (*handler)(void));
+void arch_set_kernel_stack(uint32_t logical_id, uint64_t stack_top);
 uint16_t arch_user_code_selector(void);
 uint16_t arch_user_data_selector(void);
 

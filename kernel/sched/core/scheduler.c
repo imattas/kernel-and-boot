@@ -1,5 +1,7 @@
 #include "scheduler.h"
 #include "../policy/round_robin.h"
+#include "../../arch/x86_64/cpu/tables.h"
+#include "../../arch/x86_64/smp/percpu.h"
 
 static task_wait_queue_t ready_queue;
 static task_t *current_task;
@@ -65,6 +67,10 @@ void scheduler_set_current(task_t *task) {
     current_task = task;
     if (task) task->state = TASK_RUNNING;
     spinlock_unlock_irqrestore(&scheduler_lock, flags);
+    const arch_percpu_t *cpu = arch_percpu_current();
+    if (task && cpu && task->stack && task->stack_size)
+        arch_set_kernel_stack(cpu->logical_id,
+                              ((uint64_t)(uintptr_t)task->stack + task->stack_size) & ~0xfULL);
 }
 
 void scheduler_set_idle(task_t *task) {
@@ -129,9 +135,10 @@ int scheduler_start(void) {
     task_t *next = scheduler_next();
     if (!next || next == idle_task) return 0;
     flags = spinlock_lock_irqsave(&scheduler_lock);
-    host_active = 1; current_task = next;
+    host_active = 1;
     host_context_valid = 1;
     spinlock_unlock_irqrestore(&scheduler_lock, flags);
+    scheduler_set_current(next);
     task_context_switch(&host_context, &next->context);
     host_active = 0;
     host_context_valid = 0;

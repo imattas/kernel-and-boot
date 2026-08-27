@@ -59,7 +59,7 @@ static uint32_t uhci_td_status(void) {
     return (3U << 27) | UHCI_TD_LOW_SPEED | UHCI_TD_ACTIVE;
 }
 
-static void uhci_set_running(int running) {
+static int uhci_set_running(int running) {
     uint16_t command = running ? (UHCI_CMD_RUN | UHCI_CMD_CONFIGURE) : 0;
     __asm__ volatile ("outw %0, %1" :: "a"(command),
                       "Nd"((uint16_t)(controller_base + UHCI_USBCMD)));
@@ -68,9 +68,11 @@ static void uhci_set_running(int running) {
             uint16_t status;
             __asm__ volatile ("inw %1, %0" : "=a"(status)
                               : "Nd"((uint16_t)(controller_base + UHCI_USBSTS)));
-            if ((status & UHCI_STATUS_HALTED) != 0) break;
+            if ((status & UHCI_STATUS_HALTED) != 0) return 1;
         }
+        return 0;
     }
+    return 1;
 }
 
 static int uhci_match(const device_t *device) {
@@ -195,7 +197,13 @@ int uhci_control_transfer(uint8_t address, uint8_t endpoint,
     status_td->buffer = 0;
     qh->element = (uint32_t)td_frame;
     volatile uint32_t *frame_list = (volatile uint32_t *)(uintptr_t)controller_frame_list;
-    uhci_set_running(0);
+    if (!uhci_set_running(0)) {
+        physical_free_frame(qh_frame);
+        physical_free_frame(td_frame);
+        physical_free_frame(setup_frame);
+        if (data_frame) physical_free_frame(data_frame);
+        return 0;
+    }
     for (uint32_t i = 0; i < 1024; ++i) frame_list[i] = (uint32_t)qh_frame | 2U;
     __asm__ volatile ("outl %0, %1" :: "a"((uint32_t)controller_frame_list),
                       "Nd"((uint16_t)(controller_base + UHCI_FLBASEADD)));
@@ -210,7 +218,7 @@ int uhci_control_transfer(uint8_t address, uint8_t endpoint,
         }
         __asm__ volatile ("pause");
     }
-    uhci_set_running(0);
+    if (!uhci_set_running(0)) return 0;
     for (uint32_t i = 0; i < 1024; ++i) frame_list[i] = 1U;
     uhci_set_running(1);
     if (complete && length && (setup[0] & 0x80U))
@@ -261,7 +269,7 @@ int uhci_interrupt_transfer(uint8_t address, uint8_t endpoint, void *data,
     }
     volatile uint32_t *frame_list =
         (volatile uint32_t *)(uintptr_t)controller_frame_list;
-    uhci_set_running(0);
+    if (!uhci_set_running(0)) return 0;
     for (uint32_t i = 0; i < 1024; ++i) frame_list[i] = (uint32_t)qh_frame | 2U;
     __asm__ volatile ("outl %0, %1" :: "a"((uint32_t)controller_frame_list),
                       "Nd"((uint16_t)(controller_base + UHCI_FLBASEADD)));

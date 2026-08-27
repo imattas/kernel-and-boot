@@ -35,6 +35,7 @@ typedef struct process {
 } process_t;
 
 process_t *process_create(uint64_t id);
+int process_initialize(void);
 process_t *process_lookup(uint64_t id);
 int process_load_image(process_t *process, const void *image, uint64_t size);
 int process_map_user_stack(process_t *process, uint64_t page_address);

@@ -12,6 +12,13 @@ static process_t *current_process;
 static process_t *process_table[PROCESS_MAX];
 static spinlock_t process_table_lock;
 
+int process_initialize(void) {
+    spinlock_init(&process_table_lock);
+    for (uint32_t i = 0; i < PROCESS_MAX; ++i) process_table[i] = 0;
+    current_process = 0;
+    return 1;
+}
+
 process_t *process_create(uint64_t id) {
     if (id == 0) return 0;
     uint64_t flags = spinlock_lock_irqsave(&process_table_lock);

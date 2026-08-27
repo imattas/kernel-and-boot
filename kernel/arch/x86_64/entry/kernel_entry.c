@@ -910,6 +910,10 @@ void kernel_main(void *boot_info) {
     kernel_assert(!kernel_debug_range_valid(0x1000, 1, 0x1000),
                   "debug overflow assertion failure");
     serial_write("kernel debug ready\r\n");
+    if (!process_initialize()) {
+        serial_write("process initialization failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
     process_t *thread_process = process_create(2);
     process_thread_t *thread_probe = thread_process ?
         process_thread_create(thread_process, 200, process_thread_probe, 0, 4096) : 0;

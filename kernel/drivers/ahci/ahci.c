@@ -52,6 +52,7 @@ static uint32_t active_port_number;
 static int ahci_irq_enabled;
 static volatile uint32_t ahci_interrupts;
 static spinlock_t ahci_lock;
+static int ahci_io_disabled;
 
 static int ahci_stop_engine(void) {
     if (!active_port) return 0;
@@ -66,6 +67,24 @@ static int ahci_stop_engine(void) {
         __asm__ volatile ("pause" ::: "memory");
     }
     return 0;
+}
+
+static void ahci_release_command_buffers(void) {
+    if (active_command_table) physical_free_frame(active_command_table);
+    if (active_data) physical_free_frame(active_data);
+    active_command_table = 0;
+    active_data = 0;
+}
+
+static int ahci_finish_command(int completed) {
+    if (!completed && !ahci_stop_engine()) {
+        /* A wedged HBA may still fetch these buffers; retain them safely. */
+        ahci_io_disabled = 1;
+        if (active_port) active_port[AHCI_PORT_IE / 4] = 0;
+        return 0;
+    }
+    ahci_release_command_buffers();
+    return completed;
 }
 
 static int ahci_command_ok(uint32_t task_file, uint32_t transferred,
@@ -102,6 +121,7 @@ static int ahci_probe(device_t *device) {
     }
     ready_ports = 0;
     active_port = 0; active_command_list = 0; active_command_table = 0; active_data = 0;
+    ahci_io_disabled = 0;
     for (uint32_t port = 0; port < 32; ++port) {
         if ((implemented_ports & (1U << port)) == 0) continue;
         volatile uint32_t *regs = abar + (AHCI_PORT_BASE + port * AHCI_PORT_STRIDE) / 4;
@@ -162,6 +182,7 @@ int ahci_initialize(void) {
     active_port_number = 0;
     ahci_irq_enabled = 0;
     ahci_interrupts = 0;
+    ahci_io_disabled = 0;
     ahci_driver.name = "ahci";
     ahci_driver.bus = DEVICE_BUS_PCI;
     ahci_driver.match = ahci_match;
@@ -206,7 +227,7 @@ typedef struct {
 } __attribute__((packed)) ahci_command_table_t;
 
 static int ahci_identify_locked(uint16_t *words) {
-    if (!active_port || !active_command_list || !words || active_data) return 0;
+    if (ahci_io_disabled || !active_port || !active_command_list || !words || active_data) return 0;
     active_command_table = physical_alloc_frame();
     active_data = physical_alloc_frame();
     if (!active_command_table || !active_data) {
@@ -245,15 +266,11 @@ static int ahci_identify_locked(uint16_t *words) {
         const uint16_t *source = (const uint16_t *)(uintptr_t)active_data;
         for (uint32_t i = 0; i < 256; ++i) words[i] = source[i];
     }
-    if (!completed && !ahci_stop_engine()) return 0;
-    physical_free_frame(active_command_table);
-    physical_free_frame(active_data);
-    active_command_table = 0; active_data = 0;
-    return completed;
+    return ahci_finish_command(completed);
 }
 
 static int ahci_read_sector_locked(uint64_t lba, void *buffer) {
-    if (!active_port || !active_command_list || !buffer || active_data) return 0;
+    if (ahci_io_disabled || !active_port || !active_command_list || !buffer || active_data) return 0;
     active_command_table = physical_alloc_frame();
     active_data = physical_alloc_frame();
     if (!active_command_table || !active_data) {
@@ -290,14 +307,11 @@ static int ahci_read_sector_locked(uint64_t lba, void *buffer) {
         uint8_t *destination = (uint8_t *)buffer;
         for (uint32_t i = 0; i < 512; ++i) destination[i] = source[i];
     }
-    if (!completed && !ahci_stop_engine()) return 0;
-    physical_free_frame(active_command_table); physical_free_frame(active_data);
-    active_command_table = 0; active_data = 0;
-    return completed;
+    return ahci_finish_command(completed);
 }
 
 static int ahci_write_sector_locked(uint64_t lba, const void *buffer) {
-    if (!active_port || !active_command_list || !buffer || active_data) return 0;
+    if (ahci_io_disabled || !active_port || !active_command_list || !buffer || active_data) return 0;
     active_command_table = physical_alloc_frame();
     active_data = physical_alloc_frame();
     if (!active_command_table || !active_data) {
@@ -333,14 +347,11 @@ static int ahci_write_sector_locked(uint64_t lba, const void *buffer) {
             completed = ahci_command_ok(status, header[0].prdbc, 512); break;
         }
     }
-    if (!completed && !ahci_stop_engine()) return 0;
-    physical_free_frame(active_command_table); physical_free_frame(active_data);
-    active_command_table = 0; active_data = 0;
-    return completed;
+    return ahci_finish_command(completed);
 }
 
 static int ahci_io_sectors(uint64_t lba, uint32_t count, void *buffer, int write) {
-    if (!active_port || !active_command_list || !buffer || active_data ||
+    if (ahci_io_disabled || !active_port || !active_command_list || !buffer || active_data ||
         count == 0 || count > 8) return 0;
     active_command_table = physical_alloc_frame();
     active_data = physical_alloc_frame();
@@ -393,10 +404,7 @@ static int ahci_io_sectors(uint64_t lba, uint32_t count, void *buffer, int write
     if (completed && !write)
         for (uint32_t i = 0; i < count * 512U; ++i)
             ((uint8_t *)buffer)[i] = dma[i];
-    if (!completed && !ahci_stop_engine()) return 0;
-    physical_free_frame(active_command_table); physical_free_frame(active_data);
-    active_command_table = 0; active_data = 0;
-    return completed;
+    return ahci_finish_command(completed);
 }
 
 int ahci_identify(uint16_t *words) {

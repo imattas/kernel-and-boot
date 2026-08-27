@@ -354,6 +354,9 @@ IRQ-safe driver lock, preventing concurrent callers from reusing active DMA
 buffers. Command completion now validates task-file, port interrupt, and SATA
 error status; only error causes are cleared during completion so normal
 completion causes remain observable by the IRQ path.
+AHCI command teardown now uses one ownership helper; a timeout whose port engine
+cannot quiesce quarantines further I/O and retains DMA buffers instead of freeing
+memory that a wedged HBA could still access.
 The scheduler now has an explicit core boundary
 and round-robin policy module. Process pending/blocked signal state and explicit
 termination status are now implemented; signal delivery policy remains bounded

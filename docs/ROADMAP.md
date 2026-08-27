@@ -302,15 +302,16 @@ records, and a VFS file adapter. Btrfs validates its CRC32C superblock checksum
 and supported checksum type, validates tree-node checksums/identity, and reads
 bounded leaf items through single-stripe system-chunk logical-to-physical
 mapping, loads additional single-stripe mappings from the chunk tree, resolves
-the standard FS_TREE root item, and validates CRC32C checksums for filesystem
-sector data through the checksum tree. Btrfs
+the standard FS_TREE root item, validates CRC32C checksums for filesystem
+sector data through the checksum tree, and selects a valid primary or mirror
+superblock. Btrfs
 now decodes bounded inline and uncompressed regular EXTENT_DATA records,
 extracts inode metadata, and reads mapped data including unaligned byte
 ranges, sparse holes, and multi-extent files. Btrfs now performs hashed
 DIR_ITEM lookup with variable-length entry checks and packed hash-collision
 entries; its multi-extent read path is integrated into a read-only VFS file
-adapter. Compression, encryption, cross-leaf extent lookup, data checksums, and full
-chunk-tree mapping remain before the filesystem milestone is complete. A
+adapter. Compression, encryption, and multi-device stripe mapping remain before
+the filesystem milestone is complete. A
 format is not considered complete merely because its superblock is recognized.
 
 ## Phase 10 — Userland begins after the kernel gate

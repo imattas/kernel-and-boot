@@ -124,11 +124,22 @@ int btrfs_mount(btrfs_fs_t *fs, uint32_t device) {
     if (!fs || !storage_device_at(device) ||
         storage_device_at(device)->block_size != BTRFS_SECTOR_SIZE) return 0;
     uint8_t sb[4096];
-    if (!storage_read(device, BTRFS_SUPERBLOCK_SECTOR, 8, sb) ||
-        le64(&sb[0x40]) != 0x4d5f53665248425fULL || le16(&sb[0xc0]) != 0) return 0;
-    uint32_t checksum = le32(sb);
-    sb[0] = sb[1] = sb[2] = sb[3] = 0;
-    if (crc32c(&sb[32], sizeof(sb) - 32U) != checksum) return 0;
+    const uint64_t mirrors[] = {64ULL * 1024ULL, 64ULL * 1024ULL * 1024ULL,
+                                256ULL * 1024ULL * 1024ULL * 1024ULL};
+    uint8_t valid = 0;
+    for (uint32_t i = 0; i < sizeof(mirrors) / sizeof(mirrors[0]); ++i) {
+        uint64_t lba = mirrors[i] / BTRFS_SECTOR_SIZE;
+        if (mirrors[i] % BTRFS_SECTOR_SIZE != 0 || storage_device_at(device)->block_count < 8U ||
+            lba > storage_device_at(device)->block_count - 8U ||
+            !storage_read(device, lba, 8, sb) || le64(&sb[0x40]) != 0x4d5f53665248425fULL ||
+            le16(&sb[0xc0]) != 0) continue;
+        uint32_t checksum = le32(sb);
+        sb[0] = sb[1] = sb[2] = sb[3] = 0;
+        if (crc32c(&sb[32], sizeof(sb) - 32U) != checksum) continue;
+        valid = 1;
+        break;
+    }
+    if (!valid) return 0;
     uint32_t sector_size = le32(&sb[0x90]);
     uint32_t node_size = le32(&sb[0x94]);
     uint64_t total_bytes = le64(&sb[0x70]);

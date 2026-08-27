@@ -169,6 +169,8 @@ completion gate is closed.
 ELF image teardown now unmaps each image page before returning its physical
 frame, allowing an address space to be reused without stale mappings; the
 kernel image probe exercises this unload path.
+Active address-space page flag updates and unmaps now issue `invlpg`, so
+permission and lifetime changes cannot remain hidden behind stale TLB entries.
 
 ## Phase 7 — VFS and kernel abstractions
 

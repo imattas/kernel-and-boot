@@ -26,6 +26,11 @@ static void clear_table(uint64_t *table) {
     for (uint64_t i = 0; i < 512; ++i) table[i] = 0;
 }
 
+static void invalidate_active_page(const address_space_t *space, uint64_t address) {
+    if (active_space == space)
+        __asm__ volatile ("invlpg (%0)" :: "r"((void *)(uintptr_t)address) : "memory");
+}
+
 int virtual_memory_initialize(void) {
     uint32_t low, high;
     __asm__ volatile ("rdmsr" : "=a"(low), "=d"(high) : "c"(0xc0000080));
@@ -192,6 +197,7 @@ int address_space_update_page_flags(address_space_t *space, uint64_t virtual_add
     if ((*pte & (PAGE_PRESENT | PAGE_USER)) != (PAGE_PRESENT | PAGE_USER)) return 0;
     *pte |= flags | PAGE_PRESENT;
     if ((flags & ADDRESS_SPACE_EXECUTABLE) != 0) *pte &= ~PAGE_NX;
+    invalidate_active_page(space, virtual_address);
     return 1;
 }
 
@@ -211,6 +217,7 @@ int address_space_unmap_page(address_space_t *space, uint64_t virtual_address) {
     uint64_t *pte = &pt[(virtual_address >> 12) & 0x1ff];
     if ((*pte & PAGE_PRESENT) == 0) return 0;
     *pte = 0;
+    invalidate_active_page(space, virtual_address);
     return 1;
 }
 

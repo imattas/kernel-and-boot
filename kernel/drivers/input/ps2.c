@@ -2,6 +2,7 @@
 #include "../../arch/x86_64/time/timer.h"
 
 static input_queue_t *keyboard_queue;
+static uint8_t extended_scancode;
 
 static void out8(uint16_t port, uint8_t value) {
     __asm__ volatile ("outb %0, %1" :: "a"(value), "Nd"(port));
@@ -40,6 +41,7 @@ int ps2_keyboard_initialize(input_queue_t *queue) {
     if (!keyboard_command(0xf0, 1)) return 0;
     while ((in8(0x64) & 1) != 0) (void)in8(0x60);
     keyboard_queue = queue;
+    extended_scancode = 0;
     return 1;
 }
 
@@ -50,9 +52,18 @@ void ps2_keyboard_irq(void) {
 int ps2_keyboard_poll(input_queue_t *queue) {
     if (!queue || (in8(0x64) & 1) == 0) return 0;
     uint8_t scancode = in8(0x60);
+    if (scancode == 0xe0) {
+        extended_scancode = 1;
+        return 1;
+    }
+    uint16_t code = (uint16_t)(scancode & 0x7fU);
+    if (extended_scancode) {
+        code |= 0x0100U;
+        extended_scancode = 0;
+    }
     input_event_t event = {
         .type = INPUT_EVENT_KEY,
-        .code = (uint16_t)(scancode & 0x7f),
+        .code = code,
         .value = (scancode & 0x80) == 0,
         .timestamp = timer_ticks()
     };

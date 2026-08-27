@@ -45,7 +45,8 @@ process_thread_t *process_thread_lookup(const struct process *process,
     if (!process || id == 0) return 0;
     uint64_t flags = spinlock_lock_irqsave((spinlock_t *)&process->lock);
     process_thread_t *result = process_thread_lookup_locked(process, id);
-    if (result) ++result->references;
+    if (result && result->references != UINT32_MAX) ++result->references;
+    else if (result) result = 0;
     spinlock_unlock_irqrestore((spinlock_t *)&process->lock, flags);
     return result;
 }

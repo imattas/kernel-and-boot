@@ -709,6 +709,8 @@ through `process_thread_lookup`.
 Thread lookup now returns a retained reference and exposes an explicit release
 operation, allowing thread teardown to unlink and destroy its task without
 freeing a concurrently looked-up thread object.
+Thread retained-lookup acquisition rejects reference-count saturation instead
+of wrapping ownership to zero.
 Process destruction refuses to reclaim a process while any retained thread
 lookup remains, preserving the owning process lifetime until thread release.
 

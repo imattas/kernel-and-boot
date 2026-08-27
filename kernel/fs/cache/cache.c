@@ -46,17 +46,26 @@ int block_cache_read(block_cache_t *cache, block_registry_t *registry,
         return 0;
     }
     block_cache_entry_t *entry = find_entry(cache, registry, device, sector);
+    if (entry) {
+        entry->age = ++cache->clock;
+        copy_bytes((uint8_t *)buffer, entry->data, size);
+        spinlock_unlock_irqrestore(&cache->lock, flags);
+        return 1;
+    }
+    spinlock_unlock_irqrestore(&cache->lock, flags);
+
+    uint8_t fetched[BLOCK_CACHE_SECTOR_MAX];
+    if (!block_registry_read(registry, device, sector, 1, fetched)) return 0;
+    flags = spinlock_lock_irqsave(&cache->lock);
+    entry = find_entry(cache, registry, device, sector);
     if (!entry) {
         entry = choose_entry(cache);
-        if (!block_registry_read(registry, device, sector, 1, entry->data)) {
-            spinlock_unlock_irqrestore(&cache->lock, flags);
-            return 0;
-        }
         entry->registry = registry;
         entry->device = device;
         entry->sector = sector;
         entry->sector_size = size;
         entry->valid = 1;
+        copy_bytes(entry->data, fetched, size);
     }
     entry->age = ++cache->clock;
     copy_bytes((uint8_t *)buffer, entry->data, size);
@@ -69,13 +78,17 @@ int block_cache_write(block_cache_t *cache, block_registry_t *registry,
                       uint32_t size) {
     if (!cache || !registry || !buffer || size == 0 ||
         size > BLOCK_CACHE_SECTOR_MAX) return 0;
+    uint8_t pending[BLOCK_CACHE_SECTOR_MAX];
+    copy_bytes(pending, (const uint8_t *)buffer, size);
     uint64_t flags = spinlock_lock_irqsave(&cache->lock);
     block_device_t *descriptor = block_registry_at(registry, device);
-    if (!descriptor || descriptor->sector_size != size ||
-        !block_registry_write(registry, device, sector, 1, buffer)) {
+    if (!descriptor || descriptor->sector_size != size) {
         spinlock_unlock_irqrestore(&cache->lock, flags);
         return 0;
     }
+    spinlock_unlock_irqrestore(&cache->lock, flags);
+    if (!block_registry_write(registry, device, sector, 1, pending)) return 0;
+    flags = spinlock_lock_irqsave(&cache->lock);
     block_cache_entry_t *entry = find_entry(cache, registry, device, sector);
     if (!entry) entry = choose_entry(cache);
     entry->registry = registry;
@@ -84,7 +97,7 @@ int block_cache_write(block_cache_t *cache, block_registry_t *registry,
     entry->sector_size = size;
     entry->valid = 1;
     entry->age = ++cache->clock;
-    copy_bytes(entry->data, (const uint8_t *)buffer, size);
+    copy_bytes(entry->data, pending, size);
     spinlock_unlock_irqrestore(&cache->lock, flags);
     return 1;
 }

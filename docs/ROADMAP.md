@@ -375,6 +375,8 @@ registration-state lookup before returning stable registered descriptors.
 Storage I/O now snapshots the validated callback under the registry lock and
 releases that lock before invoking hardware, preventing callback re-entry
 deadlocks and keeping registry operations independent of device latency.
+The block cache now performs cache-miss reads and write-through device I/O
+outside its metadata lock, then merges bounded results under lock.
 Task wait nodes now record their owning queue, so removal from the wrong queue
 cannot corrupt either queue's linked list.
 Scheduler initialization now precedes process-thread lifecycle operations, so

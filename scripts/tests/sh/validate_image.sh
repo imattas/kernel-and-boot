@@ -1,0 +1,28 @@
+#!/bin/sh
+set -eu
+
+image=${1:?usage: validate_image.sh <image>}
+test -f "$image"
+python3 - "$image" <<'PY'
+import sys
+data = open(sys.argv[1], 'rb').read()
+assert len(data) == 67500 * 512
+assert data[510:512] == b'\x55\xaa'
+assert int.from_bytes(data[11:13], 'little') == 512
+assert data[13] == 1
+assert int.from_bytes(data[14:16], 'little') == 32
+assert data[16] == 2
+assert int.from_bytes(data[36:40], 'little') == 520
+assert int.from_bytes(data[44:48], 'little') == 2
+assert data[82:90] == b'FAT32   '
+assert data[6 * 512:7 * 512] == data[:512]
+assert data[7 * 512:8 * 512] == data[512:2 * 512]
+root = data[(32 + 2 * 520) * 512:(33 + 2 * 520) * 512]
+assert root[:11] == b'EFI        '
+assert root[26:28] == b'\x03\x00'
+assert root[32:43] == b'KERNEL  ELF'
+assert int.from_bytes(root[58:60], 'little') >= 5
+assert data[(33 + 2 * 520) * 512 + 64:(33 + 2 * 520) * 512 + 75] == b'BOOT       '
+assert data[(34 + 2 * 520) * 512 + 64:(34 + 2 * 520) * 512 + 75] == b'BOOTX64 EFI'
+print('FAT image contract: PASS')
+PY

@@ -1,0 +1,306 @@
+#include "uhci.h"
+#include "../../device/device.h"
+#include "../pci/pci.h"
+#include "../../mm/physical/frame.h"
+
+#define UHCI_BAR_INDEX 4
+#define UHCI_USBCMD 0x00
+#define UHCI_USBSTS 0x02
+#define UHCI_USBINTR 0x04
+#define UHCI_FLBASEADD 0x08
+#define UHCI_SOFMOD 0x0c
+#define UHCI_CMD_RUN 0x0001
+#define UHCI_CMD_HCRESET 0x0002
+#define UHCI_CMD_CONFIGURE 0x0040
+#define UHCI_STATUS_HALTED 0x0020
+#define UHCI_TD_ACTIVE (1U << 23)
+#define UHCI_TD_LOW_SPEED (1U << 26)
+#define UHCI_TD_ERROR_MASK (0x3fU << 17)
+#define UHCI_PORT_BASE 0x10
+#define UHCI_PORT_COUNT 2
+#define UHCI_PORT_CONNECT 0x0001
+#define UHCI_PORT_ENABLE 0x0004
+#define UHCI_PORT_RESET 0x0200
+#define UHCI_USBLEGSUP 0xc0
+#define UHCI_LEGACY_BIOS_OWNED 0x0001U
+#define UHCI_LEGACY_OS_OWNED 0x0002U
+
+static uint32_t controllers;
+static uint32_t root_ports;
+static uint16_t controller_base;
+static uint64_t controller_frame_list;
+static device_driver_t uhci_driver;
+
+typedef struct {
+    uint32_t link;
+    uint32_t status;
+    uint32_t token;
+    uint32_t buffer;
+} __attribute__((packed, aligned(16))) uhci_td_t;
+
+typedef struct {
+    uint32_t head;
+    uint32_t element;
+} __attribute__((packed, aligned(16))) uhci_qh_t;
+
+static uint32_t uhci_token(uint8_t pid, uint8_t address, uint8_t endpoint,
+                           uint8_t toggle, uint16_t length) {
+    uint32_t max_length = length == 0 ? 0x7ffU : (uint32_t)length - 1U;
+    return pid | ((uint32_t)address << 8) | ((uint32_t)endpoint << 15) |
+           ((uint32_t)toggle << 19) | (max_length << 21);
+}
+
+static int uhci_td_complete(const uhci_td_t *td) {
+    return (td->status & UHCI_TD_ACTIVE) == 0 &&
+           (td->status & UHCI_TD_ERROR_MASK) == 0;
+}
+
+static uint32_t uhci_td_status(void) {
+    return (3U << 27) | UHCI_TD_LOW_SPEED | UHCI_TD_ACTIVE;
+}
+
+static void uhci_set_running(int running) {
+    uint16_t command = running ? (UHCI_CMD_RUN | UHCI_CMD_CONFIGURE) : 0;
+    __asm__ volatile ("outw %0, %1" :: "a"(command),
+                      "Nd"((uint16_t)(controller_base + UHCI_USBCMD)));
+    if (!running) {
+        for (uint32_t wait = 0; wait < 100000; ++wait) {
+            uint16_t status;
+            __asm__ volatile ("inw %1, %0" : "=a"(status)
+                              : "Nd"((uint16_t)(controller_base + UHCI_USBSTS)));
+            if ((status & UHCI_STATUS_HALTED) != 0) break;
+        }
+    }
+}
+
+static int uhci_match(const device_t *device) {
+    return device && device->bus == DEVICE_BUS_PCI &&
+           device->class_code == 0x0c && device->subclass == 0x03 &&
+           device->programming_interface == 0x00;
+}
+
+static int uhci_probe(device_t *device) {
+    if (!device || device->resources[UHCI_BAR_INDEX].size == 0 ||
+        (device->resources[UHCI_BAR_INDEX].flags & 1U) == 0 ||
+        !device_claim_resource(device, UHCI_BAR_INDEX, &uhci_driver)) return 0;
+    uint16_t base = (uint16_t)(device->resources[UHCI_BAR_INDEX].address & 0xfffc);
+    uint32_t legacy = pci_config_read32(device->bus_number, device->slot,
+                                        device->function, UHCI_USBLEGSUP);
+    pci_config_write32(device->bus_number, device->slot, device->function,
+                       UHCI_USBLEGSUP,
+                       (legacy & ~UHCI_LEGACY_BIOS_OWNED) | UHCI_LEGACY_OS_OWNED);
+    for (uint32_t wait = 0; wait < 100000; ++wait) {
+        legacy = pci_config_read32(device->bus_number, device->slot,
+                                   device->function, UHCI_USBLEGSUP);
+        if ((legacy & UHCI_LEGACY_BIOS_OWNED) == 0) break;
+    }
+    if ((legacy & UHCI_LEGACY_BIOS_OWNED) != 0) {
+        device_release_resource(device, UHCI_BAR_INDEX, &uhci_driver);
+        return 0;
+    }
+    uint32_t command = pci_config_read32(device->bus_number, device->slot,
+                                         device->function, 0x04);
+    pci_config_write32(device->bus_number, device->slot, device->function,
+                       0x04, command | 0x00000005U);
+    __asm__ volatile ("outw %0, %1" :: "a"((uint16_t)UHCI_CMD_HCRESET),
+                      "Nd"((uint16_t)(base + UHCI_USBCMD)));
+    int reset_complete = 0;
+    for (uint32_t i = 0; i < 100000; ++i) {
+        uint16_t status;
+        __asm__ volatile ("inw %1, %0" : "=a"(status) : "Nd"((uint16_t)(base + UHCI_USBCMD)));
+        if ((status & UHCI_CMD_HCRESET) == 0) { reset_complete = 1; break; }
+    }
+    if (!reset_complete) {
+        device_release_resource(device, UHCI_BAR_INDEX, &uhci_driver);
+        return 0;
+    }
+    uint64_t frame_list = physical_alloc_frame();
+    if (!frame_list) {
+        device_release_resource(device, UHCI_BAR_INDEX, &uhci_driver);
+        return 0;
+    }
+    uint32_t *entries = (uint32_t *)(uintptr_t)frame_list;
+    for (uint32_t i = 0; i < 1024; ++i) entries[i] = 1;
+    __asm__ volatile ("outl %0, %1" :: "a"((uint32_t)frame_list),
+                      "Nd"((uint16_t)(base + UHCI_FLBASEADD)));
+    __asm__ volatile ("outb %0, %1" :: "a"((uint8_t)64), "Nd"((uint16_t)(base + UHCI_SOFMOD)));
+    __asm__ volatile ("outw %0, %1" :: "a"((uint16_t)0), "Nd"((uint16_t)(base + UHCI_USBINTR)));
+    __asm__ volatile ("outw %0, %1" :: "a"((uint16_t)(UHCI_CMD_RUN | UHCI_CMD_CONFIGURE)),
+                      "Nd"((uint16_t)(base + UHCI_USBCMD)));
+    controller_base = base;
+    controller_frame_list = frame_list;
+    for (uint32_t port = 0; port < UHCI_PORT_COUNT; ++port) {
+        uint16_t port_address = (uint16_t)(base + UHCI_PORT_BASE + port * 2U);
+        uint16_t status;
+        __asm__ volatile ("inw %1, %0" : "=a"(status) : "Nd"(port_address));
+        if ((status & UHCI_PORT_CONNECT) == 0) continue;
+        __asm__ volatile ("outw %0, %1" :: "a"((uint16_t)UHCI_PORT_RESET), "Nd"(port_address));
+        for (volatile uint32_t delay = 0; delay < 10000; ++delay) __asm__ volatile ("pause");
+        __asm__ volatile ("outw %0, %1" :: "a"((uint16_t)(UHCI_PORT_RESET | UHCI_PORT_CONNECT)),
+                          "Nd"(port_address));
+        __asm__ volatile ("outw %0, %1" :: "a"((uint16_t)(UHCI_PORT_ENABLE | UHCI_PORT_CONNECT)),
+                          "Nd"(port_address));
+        ++root_ports;
+    }
+    ++controllers;
+    return 1;
+}
+
+int uhci_control_transfer(uint8_t address, uint8_t endpoint,
+                          const uint8_t setup[8], void *data, uint16_t length) {
+    if (!controller_base || !controller_frame_list || !setup || address > 127 ||
+        endpoint > 15 || length > 4096 || (length != 0 && !data) ||
+        length != (uint16_t)(setup[6] | ((uint16_t)setup[7] << 8))) return 0;
+    uint64_t qh_frame = physical_alloc_frame();
+    uint64_t td_frame = physical_alloc_frame();
+    uint64_t setup_frame = physical_alloc_frame();
+    uint64_t data_frame = length ? physical_alloc_frame() : 0;
+    if (!qh_frame || !td_frame || !setup_frame || (length && !data_frame)) {
+        if (qh_frame) physical_free_frame(qh_frame);
+        if (td_frame) physical_free_frame(td_frame);
+        if (setup_frame) physical_free_frame(setup_frame);
+        if (data_frame) physical_free_frame(data_frame);
+        return 0;
+    }
+    uhci_qh_t *qh = (uhci_qh_t *)(uintptr_t)qh_frame;
+    uhci_td_t *td = (uhci_td_t *)(uintptr_t)td_frame;
+    uint8_t *setup_copy = (uint8_t *)(uintptr_t)setup_frame;
+    uint8_t *data_copy = (uint8_t *)(uintptr_t)data_frame;
+    for (uint32_t i = 0; i < 4096 / 4; ++i) ((uint32_t *)td)[i] = 0;
+    qh->head = 1U;
+    qh->element = 1U;
+    for (uint32_t i = 0; i < 8; ++i) setup_copy[i] = setup[i];
+    if (length && (setup[0] & 0x80U) == 0)
+        for (uint32_t i = 0; i < length; ++i) data_copy[i] = ((uint8_t *)data)[i];
+    uint32_t data_count = length ? ((length + 63U) / 64U) : 0;
+    td[0].link = (uint32_t)(td_frame + sizeof(uhci_td_t)) | 0U;
+    td[0].status = uhci_td_status();
+    td[0].token = uhci_token(0x2d, address, endpoint, 0, 8);
+    td[0].buffer = (uint32_t)setup_frame;
+    for (uint32_t i = 0; i < data_count; ++i) {
+        uhci_td_t *current = &td[1U + i];
+        uint16_t chunk = (uint16_t)(length - i * 64U);
+        if (chunk > 64U) chunk = 64U;
+        current->link = (uint32_t)(td_frame + (2U + i) * sizeof(uhci_td_t));
+        current->status = uhci_td_status();
+        current->token = uhci_token((setup[0] & 0x80U) ? 0x69 : 0xe1,
+                                    address, endpoint, (uint8_t)(1U ^ (i & 1U)), chunk);
+        current->buffer = (uint32_t)(data_frame + i * 64U);
+    }
+    uhci_td_t *status_td = &td[1U + data_count];
+    status_td->link = 1U;
+    status_td->status = uhci_td_status();
+    status_td->token = uhci_token((setup[0] & 0x80U) ? 0xe1 : 0x69,
+                                  address, endpoint, 1, 0);
+    status_td->buffer = 0;
+    qh->element = (uint32_t)td_frame;
+    volatile uint32_t *frame_list = (volatile uint32_t *)(uintptr_t)controller_frame_list;
+    uhci_set_running(0);
+    for (uint32_t i = 0; i < 1024; ++i) frame_list[i] = (uint32_t)qh_frame | 2U;
+    __asm__ volatile ("outl %0, %1" :: "a"((uint32_t)controller_frame_list),
+                      "Nd"((uint16_t)(controller_base + UHCI_FLBASEADD)));
+    uhci_set_running(1);
+    int complete = 0;
+    for (uint32_t wait = 0; wait < 1000000; ++wait) {
+        if ((status_td->status & UHCI_TD_ACTIVE) == 0) {
+            complete = uhci_td_complete(&td[0]) && uhci_td_complete(status_td);
+            for (uint32_t i = 0; complete && i < data_count; ++i)
+                complete = uhci_td_complete(&td[1U + i]);
+            break;
+        }
+        __asm__ volatile ("pause");
+    }
+    uhci_set_running(0);
+    for (uint32_t i = 0; i < 1024; ++i) frame_list[i] = 1U;
+    uhci_set_running(1);
+    if (complete && length && (setup[0] & 0x80U))
+        for (uint32_t i = 0; i < length; ++i) ((uint8_t *)data)[i] = data_copy[i];
+    physical_free_frame(qh_frame);
+    physical_free_frame(td_frame);
+    physical_free_frame(setup_frame);
+    if (data_frame) physical_free_frame(data_frame);
+    return complete;
+}
+
+int uhci_interrupt_transfer(uint8_t address, uint8_t endpoint, void *data,
+                            uint16_t length, uint16_t max_packet,
+                            uint8_t *toggle) {
+    if (!controller_base || !controller_frame_list || !data || address > 127 ||
+        (endpoint & 0x0fU) > 15 || length == 0 || length > 4096 || max_packet == 0 ||
+        max_packet > 64 || !toggle || *toggle > 1) return 0;
+    uint32_t packet_count = (length + max_packet - 1U) / max_packet;
+    uint64_t qh_frame = physical_alloc_frame();
+    uint64_t td_frame = physical_alloc_frame();
+    uint64_t data_frame = physical_alloc_frame();
+    if (!qh_frame || !td_frame || !data_frame) {
+        if (qh_frame) physical_free_frame(qh_frame);
+        if (td_frame) physical_free_frame(td_frame);
+        if (data_frame) physical_free_frame(data_frame);
+        return 0;
+    }
+    uhci_qh_t *qh = (uhci_qh_t *)(uintptr_t)qh_frame;
+    uhci_td_t *td = (uhci_td_t *)(uintptr_t)td_frame;
+    uint8_t *transfer = (uint8_t *)(uintptr_t)data_frame;
+    int input = (endpoint & 0x80U) != 0;
+    if (!input)
+        for (uint16_t i = 0; i < length; ++i) transfer[i] = ((uint8_t *)data)[i];
+    for (uint32_t i = 0; i < 4096 / 4; ++i) ((uint32_t *)td)[i] = 0;
+    qh->head = 1U;
+    qh->element = (uint32_t)td_frame;
+    uint8_t current_toggle = *toggle;
+    for (uint32_t i = 0; i < packet_count; ++i) {
+        uint16_t chunk = (uint16_t)(length - i * max_packet);
+        if (chunk > max_packet) chunk = max_packet;
+        td[i].link = i + 1U < packet_count ?
+            (uint32_t)(td_frame + (i + 1U) * sizeof(uhci_td_t)) : 1U;
+        td[i].status = uhci_td_status();
+        td[i].token = uhci_token(input ? 0x69 : 0xe1, address,
+                                 endpoint & 0x0fU, current_toggle, chunk);
+        td[i].buffer = (uint32_t)(data_frame + i * max_packet);
+        current_toggle ^= 1U;
+    }
+    volatile uint32_t *frame_list =
+        (volatile uint32_t *)(uintptr_t)controller_frame_list;
+    uhci_set_running(0);
+    for (uint32_t i = 0; i < 1024; ++i) frame_list[i] = (uint32_t)qh_frame | 2U;
+    __asm__ volatile ("outl %0, %1" :: "a"((uint32_t)controller_frame_list),
+                      "Nd"((uint16_t)(controller_base + UHCI_FLBASEADD)));
+    uhci_set_running(1);
+    int complete = 0;
+    for (uint32_t wait = 0; wait < 1000000; ++wait) {
+        if ((td[packet_count - 1U].status & UHCI_TD_ACTIVE) == 0) {
+            complete = 1;
+            for (uint32_t i = 0; i < packet_count; ++i)
+                complete = complete && uhci_td_complete(&td[i]);
+            break;
+        }
+        __asm__ volatile ("pause");
+    }
+    uhci_set_running(0);
+    for (uint32_t i = 0; i < 1024; ++i) frame_list[i] = 1U;
+    uhci_set_running(1);
+    if (complete) {
+        if (input)
+            for (uint16_t i = 0; i < length; ++i) ((uint8_t *)data)[i] = transfer[i];
+        *toggle = current_toggle;
+    }
+    physical_free_frame(qh_frame);
+    physical_free_frame(td_frame);
+    physical_free_frame(data_frame);
+    return complete;
+}
+
+int uhci_initialize(void) {
+    controllers = 0;
+    root_ports = 0;
+    controller_base = 0;
+    controller_frame_list = 0;
+    uhci_driver.name = "uhci";
+    uhci_driver.bus = DEVICE_BUS_PCI;
+    uhci_driver.match = uhci_match;
+    uhci_driver.probe = uhci_probe;
+    return device_driver_register(&uhci_driver) && device_bind_drivers();
+}
+
+uint32_t uhci_controller_count(void) { return controllers; }
+uint32_t uhci_root_port_count(void) { return root_ports; }

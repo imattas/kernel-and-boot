@@ -1,0 +1,162 @@
+#include "process.h"
+#include "thread.h"
+#include "../../mm/heap/heap.h"
+#include "../../mm/physical/frame.h"
+#include "../../exec/exec.h"
+#include "handle.h"
+#include "../sync/spinlock.h"
+
+#define PAGE_SIZE 0x1000ULL
+
+static process_t *current_process;
+static process_t *process_table[PROCESS_MAX];
+static spinlock_t process_table_lock;
+
+process_t *process_create(uint64_t id) {
+    if (id == 0) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&process_table_lock);
+    for (uint32_t i = 0; i < PROCESS_MAX; ++i)
+        if (process_table[i] && process_table[i]->id == id) {
+            spinlock_unlock_irqrestore(&process_table_lock, flags);
+            return 0;
+        }
+    spinlock_unlock_irqrestore(&process_table_lock, flags);
+    process_t *process = (process_t *)kmalloc(sizeof(*process));
+    if (!process) return 0;
+    process->id = id;
+    process->state = PROCESS_NEW;
+    process->address_space.root = 0;
+    process->address_space.owned_count = 0;
+    process->image.entry = 0;
+    process->image.page_count = 0;
+    security_context_initialize(&process->security, 1000, 1000, 0);
+    process->user_stack_page = 0;
+    process->user_stack_top = 0;
+    process->pending_signals = 0;
+    process->blocked_signals = 0;
+    process->exit_status = 0;
+    process_handle_table_initialize(&process->handles);
+    process->threads = 0;
+    process->thread_count = 0;
+    if (!address_space_create(&process->address_space)) {
+        kfree(process);
+        return 0;
+    }
+    flags = spinlock_lock_irqsave(&process_table_lock);
+    for (uint32_t i = 0; i < PROCESS_MAX; ++i) {
+        if (process_table[i] && process_table[i]->id == id) {
+            spinlock_unlock_irqrestore(&process_table_lock, flags);
+            address_space_destroy(&process->address_space);
+            kfree(process);
+            return 0;
+        }
+        if (!process_table[i]) {
+            process_table[i] = process;
+            spinlock_unlock_irqrestore(&process_table_lock, flags);
+            return process;
+        }
+    }
+    spinlock_unlock_irqrestore(&process_table_lock, flags);
+    address_space_destroy(&process->address_space);
+    kfree(process);
+    return 0;
+}
+
+process_t *process_lookup(uint64_t id) {
+    if (id == 0) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&process_table_lock);
+    process_t *result = 0;
+    for (uint32_t i = 0; i < PROCESS_MAX; ++i)
+        if (process_table[i] && process_table[i]->id == id) { result = process_table[i]; break; }
+    spinlock_unlock_irqrestore(&process_table_lock, flags);
+    return result;
+}
+
+int process_load_image(process_t *process, const void *image, uint64_t size) {
+    if (!process || process->state != PROCESS_NEW ||
+        !exec_load_image(&process->address_space, image, size, &process->image))
+        return 0;
+    process->state = PROCESS_READY;
+    return 1;
+}
+
+int process_map_user_stack(process_t *process, uint64_t page_address) {
+    if (!process || process->state != PROCESS_READY ||
+        (page_address & (PAGE_SIZE - 1)) != 0 ||
+        page_address < (1ULL << 39) || page_address >= (1ULL << 48) ||
+        process->user_stack_page != 0)
+        return 0;
+    uint64_t frame = physical_alloc_frame();
+    if (!frame || !address_space_map_page(&process->address_space, page_address,
+                                          frame, ADDRESS_SPACE_WRITABLE | ADDRESS_SPACE_USER)) {
+        if (frame) physical_free_frame(frame);
+        return 0;
+    }
+    process->user_stack_page = frame;
+    process->user_stack_top = page_address + PAGE_SIZE;
+    return 1;
+}
+
+int process_activate(process_t *process) {
+    if (!process || process->state != PROCESS_READY ||
+        !process->user_stack_page || !address_space_activate(&process->address_space))
+        return 0;
+    process->state = PROCESS_RUNNING;
+    current_process = process;
+    return 1;
+}
+
+int process_destroy(process_t *process) {
+    if (!process || process == current_process || process->state == PROCESS_RUNNING ||
+        !process_thread_destroy_all(process)) return 0;
+    exec_unload_image(&process->address_space, &process->image);
+    if (!address_space_destroy(&process->address_space)) return 0;
+    if (process->user_stack_page) physical_free_frame(process->user_stack_page);
+    process->state = PROCESS_EXITED;
+    process_handle_table_close_all(&process->handles);
+    uint64_t flags = spinlock_lock_irqsave(&process_table_lock);
+    for (uint32_t i = 0; i < PROCESS_MAX; ++i)
+        if (process_table[i] == process) process_table[i] = 0;
+    spinlock_unlock_irqrestore(&process_table_lock, flags);
+    kfree(process);
+    return 1;
+}
+
+process_t *process_current(void) {
+    return current_process;
+}
+
+int process_send_signal(process_t *process, uint32_t signal) {
+    if (!process || process->state == PROCESS_EXITED || signal == 0 ||
+        signal > PROCESS_SIGNAL_MAX) return 0;
+    process->pending_signals |= 1U << (signal - 1U);
+    return 1;
+}
+
+int process_set_signal_mask(process_t *process, uint32_t mask) {
+    if (!process || process->state == PROCESS_EXITED) return 0;
+    process->blocked_signals = mask;
+    return 1;
+}
+
+int process_take_signal(process_t *process, uint32_t *signal) {
+    if (!process || !signal) return 0;
+    uint32_t available = process->pending_signals & ~process->blocked_signals;
+    if (!available) return 0;
+    uint32_t bit = 0;
+    while ((available & (1U << bit)) == 0) ++bit;
+    process->pending_signals &= ~(1U << bit);
+    *signal = bit + 1U;
+    return 1;
+}
+
+int process_terminate(process_t *process, int32_t status) {
+    if (!process || process->state == PROCESS_EXITED ||
+        process == current_process) return 0;
+    for (process_thread_t *thread = process->threads; thread; thread = thread->next)
+        if (!thread->task || thread->task->state == TASK_RUNNING) return 0;
+    if (!process_thread_destroy_all(process)) return 0;
+    process->exit_status = status;
+    process->state = PROCESS_EXITED;
+    return 1;
+}

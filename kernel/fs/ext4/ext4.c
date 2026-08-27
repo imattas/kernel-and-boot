@@ -1,0 +1,144 @@
+#include "ext4.h"
+#include "../../drivers/storage/storage.h"
+
+#define EXT4_SECTOR_SIZE 512U
+#define EXT4_MAGIC 0xef53U
+#define EXT4_EXTENTS_FL 0x00080000U
+#define EXT4_EXTENT_MAGIC 0xf30aU
+#define EXT4_INCOMPAT_FILETYPE 0x0002U
+#define EXT4_INCOMPAT_EXTENTS 0x0040U
+#define EXT4_INCOMPAT_64BIT 0x0080U
+
+static uint16_t load16(const uint8_t *p) { return (uint16_t)p[0] | ((uint16_t)p[1] << 8); }
+static uint32_t load32(const uint8_t *p) { return (uint32_t)load16(p) | ((uint32_t)load16(p + 2) << 16); }
+
+static int read_block(const ext4_fs_t *fs, uint64_t block, void *buffer) {
+    if (!fs || !buffer || block >= fs->block_count || fs->block_size > 4096U) return 0;
+    return storage_read(fs->device, block * (fs->block_size / EXT4_SECTOR_SIZE),
+                        fs->block_size / EXT4_SECTOR_SIZE, buffer);
+}
+
+int ext4_mount(ext4_fs_t *fs, uint32_t device) {
+    if (!fs || !storage_device_at(device) ||
+        storage_device_at(device)->block_size != EXT4_SECTOR_SIZE) return 0;
+    uint8_t sb[1024];
+    if (!storage_read(device, 2, 2, sb) || load16(&sb[56]) != EXT4_MAGIC) return 0;
+    uint32_t log_block_size = load32(&sb[24]);
+    uint32_t block_size = 1024U << log_block_size;
+    uint32_t incompat = load32(&sb[96]);
+    uint64_t block_count = load32(&sb[4]);
+    uint32_t blocks_per_group = load32(&sb[32]);
+    uint32_t inodes_per_group = load32(&sb[40]);
+    uint32_t inode_size = load16(&sb[88]);
+    uint32_t descriptor_size = load16(&sb[254]);
+    if (log_block_size > 2 || block_size < 1024 || block_size > 4096 ||
+        (incompat & ~(EXT4_INCOMPAT_FILETYPE | EXT4_INCOMPAT_EXTENTS)) != 0 ||
+        block_count == 0 || blocks_per_group == 0 || inodes_per_group == 0 ||
+        inode_size < 128 || inode_size > block_size ||
+        (block_size % inode_size) != 0 || descriptor_size < 32 ||
+        descriptor_size > block_size) return 0;
+    uint8_t group[4096];
+    ext4_fs_t probe = {.device = device, .block_size = block_size, .block_count = block_count};
+    uint64_t descriptor_block = block_size == 1024 ? 2 : 1;
+    if (!read_block(&probe, descriptor_block, group)) return 0;
+    uint32_t inode_table = load32(&group[8]);
+    if (inode_table >= block_count || (uint64_t)inode_table +
+        (inodes_per_group * inode_size + block_size - 1U) / block_size > block_count) return 0;
+    fs->device = device; fs->block_size = block_size; fs->inode_size = inode_size;
+    fs->inodes_per_group = inodes_per_group; fs->inode_table = inode_table;
+    fs->block_count = block_count; fs->mounted = 1;
+    return 1;
+}
+
+static int read_inode(const ext4_fs_t *fs, uint32_t number, uint8_t *inode) {
+    if (!fs || !fs->mounted || number == 0 ||
+        number > fs->inodes_per_group || !inode) return 0;
+    uint64_t byte_offset = (uint64_t)(number - 1U) * fs->inode_size;
+    uint64_t block = fs->inode_table + byte_offset / fs->block_size;
+    uint32_t offset = (uint32_t)(byte_offset % fs->block_size);
+    if (offset + fs->inode_size > fs->block_size) return 0;
+    uint8_t data[4096];
+    if (!read_block(fs, block, data)) return 0;
+    for (uint32_t i = 0; i < fs->inode_size; ++i) inode[i] = data[offset + i];
+    return 1;
+}
+
+static int inode_data_block(const ext4_fs_t *fs, const uint8_t *inode,
+                            uint32_t logical, uint64_t *physical) {
+    if (!fs || !inode || !physical) return 0;
+    if ((load32(&inode[32]) & EXT4_EXTENTS_FL) != 0) {
+        const uint8_t *header = &inode[40];
+        if (load16(header) != EXT4_EXTENT_MAGIC || load16(header + 6) != 0) return 0;
+        uint16_t entries = load16(header + 2);
+        if (entries > load16(header + 4) || 12U + (uint32_t)entries * 12U > 60U) return 0;
+        for (uint16_t i = 0; i < entries; ++i) {
+            const uint8_t *extent = header + 12U + i * 12U;
+            uint32_t first = load32(extent);
+            uint16_t length = load16(extent + 4) & 0x7fffU;
+            if (logical < first || logical - first >= length) continue;
+            uint64_t start = ((uint64_t)load16(extent + 6) << 32) | load32(extent + 8);
+            *physical = start + logical - first;
+            return *physical < fs->block_count;
+        }
+        return 0;
+    }
+    if (logical >= 12) return 0;
+    *physical = load32(&inode[40 + logical * 4U]);
+    return *physical != 0 && *physical < fs->block_count;
+}
+
+int ext4_lookup(ext4_fs_t *fs, uint32_t directory_inode, const char *name,
+                uint32_t *inode_number) {
+    if (!fs || !fs->mounted || !name || !inode_number || name[0] == 0) return 0;
+    uint8_t inode[4096], block[4096];
+    if (!read_inode(fs, directory_inode, inode) || (load16(inode) & 0xf000U) != 0x4000U) return 0;
+    uint64_t directory_size = load32(&inode[4]);
+    uint32_t block_count = (uint32_t)((directory_size + fs->block_size - 1U) / fs->block_size);
+    for (uint32_t logical = 0; logical < block_count; ++logical) {
+        uint64_t physical = 0;
+        if (!inode_data_block(fs, inode, logical, &physical) || !read_block(fs, physical, block)) return 0;
+        uint32_t offset = 0;
+        while (offset + 8 <= fs->block_size) {
+            uint32_t child = load32(&block[offset]); uint16_t record = load16(&block[offset + 4]);
+            uint8_t name_length = block[offset + 6];
+            if (record < 8 || (record & 3U) != 0 || offset + record > fs->block_size ||
+                name_length > record - 8U) return 0;
+            if (child != 0 && name_length == 0) return 0;
+            int equal = child != 0 && name_length != 0;
+            for (uint32_t i = 0; equal && (name[i] || i < name_length); ++i)
+                if (i >= name_length || name[i] == 0 || name[i] != (char)block[offset + 8 + i]) equal = 0;
+            if (equal && name[name_length] == 0) { *inode_number = child; return 1; }
+            offset += record;
+            if (record == 0) return 0;
+        }
+    }
+    return 0;
+}
+
+int ext4_inode_size(ext4_fs_t *fs, uint32_t inode_number, uint64_t *size) {
+    uint8_t inode[4096];
+    if (!size || !read_inode(fs, inode_number, inode)) return 0;
+    if ((load16(inode) & 0xf000U) != 0x8000U) return 0;
+    *size = load32(&inode[4]);
+    return 1;
+}
+
+int ext4_read_file(ext4_fs_t *fs, uint32_t inode_number, uint64_t offset,
+                   void *buffer, uint32_t size) {
+    if (!fs || !buffer || size == 0) return 0;
+    uint8_t inode[4096];
+    if (!read_inode(fs, inode_number, inode)) return 0;
+    uint64_t file_size = load32(&inode[4]);
+    if (offset > file_size || size > file_size - offset) return 0;
+    uint8_t block[4096]; uint8_t *destination = buffer;
+    uint32_t in_block = (uint32_t)(offset % fs->block_size); uint64_t logical = offset / fs->block_size;
+    uint32_t remaining = size;
+    while (remaining) {
+        uint64_t physical = 0;
+        if (!inode_data_block(fs, inode, (uint32_t)logical, &physical) || !read_block(fs, physical, block)) return 0;
+        uint32_t chunk = fs->block_size - in_block; if (chunk > remaining) chunk = remaining;
+        for (uint32_t i = 0; i < chunk; ++i) destination[i] = block[in_block + i];
+        destination += chunk; remaining -= chunk; ++logical; in_block = 0;
+    }
+    return 1;
+}

@@ -1,0 +1,16 @@
+# Generated build and test output
+/build/
+/dist/
+
+# Local editor and host files
+.vscode/
+.idea/
+*.swp
+*.swo
+*.user
+*.suo
+
+# Temporary logs and emulator state
+*.log
+*.pid
+*.tmp

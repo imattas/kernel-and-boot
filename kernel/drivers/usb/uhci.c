@@ -31,6 +31,7 @@
 #define UHCI_LEGACY_OS_OWNED 0x0002U
 #define UHCI_IRQ_VECTOR 0x51
 #define UHCI_INTR_MASK 0x0007U
+#define UHCI_IO_SPACE_SIZE 0x20U
 
 extern void arch_pci_shared_irq_stub(void);
 
@@ -117,7 +118,9 @@ static int uhci_match(const device_t *device) {
 }
 
 static int uhci_probe(device_t *device) {
-    if (!device || device->resources[UHCI_BAR_INDEX].size == 0 ||
+    if (!device || device->resources[UHCI_BAR_INDEX].size < UHCI_IO_SPACE_SIZE ||
+        device->resources[UHCI_BAR_INDEX].address == 0 ||
+        device->resources[UHCI_BAR_INDEX].address > 0xfffcULL ||
         (device->resources[UHCI_BAR_INDEX].flags & 1U) == 0 ||
         !device_claim_resource(device, UHCI_BAR_INDEX, &uhci_driver)) return 0;
     uint16_t base = (uint16_t)(device->resources[UHCI_BAR_INDEX].address & 0xfffc);

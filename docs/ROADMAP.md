@@ -404,6 +404,9 @@ endpoint toggles; the boot path discovers an interrupt-IN endpoint from the
 configuration descriptors and exercises the USB HID polling path.
 UHCI interrupt transfers now reject endpoint values before token bit-packing,
 preventing invalid endpoint numbers from being silently truncated.
+UHCI probing now requires a complete 0x20-byte I/O BAR within the 16-bit x86
+I/O-port range, preventing BAR-address truncation from redirecting MMIO-style
+accesses to unrelated ports.
 The boot path now attempts a HID interrupt poll, tolerates an idle keyboard’s
 valid no-report response, and feeds any completed decoded report into the
 shared input event queue.

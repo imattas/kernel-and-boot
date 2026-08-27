@@ -2405,6 +2405,24 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("chdir syscall ready\r\n");
+    static const char dev_path[] = "/dev";
+    char cwd_path[8] = {0};
+    if (!syscall_copy_to_user(0x8000002000ULL, dev_path, sizeof(dev_path)) ||
+        syscall_dispatch(OS_SYSCALL_CHDIR, 0x8000002000ULL,
+                         sizeof(dev_path) - 1, 0) != 0 ||
+        syscall_dispatch(OS_SYSCALL_GETCWD, 0x8000005000ULL,
+                         sizeof(cwd_path), 0) != 4 ||
+        !syscall_copy_from_user(cwd_path, 0x8000005000ULL,
+                                sizeof(cwd_path)) || cwd_path[0] != '/' ||
+        cwd_path[1] != 'd' || cwd_path[3] != 'v' || cwd_path[4] != '\0' ||
+        !syscall_copy_to_user(0x8000002000ULL, root_path, sizeof(root_path)) ||
+        syscall_dispatch(OS_SYSCALL_CHDIR, 0x8000002000ULL,
+                         sizeof(root_path) - 1, 0) != 0 ||
+        syscall_dispatch(OS_SYSCALL_GETCWD, 0x8000005000ULL, 2, 0) != 1) {
+        serial_write("getcwd syscall failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("getcwd syscall ready\r\n");
     if (!kernel_init_state_advance(&init_state, KERNEL_INIT_SERVICES))
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     serial_write("user mode deferred until kernel completion\r\n");

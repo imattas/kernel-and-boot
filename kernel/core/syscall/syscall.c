@@ -234,6 +234,61 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
             if (directory) vfs_node_release(directory);
             return valid ? 0 : OS_SYSCALL_ERROR;
         }
+        case OS_SYSCALL_GETCWD: {
+            process_t *process = process_current();
+            if (!process || arg2 == 0 || arg2 > OS_SYSCALL_MAX_PATH) return OS_SYSCALL_ERROR;
+            vfs_node_t *root = 0;
+            vfs_node_t *current = 0;
+            uint64_t flags = spinlock_lock_irqsave(&process->lock);
+            if (process->root_directory) {
+                root = process->root_directory;
+                current = process->working_directory;
+                vfs_node_retain(root);
+                if (current) vfs_node_retain(current);
+            }
+            spinlock_unlock_irqrestore(&process->lock, flags);
+            if (!root || !current) {
+                if (root) vfs_node_release(root);
+                if (current) vfs_node_release(current);
+                return OS_SYSCALL_ERROR;
+            }
+            char path[OS_SYSCALL_MAX_PATH + 1];
+            uint32_t end = sizeof(path);
+            path[--end] = '\0';
+            while (current != root) {
+                char name[sizeof(current->name)];
+                vfs_node_t *parent = 0;
+                uint64_t node_flags = spinlock_lock_irqsave(&current->lock);
+                parent = current->parent;
+                if (parent) vfs_node_retain(parent);
+                for (uint32_t i = 0; i < sizeof(name); ++i) name[i] = current->name[i];
+                spinlock_unlock_irqrestore(&current->lock, node_flags);
+                if (!parent) {
+                    vfs_node_release(current);
+                    vfs_node_release(root);
+                    return OS_SYSCALL_ERROR;
+                }
+                uint32_t length = 0;
+                while (length < sizeof(name) && name[length] != '\0') ++length;
+                if (length == 0 || end < length + 1) {
+                    vfs_node_release(parent);
+                    vfs_node_release(current);
+                    vfs_node_release(root);
+                    return OS_SYSCALL_ERROR;
+                }
+                end -= length;
+                for (uint32_t i = 0; i < length; ++i) path[end + i] = name[i];
+                path[--end] = '/';
+                vfs_node_release(current);
+                current = parent;
+            }
+            if (end == sizeof(path) - 1) path[--end] = '/';
+            uint32_t length = sizeof(path) - end;
+            int valid = length <= arg2 && syscall_copy_to_user(arg1, &path[end], length);
+            vfs_node_release(current);
+            vfs_node_release(root);
+            return valid ? length - 1 : OS_SYSCALL_ERROR;
+        }
         case OS_SYSCALL_SIGNAL_NEXT: {
             uint32_t signal = 0;
             if (!user_range(arg1, sizeof(signal), 1) ||

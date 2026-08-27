@@ -252,6 +252,8 @@ The syscall ABI now exposes cooperative scheduler yield, completing the first
 explicit task-scheduling operation available to future user tasks.
 Processes now support root-confined working-directory changes through a
 validated `chdir` syscall; non-directory targets are rejected.
+The namespace ABI now reconstructs and validates the current path through a
+root-bounded `getcwd` syscall, including retained ancestry during traversal.
 Current-process exit now publishes an exit status, wakes signal and exit
 waiters, and terminates the scheduler task through a dedicated exit syscall;
 successful ring-3 invocation remains deferred with the rest of userland.

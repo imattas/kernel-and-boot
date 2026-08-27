@@ -82,8 +82,39 @@ static int inode_data_block(const ext4_fs_t *fs, const uint8_t *inode,
         }
         return 0;
     }
-    if (logical >= 12) return 0;
-    *physical = load32(&inode[40 + logical * 4U]);
+    uint64_t index = logical;
+    if (index < 12U) {
+        *physical = load32(&inode[40 + (uint32_t)index * 4U]);
+        return *physical != 0 && *physical < fs->block_count;
+    }
+    index -= 12U;
+    uint64_t pointers = fs->block_size / 4U;
+    uint32_t indirect = load32(&inode[40 + 12U * 4U]);
+    uint8_t block[4096];
+    if (index < pointers) {
+        if (!read_block(fs, indirect, block)) return 0;
+        *physical = load32(&block[index * 4U]);
+        return *physical != 0 && *physical < fs->block_count;
+    }
+    index -= pointers;
+    uint64_t double_count = pointers * pointers;
+    uint32_t double_indirect = load32(&inode[40 + 13U * 4U]);
+    if (index < double_count) {
+        if (!read_block(fs, double_indirect, block)) return 0;
+        uint32_t first = load32(&block[(index / pointers) * 4U]);
+        if (!read_block(fs, first, block)) return 0;
+        *physical = load32(&block[(index % pointers) * 4U]);
+        return *physical != 0 && *physical < fs->block_count;
+    }
+    index -= double_count;
+    uint64_t triple_count = double_count * pointers;
+    uint32_t triple_indirect = load32(&inode[40 + 14U * 4U]);
+    if (index >= triple_count || !read_block(fs, triple_indirect, block)) return 0;
+    uint32_t first = load32(&block[(index / double_count) * 4U]);
+    if (!read_block(fs, first, block)) return 0;
+    uint32_t second = load32(&block[((index / pointers) % pointers) * 4U]);
+    if (!read_block(fs, second, block)) return 0;
+    *physical = load32(&block[(index % pointers) * 4U]);
     return *physical != 0 && *physical < fs->block_count;
 }
 

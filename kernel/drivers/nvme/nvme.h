@@ -16,5 +16,6 @@ int nvme_read_sector(uint64_t lba, void *buffer);
 int nvme_write_sector(uint64_t lba, const void *buffer);
 int nvme_read_sectors(uint64_t lba, uint32_t count, void *buffer);
 int nvme_write_sectors(uint64_t lba, uint32_t count, const void *buffer);
+uint32_t nvme_last_io_page_count(void);
 
 #endif

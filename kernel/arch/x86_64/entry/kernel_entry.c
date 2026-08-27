@@ -383,14 +383,14 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("hlt" ::: "memory");
     }
     serial_write("virtual memory root="); serial_write_hex(virtual_memory_root()); serial_write("\r\n");
-    address_space_t process_space;
+    static address_space_t process_space;
     process_space.root = 0;
     process_space.owned_count = 0;
     uint64_t process_page = physical_alloc_frame();
-    user_image_t rejected_image;
-    user_image_t loaded_image;
-    uint8_t invalid_image[sizeof(user_image_probe)];
-    uint8_t invalid_alignment_image[sizeof(user_image_probe)];
+    static user_image_t rejected_image;
+    static user_image_t loaded_image;
+    static uint8_t invalid_image[sizeof(user_image_probe)];
+    static uint8_t invalid_alignment_image[sizeof(user_image_probe)];
     build_user_image_probe();
     for (uint32_t i = 0; i < sizeof(invalid_image); ++i)
         invalid_image[i] = user_image_probe[i];
@@ -431,7 +431,29 @@ void kernel_main(void *boot_info) {
         serial_write("address space table reclamation failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
-    address_space_t cloned_space = {0};
+    static address_space_t cloned_image_space;
+    static user_image_t cloned_image;
+    cloned_image_space = (address_space_t){0};
+    cloned_image = (user_image_t){0};
+    if (!user_image_load(&process_space, user_image_probe,
+                         sizeof(user_image_probe), &loaded_image) ||
+        !user_image_clone(&cloned_image_space, &loaded_image, &cloned_image) ||
+        cloned_image.entry != loaded_image.entry ||
+        cloned_image.page_count != loaded_image.page_count ||
+        cloned_image.pages[0] == loaded_image.pages[0] ||
+        ((volatile uint8_t *)(uintptr_t)cloned_image.pages[0])[0] !=
+            ((volatile uint8_t *)(uintptr_t)loaded_image.pages[0])[0]) {
+        serial_write("user image clone failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    user_image_destroy(&cloned_image_space, &cloned_image);
+    if (!address_space_destroy(&cloned_image_space)) {
+        serial_write("user image clone teardown failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    user_image_destroy(&process_space, &loaded_image);
+    static address_space_t cloned_space;
+    cloned_space = (address_space_t){0};
     if (!address_space_map_anonymous(&process_space, 0x8000003000ULL, 1,
                                      ADDRESS_SPACE_WRITABLE) ||
         process_space.anonymous_count != 1 ||

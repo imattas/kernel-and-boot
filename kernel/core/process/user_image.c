@@ -72,6 +72,7 @@ static void release_pages(address_space_t *space, user_image_t *loaded) {
     for (uint32_t i = 0; i < loaded->page_count; ++i) {
         if (space) (void)address_space_unmap_page(space, loaded->virtual_pages[i]);
         physical_free_frame(loaded->pages[i]);
+        loaded->page_flags[i] = 0;
     }
     loaded->page_count = 0;
 }
@@ -123,9 +124,10 @@ int user_image_load(address_space_t *space, const void *image, uint64_t image_si
                 physical_page = loaded->pages[page_index];
                 if ((program->flags & (ELF_PF_W | ELF_PF_X)) != 0 &&
                     !address_space_update_page_flags(space, virtual_page, page_flags)) {
-            release_pages(space, loaded);
+                    release_pages(space, loaded);
                     return 0;
                 }
+                loaded->page_flags[page_index] |= page_flags;
             } else {
                 if (loaded->page_count >= USER_IMAGE_MAX_PAGES) {
             release_pages(space, loaded);
@@ -140,6 +142,7 @@ int user_image_load(address_space_t *space, const void *image, uint64_t image_si
                 }
                 loaded->pages[loaded->page_count] = physical_page;
                 loaded->virtual_pages[loaded->page_count] = virtual_page;
+                loaded->page_flags[loaded->page_count] = page_flags;
                 ++loaded->page_count;
                 uint8_t *new_page = (uint8_t *)(uintptr_t)physical_page;
                 for (uint64_t byte = 0; byte < PAGE_SIZE; ++byte) new_page[byte] = 0;
@@ -173,4 +176,34 @@ void user_image_destroy(address_space_t *space, user_image_t *loaded) {
     if (!loaded) return;
     release_pages(space, loaded);
     loaded->entry = 0;
+}
+
+int user_image_clone(address_space_t *destination_space,
+                     const user_image_t *source, user_image_t *clone) {
+    if (!destination_space || !source || !clone || destination_space->root != 0 ||
+        source->page_count == 0 || source->page_count > USER_IMAGE_MAX_PAGES)
+        return 0;
+    uint8_t *clone_bytes = (uint8_t *)clone;
+    for (uint64_t byte = 0; byte < sizeof(*clone); ++byte) clone_bytes[byte] = 0;
+    if (!address_space_create(destination_space)) return 0;
+    clone->entry = source->entry;
+    for (uint32_t index = 0; index < source->page_count; ++index) {
+        uint64_t frame = physical_alloc_frame();
+        if (!frame || !address_space_map_page(destination_space,
+                                              source->virtual_pages[index], frame,
+                                              source->page_flags[index])) {
+            if (frame) physical_free_frame(frame);
+            user_image_destroy(destination_space, clone);
+            (void)address_space_destroy(destination_space);
+            return 0;
+        }
+        volatile uint8_t *from = (volatile uint8_t *)(uintptr_t)source->pages[index];
+        volatile uint8_t *to = (volatile uint8_t *)(uintptr_t)frame;
+        for (uint32_t byte = 0; byte < PAGE_SIZE; ++byte) to[byte] = from[byte];
+        clone->pages[index] = frame;
+        clone->virtual_pages[index] = source->virtual_pages[index];
+        clone->page_flags[index] = source->page_flags[index];
+        ++clone->page_count;
+    }
+    return 1;
 }

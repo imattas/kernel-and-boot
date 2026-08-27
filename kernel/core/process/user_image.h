@@ -11,10 +11,13 @@ typedef struct {
     uint32_t page_count;
     uint64_t pages[USER_IMAGE_MAX_PAGES];
     uint64_t virtual_pages[USER_IMAGE_MAX_PAGES];
+    uint64_t page_flags[USER_IMAGE_MAX_PAGES];
 } user_image_t;
 
 int user_image_load(address_space_t *space, const void *image, uint64_t image_size,
                     user_image_t *loaded);
 void user_image_destroy(address_space_t *space, user_image_t *loaded);
+int user_image_clone(address_space_t *destination_space,
+                     const user_image_t *source, user_image_t *clone);
 
 #endif

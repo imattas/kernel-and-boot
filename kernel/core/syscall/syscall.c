@@ -98,8 +98,9 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
                 vfs_lookup_path_at_access(root, working, path, &security) : 0;
             uint32_t requested = (arg3 & VFS_FILE_READ ? 4U : 0U) |
                                  (arg3 & VFS_FILE_WRITE ? 2U : 0U);
-            int handle = node && vfs_node_access(node, &security, requested) ?
-                vfs_file_open_handle(&process->handles, node, (uint32_t)arg3) : 0;
+            int access = node && vfs_node_access(node, &security, requested);
+            int handle = access ? vfs_file_open_handle(&process->handles, node,
+                                                        (uint32_t)arg3) : 0;
             if (node) vfs_node_release(node);
             if (working) vfs_node_release(working);
             if (root) vfs_node_release(root);

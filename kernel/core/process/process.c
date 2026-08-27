@@ -126,6 +126,22 @@ int process_set_namespace(process_t *process, vfs_node_t *root,
     return 1;
 }
 
+int process_set_working_directory(process_t *process, vfs_node_t *directory) {
+    if (!process || !directory || directory->type != VFS_NODE_DIRECTORY) return 0;
+    vfs_node_retain(directory);
+    uint64_t flags = spinlock_lock_irqsave(&process->lock);
+    if (process->state == PROCESS_EXITED || !process->root_directory) {
+        spinlock_unlock_irqrestore(&process->lock, flags);
+        vfs_node_release(directory);
+        return 0;
+    }
+    vfs_node_t *old = process->working_directory;
+    process->working_directory = directory;
+    spinlock_unlock_irqrestore(&process->lock, flags);
+    if (old) vfs_node_release(old);
+    return 1;
+}
+
 process_t *process_create_user(uint64_t id, const void *image,
                                uint64_t image_size, uint64_t stack_base,
                                uint32_t thread_id, uint64_t kernel_stack_size) {

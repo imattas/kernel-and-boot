@@ -217,6 +217,23 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
         case OS_SYSCALL_YIELD:
             scheduler_yield();
             return 0;
+        case OS_SYSCALL_CHDIR: {
+            process_t *process = process_current();
+            if (!process || arg2 == 0 || arg2 > OS_SYSCALL_MAX_PATH) return OS_SYSCALL_ERROR;
+            char path[OS_SYSCALL_MAX_PATH + 1];
+            if (!syscall_copy_from_user(path, arg1, arg2) || path[0] != '/')
+                return OS_SYSCALL_ERROR;
+            path[arg2] = '\0';
+            uint64_t flags = spinlock_lock_irqsave(&process->lock);
+            vfs_node_t *root = process->root_directory;
+            if (root) vfs_node_retain(root);
+            spinlock_unlock_irqrestore(&process->lock, flags);
+            vfs_node_t *directory = root ? vfs_lookup_path(root, path) : 0;
+            if (root) vfs_node_release(root);
+            int valid = directory && process_set_working_directory(process, directory);
+            if (directory) vfs_node_release(directory);
+            return valid ? 0 : OS_SYSCALL_ERROR;
+        }
         case OS_SYSCALL_SIGNAL_NEXT: {
             uint32_t signal = 0;
             if (!user_range(arg1, sizeof(signal), 1) ||

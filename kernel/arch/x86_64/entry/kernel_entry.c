@@ -2393,6 +2393,18 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("yield syscall ready\r\n");
+    static const char root_path[] = "/";
+    static const char file_path[] = "/write_probe";
+    if (!syscall_copy_to_user(0x8000002000ULL, root_path, sizeof(root_path)) ||
+        syscall_dispatch(OS_SYSCALL_CHDIR, 0x8000002000ULL,
+                         sizeof(root_path) - 1, 0) != 0 ||
+        !syscall_copy_to_user(0x8000002000ULL, file_path, sizeof(file_path)) ||
+        syscall_dispatch(OS_SYSCALL_CHDIR, 0x8000002000ULL,
+                         sizeof(file_path) - 1, 0) != OS_SYSCALL_ERROR) {
+        serial_write("chdir syscall failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("chdir syscall ready\r\n");
     if (!kernel_init_state_advance(&init_state, KERNEL_INIT_SERVICES))
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     serial_write("user mode deferred until kernel completion\r\n");

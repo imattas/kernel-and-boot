@@ -93,6 +93,13 @@ typedef struct {
     uint8_t *reassembly_output;
 } network_runtime_context_t;
 static network_runtime_context_t network_runtime;
+static input_queue_t *input_runtime_queue;
+static uint8_t input_runtime_endpoint;
+static uint16_t input_runtime_packet;
+static uint8_t input_runtime_toggle;
+static uint8_t input_runtime_report[64];
+static usb_hid_keyboard_state_t input_runtime_hid_state;
+static int input_runtime_ready;
 
 static void network_runtime_task(void *argument) {
     network_runtime_context_t *runtime = (network_runtime_context_t *)argument;
@@ -102,6 +109,27 @@ static void network_runtime_task(void *argument) {
                               runtime->udp, timer_ticks(), 8,
                               runtime->reassembly, runtime->reassembly_output,
                               IPV4_REASSEMBLY_MAX_PAYLOAD);
+        scheduler_yield();
+    }
+}
+
+static void input_runtime_task(void *argument) {
+    (void)argument;
+    for (;;) {
+        if (input_runtime_ready &&
+            uhci_interrupt_transfer(1, input_runtime_endpoint,
+                                    input_runtime_report, input_runtime_packet,
+                                    input_runtime_packet,
+                                    &input_runtime_toggle)) {
+            input_event_t events[20];
+            uint32_t event_count = 0;
+            if (usb_hid_keyboard_decode_state(input_runtime_report,
+                                              input_runtime_packet,
+                                              &input_runtime_hid_state,
+                                              events, &event_count))
+                for (uint32_t event = 0; event < event_count; ++event)
+                    (void)input_queue_push(input_runtime_queue, &events[event]);
+        }
         scheduler_yield();
     }
 }
@@ -1569,6 +1597,7 @@ void kernel_main(void *boot_info) {
     }
     serial_write("slab cache ready\r\n");
     input_queue_t input_queue;
+    input_runtime_queue = &input_queue;
     input_event_t input_event = {
         .type = INPUT_EVENT_KEY, .code = 30, .value = 1, .timestamp = 7
     };
@@ -1706,22 +1735,23 @@ void kernel_main(void *boot_info) {
     }
     serial_write("USB HID mouse ready\r\n");
     if (uhci_root_port_count() != 0 && uhci_interrupt_endpoint != 0) {
-        uint8_t uhci_report[64] = {0};
-        uint8_t uhci_toggle = 0;
+        for (uint32_t i = 0; i < sizeof(input_runtime_report); ++i)
+            input_runtime_report[i] = 0;
+        input_runtime_toggle = 0;
+        input_runtime_endpoint = uhci_interrupt_endpoint;
+        input_runtime_packet = uhci_interrupt_packet;
+        input_runtime_ready = 1;
         int uhci_report_ready = uhci_interrupt_transfer(
-            1, uhci_interrupt_endpoint, uhci_report, uhci_interrupt_packet,
-            uhci_interrupt_packet, &uhci_toggle);
+            1, input_runtime_endpoint, input_runtime_report,
+            input_runtime_packet, input_runtime_packet,
+            &input_runtime_toggle);
         input_event_t uhci_events[20];
         uint32_t uhci_event_count = 0;
-        static usb_hid_keyboard_state_t uhci_hid_state;
-        static uint8_t uhci_hid_state_initialized;
-        if (!uhci_hid_state_initialized) {
-            usb_hid_keyboard_state_initialize(&uhci_hid_state);
-            uhci_hid_state_initialized = 1;
-        }
+        usb_hid_keyboard_state_initialize(&input_runtime_hid_state);
         if (uhci_report_ready &&
-            usb_hid_keyboard_decode_state(uhci_report, uhci_interrupt_packet,
-                                          &uhci_hid_state, uhci_events,
+            usb_hid_keyboard_decode_state(input_runtime_report,
+                                          input_runtime_packet,
+                                          &input_runtime_hid_state, uhci_events,
                                           &uhci_event_count)) {
             for (uint32_t event = 0; event < uhci_event_count; ++event)
                 if (!input_queue_push(&input_queue, &uhci_events[event])) {
@@ -2100,10 +2130,20 @@ void kernel_main(void *boot_info) {
             serial_write("network runtime task setup failure\r\n");
             for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
         }
-        scheduler_enable_preemption(1);
         serial_write("network runtime service ready\r\n");
+    }
+    if (input_runtime_ready) {
+        task_t *input_task = task_create_kernel(501, input_runtime_task, 0, 16384);
+        if (!input_task || !scheduler_enqueue(input_task)) {
+            serial_write("input runtime task setup failure\r\n");
+            for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+        }
+        serial_write("input runtime service ready\r\n");
+    }
+    if (e1000_controller_count() != 0 || input_runtime_ready) {
+        scheduler_enable_preemption(1);
         if (!scheduler_start()) {
-            serial_write("network runtime task start failure\r\n");
+            serial_write("kernel runtime task start failure\r\n");
             for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
         }
     }

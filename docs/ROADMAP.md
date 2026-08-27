@@ -861,6 +861,10 @@ x86-64 exception stubs now normalize CPU-pushed and synthetic error-code
 frames before entering the panic path. Panic diagnostics report the fault
 vector, error code, instruction pointer, code selector, and flags, preserving
 actionable architectural state for later crash-dump and recovery work.
+The same exception entry path now preserves all general-purpose registers and
+prints them in a deterministic order, making architectural fault reports
+useful for postmortem debugging without changing the normal interrupt return
+path.
 
 This gate includes all non-driver kernel core services and VFS abstractions,
 then the complete driver phase, with build integration, focused tests, and QEMU

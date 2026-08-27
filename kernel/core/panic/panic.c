@@ -25,7 +25,7 @@ __attribute__((noreturn)) void kernel_panic_exception(uint64_t vector) {
 
 __attribute__((noreturn)) void kernel_panic_exception_frame(
     uint64_t vector, uint64_t error_code, uint64_t rip, uint64_t cs,
-    uint64_t rflags) {
+    uint64_t rflags, const uint64_t registers[15]) {
     __asm__ volatile ("cli" ::: "memory");
     if (__atomic_exchange_n(&panic_state, 1, __ATOMIC_ACQ_REL) == 0) {
         serial_write("\r\nKERNEL EXCEPTION vector="); serial_write_hex(vector);
@@ -33,6 +33,14 @@ __attribute__((noreturn)) void kernel_panic_exception_frame(
         serial_write(" rip="); serial_write_hex(rip);
         serial_write(" cs="); serial_write_hex(cs);
         serial_write(" rflags="); serial_write_hex(rflags);
+        static const char *const names[15] = {
+            " r15=", " r14=", " r13=", " r12=", " r11=", " r10=",
+            " r9=", " r8=", " rdi=", " rsi=", " rbp=", " rbx=",
+            " rdx=", " rcx=", " rax="};
+        if (registers)
+            for (uint32_t i = 0; i < 15; ++i) {
+                serial_write(names[i]); serial_write_hex(registers[i]);
+            }
         serial_write("\r\n");
     }
     for (;;) __asm__ volatile ("hlt" ::: "memory");

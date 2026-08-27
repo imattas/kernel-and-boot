@@ -34,12 +34,32 @@ extern arch_exception_panic_frame
 global arch_exception_stub_%+vector
 arch_exception_stub_%+vector:
     cli
+    push rax
+    push rcx
+    push rdx
+    push rbx
+    push rbp
+    push rsi
+    push rdi
+    push r8
+    push r9
+    push r10
+    push r11
+    push r12
+    push r13
+    push r14
+    push r15
 %if vector != 8 && vector != 10 && vector != 11 && vector != 12 && vector != 13 && vector != 14 && vector != 17 && vector != 21 && vector != 29 && vector != 30
     push qword 0
 %endif
     push vector
     mov rdi, [rsp]
-    lea rsi, [rsp + 8]
+%if vector != 8 && vector != 10 && vector != 11 && vector != 12 && vector != 13 && vector != 14 && vector != 17 && vector != 21 && vector != 29 && vector != 30
+    lea rsi, [rsp + 136]
+%else
+    lea rsi, [rsp + 128]
+%endif
+    lea rdx, [rsp + 8]
     call arch_exception_panic_frame
 .exception_halt_%+vector:
     hlt

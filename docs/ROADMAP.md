@@ -311,7 +311,9 @@ the on-disk low/high inode size fields. XFS and
 Btrfs now have strict read-only superblock and geometry
 mount layers with contract tests. XFS now maps allocation-group inode numbers,
 reads v1/v2 inodes, supports short-form directories, inline files, extent
-records, and a VFS file adapter. Btrfs validates its CRC32C superblock checksum
+records, and a VFS file adapter. XFS extent reads now decode the extent-state
+flag correctly and return zeroes for sparse gaps and unwritten extents. Btrfs
+validates its CRC32C superblock checksum
 and supported checksum type, validates tree-node checksums/identity, and reads
 bounded leaf items through single-stripe system-chunk logical-to-physical
 mapping, loads additional single-stripe mappings from the chunk tree, resolves

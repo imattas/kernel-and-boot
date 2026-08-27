@@ -77,13 +77,14 @@ static int xfs_read_inode(const xfs_fs_t *fs, uint64_t inode, uint8_t *data) {
 }
 
 static int xfs_extent(const uint8_t *record, uint64_t logical,
-                      uint64_t *physical, uint64_t *length) {
+                      uint64_t *physical, uint64_t *length, uint8_t *unwritten) {
     uint64_t high = be64(record), low = be64(record + 8);
-    uint64_t start = high >> 9;
+    uint64_t start = (high & 0x7fffffffffffffffULL) >> 9;
     uint64_t block = ((high & 0x1ffULL) << 43) | (low >> 21);
     uint64_t count = low & 0x1fffffULL;
     if (!count || logical < start || logical - start >= count) return 0;
     *physical = block + logical - start; *length = count - (logical - start);
+    *unwritten = (uint8_t)(high >> 63);
     return 1;
 }
 
@@ -140,12 +141,17 @@ int xfs_read_file(xfs_fs_t *fs, uint64_t inode, uint64_t offset,
     uint8_t *destination = buffer; uint32_t remaining = size;
     uint64_t logical = offset / fs->block_size; uint32_t in_block = (uint32_t)(offset % fs->block_size);
     while (remaining) {
-        uint64_t physical = 0, extent_length = 0; int found = 0;
+        uint64_t physical = 0, extent_length = 0; uint8_t unwritten = 0; int found = 0;
         for (uint32_t i = 0; i < extent_count; ++i)
-            if (xfs_extent(&data[core + i * 16U], logical, &physical, &extent_length)) { found = 1; break; }
-        if (!found || physical >= fs->block_count || !xfs_read_block(fs, physical, block)) return 0;
+            if (xfs_extent(&data[core + i * 16U], logical, &physical, &extent_length,
+                           &unwritten)) { found = 1; break; }
         uint32_t chunk = fs->block_size - in_block; if (chunk > remaining) chunk = remaining;
-        for (uint32_t i = 0; i < chunk; ++i) destination[i] = block[in_block + i];
+        if (!found || unwritten) {
+            for (uint32_t i = 0; i < chunk; ++i) destination[i] = 0;
+        } else {
+            if (physical >= fs->block_count || !xfs_read_block(fs, physical, block)) return 0;
+            for (uint32_t i = 0; i < chunk; ++i) destination[i] = block[in_block + i];
+        }
         destination += chunk; remaining -= chunk; ++logical; in_block = 0;
     }
     return 1;

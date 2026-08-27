@@ -264,6 +264,9 @@ distinct extended key codes while retaining make/break values.
 The PS/2 IRQ stub now sends a local-APIC EOI for IOAPIC delivery and retains a
 PIC EOI for the legacy fallback, preventing either route from blocking later
 keyboard events.
+Interrupt initialization now routes PS/2 IRQ1 to vector 33 through the IOAPIC
+when ACPI provides a valid route, and masks the PIC path only after that route
+is installed.
 The ATA PIO fallback now selects validated LBA48 task-file commands when the
 device advertises 48-bit addressing, while retaining the bounded LBA28 path.
 ATA PIO task-file access and shared IDENTIFY metadata are now serialized with

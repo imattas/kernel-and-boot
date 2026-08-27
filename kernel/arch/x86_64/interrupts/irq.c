@@ -16,7 +16,9 @@ void interrupts_initialize(void) {
     out8(0x21, 0x20); out8(0xa1, 0x28);
     out8(0x21, 0x04); out8(0xa1, 0x02);
     out8(0x21, 0x01); out8(0xa1, 0x01);
-    out8(0x21, 0xfd); out8(0xa1, 0xff);
+    out8(0xa1, 0xff);
+    if (arch_ioapic_route_irq(1, 33)) out8(0x21, 0xff);
+    else out8(0x21, 0xfd);
     if (!arch_apic_timer_initialize()) return;
     serial_write("interrupt controller configured\r\n");
     __asm__ volatile ("sti" ::: "memory");

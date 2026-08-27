@@ -63,6 +63,16 @@ int vfs_file_open_handle(process_handle_table_t *table, vfs_node_t *node,
     return handle;
 }
 
+int vfs_file_open_path_handle(process_handle_table_t *table, vfs_node_t *root,
+                              const char *path, uint32_t flags) {
+    if (!table || !root || !path) return 0;
+    vfs_node_t *node = vfs_lookup_path(root, path);
+    if (!node) return 0;
+    int handle = vfs_file_open_handle(table, node, flags);
+    vfs_node_release(node);
+    return handle;
+}
+
 int vfs_file_read(vfs_file_t *file, void *buffer, uint32_t size) {
     if (!file || !buffer || size == 0) return 0;
     uint64_t flags = spinlock_lock_irqsave(&file->lock);

@@ -235,6 +235,8 @@ make an old numeric handle access the replacement object.
 VFS file descriptions now retain their node, serialize per-open offsets, enforce
 read/write rights, and can be installed as owned process handles with safe close
 and retained-reference behavior.
+Path-based descriptor opening now resolves a retained VFS node before creating
+the owned file handle, releasing the lookup reference on every path.
 The process registry now serializes duplicate-ID checks, insertion, lookup,
 and removal across concurrent lifecycle operations.
 The bootable `dist/os.img` is now a standards-compliant FAT32 superfloppy

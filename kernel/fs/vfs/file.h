@@ -13,6 +13,8 @@ typedef struct vfs_file vfs_file_t;
 vfs_file_t *vfs_file_open(vfs_node_t *node, uint32_t flags);
 int vfs_file_open_handle(process_handle_table_t *table, vfs_node_t *node,
                          uint32_t flags);
+int vfs_file_open_path_handle(process_handle_table_t *table, vfs_node_t *root,
+                              const char *path, uint32_t flags);
 void vfs_file_retain(vfs_file_t *file);
 void vfs_file_release(vfs_file_t *file);
 int vfs_file_read(vfs_file_t *file, void *buffer, uint32_t size);

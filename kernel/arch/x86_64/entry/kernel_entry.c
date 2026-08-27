@@ -1557,7 +1557,8 @@ void kernel_main(void *boot_info) {
     process_handle_table_t file_handles;
     process_handle_ref_t file_ref = {0};
     process_handle_table_initialize(&file_handles);
-    int file_handle = vfs_file_open_handle(&file_handles, proc_pid, VFS_FILE_READ);
+    int file_handle = vfs_file_open_path_handle(&file_handles, proc_root,
+                                                "/self/pid", VFS_FILE_READ);
     char file_pid_text[4] = {0};
     if (!proc_file || vfs_file_read(proc_file, file_pid_text, 3) != 3 ||
         file_pid_text[0] != '4' || file_pid_text[1] != '2' ||

@@ -11,6 +11,10 @@
 
 static uint16_t load16(const uint8_t *p) { return (uint16_t)p[0] | ((uint16_t)p[1] << 8); }
 static uint32_t load32(const uint8_t *p) { return (uint32_t)load16(p) | ((uint32_t)load16(p + 2) << 16); }
+static void store32(uint8_t *p, uint32_t value) {
+    p[0] = (uint8_t)value; p[1] = (uint8_t)(value >> 8);
+    p[2] = (uint8_t)(value >> 16); p[3] = (uint8_t)(value >> 24);
+}
 static uint64_t inode_size_value(const uint8_t *inode) {
     return (uint64_t)load32(&inode[4]) | ((uint64_t)load32(&inode[108]) << 32);
 }
@@ -99,6 +103,31 @@ static int read_inode(const ext4_fs_t *fs, uint32_t number, uint8_t *inode) {
     if (!read_block(fs, block, data)) return 0;
     for (uint32_t i = 0; i < fs->inode_size; ++i) inode[i] = data[offset + i];
     return 1;
+}
+
+static int write_inode_size(const ext4_fs_t *fs, uint32_t number,
+                            uint64_t size) {
+    if (!fs || !fs->mounted || number == 0) return 0;
+    uint64_t group_number = ((uint64_t)number - 1U) / fs->inodes_per_group;
+    uint32_t group_index = (uint32_t)(((uint64_t)number - 1U) % fs->inodes_per_group);
+    if (group_number >= fs->groups_count) return 0;
+    uint8_t descriptor[64], descriptor_data[4096], data[4096];
+    uint64_t descriptor_block = fs->descriptor_block +
+        (group_number * fs->descriptor_size) / fs->block_size;
+    uint32_t descriptor_offset = (uint32_t)((group_number * fs->descriptor_size) % fs->block_size);
+    if (descriptor_offset + fs->descriptor_size > fs->block_size ||
+        !read_block(fs, descriptor_block, descriptor_data)) return 0;
+    for (uint32_t i = 0; i < fs->descriptor_size && i < sizeof(descriptor); ++i)
+        descriptor[i] = descriptor_data[descriptor_offset + i];
+    uint64_t inode_table = load32(&descriptor[8]);
+    if (fs->has_64bit) inode_table |= (uint64_t)load32(&descriptor[40]) << 32;
+    uint64_t byte_offset = (uint64_t)group_index * fs->inode_size;
+    uint64_t block = inode_table + byte_offset / fs->block_size;
+    uint32_t offset = (uint32_t)(byte_offset % fs->block_size);
+    if (offset + fs->inode_size > fs->block_size || !read_block(fs, block, data)) return 0;
+    store32(&data[offset + 4], (uint32_t)size);
+    store32(&data[offset + 108], (uint32_t)(size >> 32));
+    return write_block(fs, block, data);
 }
 
 static int extent_data_block(const ext4_fs_t *fs, const uint8_t *header,
@@ -286,4 +315,12 @@ int ext4_write_file(ext4_fs_t *fs, uint32_t inode_number, uint64_t offset,
         source += chunk; remaining -= chunk; ++logical; in_block = 0;
     }
     return 1;
+}
+
+int ext4_truncate_file(ext4_fs_t *fs, uint32_t inode_number, uint64_t size) {
+    if (!fs || !fs->mounted || size == 0) return 0;
+    uint64_t old_size = 0;
+    if (!ext4_inode_size(fs, inode_number, &old_size) || size >= old_size)
+        return 0;
+    return write_inode_size(fs, inode_number, size);
 }

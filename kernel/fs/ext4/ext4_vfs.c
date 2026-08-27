@@ -24,6 +24,15 @@ static int ext4_vfs_write(vfs_node_t *node, uint64_t offset,
     spinlock_unlock_irqrestore(&file->lock, flags);
     return result;
 }
+static int ext4_vfs_truncate(vfs_node_t *node, uint32_t size) {
+    ext4_vfs_file_t *file = node ? (ext4_vfs_file_t *)node->private_data : 0;
+    if (!file || size == 0 || (uint64_t)size >= file->size) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&file->lock);
+    int result = ext4_truncate_file(file->fs, file->inode, size);
+    if (result) file->size = size;
+    spinlock_unlock_irqrestore(&file->lock, flags);
+    return result;
+}
 int ext4_vfs_attach_file_in_directory(ext4_fs_t *fs, vfs_node_t *root,
                                       uint32_t directory,
                                       const char *filesystem_name,
@@ -44,6 +53,7 @@ int ext4_vfs_attach_file_in_directory(ext4_fs_t *fs, vfs_node_t *root,
                                        mode & 0777U);
     if (!node || !vfs_node_set_read(node, ext4_vfs_read, file) ||
         !vfs_node_set_write(node, ext4_vfs_write, file) ||
+        !vfs_node_set_truncate(node, ext4_vfs_truncate) ||
         !vfs_node_set_private_destructor(node, ext4_vfs_destroy) ||
         !vfs_node_add_child(root, node)) {
         if (node) {

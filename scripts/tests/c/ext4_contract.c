@@ -28,7 +28,7 @@ int main(void) {
     put32(&image[9 * 1024], 10); memcpy(&image[10 * 1024], "indir", 5);
     put16(&image[11 * 1024], 0xf30a); put16(&image[11 * 1024 + 2], 1); put16(&image[11 * 1024 + 4], 4); put32(&image[11 * 1024 + 12], 0); put16(&image[11 * 1024 + 16], 1); put32(&image[11 * 1024 + 20], 12); memcpy(&image[12 * 1024], "deep", 4);
     storage_initialize(); storage_device_t device = {.name = "ram-ext4", .block_size = 512, .block_count = 128, .read = image_read, .write = image_write}; assert(storage_register(&device));
-    ext4_fs_t fs; assert(ext4_mount(&fs, 0)); uint32_t inode = 0;
+    ext4_fs_t fs; assert(ext4_mount(&fs, 0)); uint32_t inode = 0; uint64_t size = 0;
     assert(ext4_lookup(&fs, 2, "hello", &inode) && inode == 3);
     char output[6] = {0}; assert(ext4_read_file(&fs, inode, 0, output, 5)); assert(memcmp(output, "world", 5) == 0);
     assert(ext4_write_file(&fs, inode, 1, "a", 1));
@@ -36,6 +36,8 @@ int main(void) {
     assert(ext4_read_file(&fs, inode, 0, output, 5));
     assert(memcmp(output, "warld", 5) == 0);
     assert(ext4_write_file(&fs, inode, 1, "o", 1));
+    assert(ext4_truncate_file(&fs, inode, 3));
+    assert(ext4_inode_size(&fs, inode, &size) && size == 3);
     memset(output, 0, sizeof(output)); assert(ext4_read_file(&fs, 4, 1024U * 12U, output, 5)); assert(memcmp(output, "indir", 5) == 0);
     memset(output, 0, sizeof(output)); assert(ext4_read_file(&fs, 5, 0, output, 4)); assert(memcmp(output, "deep", 4) == 0);
     uint64_t group_size = 0;

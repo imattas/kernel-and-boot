@@ -999,6 +999,9 @@ counts before issuing block I/O.
 Ext4 VFS regular files now support bounded read-modify-write updates to already
 allocated direct, indirect, or extent-mapped blocks; sparse allocation and
 file-size-changing metadata operations remain separate.
+Ext4 now supports bounded nonzero shrink/truncation by persistently updating
+the inode low/high size fields, with the VFS adapter synchronizing its cached
+file size and the contract verifying the on-disk result.
 Btrfs now has strict superblock and geometry
 mount layers with contract tests. XFS now maps allocation-group inode numbers,
 reads v1/v2 inodes, supports short-form directories, inline files, extent

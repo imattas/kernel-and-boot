@@ -24,5 +24,6 @@ int ext4_read_file(ext4_fs_t *fs, uint32_t inode_number, uint64_t offset,
                    void *buffer, uint32_t size);
 int ext4_write_file(ext4_fs_t *fs, uint32_t inode_number, uint64_t offset,
                     const void *buffer, uint32_t size);
+int ext4_truncate_file(ext4_fs_t *fs, uint32_t inode_number, uint64_t size);
 
 #endif

@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include "irq.h"
 #include "../cpu/tables.h"
+#include "../smp/percpu.h"
 #include "apic.h"
 #include "../../../core/printk/serial.h"
 #include "../../../drivers/input/ps2.h"
@@ -26,5 +27,6 @@ void interrupts_initialize(void) {
     if (!arch_apic_timer_initialize()) return;
     serial_write("interrupt controller configured\r\n");
     __asm__ volatile ("sti" ::: "memory");
+    arch_percpu_release_interrupts();
     serial_write("interrupts enabled\r\n");
 }

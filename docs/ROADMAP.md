@@ -125,6 +125,9 @@ Develop APIC-era interrupt handling, timer sources, timekeeping foundations, mul
 APIC IPI startup now polls the hardware delivery-status bit with a bounded
 timeout instead of treating a fixed delay as delivery proof; the complete
 QEMU SMP boot gate passes with this path.
+AP startup now publishes the AP as online only after its per-CPU IDT, GDT,
+TSS, and timer are initialized, waits for the BSP interrupt setup release,
+and enables CR4 OSFXSR/OSXMMEXCPT before entering compiled kernel code.
 
 ## Phase 5 — Tasks and scheduling
 

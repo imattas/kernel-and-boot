@@ -16,5 +16,7 @@ uint32_t arch_percpu_present_count(void);
 uint32_t arch_percpu_online_count(void);
 int arch_percpu_bringup(void);
 void arch_percpu_ap_entry(uint32_t apic_id);
+void arch_percpu_release_interrupts(void);
+int arch_percpu_interrupts_released(void);
 
 #endif

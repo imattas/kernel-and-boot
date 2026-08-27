@@ -40,7 +40,7 @@ protected_mode:
     mov ss, ax
     mov esp, 0x7000
     mov eax, cr4
-    or eax, 0x20
+    or eax, 0x620
     mov cr4, eax
     mov ecx, 0xc0000080
     rdmsr

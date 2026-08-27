@@ -25,11 +25,13 @@ static uint32_t present_count;
 static uint32_t online_count;
 static arch_percpu_t *current;
 static uint8_t ap_stacks[64][SMP_STACK_SIZE] __attribute__((aligned(16)));
+static uint32_t interrupts_released;
 
 int arch_percpu_initialize(void) {
     present_count = acpi_cpu_count();
     online_count = 0;
     current = 0;
+    interrupts_released = 0;
     if (present_count == 0 || present_count > 64) return 0;
     uint32_t bsp_id = arch_apic_id();
     for (uint32_t i = 0; i < present_count; ++i) {
@@ -52,6 +54,14 @@ const arch_percpu_t *arch_percpu_current(void) {
 }
 uint32_t arch_percpu_present_count(void) { return present_count; }
 uint32_t arch_percpu_online_count(void) { return online_count; }
+
+void arch_percpu_release_interrupts(void) {
+    __atomic_store_n(&interrupts_released, 1, __ATOMIC_RELEASE);
+}
+
+int arch_percpu_interrupts_released(void) {
+    return __atomic_load_n(&interrupts_released, __ATOMIC_ACQUIRE) != 0;
+}
 
 void arch_percpu_ap_entry(uint32_t apic_id) {
     for (uint32_t i = 0; i < present_count; ++i) {
@@ -83,7 +93,7 @@ int arch_percpu_bringup(void) {
         for (uint32_t retry = 0; retry < 3 && !online; ++retry) {
             copy_trampoline(cpus[i].apic_id, i);
             if (!arch_apic_startup(cpus[i].apic_id, SMP_TRAMPOLINE_VECTOR)) continue;
-            uint32_t attempts = 10000;
+            uint32_t attempts = 10000000;
             while (!__atomic_load_n(&cpus[i].online, __ATOMIC_ACQUIRE) && attempts-- != 0)
                 __asm__ volatile ("pause");
             online = __atomic_load_n(&cpus[i].online, __ATOMIC_ACQUIRE);
@@ -94,15 +104,17 @@ int arch_percpu_bringup(void) {
 }
 
 void smp_ap_entry(uint32_t apic_id) {
-    arch_percpu_ap_entry(apic_id);
     serial_write("AP entered\r\n");
     const arch_percpu_t *cpu = arch_percpu_current();
     arch_init_tables_for_cpu(cpu ? cpu->logical_id : 0);
-    serial_write_hex_line("AP online id=", apic_id);
     if (!arch_apic_timer_initialize()) {
         serial_write("AP timer initialization failed\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
+    arch_percpu_ap_entry(apic_id);
+    serial_write_hex_line("AP online id=", apic_id);
+    while (!arch_percpu_interrupts_released())
+        __asm__ volatile ("pause");
     __asm__ volatile ("sti" ::: "memory");
     for (;;) __asm__ volatile ("hlt" ::: "memory");
 }

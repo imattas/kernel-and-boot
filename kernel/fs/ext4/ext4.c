@@ -407,7 +407,7 @@ static int ext4_resize_extent_file(ext4_fs_t *fs, uint32_t inode_number,
     if (depth == 0) {
         record_capacity = maximum;
     } else if (depth == 1 && entries != 0) {
-        uint8_t *index = &inode[52];
+        uint8_t *index = &inode[52U + (uint32_t)(root_entries - 1U) * 12U];
         leaf_block = (uint64_t)load32(&index[4]) |
                      ((uint64_t)load16(&index[10]) << 32);
         if (leaf_block >= fs->block_count || !read_block(fs, leaf_block, leaf_data))

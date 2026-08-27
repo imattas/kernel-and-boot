@@ -322,6 +322,9 @@ length fields before higher network protocols consume a frame.
 The ARP packet codec now validates Ethernet/IPv4 hardware and protocol sizes,
 operation codes, and the fixed 28-byte layout while constructing bounded
 requests and replies for the Ethernet layer.
+The bounded ARP cache now serializes updates and lookups, replaces the oldest
+entry when full, refreshes existing mappings, and expires entries using a
+caller-supplied monotonic timestamp.
 The e1000 ISR now records delivery, and the post-interrupt-enable QEMU probe
 transmits a frame and requires an observed interrupt before continuing.
 The e1000 ISR now preserves cleared interrupt causes for the polling/service

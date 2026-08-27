@@ -34,6 +34,7 @@
 #include "../../../drivers/network/e1000.h"
 #include "../../../drivers/network/ethernet.h"
 #include "../../../drivers/network/arp.h"
+#include "../../../drivers/network/arp_cache.h"
 #include "../../../time/clock.h"
 #include "../../../debug/assert.h"
 #include "../../../core/task/context.h"
@@ -521,6 +522,28 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("ARP packet ready\r\n");
+    arp_cache_t arp_probe_cache;
+    static const uint8_t arp_cache_ip[4] = {192, 168, 0, 1};
+    static const uint8_t arp_cache_mac[6] =
+        {0x02, 0x11, 0x22, 0x33, 0x44, 0x55};
+    static const uint8_t arp_cache_replacement_mac[6] =
+        {0x02, 0xaa, 0xbb, 0xcc, 0xdd, 0xee};
+    uint8_t arp_cache_result[6] = {0};
+    arp_cache_initialize(&arp_probe_cache);
+    if (!arp_cache_update(&arp_probe_cache, arp_cache_ip, arp_cache_mac, 10) ||
+        !arp_cache_lookup(&arp_probe_cache, arp_cache_ip, arp_cache_result) ||
+        arp_cache_result[1] != 0x11 ||
+        !arp_cache_update(&arp_probe_cache, arp_cache_ip,
+                          arp_cache_replacement_mac, 20) ||
+        !arp_cache_lookup(&arp_probe_cache, arp_cache_ip, arp_cache_result) ||
+        arp_cache_result[1] != 0xaa ||
+        arp_cache_expire(&arp_probe_cache, 29, 10) != 0 ||
+        arp_cache_expire(&arp_probe_cache, 30, 10) != 1 ||
+        arp_cache_lookup(&arp_probe_cache, arp_cache_ip, arp_cache_result)) {
+        serial_write("ARP cache failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("ARP cache ready\r\n");
     if (e1000_controller_count() != 0 &&
         !e1000_transmit(network_probe_packet, sizeof(network_probe_packet))) {
         serial_write("e1000 transmit failure\r\n");

@@ -173,6 +173,9 @@ static int block_probe_write(void *context, uint64_t sector, uint32_t count,
         destination[sector * 16U + i] = source[i];
     return 1;
 }
+static int block_probe_flush(void *context) {
+    return context != 0;
+}
 static int vfs_probe_write(vfs_node_t *node, uint64_t offset,
                            const void *buffer, uint32_t size) {
     uint8_t *storage = (uint8_t *)node->private_data;
@@ -2272,6 +2275,7 @@ void kernel_main(void *boot_info) {
     block_probe.context = block_probe_storage;
     block_probe.read = block_probe_read;
     block_probe.write = block_probe_write;
+    block_probe.flush = block_probe_flush;
     for (uint32_t i = 0; i < sizeof(block_probe_data); ++i)
         block_probe_data[i] = (uint8_t)(i + 1);
     if (!block_registry_register(&block_registry, &block_probe) ||
@@ -2312,6 +2316,10 @@ void kernel_main(void *boot_info) {
                           block_probe_data, sizeof(block_probe_data)) ||
         block_probe_data[0] != 0xa0 || block_probe_data[15] != 0xaf) {
         serial_write("block cache failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    if (!block_cache_flush(&block_cache, &block_registry, 0)) {
+        serial_write("block cache flush failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("block cache ready\r\n");

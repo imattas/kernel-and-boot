@@ -438,6 +438,10 @@ The network stack now validates TCP segment headers and pseudo-header
 checksums, exposes bounded SYN/ACK establishment and in-order payload/FIN
 state transitions, and routes TCP frames through the common network decoder.
 The QEMU kernel probe covers the handshake, payload sequencing, and reset path.
+Bounded TCP endpoints now bind local addresses and ports, match established
+peers, queue validated in-order stream payloads, expose overflow accounting,
+and return connection-control results to the network boundary. The QEMU probe
+delivers a complete framed handshake and reads the queued stream data back.
 The network service loop now forwards validated UDP frames from the hardware
 packet queue into bound endpoint tables, and the QEMU boot probe exercises that
 end-to-end queue-to-endpoint delivery path.

@@ -27,7 +27,7 @@ int main(void) {
     memcpy(&image[14 * 1024], "group", 5);
     put32(&image[9 * 1024], 10); memcpy(&image[10 * 1024], "indir", 5);
     put16(&image[11 * 1024], 0xf30a); put16(&image[11 * 1024 + 2], 1); put16(&image[11 * 1024 + 4], 4); put32(&image[11 * 1024 + 12], 0); put16(&image[11 * 1024 + 16], 1); put32(&image[11 * 1024 + 20], 12); memcpy(&image[12 * 1024], "deep", 4);
-    storage_initialize(); storage_device_t device = {"ram-ext4", 512, 64, image_read, image_write}; assert(storage_register(&device));
+    storage_initialize(); storage_device_t device = {.name = "ram-ext4", .block_size = 512, .block_count = 64, .read = image_read, .write = image_write}; assert(storage_register(&device));
     ext4_fs_t fs; assert(ext4_mount(&fs, 0)); uint32_t inode = 0;
     assert(ext4_lookup(&fs, 2, "hello", &inode) && inode == 3);
     char output[6] = {0}; assert(ext4_read_file(&fs, inode, 0, output, 5)); assert(memcmp(output, "world", 5) == 0);

@@ -16,8 +16,10 @@ static int same_name(const char *left, const char *right) {
 }
 
 int storage_register(const storage_device_t *device) {
-    if (!device || !device->name || !device->name[0] || !device->read ||
-        !device->write || device->block_size == 0 || device->block_count == 0 ||
+    if (!device || !device->name || !device->name[0] ||
+        ((!device->read || !device->write) &&
+         (!device->read_context || !device->write_context)) ||
+        device->block_size == 0 || device->block_count == 0 ||
         device->block_count > UINT64_MAX / device->block_size)
         return 0;
     uint64_t flags = spinlock_lock_irqsave(&storage_lock);
@@ -58,7 +60,10 @@ int storage_read(uint32_t device, uint64_t lba, uint32_t count, void *buffer) {
         return 0;
     }
     storage_read_fn read = devices[device].read;
+    storage_read_context_fn read_context = devices[device].read_context;
+    void *context = devices[device].context;
     spinlock_unlock_irqrestore(&storage_lock, flags);
+    if (read_context) return read_context(lba, count, buffer, context);
     return read(lba, count, buffer);
 }
 
@@ -72,6 +77,9 @@ int storage_write(uint32_t device, uint64_t lba, uint32_t count,
         return 0;
     }
     storage_write_fn write = devices[device].write;
+    storage_write_context_fn write_context = devices[device].write_context;
+    void *context = devices[device].context;
     spinlock_unlock_irqrestore(&storage_lock, flags);
+    if (write_context) return write_context(lba, count, buffer, context);
     return write(lba, count, buffer);
 }

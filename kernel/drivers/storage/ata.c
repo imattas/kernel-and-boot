@@ -176,7 +176,7 @@ static int ata_probe(device_t *device) {
         if (claimed_control) device_release_resource(device, 1, &ata_driver);
         return 0;
     }
-    storage_device_t discovered;
+    storage_device_t discovered = {0};
     discovered.name = "ata0";
     discovered.block_size = 512;
     discovered.block_count = sector_count;

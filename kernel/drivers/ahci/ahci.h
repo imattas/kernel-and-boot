@@ -8,6 +8,7 @@ uint32_t ahci_controller_count(void);
 uint32_t ahci_port_mask(void);
 uint32_t ahci_ready_port_count(void);
 uint32_t ahci_ready_port_mask(void);
+int ahci_register_storage_devices(void);
 int ahci_interrupt_enabled(void);
 uint32_t ahci_interrupt_count(void);
 void ahci_interrupt_handler(void);

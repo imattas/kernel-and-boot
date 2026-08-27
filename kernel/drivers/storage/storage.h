@@ -7,6 +7,10 @@
 
 typedef int (*storage_read_fn)(uint64_t lba, uint32_t count, void *buffer);
 typedef int (*storage_write_fn)(uint64_t lba, uint32_t count, const void *buffer);
+typedef int (*storage_read_context_fn)(uint64_t lba, uint32_t count,
+                                       void *buffer, void *context);
+typedef int (*storage_write_context_fn)(uint64_t lba, uint32_t count,
+                                        const void *buffer, void *context);
 
 typedef struct {
     const char *name;
@@ -14,6 +18,9 @@ typedef struct {
     uint64_t block_count;
     storage_read_fn read;
     storage_write_fn write;
+    void *context;
+    storage_read_context_fn read_context;
+    storage_write_context_fn write_context;
 } storage_device_t;
 
 void storage_initialize(void);

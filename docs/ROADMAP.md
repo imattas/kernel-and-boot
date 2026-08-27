@@ -545,8 +545,10 @@ AHCI command teardown now uses one ownership helper; a timeout whose port engine
 cannot quiesce quarantines further I/O and retains DMA buffers instead of freeing
 memory that a wedged HBA could still access.
 AHCI now provisions independent command-list and received-FIS memory for every
-link-ready implemented SATA port instead of silently skipping all but the first;
-the existing primary-port storage callback remains the next routing boundary.
+link-ready implemented SATA port instead of silently skipping all but the first.
+The storage interface now supports optional per-device contexts, and AHCI
+registers each identified port as an independently routable block device;
+QEMU verifies secondary-disk read/write through the generic storage layer.
 The scheduler now has an explicit core boundary
 and round-robin policy module. Process pending/blocked signal state and explicit
 termination status are now implemented; signal delivery policy remains bounded

@@ -40,7 +40,7 @@ int main(void) {
     uint8_t *root = &image[25 * 512]; root[0] = 0x85; root[1] = 2; root[32] = 0xc0; root[33] = 2; root[35] = 9; put32(&root[52], 3); put64(&root[56], 5); root[64] = 0xc1;
     const char *name = "HELLO.TXT"; for (uint32_t i = 0; i < 9; ++i) put16(&root[66 + i * 2], (uint8_t)name[i]); memcpy(&image[26 * 512], "hello", 5);
     put16(&root[2], entry_checksum(root, 0, 2));
-    storage_initialize(); storage_device_t device = {"ram-exfat", 512, 64, image_read, image_write}; assert(storage_register(&device));
+    storage_initialize(); storage_device_t device = {.name = "ram-exfat", .block_size = 512, .block_count = 64, .read = image_read, .write = image_write}; assert(storage_register(&device));
     exfat_fs_t fs; assert(exfat_mount(&fs, 0)); uint32_t cluster = 0; uint64_t size = 0; uint8_t no_fat = 0;
     assert(exfat_lookup(&fs, "hello.txt", &cluster, &size, &no_fat)); assert(cluster == 3 && size == 5 && no_fat);
     char output[6] = {0}; assert(exfat_read_file(&fs, "HELLO.TXT", 0, output, 5)); assert(memcmp(output, "hello", 5) == 0);

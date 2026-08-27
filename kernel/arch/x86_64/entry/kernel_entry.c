@@ -1119,22 +1119,16 @@ void kernel_main(void *boot_info) {
         }
     serial_write("AHCI multi-sector I/O ready\r\n");
     storage_initialize();
-    uint64_t ahci_sector_count = (uint64_t)ahci_identify_words[100] |
-        ((uint64_t)ahci_identify_words[101] << 16) |
-        ((uint64_t)ahci_identify_words[102] << 32) |
-        ((uint64_t)ahci_identify_words[103] << 48);
-    storage_device_t ahci_storage = {
-        "ahci0", 512, ahci_sector_count, ahci_read_sectors, ahci_write_sectors
-    };
-    if (!storage_register(&ahci_storage)) {
+    if (!ahci_register_storage_devices()) {
         serial_write("AHCI storage registration failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("AHCI storage backend ready\r\n");
     if (nvme_controller_count() != 0) {
         storage_device_t nvme_storage = {
-            "nvme0", 512, nvme_namespace_sectors,
-            nvme_read_sectors, nvme_write_sectors
+            .name = "nvme0", .block_size = 512,
+            .block_count = nvme_namespace_sectors,
+            .read = nvme_read_sectors, .write = nvme_write_sectors
         };
         if (!storage_register(&nvme_storage)) {
             serial_write("NVMe storage registration failure\r\n");
@@ -1184,6 +1178,22 @@ void kernel_main(void *boot_info) {
             serial_write("storage write verification failure\r\n");
             for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
         }
+    }
+    if (ahci_ready_port_count() > 1) {
+        for (uint32_t byte = 0; byte < sizeof(storage_scratch); ++byte)
+            storage_scratch[byte] = (uint8_t)(0x37U ^ byte);
+        if (!storage_read(1, 1, 1, storage_verify) ||
+            !storage_write(1, 120, 1, storage_scratch) ||
+            !storage_read(1, 120, 1, storage_verify)) {
+            serial_write("AHCI secondary storage failure\r\n");
+            for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+        }
+        for (uint32_t byte = 0; byte < sizeof(storage_scratch); ++byte)
+            if (storage_scratch[byte] != storage_verify[byte]) {
+                serial_write("AHCI secondary storage verification failure\r\n");
+                for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+            }
+        serial_write("AHCI multi-disk storage ready\r\n");
     }
     serial_write("storage read-write ready\r\n");
     if (!heap_initialize()) {

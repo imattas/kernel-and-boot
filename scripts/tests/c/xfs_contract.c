@@ -1,4 +1,5 @@
 #include <assert.h>
+#pragma clang diagnostic ignored "-Wmissing-field-initializers"
 #include <stdint.h>
 #include <string.h>
 #include "../../../kernel/fs/xfs/xfs.h"

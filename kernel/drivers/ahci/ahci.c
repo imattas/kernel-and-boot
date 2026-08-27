@@ -3,6 +3,7 @@
 #include "../../mm/physical/frame.h"
 #include "../../arch/x86_64/cpu/tables.h"
 #include "../pci/pci.h"
+#include "../storage/storage.h"
 #include "../../core/sync/spinlock.h"
 
 #define PCI_CLASS_MASS_STORAGE 0x01
@@ -52,6 +53,9 @@ typedef struct {
     volatile uint32_t *regs;
     uint64_t command_list;
     uint64_t fis;
+    uint64_t sector_count;
+    int lba48;
+    int identified;
 } ahci_port_state_t;
 static ahci_port_state_t port_state[32];
 static volatile uint32_t *active_port;
@@ -67,6 +71,16 @@ static spinlock_t ahci_lock;
 static int ahci_io_disabled;
 static uint64_t active_sector_count;
 static int active_lba48;
+static int ahci_storage_registered;
+static int ahci_identify_ready_ports_locked(void);
+
+static void ahci_select_port_locked(uint32_t port) {
+    active_port = port_state[port].regs;
+    active_port_number = port;
+    active_command_list = port_state[port].command_list;
+    active_sector_count = port_state[port].sector_count;
+    active_lba48 = port_state[port].lba48;
+}
 
 static int ahci_lba_valid(uint64_t lba, uint32_t count) {
     uint64_t maximum = active_lba48 ? AHCI_MAX_LBA : AHCI_LEGACY_MAX_LBA;
@@ -147,6 +161,7 @@ static int ahci_probe(device_t *device) {
         port_state[port] = (ahci_port_state_t){0};
     active_port = 0; active_command_list = 0; active_command_table = 0; active_data = 0;
     ahci_io_disabled = 0;
+    ahci_storage_registered = 0;
     for (uint32_t port = 0; port < 32; ++port) {
         if ((implemented_ports & (1U << port)) == 0) continue;
         uint64_t port_offset = AHCI_PORT_BASE + (uint64_t)port * AHCI_PORT_STRIDE;
@@ -232,7 +247,10 @@ int ahci_initialize(void) {
     ahci_driver.match = ahci_match;
     ahci_driver.probe = ahci_probe;
     if (!device_driver_register(&ahci_driver) || !device_bind_drivers()) return 0;
-    return 1;
+    uint64_t flags = spinlock_lock_irqsave(&ahci_lock);
+    int identified = ahci_identify_ready_ports_locked();
+    spinlock_unlock_irqrestore(&ahci_lock, flags);
+    return identified;
 }
 
 uint32_t ahci_controller_count(void) { return controllers; }
@@ -333,6 +351,33 @@ static int ahci_identify_locked(uint16_t *words) {
         active_lba48 = 0;
     }
     return result;
+}
+
+static int ahci_identify_ready_ports_locked(void) {
+    uint16_t words[256];
+    uint32_t identified_mask = 0;
+    for (uint32_t port = 0; port < 32; ++port) {
+        if ((ready_port_mask & (1U << port)) == 0) continue;
+        ahci_select_port_locked(port);
+        if (!ahci_identify_locked(words)) {
+            port_state[port].identified = 0;
+            continue;
+        }
+        port_state[port].lba48 = active_lba48;
+        port_state[port].sector_count = active_sector_count;
+        port_state[port].identified = 1;
+        identified_mask |= 1U << port;
+    }
+    ready_port_mask = identified_mask;
+    ready_ports = 0;
+    for (uint32_t port = 0; port < 32; ++port)
+        if (identified_mask & (1U << port)) ++ready_ports;
+    for (uint32_t port = 0; port < 32; ++port)
+        if (identified_mask & (1U << port)) {
+            ahci_select_port_locked(port);
+            break;
+        }
+    return ready_ports != 0;
 }
 
 static int ahci_read_sector_locked(uint64_t lba, void *buffer) {
@@ -478,6 +523,64 @@ static int ahci_io_sectors(uint64_t lba, uint32_t count, void *buffer, int write
         for (uint32_t i = 0; i < count * 512U; ++i)
             ((uint8_t *)buffer)[i] = dma[i];
     return ahci_finish_command(completed);
+}
+
+static int ahci_storage_read_context(uint64_t lba, uint32_t count,
+                                     void *buffer, void *context) {
+    uint32_t port = (uint32_t)(uintptr_t)context;
+    uint64_t flags = spinlock_lock_irqsave(&ahci_lock);
+    int result = port < 32 && port_state[port].identified;
+    if (result) {
+        ahci_select_port_locked(port);
+        result = ahci_io_sectors(lba, count, buffer, 0);
+    }
+    spinlock_unlock_irqrestore(&ahci_lock, flags);
+    return result;
+}
+
+static int ahci_storage_write_context(uint64_t lba, uint32_t count,
+                                      const void *buffer, void *context) {
+    uint32_t port = (uint32_t)(uintptr_t)context;
+    uint64_t flags = spinlock_lock_irqsave(&ahci_lock);
+    int result = port < 32 && port_state[port].identified;
+    if (result) {
+        ahci_select_port_locked(port);
+        result = ahci_io_sectors(lba, count, (void *)buffer, 1);
+    }
+    spinlock_unlock_irqrestore(&ahci_lock, flags);
+    return result;
+}
+
+int ahci_register_storage_devices(void) {
+    if (ahci_storage_registered) return 0;
+    static char names[32][8];
+    uint32_t ordinal = 0;
+    for (uint32_t port = 0; port < 32; ++port) {
+        if (!port_state[port].identified) continue;
+        names[ordinal][0] = 'a'; names[ordinal][1] = 'h';
+        names[ordinal][2] = 'c'; names[ordinal][3] = 'i';
+        names[ordinal][4] = (char)('0' + (ordinal % 10U));
+        uint32_t digits = ordinal / 10U;
+        if (digits != 0) {
+            names[ordinal][4] = (char)('0' + digits);
+            names[ordinal][5] = (char)('0' + (ordinal % 10U));
+            names[ordinal][6] = '\0';
+        } else {
+            names[ordinal][5] = '\0';
+        }
+        storage_device_t device = {
+            .name = names[ordinal],
+            .block_size = 512,
+            .block_count = port_state[port].sector_count,
+            .context = (void *)(uintptr_t)port,
+            .read_context = ahci_storage_read_context,
+            .write_context = ahci_storage_write_context
+        };
+        if (!storage_register(&device)) return 0;
+        ++ordinal;
+    }
+    ahci_storage_registered = ordinal != 0;
+    return ahci_storage_registered;
 }
 
 int ahci_identify(uint16_t *words) {

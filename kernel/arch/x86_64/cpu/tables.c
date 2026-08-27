@@ -39,6 +39,8 @@ static uint64_t gdt[64][9] __attribute__((aligned(8)));
 static struct tss64 tss[64] __attribute__((aligned(16)));
 static uint8_t tss_stacks[64][16384] __attribute__((aligned(16)));
 
+#define TSS_SELECTOR 0x38
+
 static void set_gate_with_attributes(struct idt_gate *gate, uintptr_t address,
                                      uint8_t attributes, uint16_t selector) {
     gate->offset_low = (uint16_t)address;
@@ -77,7 +79,7 @@ static void initialize_gdt(uint32_t logical_id) {
     gdt_ptr.limit = (uint16_t)(sizeof(gdt[0]) - 1);
     gdt_ptr.base = (uint64_t)(uintptr_t)&gdt[logical_id][0];
     arch_load_gdt(&gdt_ptr);
-    __asm__ volatile ("ltr %0" :: "r"((uint16_t)0x38) : "memory");
+    __asm__ volatile ("ltr %0" :: "r"((uint16_t)TSS_SELECTOR) : "memory");
 }
 
 void arch_init_tables_for_cpu(uint32_t logical_id) {
@@ -103,7 +105,8 @@ void arch_init_tables_for_cpu(uint32_t logical_id) {
     idt_ptr.limit = (uint16_t)(sizeof(idt[0]) - 1);
     idt_ptr.base = (uint64_t)(uintptr_t)&table[0];
     arch_load_idt(&idt_ptr);
-    if (logical_id == 0) initialize_gdt(logical_id);
+    /* Every CPU needs its own GDT and TSS after leaving the AP trampoline. */
+    initialize_gdt(logical_id);
 }
 
 void arch_init_tables(void) { arch_init_tables_for_cpu(0); }
@@ -124,5 +127,5 @@ void arch_set_user_interrupt_gate(uint8_t vector, void (*handler)(void)) {
     }
 }
 
-uint16_t arch_user_code_selector(void) { return 0x2b; }
-uint16_t arch_user_data_selector(void) { return 0x33; }
+uint16_t arch_user_code_selector(void) { return 5 * 8 + 3; }
+uint16_t arch_user_data_selector(void) { return 6 * 8 + 3; }

@@ -3186,6 +3186,8 @@ void kernel_main(void *boot_info) {
         syscall_dispatch(OS_SYSCALL_UNLINK, 0x8000006000ULL,
                          sizeof(rename_syscall_path) - 1, 0) != 0 ||
         syscall_dispatch(OS_SYSCALL_UNLINK, 0x8000003000ULL,
+                         sizeof(mkdir_syscall_path) - 1, 0) != OS_SYSCALL_ERROR ||
+        syscall_dispatch(OS_SYSCALL_RMDIR, 0x8000003000ULL,
                          sizeof(mkdir_syscall_path) - 1, 0) != 0) {
         serial_write("filesystem mutation syscall failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");

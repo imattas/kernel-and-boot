@@ -421,13 +421,15 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
         }
         case OS_SYSCALL_CREATE:
         case OS_SYSCALL_MKDIR:
-        case OS_SYSCALL_UNLINK: {
+        case OS_SYSCALL_UNLINK:
+        case OS_SYSCALL_RMDIR: {
             process_t *process = process_current();
             if (!process || arg2 == 0 || arg2 > OS_SYSCALL_MAX_PATH ||
                 (number == OS_SYSCALL_CREATE &&
                  (arg3 == 0 || (arg3 & ~(VFS_FILE_READ | VFS_FILE_WRITE)) != 0)) ||
                 (number == OS_SYSCALL_MKDIR && (arg3 & ~0777U) != 0) ||
-                (number == OS_SYSCALL_UNLINK && arg3 != 0))
+                ((number == OS_SYSCALL_UNLINK || number == OS_SYSCALL_RMDIR) &&
+                 arg3 != 0))
                 return OS_SYSCALL_ERROR;
             char path[OS_SYSCALL_MAX_PATH + 1];
             char leaf[32];
@@ -438,7 +440,16 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
             if (!parent) return OS_SYSCALL_ERROR;
             if (number == OS_SYSCALL_UNLINK) {
                 vfs_node_t *child = vfs_node_lookup(parent, leaf);
-                int result = child && vfs_node_remove(parent, child);
+                int result = child && child->type == VFS_NODE_REGULAR &&
+                             vfs_node_remove(parent, child);
+                if (child) vfs_node_release(child);
+                vfs_node_release(parent);
+                return result ? 0 : OS_SYSCALL_ERROR;
+            }
+            if (number == OS_SYSCALL_RMDIR) {
+                vfs_node_t *child = vfs_node_lookup(parent, leaf);
+                int result = child && child->type == VFS_NODE_DIRECTORY &&
+                             vfs_node_remove(parent, child);
                 if (child) vfs_node_release(child);
                 vfs_node_release(parent);
                 return result ? 0 : OS_SYSCALL_ERROR;

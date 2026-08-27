@@ -293,6 +293,8 @@ creation, descriptor closure, directory creation, and removal.
 The ABI now also provides same-directory `rename` with packed dual-path length
 validation, parent permission checks, and duplicate-name rejection; the QEMU
 probe covers rename before removal.
+Directory removal now has a separate permission-checked `rmdir` ABI; `unlink`
+rejects directories, and the QEMU probe verifies the type distinction.
 Access-aware VFS path traversal now requires search permission on every
 directory crossed, preventing inaccessible parent directories from being used
 as a path-resolution side channel.

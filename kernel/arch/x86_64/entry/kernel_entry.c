@@ -2079,6 +2079,15 @@ void kernel_main(void *boot_info) {
         serial_write("process registry reap failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
+    process_t *retained_process = process_create(5);
+    process_t *retained_lookup = process_lookup_retain(5);
+    if (!retained_process || retained_lookup != retained_process ||
+        !process_terminate(retained_process, 9) ||
+        !process_destroy(retained_process) || process_lookup_retain(5) != 0) {
+        serial_write("process retained lookup failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    process_release(retained_lookup);
     process_t *terminate_process = process_create(3);
     process_thread_t *terminate_thread = terminate_process ?
         process_thread_create(terminate_process, 202, process_thread_probe, 0, 4096) : 0;

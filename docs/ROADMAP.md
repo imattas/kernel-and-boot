@@ -633,8 +633,8 @@ syscall and lifecycle paths cannot race on the active process pointer.
 Cross-process signal lookup now retains a process reference under the table
 lock and releases it after delivery; process teardown drops its table-owned
 reference, preventing concurrent target lookup from becoming a use-after-free.
-Reference release rejects duplicate releases after the count reaches zero,
-preventing a stale caller from double-freeing a process object.
+The QEMU process lifecycle probe now retains a target across teardown and
+releases it only after table removal, exercising the deferred object lifetime.
 Cross-process signal syscalls now require the same UID or
 `SECURITY_CAP_SYS_ADMIN`; self-signaling remains valid for every live process.
 Blocking signal waits now use the scheduler wait-queue handoff, and QEMU

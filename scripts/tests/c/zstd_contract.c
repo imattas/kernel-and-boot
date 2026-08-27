@@ -21,6 +21,7 @@ int main(void) {
     btrfs_fse_table_t sequence_previous[3];
     uint32_t tables_consumed = 0;
     btrfs_zstd_sequence_t values;
+    btrfs_zstd_sequence_t sequence_list[2];
     uint8_t literals[] = {'a', 'b', 'c'};
     uint8_t sequence_output[16] = {0};
     uint32_t literal_offset = 0, sequence_output_size = 0;
@@ -90,5 +91,15 @@ int main(void) {
                                       &sequence_state, &sequence_state, &sequence_state,
                                       (const uint8_t[]){0x04}, &sequence_bits, 1, &values));
     assert(values.literal_length == 0 && values.match_length == 3 && values.offset == 1);
+    sequence_state = 0; sequence_bits = 0;
+    assert(btrfs_zstd_decode_sequences(&sequence_table, &sequence_table, &sequence_table,
+                                       &sequence_state, &sequence_state, &sequence_state,
+                                       (const uint8_t[]){0x04}, &sequence_bits, 1,
+                                       sequence_list, 2));
+    assert(sequence_list[0].match_length == 3 && sequence_list[0].offset == 1);
+    assert(!btrfs_zstd_decode_sequences(&sequence_table, &sequence_table, &sequence_table,
+                                        &sequence_state, &sequence_state, &sequence_state,
+                                        (const uint8_t[]){0x04}, &sequence_bits, 2,
+                                        sequence_list, 1));
     return 0;
 }

@@ -354,6 +354,8 @@ wired into one-sequence decoding with offset, match-length, and literal-length
 extra-bit consumption and optional state updates.
 Zstandard sequence-table preparation now consumes and validates LL/offset/ML
 mode tables in order, including inherited repeat tables.
+The multi-sequence coordinator now decodes exactly the declared count and
+applies the final-sequence state-update rule.
 
 ## Phase 10 — Userland begins after the kernel gate
 

@@ -176,6 +176,26 @@ int btrfs_zstd_decode_sequence(const btrfs_fse_table_t *literal_table,
     return 1;
 }
 
+int btrfs_zstd_decode_sequences(const btrfs_fse_table_t *literal_table,
+                                const btrfs_fse_table_t *match_table,
+                                const btrfs_fse_table_t *offset_table,
+                                uint32_t *literal_state, uint32_t *match_state,
+                                uint32_t *offset_state, const uint8_t *stream,
+                                int64_t *bit_offset, uint32_t count,
+                                btrfs_zstd_sequence_t *sequences,
+                                uint32_t capacity) {
+    if (!literal_table || !match_table || !offset_table || !literal_state ||
+        !match_state || !offset_state || !stream || !bit_offset || !sequences ||
+        !count || count > capacity) return 0;
+    for (uint32_t i = 0; i < count; ++i) {
+        if (!btrfs_zstd_decode_sequence(literal_table, match_table, offset_table,
+                                         literal_state, match_state, offset_state,
+                                         stream, bit_offset, (uint8_t)(i + 1U == count),
+                                         &sequences[i])) return 0;
+    }
+    return 1;
+}
+
 static uint32_t zstd_stream_bits(const uint8_t *source, uint32_t bits,
                                  int64_t *offset) {
     int64_t start = *offset - (int64_t)bits;

@@ -435,6 +435,8 @@ and duplicate-key rejection.
 USB HID keyboard polling now tracks the previous six-key report and emits
 bounded press/release transitions, preventing repeated held-key reports from
 being misclassified as new presses.
+The HID state tracker now also emits transitions for all eight boot-report
+modifier bits using stable modifier key codes.
 PS/2 mouse initialization now verifies the controller auxiliary-port test
 before enabling mouse commands, preventing an unavailable second port from
 being published as an active input backend.

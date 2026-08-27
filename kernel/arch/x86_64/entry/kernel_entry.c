@@ -1619,20 +1619,24 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     usb_hid_keyboard_state_t hid_probe_state;
-    input_event_t hid_transition_events[12];
+    input_event_t hid_transition_events[20];
     uint32_t hid_transition_count = 0;
     usb_hid_keyboard_state_initialize(&hid_probe_state);
     static const uint8_t hid_release_report[8] = {0, 0, 0x05, 0, 0, 0, 0, 0};
     if (!usb_hid_keyboard_decode_state(hid_probe_report, sizeof(hid_probe_report),
                                        &hid_probe_state, hid_transition_events,
                                        &hid_transition_count) ||
-        hid_transition_count != 2 ||
+        hid_transition_count != 3 ||
+        hid_transition_events[0].code != 0xe1 ||
+        hid_transition_events[0].value != 1 ||
         !usb_hid_keyboard_decode_state(hid_release_report,
                                        sizeof(hid_release_report),
                                        &hid_probe_state, hid_transition_events,
                                        &hid_transition_count) ||
-        hid_transition_count != 1 || hid_transition_events[0].code != 0x04 ||
-        hid_transition_events[0].value != 0) {
+        hid_transition_count != 2 || hid_transition_events[0].code != 0xe1 ||
+        hid_transition_events[0].value != 0 ||
+        hid_transition_events[1].code != 0x04 ||
+        hid_transition_events[1].value != 0) {
         serial_write("USB HID keyboard state failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
@@ -1660,7 +1664,7 @@ void kernel_main(void *boot_info) {
         int uhci_report_ready = uhci_interrupt_transfer(
             1, uhci_interrupt_endpoint, uhci_report, uhci_interrupt_packet,
             uhci_interrupt_packet, &uhci_toggle);
-        input_event_t uhci_events[12];
+        input_event_t uhci_events[20];
         uint32_t uhci_event_count = 0;
         static usb_hid_keyboard_state_t uhci_hid_state;
         static uint8_t uhci_hid_state_initialized;

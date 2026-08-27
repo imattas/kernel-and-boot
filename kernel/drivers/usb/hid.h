@@ -6,6 +6,7 @@
 
 typedef struct {
     uint8_t keys[6];
+    uint8_t modifiers;
 } usb_hid_keyboard_state_t;
 
 int usb_hid_keyboard_decode(const uint8_t *report, uint32_t length,
@@ -16,7 +17,7 @@ int usb_hid_keyboard_decode_report(const uint8_t *report, uint32_t length,
 void usb_hid_keyboard_state_initialize(usb_hid_keyboard_state_t *state);
 int usb_hid_keyboard_decode_state(const uint8_t *report, uint32_t length,
                                   usb_hid_keyboard_state_t *state,
-                                  input_event_t events[12],
+                                  input_event_t events[20],
                                   uint32_t *event_count);
 int usb_hid_mouse_decode(const uint8_t *report, uint32_t length,
                          input_event_t events[3], uint32_t *event_count);

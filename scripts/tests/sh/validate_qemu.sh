@@ -85,6 +85,7 @@ grep -F 'os kernel entry ok' "$log" >/dev/null
 grep -F 'syscall ABI ready' "$log" >/dev/null
 grep -F 'signal syscalls ready' "$log" >/dev/null
 grep -F 'process lifecycle ready' "$log" >/dev/null
+grep -F 'user process clone ready' "$log" >/dev/null
 grep -F 'process signals ready' "$log" >/dev/null
 grep -F 'signal blocking ready' "$log" >/dev/null
 grep -F 'process handles ready' "$log" >/dev/null

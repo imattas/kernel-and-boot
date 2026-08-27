@@ -193,6 +193,10 @@ the QEMU memory probe verifies copied contents remain isolated after cloning.
 Executable image metadata now records per-page protection flags and supports
 rollback-safe image cloning into a separate address space with independent
 frames; the QEMU memory probe verifies cloned image contents and entry metadata.
+Process cloning now composes image cloning with independent user-stack copying,
+namespace/security inheritance, handle inheritance, and initial user-thread
+creation; failed child construction is reclaimed through the normal process
+teardown path and the QEMU lifecycle probe covers the completed child.
 ELF page mappings now carry the segment write policy, with a controlled flag
 update for shared pages; the QEMU image probe verifies a non-writable code
 page while the process stack remains writable.

@@ -51,6 +51,8 @@ process_t *process_create_auto(void);
 process_t *process_create_user(uint64_t id, const void *image, uint64_t image_size,
                                uint64_t stack_base, uint32_t thread_id,
                                uint64_t kernel_stack_size);
+process_t *process_clone_user(process_t *parent, uint64_t id,
+                               uint32_t thread_id, uint64_t kernel_stack_size);
 int process_initialize(void);
 int process_set_namespace(process_t *process, vfs_node_t *root,
                           vfs_node_t *working_directory);

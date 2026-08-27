@@ -2828,6 +2828,17 @@ void kernel_main(void *boot_info) {
         serial_write("user process construction failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
+    process_t *cloned_process = process_clone_user(runtime_process, 8, 80, 4096);
+    if (!cloned_process || cloned_process->state != PROCESS_READY ||
+        cloned_process->thread_count != 1 ||
+        cloned_process->root_directory != runtime_process->root_directory ||
+        cloned_process->image.pages[0] == runtime_process->image.pages[0] ||
+        cloned_process->user_stack_pages[0] == runtime_process->user_stack_pages[0] ||
+        !process_destroy(cloned_process)) {
+        serial_write("user process clone failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("user process clone ready\r\n");
     process_thread_t *user_context_probe = process_thread_create_user(
         runtime_process, 2, runtime_process->image.entry,
         runtime_process->user_stack_top, 4096);

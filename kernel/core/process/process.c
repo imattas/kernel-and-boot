@@ -227,6 +227,92 @@ process_t *process_create_user(uint64_t id, const void *image,
     return process;
 }
 
+process_t *process_clone_user(process_t *parent, uint64_t id,
+                               uint32_t thread_id, uint64_t kernel_stack_size) {
+    if (!parent || id == 0 || thread_id == 0 || kernel_stack_size < PAGE_SIZE)
+        return 0;
+    uint64_t stack_frames[PROCESS_USER_STACK_PAGES];
+    uint64_t stack_top = 0;
+    security_context_t security;
+    vfs_node_t *root = 0;
+    vfs_node_t *working = 0;
+    address_space_t cloned_space = {0};
+    user_image_t cloned_image = {0};
+    uint64_t parent_flags = spinlock_lock_irqsave(&parent->lock);
+    if (parent->state == PROCESS_EXITED ||
+        parent->user_stack_page_count != PROCESS_USER_STACK_PAGES ||
+        parent->image.page_count == 0) {
+        spinlock_unlock_irqrestore(&parent->lock, parent_flags);
+        return 0;
+    }
+    for (uint32_t page = 0; page < PROCESS_USER_STACK_PAGES; ++page)
+        stack_frames[page] = parent->user_stack_pages[page];
+    stack_top = parent->user_stack_top;
+    security = parent->security;
+    root = parent->root_directory;
+    working = parent->working_directory;
+    if (!root || !working) {
+        spinlock_unlock_irqrestore(&parent->lock, parent_flags);
+        return 0;
+    }
+    vfs_node_retain(root);
+    vfs_node_retain(working);
+    process_t *child = process_create(id);
+    if (!child || !user_image_clone(&cloned_space, &parent->image, &cloned_image)) {
+        spinlock_unlock_irqrestore(&parent->lock, parent_flags);
+        vfs_node_release(working);
+        vfs_node_release(root);
+        if (cloned_image.page_count != 0)
+            user_image_destroy(&cloned_space, &cloned_image);
+        else if (cloned_space.root != 0)
+            (void)address_space_destroy(&cloned_space);
+        if (child) (void)process_destroy(child);
+        return 0;
+    }
+    spinlock_unlock_irqrestore(&parent->lock, parent_flags);
+    if (!address_space_destroy(&child->address_space)) {
+        user_image_destroy(&cloned_space, &cloned_image);
+        vfs_node_release(working);
+        vfs_node_release(root);
+        (void)process_destroy(child);
+        return 0;
+    }
+    child->address_space = cloned_space;
+    child->image = cloned_image;
+    child->security = security;
+    child->root_directory = root;
+    child->working_directory = working;
+    for (uint32_t page = 0; page < PROCESS_USER_STACK_PAGES; ++page) {
+        uint64_t frame = physical_alloc_frame();
+        uint64_t virtual_page = stack_top -
+            (uint64_t)(PROCESS_USER_STACK_PAGES - page) * PAGE_SIZE;
+        if (!frame || !address_space_map_page(&child->address_space, virtual_page,
+                                               frame, ADDRESS_SPACE_WRITABLE |
+                                               ADDRESS_SPACE_USER)) {
+            if (frame) physical_free_frame(frame);
+            (void)process_destroy(child);
+            return 0;
+        }
+        volatile uint8_t *from = (volatile uint8_t *)(uintptr_t)stack_frames[page];
+        volatile uint8_t *to = (volatile uint8_t *)(uintptr_t)frame;
+        for (uint32_t byte = 0; byte < PAGE_SIZE; ++byte) to[byte] = from[byte];
+        child->user_stack_pages[page] = frame;
+    }
+    child->user_stack_page_count = PROCESS_USER_STACK_PAGES;
+    child->user_stack_top = stack_top;
+    if (!process_inherit_handles(child, parent)) {
+        (void)process_destroy(child);
+        return 0;
+    }
+    child->state = PROCESS_READY;
+    if (!process_thread_create_user(child, thread_id, child->image.entry,
+                                    child->user_stack_top, kernel_stack_size)) {
+        (void)process_destroy(child);
+        return 0;
+    }
+    return child;
+}
+
 process_t *process_lookup(uint64_t id) {
     if (id == 0) return 0;
     uint64_t flags = spinlock_lock_irqsave(&process_table_lock);

@@ -1711,6 +1711,17 @@ void kernel_main(void *boot_info) {
         serial_write("PS2 mouse packet failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
+    static const uint8_t ps2_mouse_wheel_packet[4] = {0x08, 1, 0xff, 0x0f};
+    input_event_t ps2_mouse_wheel_events[4];
+    uint32_t ps2_mouse_wheel_count = 0;
+    if (!ps2_mouse_decode_wheel(ps2_mouse_wheel_packet,
+                                ps2_mouse_wheel_events,
+                                &ps2_mouse_wheel_count) ||
+        ps2_mouse_wheel_count != 4 || ps2_mouse_wheel_events[3].code != 2 ||
+        ps2_mouse_wheel_events[3].value != -1) {
+        serial_write("PS2 mouse wheel failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
     serial_write("PS2 mouse packet ready\r\n");
     if (ps2_mouse_initialize(&input_queue))
         serial_write("PS2 mouse controller ready\r\n");

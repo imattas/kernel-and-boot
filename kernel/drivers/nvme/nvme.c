@@ -369,6 +369,20 @@ static int nvme_io(uint64_t lba, void *buffer, uint32_t count, int write) {
     return success;
 }
 
+static int nvme_io_range(uint64_t lba, void *buffer, uint32_t count, int write) {
+    if (!nvme_lba_valid(lba, count) || !buffer) return 0;
+    uint32_t completed = 0;
+    while (completed < count) {
+        uint32_t chunk = count - completed;
+        if (chunk > 8U) chunk = 8U;
+        if (!nvme_io(lba + completed,
+                     (uint8_t *)buffer + (uint64_t)completed * 512U,
+                     chunk, write)) return 0;
+        completed += chunk;
+    }
+    return 1;
+}
+
 static int nvme_flush(void) {
     if (nvme_disabled || !active_io_ready || !active_regs) return 0;
     uint64_t flags = spinlock_lock_irqsave(&nvme_lock);
@@ -421,11 +435,11 @@ int nvme_write_sector(uint64_t lba, const void *buffer) {
 }
 
 int nvme_read_sectors(uint64_t lba, uint32_t count, void *buffer) {
-    return nvme_io(lba, buffer, count, 0);
+    return nvme_io_range(lba, buffer, count, 0);
 }
 
 int nvme_write_sectors(uint64_t lba, uint32_t count, const void *buffer) {
-    return nvme_io(lba, (void *)buffer, count, 1) && nvme_flush();
+    return nvme_io_range(lba, (void *)buffer, count, 1) && nvme_flush();
 }
 
 int nvme_initialize(void) {

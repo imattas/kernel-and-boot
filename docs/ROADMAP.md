@@ -332,8 +332,9 @@ sector-segment framing with bounded LZO1X decoding. A
 format is not considered complete merely because its superblock is recognized.
 Zstandard frame parsing now has strict raw/RLE block contracts plus compressed
 blocks using direct-weight Huffman literals with zero sequences. FSE-compressed
-Huffman weights/literals and sequence execution are still pending; the bounded
-FSE decoding-table builder is now implemented and contracted, so
+Huffman weights/literals and sequence execution are still pending; bounded FSE
+table construction and reverse-bitstream state decoding are now implemented and
+contracted, so
 Zstandard is not exposed through Btrfs yet.
 
 ## Phase 10 — Userland begins after the kernel gate

@@ -6,6 +6,20 @@ static uint32_t highest_bit(uint32_t value) {
     return bit;
 }
 
+static uint32_t stream_bits(const uint8_t *source, uint32_t bits, int64_t *offset) {
+    int64_t start = *offset - (int64_t)bits;
+    uint32_t result = 0, shift = 0;
+    *offset = start;
+    while (bits && start >= 0) {
+        uint32_t available = 8U - (uint32_t)(start & 7);
+        uint32_t count = bits < available ? bits : available;
+        result |= (((uint32_t)source[start >> 3] >> (start & 7)) &
+                   ((1U << count) - 1U)) << shift;
+        shift += count; bits -= count; start += count;
+    }
+    return result;
+}
+
 int btrfs_fse_build(btrfs_fse_table_t *table, const int16_t *normalized,
                     uint32_t symbol_count, uint32_t accuracy_log) {
     uint32_t size, high_threshold, position, step, mask;
@@ -43,5 +57,26 @@ int btrfs_fse_build(btrfs_fse_table_t *table, const int16_t *normalized,
         table->new_state[state] = (uint16_t)((descriptor << bit_count) - size);
     }
     table->size = size; table->accuracy_log = accuracy_log;
+    return 1;
+}
+
+int btrfs_fse_decode(const btrfs_fse_table_t *table, const uint8_t *stream,
+                     uint32_t stream_size, uint8_t *symbols,
+                     uint32_t symbol_count) {
+    int64_t offset;
+    uint32_t state;
+    if (!table || !stream || !stream_size || !symbols || !symbol_count ||
+        !table->size || table->size > BTRFS_FSE_TABLE_MAX ||
+        table->accuracy_log > 10U || !stream[stream_size - 1U]) return 0;
+    offset = (int64_t)stream_size * 8;
+    state = stream_bits(stream, table->accuracy_log, &offset);
+    for (uint32_t i = 0; i < symbol_count; ++i) {
+        uint32_t bits;
+        if (state >= table->size) return 0;
+        symbols[i] = table->symbols[state];
+        bits = table->bits[state];
+        state = table->new_state[state] + stream_bits(stream, bits, &offset);
+        if (state >= table->size) return 0;
+    }
     return 1;
 }

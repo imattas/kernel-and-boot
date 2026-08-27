@@ -15,5 +15,8 @@ typedef struct {
 
 int btrfs_fse_build(btrfs_fse_table_t *table, const int16_t *normalized,
                     uint32_t symbol_count, uint32_t accuracy_log);
+int btrfs_fse_decode(const btrfs_fse_table_t *table, const uint8_t *stream,
+                     uint32_t stream_size, uint8_t *symbols,
+                     uint32_t symbol_count);
 
 #endif

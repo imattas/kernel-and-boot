@@ -118,6 +118,12 @@ static uint64_t bar_size(uint32_t mask, uint64_t high_mask, int wide) {
 }
 
 static void read_resources(device_t *device, uint8_t header_type) {
+    uint32_t command_status = config_read(device->bus_number, device->slot,
+                                          device->function, 0x04);
+    uint16_t command = (uint16_t)command_status;
+    command = (uint16_t)(command & (uint16_t)~0x0007U);
+    config_write(device->bus_number, device->slot, device->function, 0x04,
+                 (command_status & 0xffff0000U) | command);
     uint8_t limit = (header_type & 0x7fu) == 1u ? 2u : 6u;
     for (uint8_t bar = 0; bar < limit; ++bar) {
         uint8_t offset = (uint8_t)(0x10 + bar * 4);
@@ -172,13 +178,13 @@ static void read_resources(device_t *device, uint8_t header_type) {
         if (device->resources[bar].size != 0) ++resources;
         if (wide) ++bar;
     }
+    config_write(device->bus_number, device->slot, device->function, 0x04,
+                 command_status);
 }
 
 static void scan_function(uint8_t bus, uint8_t slot, uint8_t function) {
     uint16_t vendor = config_read16(bus, slot, function, 0x00);
     if (vendor == 0xffffu) return;
-    enable_device(bus, slot, function);
-
     device_t device = {
         .bus = DEVICE_BUS_PCI,
         .bus_number = bus,
@@ -192,6 +198,7 @@ static void scan_function(uint8_t bus, uint8_t slot, uint8_t function) {
     };
     uint8_t header = config_read8(bus, slot, function, PCI_HEADER_TYPE);
     read_resources(&device, header);
+    enable_device(bus, slot, function);
     if (device_register(&device)) ++discovered;
 
     if ((header & 0x7fu) == 1u && device.class_code == 0x06u &&

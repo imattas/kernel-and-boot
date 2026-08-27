@@ -313,6 +313,9 @@ The e1000 ISR now records delivery, and the post-interrupt-enable QEMU probe
 transmits a frame and requires an observed interrupt before continuing.
 The e1000 ISR now preserves cleared interrupt causes for the polling/service
 path, preventing the accounting read from hiding completion work from service.
+e1000 TX completion service now records hardware descriptor error bits instead
+of silently treating errored completions as successful reclamation; the QEMU
+probe requires a clean completion.
 UHCI control transfers now build a bounded multi-packet endpoint-0 TD chain,
 validate the setup transfer length, alternate data toggles, and verify every
 TD before releasing DMA frames.

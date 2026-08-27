@@ -37,6 +37,7 @@
 #define E1000_TX_CMD_IFCS 0x02U
 #define E1000_TX_CMD_RS 0x08U
 #define E1000_DESC_DONE 0x01U
+#define E1000_DESC_ERROR_MASK 0x0eU
 #define E1000_DESC_EOP 0x02U
 #define E1000_IMS_RXDMT0 (1U << 4)
 #define E1000_IMS_RXT0 (1U << 7)
@@ -64,6 +65,7 @@ static spinlock_t e1000_lock;
 static int e1000_msi_enabled;
 static volatile uint32_t e1000_interrupts;
 static volatile uint32_t e1000_pending_causes;
+static volatile uint32_t e1000_tx_errors;
 
 static int e1000_match(const device_t *device) {
     return device && device->bus == DEVICE_BUS_PCI && device->class_code == 0x02 &&
@@ -140,6 +142,7 @@ int e1000_initialize(void) {
     e1000_msi_enabled = 0;
     e1000_interrupts = 0;
     e1000_pending_causes = 0;
+    e1000_tx_errors = 0;
     spinlock_init(&e1000_lock);
     for (uint32_t i = 0; i < E1000_RING_COUNT; ++i) {
         e1000_rx_buffers[i] = 0;
@@ -155,6 +158,7 @@ int e1000_link_up(void) {
 }
 int e1000_interrupt_enabled(void) { return e1000_msi_enabled; }
 uint32_t e1000_interrupt_count(void) { return e1000_interrupts; }
+uint32_t e1000_tx_error_count(void) { return e1000_tx_errors; }
 void e1000_interrupt_handler(void) {
     if (!e1000_regs) return;
     uint32_t causes = e1000_regs[E1000_ICR / 4];
@@ -193,6 +197,9 @@ uint32_t e1000_service(void) {
     causes |= e1000_regs[E1000_ICR / 4];
     while (e1000_tx_pending != 0 &&
            (e1000_tx_ring[e1000_tx_reclaim_index].status & E1000_DESC_DONE) != 0) {
+        if ((e1000_tx_ring[e1000_tx_reclaim_index].status &
+             E1000_DESC_ERROR_MASK) != 0)
+            ++e1000_tx_errors;
         e1000_tx_reclaim_index =
             (e1000_tx_reclaim_index + 1U) % E1000_RING_COUNT;
         --e1000_tx_pending;

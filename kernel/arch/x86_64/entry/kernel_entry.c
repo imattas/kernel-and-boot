@@ -1150,6 +1150,10 @@ void kernel_main(void *boot_info) {
             serial_write("e1000 interrupt delivery failure\r\n");
             for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
         }
+        if (e1000_tx_error_count() != 0) {
+            serial_write("e1000 completion error failure\r\n");
+            for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+        }
         serial_write("e1000 interrupt delivery ready\r\n");
     }
     timer_wait(10);

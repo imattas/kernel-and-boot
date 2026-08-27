@@ -26,14 +26,116 @@ static uint64_t frame_content_size(const uint8_t *header, uint32_t descriptor,
     return size;
 }
 
+static uint32_t zstd_highest_bit(uint32_t value) {
+    uint32_t bit = 0;
+    while (value > 1U) { value >>= 1; ++bit; }
+    return bit;
+}
+
+static uint32_t zstd_stream_bits(const uint8_t *source, uint32_t bits,
+                                 int64_t *offset) {
+    int64_t start = *offset - (int64_t)bits;
+    uint32_t result = 0, shift = 0;
+    *offset = start;
+    while (bits && start >= 0) {
+        uint32_t available = 8U - (uint32_t)(start & 7);
+        uint32_t count = bits < available ? bits : available;
+        uint32_t mask = (1U << count) - 1U;
+        result |= (((uint32_t)source[start >> 3] >> (start & 7)) & mask) << shift;
+        shift += count; bits -= count; start += count;
+    }
+    return result;
+}
+
+static int zstd_huffman_decode(const uint8_t *source, uint32_t source_size,
+                               const uint8_t *weights, uint32_t weight_count,
+                               uint8_t *output, uint32_t output_capacity,
+                               uint32_t expected_size) {
+    uint8_t symbols[2048], bits[2048], lengths[256];
+    uint16_t rank_count[17];
+    uint32_t rank_index[17], max_bits = 0, table_size, weight_sum = 0;
+    int64_t offset;
+    if (!source || !source_size || !weights || !weight_count || !output ||
+        expected_size > output_capacity || weight_count >= 256U) return 0;
+    for (uint32_t i = 0; i < 17; ++i) rank_count[i] = 0;
+    for (uint32_t i = 0; i < weight_count; ++i) {
+        if (weights[i] > 16U) return 0;
+        if (weights[i]) weight_sum += 1U << (weights[i] - 1U);
+    }
+    if (!weight_sum) return 0;
+    max_bits = zstd_highest_bit(weight_sum) + 1U;
+    if (max_bits > 16U) return 0;
+    uint32_t left = (1U << max_bits) - weight_sum;
+    if (!left || (left & (left - 1U))) return 0;
+    uint32_t last_weight = zstd_highest_bit(left) + 1U;
+    if (max_bits + 1U < last_weight) return 0;
+    for (uint32_t i = 0; i < weight_count; ++i) {
+        lengths[i] = weights[i] ? (uint8_t)(max_bits + 1U - weights[i]) : 0;
+        if (lengths[i]) ++rank_count[lengths[i]];
+    }
+    lengths[weight_count] = (uint8_t)(max_bits + 1U - last_weight);
+    if (!lengths[weight_count]) return 0;
+    ++rank_count[lengths[weight_count]];
+    table_size = 1U << max_bits;
+    rank_index[max_bits] = 0;
+    for (uint32_t i = max_bits; i > 0; --i) {
+        rank_index[i - 1] = rank_index[i] + rank_count[i] * (1U << (max_bits - i));
+        for (uint32_t j = rank_index[i]; j < rank_index[i - 1]; ++j) bits[j] = (uint8_t)i;
+    }
+    if (rank_index[0] != table_size) return 0;
+    for (uint32_t symbol = 0; symbol <= weight_count; ++symbol) {
+        uint32_t length = lengths[symbol];
+        if (!length) continue;
+        uint32_t index = rank_index[length];
+        uint32_t span = 1U << (max_bits - length);
+        for (uint32_t j = 0; j < span; ++j) symbols[index + j] = (uint8_t)symbol;
+        rank_index[length] += span;
+    }
+    uint8_t last = source[source_size - 1U];
+    if (!last) return 0;
+    offset = (int64_t)source_size * 8 - (int64_t)(8U - zstd_highest_bit(last));
+    uint32_t state = zstd_stream_bits(source, max_bits, &offset), produced = 0;
+    while (offset > -(int64_t)max_bits) {
+        if (produced == expected_size) return 0;
+        uint32_t length = bits[state];
+        output[produced++] = symbols[state];
+        state = ((state << length) + zstd_stream_bits(source, length, &offset)) & (table_size - 1U);
+    }
+    return produced == expected_size && offset == -(int64_t)max_bits;
+}
+
 static int decode_compressed_literals(const uint8_t *input, uint32_t size,
                                       uint8_t *output, uint32_t capacity,
-                                      uint32_t *decoded_size) {
+                                      uint32_t *decoded_size, uint32_t *section_size) {
     uint32_t header, format, regenerated, header_size;
-    if (!input || size < 2 || !output || !decoded_size) return 0;
+    if (!input || size < 2 || !output || !decoded_size || !section_size) return 0;
     header = input[0];
-    if ((header & 3U) > 1U) return 0;
+    if ((header & 3U) > 2U) return 0;
     format = (header >> 2) & 3U;
+    if ((header & 3U) == 2U) {
+        uint32_t packed, compressed, tree_header, count, tree_bytes;
+        uint8_t weights[255];
+        if (format != 0U || size < 4U) return 0;
+        packed = (uint32_t)input[0] | ((uint32_t)input[1] << 8) |
+                 ((uint32_t)input[2] << 16);
+        regenerated = (packed >> 4) & 0x3ffU;
+        compressed = (packed >> 14) & 0x3ffU;
+        if (!regenerated || !compressed || regenerated > capacity || compressed > size - 3U)
+            return 0;
+        tree_header = input[3];
+        if (tree_header < 128U) return 0;
+        count = tree_header - 127U;
+        tree_bytes = (count + 1U) / 2U;
+        if (count >= 256U || tree_bytes > compressed - 1U) return 0;
+        for (uint32_t i = 0; i < count; ++i)
+            weights[i] = (uint8_t)(i & 1U ? input[4U + i / 2U] & 0x0fU :
+                                   input[4U + i / 2U] >> 4);
+        if (!zstd_huffman_decode(input + 4U + tree_bytes,
+                                 compressed - 1U - tree_bytes, weights,
+                                 count, output, capacity, regenerated)) return 0;
+        *decoded_size = regenerated; *section_size = 3U + compressed;
+        return 1;
+    }
     if (format == 0U || format == 2U) {
         regenerated = header >> 3; header_size = 1;
     } else if (format == 1U) {
@@ -52,6 +154,7 @@ static int decode_compressed_literals(const uint8_t *input, uint32_t size,
         for (uint32_t i = 0; i < regenerated; ++i) output[i] = input[header_size];
     }
     *decoded_size = regenerated;
+    *section_size = header_size + regenerated;
     return 1;
 }
 
@@ -60,14 +163,8 @@ static int decode_compressed_block(const uint8_t *input, uint32_t size,
                                    uint32_t *decoded_size) {
     uint32_t literals_size, literals_decoded, sequences;
     if (!input || !size || !output || !decoded_size ||
-        !decode_compressed_literals(input, size, output, capacity, &literals_decoded)) return 0;
-    if (input[0] & 3U) return 0;
-    if (((input[0] >> 2) & 3U) == 0U || ((input[0] >> 2) & 3U) == 2U)
-        literals_size = 1U + literals_decoded;
-    else if (((input[0] >> 2) & 3U) == 1U)
-        literals_size = 2U + literals_decoded;
-    else
-        literals_size = 3U + literals_decoded;
+        !decode_compressed_literals(input, size, output, capacity, &literals_decoded,
+                                    &literals_size)) return 0;
     if (literals_size >= size) return 0;
     sequences = input[literals_size];
     if (sequences != 0U) return 0;

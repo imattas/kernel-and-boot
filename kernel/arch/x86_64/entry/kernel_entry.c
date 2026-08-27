@@ -270,6 +270,17 @@ void kernel_main(void *boot_info) {
     }
     physical_free_frame(recycled_frame);
     serial_write("physical frame hygiene ready\r\n");
+    uint64_t contiguous_frames = physical_alloc_frames(2);
+    if (!contiguous_frames || physical_alloc_frames(0) != 0 ||
+        (contiguous_frames & 0xfffULL) != 0 ||
+        ((volatile uint8_t *)(uintptr_t)contiguous_frames)[0] != 0 ||
+        ((volatile uint8_t *)(uintptr_t)contiguous_frames)[4096] != 0) {
+        if (contiguous_frames) physical_free_frames(contiguous_frames, 2);
+        serial_write("physical contiguous allocation failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    physical_free_frames(contiguous_frames, 2);
+    serial_write("physical contiguous frames ready\r\n");
     if (!virtual_memory_initialize()) {
         serial_write("virtual memory initialization failed\r\n");
         for (;;) __asm__ volatile ("hlt" ::: "memory");

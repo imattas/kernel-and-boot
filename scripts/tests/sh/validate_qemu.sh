@@ -7,6 +7,7 @@ grep -F 'os UEFI loader' "$log" >/dev/null
 grep -F 'serial driver ready' "$log" >/dev/null
 grep -F 'firmware boot contract ready' "$log" >/dev/null
 grep -F 'physical frame hygiene ready' "$log" >/dev/null
+grep -F 'physical contiguous frames ready' "$log" >/dev/null
 grep -F 'local APIC ready' "$log" >/dev/null
 grep -F 'address space foundation ready' "$log" >/dev/null
 grep -F 'user image loader ready' "$log" >/dev/null

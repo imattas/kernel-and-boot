@@ -80,16 +80,26 @@ int physical_init(const os_boot_info_t *boot_info) {
 const physical_memory_stats_t *physical_stats(void) { return &stats; }
 
 uint64_t physical_alloc_frame(void) {
+    return physical_alloc_frames(1);
+}
+
+uint64_t physical_alloc_frames(uint32_t count) {
+    if (count == 0) return 0;
     uint64_t flags = spinlock_lock_irqsave(&frame_lock);
-    for (uint64_t frame = 256; frame < MAX_FRAMES; ++frame) {
-        if (frame_is_free(frame)) {
-            mark_frame(frame, 0);
-            mark_allocated(frame, 1);
-            --stats.free_frames;
-            ++stats.reserved_frames;
-            volatile uint64_t *memory = (volatile uint64_t *)(uintptr_t)(frame * FRAME_SIZE);
-            for (uint32_t word = 0; word < FRAME_SIZE / sizeof(uint64_t); ++word)
-                memory[word] = 0;
+    for (uint64_t frame = 256; frame <= MAX_FRAMES - count; ++frame) {
+        uint32_t available = 0;
+        while (available < count && frame_is_free(frame + available)) ++available;
+        if (available == count) {
+            for (uint32_t page = 0; page < count; ++page) {
+                mark_frame(frame + page, 0);
+                mark_allocated(frame + page, 1);
+                volatile uint64_t *memory = (volatile uint64_t *)(uintptr_t)
+                    ((frame + page) * FRAME_SIZE);
+                for (uint32_t word = 0; word < FRAME_SIZE / sizeof(uint64_t); ++word)
+                    memory[word] = 0;
+            }
+            stats.free_frames -= count;
+            stats.reserved_frames += count;
             spinlock_unlock_irqrestore(&frame_lock, flags);
             return frame * FRAME_SIZE;
         }
@@ -99,14 +109,23 @@ uint64_t physical_alloc_frame(void) {
 }
 
 void physical_free_frame(uint64_t address) {
-    if ((address & (FRAME_SIZE - 1)) != 0 || address >= MAX_PHYSICAL_ADDRESS) return;
-    uint64_t frame = address / FRAME_SIZE;
+    physical_free_frames(address, 1);
+}
+
+void physical_free_frames(uint64_t address, uint32_t count) {
+    if (count == 0 || (address & (FRAME_SIZE - 1)) != 0 ||
+        address >= MAX_PHYSICAL_ADDRESS ||
+        count > (MAX_PHYSICAL_ADDRESS - address) / FRAME_SIZE) return;
+    uint64_t first = address / FRAME_SIZE;
     uint64_t flags = spinlock_lock_irqsave(&frame_lock);
-    if (frame_is_allocated(frame)) {
-        mark_allocated(frame, 0);
-        mark_frame(frame, 1);
-        ++stats.free_frames;
-        --stats.reserved_frames;
+    for (uint32_t page = 0; page < count; ++page) {
+        uint64_t frame = first + page;
+        if (frame_is_allocated(frame)) {
+            mark_allocated(frame, 0);
+            mark_frame(frame, 1);
+            ++stats.free_frames;
+            --stats.reserved_frames;
+        }
     }
     spinlock_unlock_irqrestore(&frame_lock, flags);
 }

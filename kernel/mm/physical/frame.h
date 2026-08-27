@@ -14,5 +14,7 @@ int physical_init(const os_boot_info_t *boot_info);
 const physical_memory_stats_t *physical_stats(void);
 uint64_t physical_alloc_frame(void);
 void physical_free_frame(uint64_t address);
+uint64_t physical_alloc_frames(uint32_t count);
+void physical_free_frames(uint64_t address, uint32_t count);
 
 #endif

@@ -196,15 +196,24 @@ int e1000_mac_address(uint8_t address[6]) {
     return 1;
 }
 int e1000_interrupt_enabled(void) { return e1000_msi_enabled; }
-uint32_t e1000_interrupt_count(void) { return e1000_interrupts; }
-uint32_t e1000_tx_error_count(void) { return e1000_tx_errors; }
-uint32_t e1000_link_event_count(void) { return e1000_link_events; }
-uint32_t e1000_rx_overrun_count(void) { return e1000_rx_overruns; }
+uint32_t e1000_interrupt_count(void) {
+    return __atomic_load_n(&e1000_interrupts, __ATOMIC_ACQUIRE);
+}
+uint32_t e1000_tx_error_count(void) {
+    return __atomic_load_n(&e1000_tx_errors, __ATOMIC_ACQUIRE);
+}
+uint32_t e1000_link_event_count(void) {
+    return __atomic_load_n(&e1000_link_events, __ATOMIC_ACQUIRE);
+}
+uint32_t e1000_rx_overrun_count(void) {
+    return __atomic_load_n(&e1000_rx_overruns, __ATOMIC_ACQUIRE);
+}
 void e1000_interrupt_handler(void) {
     if (!e1000_regs) return;
     uint32_t causes = e1000_regs[E1000_ICR / 4];
     __atomic_fetch_or(&e1000_pending_causes, causes, __ATOMIC_RELEASE);
-    if ((causes & E1000_INTERRUPT_MASK) != 0) ++e1000_interrupts;
+    if ((causes & E1000_INTERRUPT_MASK) != 0)
+        __atomic_fetch_add(&e1000_interrupts, 1U, __ATOMIC_RELAXED);
 }
 
 int e1000_transmit(const void *data, uint16_t length) {
@@ -236,13 +245,15 @@ uint32_t e1000_service(void) {
     uint32_t causes = __atomic_exchange_n(&e1000_pending_causes, 0,
                                           __ATOMIC_ACQUIRE);
     causes |= e1000_regs[E1000_ICR / 4];
-    if ((causes & E1000_IMS_LSC) != 0) ++e1000_link_events;
-    if ((causes & E1000_IMS_RXO) != 0) ++e1000_rx_overruns;
+    if ((causes & E1000_IMS_LSC) != 0)
+        __atomic_fetch_add(&e1000_link_events, 1U, __ATOMIC_RELAXED);
+    if ((causes & E1000_IMS_RXO) != 0)
+        __atomic_fetch_add(&e1000_rx_overruns, 1U, __ATOMIC_RELAXED);
     while (e1000_tx_pending != 0 &&
            (e1000_tx_ring[e1000_tx_reclaim_index].status & E1000_DESC_DONE) != 0) {
         if ((e1000_tx_ring[e1000_tx_reclaim_index].status &
              E1000_DESC_ERROR_MASK) != 0)
-            ++e1000_tx_errors;
+            __atomic_fetch_add(&e1000_tx_errors, 1U, __ATOMIC_RELAXED);
         e1000_tx_reclaim_index =
             (e1000_tx_reclaim_index + 1U) % E1000_RING_COUNT;
         --e1000_tx_pending;

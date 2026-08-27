@@ -288,7 +288,8 @@ static int uhci_control_transfer_locked(uint8_t address, uint8_t endpoint,
         return 0;
     }
     uint16_t controller_status = uhci_status();
-    uhci_last_status_value = controller_status;
+    __atomic_store_n(&uhci_last_status_value, controller_status,
+                     __ATOMIC_RELEASE);
     complete = complete && (controller_status & (UHCI_STATUS_ERROR |
                         UHCI_STATUS_HOST_SYSTEM_ERROR |
                         UHCI_STATUS_PROCESS_ERROR)) == 0;
@@ -382,8 +383,10 @@ static int uhci_data_transfer_locked(uint8_t address, uint8_t endpoint, void *da
         return 0;
     }
     uint16_t controller_status = uhci_status();
-    uhci_last_td_status_value = td[packet_count - 1U].status;
-    uhci_last_status_value = controller_status;
+    __atomic_store_n(&uhci_last_td_status_value, td[packet_count - 1U].status,
+                     __ATOMIC_RELEASE);
+    __atomic_store_n(&uhci_last_status_value, controller_status,
+                     __ATOMIC_RELEASE);
     complete = complete && (controller_status & (UHCI_STATUS_ERROR |
                         UHCI_STATUS_HOST_SYSTEM_ERROR |
                         UHCI_STATUS_PROCESS_ERROR)) == 0;
@@ -482,13 +485,17 @@ fail:
 static int uhci_interrupt_poll_locked(void) {
     if (!uhci_async_pending) return 0;
     uhci_td_t *td = (uhci_td_t *)(uintptr_t)uhci_async_td_frame;
-    uhci_last_td_status_value = td[uhci_async_packet_count - 1U].status;
-    if (uhci_last_td_status_value & UHCI_TD_ACTIVE) return 0;
+    uint32_t last_td_status = td[uhci_async_packet_count - 1U].status;
+    __atomic_store_n(&uhci_last_td_status_value, last_td_status,
+                     __ATOMIC_RELEASE);
+    if (last_td_status & UHCI_TD_ACTIVE) return 0;
     int complete = 1;
     for (uint32_t i = 0; i < uhci_async_packet_count; ++i)
         complete = complete && uhci_td_complete(&td[i]);
-    uhci_last_status_value = uhci_status();
-    complete = complete && !(uhci_last_status_value & (UHCI_STATUS_ERROR |
+    uint16_t controller_status = uhci_status();
+    __atomic_store_n(&uhci_last_status_value, controller_status,
+                     __ATOMIC_RELEASE);
+    complete = complete && !(controller_status & (UHCI_STATUS_ERROR |
         UHCI_STATUS_HOST_SYSTEM_ERROR | UHCI_STATUS_PROCESS_ERROR));
     if (!uhci_set_running(0)) { uhci_io_disabled = 1; return -1; }
     volatile uint32_t *frame_list =
@@ -534,8 +541,12 @@ uint32_t uhci_controller_count(void) { return controllers; }
 uint32_t uhci_root_port_count(void) { return root_ports; }
 int uhci_interrupt_enabled(void) { return uhci_irq_enabled; }
 uint32_t uhci_interrupt_count(void) { return uhci_interrupts; }
-uint32_t uhci_last_transfer_td_status(void) { return uhci_last_td_status_value; }
-uint16_t uhci_last_controller_status(void) { return uhci_last_status_value; }
+uint32_t uhci_last_transfer_td_status(void) {
+    return __atomic_load_n(&uhci_last_td_status_value, __ATOMIC_ACQUIRE);
+}
+uint16_t uhci_last_controller_status(void) {
+    return __atomic_load_n(&uhci_last_status_value, __ATOMIC_ACQUIRE);
+}
 int uhci_interrupt_submit(uint8_t address, uint8_t endpoint, void *data,
                           uint16_t length, uint16_t max_packet, uint8_t interval,
                           uint8_t *toggle) {
@@ -587,7 +598,7 @@ void uhci_interrupt_handler(void) {
     }
     uint16_t status = uhci_status();
     if ((status & UHCI_INTR_MASK) != 0) {
-        ++uhci_interrupts;
+        __atomic_fetch_add(&uhci_interrupts, 1U, __ATOMIC_RELAXED);
         uhci_acknowledge_status(status & 0x001fU);
     }
     spinlock_unlock_irqrestore(&uhci_lock, flags);

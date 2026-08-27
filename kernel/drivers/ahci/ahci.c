@@ -137,9 +137,11 @@ static int ahci_command_ok(uint32_t task_file, uint32_t transferred,
     interrupt_status |= __atomic_exchange_n(
         &ahci_pending_port_status[active_port_number], 0U, __ATOMIC_ACQUIRE);
     uint32_t serial_error = active_port[AHCI_PORT_SERR / 4];
-    ahci_last_task_file = task_file;
-    ahci_last_interrupt_status_value = interrupt_status;
-    ahci_last_serial_error_value = serial_error;
+    __atomic_store_n(&ahci_last_task_file, task_file, __ATOMIC_RELEASE);
+    __atomic_store_n(&ahci_last_interrupt_status_value, interrupt_status,
+                     __ATOMIC_RELEASE);
+    __atomic_store_n(&ahci_last_serial_error_value, serial_error,
+                     __ATOMIC_RELEASE);
     if (interrupt_status & AHCI_PORT_IS_ERROR_MASK)
         active_port[AHCI_PORT_IS / 4] =
             interrupt_status & AHCI_PORT_IS_ERROR_MASK;
@@ -147,7 +149,7 @@ static int ahci_command_ok(uint32_t task_file, uint32_t transferred,
     int success = (task_file & 0x09U) == 0 && transferred == expected &&
            (interrupt_status & AHCI_PORT_IS_ERROR_MASK) == 0 &&
            serial_error == 0;
-    if (!success) ++ahci_errors;
+    if (!success) __atomic_fetch_add(&ahci_errors, 1U, __ATOMIC_RELAXED);
     return success;
 }
 
@@ -684,7 +686,15 @@ int ahci_write_sectors(uint64_t lba, uint32_t count, const void *buffer) {
 }
 
 uint32_t ahci_last_io_prdt_length(void) { return ahci_last_prdt_length; }
-uint32_t ahci_error_count(void) { return ahci_errors; }
-uint32_t ahci_last_task_file_status(void) { return ahci_last_task_file; }
-uint32_t ahci_last_interrupt_status(void) { return ahci_last_interrupt_status_value; }
-uint32_t ahci_last_serial_error(void) { return ahci_last_serial_error_value; }
+uint32_t ahci_error_count(void) {
+    return __atomic_load_n(&ahci_errors, __ATOMIC_ACQUIRE);
+}
+uint32_t ahci_last_task_file_status(void) {
+    return __atomic_load_n(&ahci_last_task_file, __ATOMIC_ACQUIRE);
+}
+uint32_t ahci_last_interrupt_status(void) {
+    return __atomic_load_n(&ahci_last_interrupt_status_value, __ATOMIC_ACQUIRE);
+}
+uint32_t ahci_last_serial_error(void) {
+    return __atomic_load_n(&ahci_last_serial_error_value, __ATOMIC_ACQUIRE);
+}

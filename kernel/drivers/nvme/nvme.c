@@ -288,7 +288,7 @@ static int nvme_submit_admin_words(uint8_t opcode, uint32_t namespace_id,
         uint16_t status = completion->status;
         if ((status & 1U) != active_cq_phase) continue;
         if (completion->command_id != command_id) continue;
-        nvme_last_status = status;
+        __atomic_store_n(&nvme_last_status, status, __ATOMIC_RELEASE);
         *result = completion->result;
         __atomic_store_n(&nvme_completion_pending, 0U, __ATOMIC_RELEASE);
         int success = (status >> 1) == 0;
@@ -451,7 +451,7 @@ static int nvme_io(uint64_t lba, void *buffer, uint32_t count, int write) {
         uint16_t status = completion->status;
         if ((status & 1U) != active_io_cq_phase ||
             completion->command_id != command_id) continue;
-        nvme_last_status = status;
+        __atomic_store_n(&nvme_last_status, status, __ATOMIC_RELEASE);
         success = (status >> 1) == 0;
         if (!success) ++nvme_errors;
         __atomic_store_n(&nvme_completion_pending, 0U, __ATOMIC_RELEASE);
@@ -526,7 +526,7 @@ static int nvme_flush(void) {
         uint16_t status = completion->status;
         if ((status & 1U) != active_io_cq_phase ||
             completion->command_id != command_id) continue;
-        nvme_last_status = status;
+        __atomic_store_n(&nvme_last_status, status, __ATOMIC_RELEASE);
         success = (status >> 1) == 0;
         if (!success) ++nvme_errors;
         __atomic_store_n(&nvme_completion_pending, 0U, __ATOMIC_RELEASE);
@@ -592,6 +592,12 @@ int nvme_initialize(void) {
 
 uint32_t nvme_controller_count(void) { return controllers; }
 int nvme_interrupt_enabled(void) { return nvme_irq_enabled; }
-uint32_t nvme_interrupt_count(void) { return nvme_interrupts; }
-uint32_t nvme_error_count(void) { return nvme_errors; }
-uint16_t nvme_last_completion_status(void) { return nvme_last_status; }
+uint32_t nvme_interrupt_count(void) {
+    return __atomic_load_n(&nvme_interrupts, __ATOMIC_ACQUIRE);
+}
+uint32_t nvme_error_count(void) {
+    return __atomic_load_n(&nvme_errors, __ATOMIC_ACQUIRE);
+}
+uint16_t nvme_last_completion_status(void) {
+    return __atomic_load_n(&nvme_last_status, __ATOMIC_ACQUIRE);
+}

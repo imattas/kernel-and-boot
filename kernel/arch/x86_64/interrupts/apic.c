@@ -17,6 +17,15 @@
 #define APIC_REG_ICR_LOW 0x300
 #define APIC_REG_ICR_HIGH 0x310
 #define APIC_ICR_DELIVERY_STATUS (1u << 12)
+#define APIC_REG_TIMER_INITIAL 0x380
+#define APIC_REG_TIMER_CURRENT 0x390
+#define APIC_TIMER_PERIODIC (1u << 17)
+#define APIC_TIMER_MASKED (1u << 16)
+#define PIT_COMMAND 0x43
+#define PIT_CHANNEL2 0x42
+#define PIT_CONTROL 0x61
+#define PIT_INPUT_HZ 1193182U
+#define PIT_CALIBRATION_HZ 100U
 
 static volatile uint32_t *lapic;
 
@@ -38,6 +47,36 @@ static void lapic_write(uint32_t reg, uint32_t value) {
 
 static uint32_t lapic_read(uint32_t reg) {
     return lapic[reg / sizeof(uint32_t)];
+}
+
+static void io_write8(uint16_t port, uint8_t value) {
+    __asm__ volatile ("outb %0, %1" :: "a"(value), "Nd"(port));
+}
+
+static uint8_t io_read8(uint16_t port) {
+    uint8_t value;
+    __asm__ volatile ("inb %1, %0" : "=a"(value) : "Nd"(port));
+    return value;
+}
+
+static uint32_t apic_timer_calibrate(void) {
+    uint32_t pit_count = PIT_INPUT_HZ / PIT_CALIBRATION_HZ;
+    uint8_t control = io_read8(PIT_CONTROL);
+    control = (uint8_t)((control | 0x01U) & (uint8_t)~0x02U);
+    io_write8(PIT_CONTROL, control);
+    io_write8(PIT_COMMAND, 0xb0);
+    io_write8(PIT_CHANNEL2, (uint8_t)pit_count);
+    io_write8(PIT_CHANNEL2, (uint8_t)(pit_count >> 8));
+
+    lapic_write(APIC_REG_TIMER_INITIAL, 0xffffffffU);
+    uint32_t attempts = 2000000U;
+    while ((io_read8(PIT_CONTROL) & 0x20U) == 0 && attempts-- != 0)
+        __asm__ volatile ("pause" ::: "memory");
+    uint32_t elapsed = 0xffffffffU - lapic_read(APIC_REG_TIMER_CURRENT);
+    lapic_write(APIC_REG_TIMER_INITIAL, 0);
+    io_write8(PIT_CONTROL, control);
+    if (attempts == 0 || elapsed < 1000U || elapsed > 0x0fffffffU) return 62500U;
+    return elapsed;
 }
 
 static void apic_delay(void) {
@@ -97,7 +136,9 @@ int arch_apic_startup(uint32_t apic_id, uint8_t vector) {
 int arch_apic_timer_initialize(void) {
     if (!lapic) return 0;
     lapic_write(APIC_REG_TIMER_DIVIDE, 0x3);
-    lapic_write(APIC_REG_LVT_TIMER, APIC_TIMER_VECTOR | (1u << 17));
-    lapic_write(0x380, 62500);
+    lapic_write(APIC_REG_LVT_TIMER, APIC_TIMER_VECTOR | APIC_TIMER_PERIODIC | APIC_TIMER_MASKED);
+    uint32_t initial_count = apic_timer_calibrate();
+    lapic_write(APIC_REG_LVT_TIMER, APIC_TIMER_VECTOR | APIC_TIMER_PERIODIC);
+    lapic_write(APIC_REG_TIMER_INITIAL, initial_count);
     return 1;
 }

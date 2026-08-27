@@ -76,7 +76,8 @@ now owns and loads a separate early IDT, enables its local APIC timer, and
 enters an interruptible idle loop. Per-CPU lookup is APIC-identified and global
 tick accounting is BSP-owned. Tick counts are exposed as a monotonic
 nanosecond clock with overflow-safe waits and BSP-owned global tick accounting;
-APIC frequency calibration,
+the BSP and AP now calibrate their periodic APIC timer against the PIT with a
+bounded fallback;
 richer per-CPU execution stacks, and scheduler policy remain in progress. The
 kernel now has intrusive, spinlock-protected FIFO wait queues with duplicate
 enqueue rejection, removal, dequeue, and task-state definitions. The scheduler

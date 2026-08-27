@@ -392,6 +392,9 @@ fallback count, preventing slow firmware emulation from blocking kernel boot.
 UEFI memory-map retries now release rejected candidate pools and validate boot
 services before dereferencing them, keeping ExitBootServices preparation
 bounded without leaking retry buffers.
+The kernel firmware contract now rejects non-integral memory-map lengths and
+kernel ranges outside the supported below-4-GiB physical window, with a boot
+path rejection probe.
 Successful memory-map replacement now releases the original pool, and the
 UEFI loader releases the relocated kernel-file buffer before ExitBootServices.
 The ELF loader now falls back from its preferred physical base to a bounded

@@ -167,6 +167,12 @@ void kernel_main(void *boot_info) {
         serial_write("os kernel contract invalid\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
+    os_boot_info_t invalid_contract = *info;
+    invalid_contract.memory_map_size -= 1;
+    if (firmware_boot_contract_valid(&invalid_contract)) {
+        serial_write("firmware contract rejection failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
     serial_write("firmware boot contract ready\r\n");
     if (!physical_init(info)) {
         serial_write("physical memory initialization failed\r\n");

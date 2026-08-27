@@ -269,6 +269,9 @@ backend dispatch, rejects duplicate device names, and has hosted contract-test
 build support without executing privileged interrupt-state instructions.
 The PS/2 keyboard backend now consumes Set-1 extended prefixes and emits
 distinct extended key codes while retaining make/break values.
+PS/2 initialization now validates the controller self-test and keyboard-port
+test, configures keyboard IRQ delivery and port enablement, flushes stale
+controller output, selects Set-1 scancodes, and explicitly enables scanning.
 The PS/2 IRQ stub now sends a local-APIC EOI for IOAPIC delivery and retains a
 PIC EOI for the legacy fallback, preventing either route from blocking later
 keyboard events.

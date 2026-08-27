@@ -105,10 +105,16 @@ int fat32_mount(fat32_fs_t *fs, uint32_t device) {
     if (total == 0) total = load32(&boot[32]);
     uint32_t fat_start = load16(&boot[14]);
     uint32_t fat_size = load32(&boot[36]);
-    uint32_t data_start = fat_start + (uint32_t)boot[16] * fat_size;
-    if (total <= data_start || boot[13] > FAT32_MAX_SECTORS_PER_CLUSTER ||
-        fat_size > total - fat_start || data_start > total ||
-        (total - data_start) / boot[13] < 65525U) return 0;
+    uint64_t data_start = fat_start + (uint64_t)boot[16] * fat_size;
+    uint64_t data_clusters = data_start < total && boot[13] != 0 ?
+                             (total - data_start) / boot[13] : 0;
+    uint64_t device_sectors = storage_device_at(device)->block_count;
+    if (total <= data_start || total > device_sectors ||
+        data_start > UINT32_MAX || boot[13] > FAT32_MAX_SECTORS_PER_CLUSTER ||
+        fat_size > total - fat_start || data_clusters < 65525U ||
+        data_clusters > 0x0ffffff5ULL ||
+        (uint64_t)fat_size * FAT32_SECTOR_SIZE / 4U < data_clusters + 2U)
+        return 0;
     fs->device = device;
     fs->bytes_per_sector = FAT32_SECTOR_SIZE;
     fs->sectors_per_cluster = boot[13];
@@ -116,10 +122,10 @@ int fat32_mount(fat32_fs_t *fs, uint32_t device) {
     fs->fat_count = boot[16];
     fs->sectors_per_fat = fat_size;
     fs->fat_start = fat_start;
-    fs->data_start = data_start;
+    fs->data_start = (uint32_t)data_start;
     fs->root_cluster = load32(&boot[44]) & 0x0fffffffU;
     fs->total_sectors = total;
-    fs->data_clusters = (total - data_start) / fs->sectors_per_cluster;
+    fs->data_clusters = (uint32_t)data_clusters;
     fs->fat_sector_number = 0;
     fs->fat_sector_valid = 0;
     fs->mounted = cluster_valid(fs, fs->root_cluster);

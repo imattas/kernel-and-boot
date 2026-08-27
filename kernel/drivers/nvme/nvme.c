@@ -3,6 +3,7 @@
 #include "../pci/pci.h"
 #include "../../mm/physical/frame.h"
 #include "../../core/sync/spinlock.h"
+#include "../../arch/x86_64/cpu/tables.h"
 
 #define NVME_BAR_INDEX 0
 #define NVME_CAP 0x00
@@ -19,6 +20,9 @@
 #define NVME_CAP_DSTRD_SHIFT 32
 #define NVME_ADMIN_SQ_DOORBELL 0x1000
 #define NVME_TIMEOUT_ATTEMPTS 10000000U
+#define NVME_IRQ_VECTOR 0x53
+
+extern void arch_nvme_irq_stub(void);
 
 static uint32_t controllers;
 static volatile uint32_t *active_regs;
@@ -38,6 +42,8 @@ static uint8_t active_io_cq_phase;
 static uint8_t active_io_ready;
 static spinlock_t nvme_lock;
 static device_driver_t nvme_driver;
+static int nvme_irq_enabled;
+static volatile uint32_t nvme_interrupts;
 
 static int nvme_submit_admin_words(uint8_t opcode, uint32_t namespace_id,
                                    uint64_t prp1, const uint32_t words[6],
@@ -103,6 +109,10 @@ static int nvme_probe(device_t *device) {
     active_io_sq = 0;
     active_io_cq = 0;
     active_io_ready = 0;
+    arch_set_interrupt_gate(NVME_IRQ_VECTOR, arch_nvme_irq_stub);
+    nvme_irq_enabled = pci_enable_msi(device, NVME_IRQ_VECTOR);
+    if (!nvme_irq_enabled)
+        nvme_irq_enabled = pci_enable_legacy_irq(device, NVME_IRQ_VECTOR);
     if (!nvme_initialize_io()) goto fail;
     ++controllers;
     return 1;
@@ -111,6 +121,7 @@ fail:
     if (acq) physical_free_frame(acq);
     active_regs = 0; active_asq = 0; active_acq = 0;
     active_io_sq = 0; active_io_cq = 0; active_io_ready = 0;
+    nvme_irq_enabled = 0;
     device_release_resource(device, NVME_BAR_INDEX, &nvme_driver);
     return 0;
 }
@@ -337,6 +348,8 @@ int nvme_initialize(void) {
     active_asq = 0;
     active_acq = 0;
     active_queue_entries = 0;
+    nvme_irq_enabled = 0;
+    nvme_interrupts = 0;
     spinlock_init(&nvme_lock);
     nvme_driver.name = "nvme";
     nvme_driver.bus = DEVICE_BUS_PCI;
@@ -346,3 +359,6 @@ int nvme_initialize(void) {
 }
 
 uint32_t nvme_controller_count(void) { return controllers; }
+int nvme_interrupt_enabled(void) { return nvme_irq_enabled; }
+uint32_t nvme_interrupt_count(void) { return nvme_interrupts; }
+void nvme_interrupt_handler(void) { ++nvme_interrupts; }

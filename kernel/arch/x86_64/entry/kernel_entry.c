@@ -996,6 +996,18 @@ void kernel_main(void *boot_info) {
     task_context_switch(&task_demo_main, &task_demo_worker);
     serial_write("task context returned\r\n");
     interrupts_initialize();
+    if (nvme_controller_count() != 0 && nvme_interrupt_enabled() != 0) {
+        static uint8_t nvme_interrupt_probe[512];
+        if (!nvme_read_sector(0, nvme_interrupt_probe)) {
+            serial_write("NVMe interrupt probe read failure\r\n");
+            for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+        }
+        if (nvme_interrupt_count() == 0) {
+            serial_write("NVMe interrupt delivery failure\r\n");
+            for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+        }
+        serial_write("NVMe interrupt delivery ready\r\n");
+    }
     if (e1000_controller_count() != 0) {
         static const uint8_t e1000_interrupt_packet[60] = {0};
         if (!e1000_transmit(e1000_interrupt_packet,

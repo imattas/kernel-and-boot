@@ -1,8 +1,12 @@
 #include <assert.h>
 #include <stdint.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include "kernel/fs/btrfs/zstd.h"
+
+void *kmalloc(uint64_t size) { return malloc((size_t)size); }
+void kfree(void *pointer) { free(pointer); }
 
 int main(void) {
     uint8_t raw[] = {0x28, 0xb5, 0x2f, 0xfd, 0x20, 0x05, 0x29, 0x00, 0x00,

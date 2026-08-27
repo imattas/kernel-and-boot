@@ -1,6 +1,7 @@
 #include "btrfs.h"
 #include "deflate.h"
 #include "lzo.h"
+#include "zstd.h"
 #include "../../drivers/storage/storage.h"
 #include "../../mm/heap/heap.h"
 
@@ -570,6 +571,35 @@ int btrfs_read_extent_data(btrfs_fs_t *fs, uint64_t tree_bytenr, uint64_t inode,
         if (compressed && decoded && btrfs_read_checked(fs, sector_logical, covered, compressed) &&
             btrfs_lzo_inflate(compressed + in_sector, (uint32_t)disk_size, in_sector,
                               fs->sector_size, decoded, (uint32_t)data_size, &decoded_size) &&
+            relative <= decoded_size && size <= decoded_size - relative) {
+            for (uint32_t i = 0; i < size; ++i) ((uint8_t *)buffer)[i] = decoded[relative + i];
+            result = 1;
+        }
+        kfree(decoded); kfree(compressed);
+        return result;
+    }
+    if (item[16] == 3) {
+        uint64_t disk_bytenr = le64(&item[21]);
+        uint64_t disk_size = le64(&item[29]);
+        uint64_t data_offset = le64(&item[37]);
+        uint64_t data_size = le64(&item[45]);
+        if (extent_type != 1 || data_size == 0 || data_size > 65536U || disk_size == 0 ||
+            disk_size > 65536U || data_offset > disk_size || relative > data_size ||
+            size > data_size - relative || file_offset > UINT64_MAX - disk_bytenr - data_offset)
+            return 0;
+        uint64_t logical = disk_bytenr + data_offset;
+        uint64_t sector_logical = logical - logical % fs->sector_size;
+        uint32_t in_sector = (uint32_t)(logical - sector_logical);
+        uint32_t transfer = in_sector + (uint32_t)disk_size;
+        uint32_t covered = (transfer + fs->sector_size - 1U) / fs->sector_size * fs->sector_size;
+        uint8_t *compressed = 0, *decoded = 0;
+        uint32_t decoded_size = 0; int result = 0;
+        if (transfer < disk_size || covered < transfer || covered > 65536U) return 0;
+        compressed = (uint8_t *)kmalloc(covered);
+        decoded = (uint8_t *)kmalloc((uint32_t)data_size);
+        if (compressed && decoded && btrfs_read_checked(fs, sector_logical, covered, compressed) &&
+            btrfs_zstd_decompress(compressed + in_sector, (uint32_t)disk_size, decoded,
+                                  (uint32_t)data_size, &decoded_size) &&
             relative <= decoded_size && size <= decoded_size - relative) {
             for (uint32_t i = 0; i < size; ++i) ((uint8_t *)buffer)[i] = decoded[relative + i];
             result = 1;

@@ -322,29 +322,29 @@ adapter. Redundant same-device chunk layouts are now accepted by selecting a
 validated mirror stripe with read fallback after checksum failure. Btrfs now
 resolves matching filesystem devices by device ID and maps bounded RAID1
 mirrors across separate registered storage devices, with the same read
-fallback behavior. Compression and encryption remain before the filesystem
-milestone is complete. Btrfs regular extents now support bounded zlib-wrapped
+fallback behavior. Encryption and additional compression edge cases remain
+before the filesystem milestone is complete. Btrfs regular extents now support bounded zlib-wrapped
 DEFLATE streams, including stored, fixed-Huffman, and dynamic-Huffman blocks,
-with Adler-32 validation and sector-checksum-protected input. Encryption and
-the remaining compression formats remain before the filesystem milestone is
-complete. Btrfs regular extents now also support native LZO length-header and
+with Adler-32 validation and sector-checksum-protected input. The remaining
+compression edge cases remain before the filesystem milestone is complete.
+Btrfs regular extents now also support native LZO length-header and
 sector-segment framing with bounded LZO1X decoding. A
 format is not considered complete merely because its superblock is recognized.
 Zstandard frame parsing now has strict raw/RLE block contracts plus compressed
-blocks using direct-weight Huffman literals with zero sequences. FSE-compressed
-Huffman weights/literals and sequence execution are still pending; bounded FSE
-table construction and reverse-bitstream state decoding are now implemented and
+blocks using direct-weight Huffman literals. Bounded FSE table construction,
+reverse-bitstream state decoding, and compressed-block sequence execution are
+now implemented and
 contracted, including the two-state interleaved stream form. FSE
-normalized-header parsing is now also implemented and
-contracted, and the reusable initialized/peek/update stream API is now
-implemented and contracted, so
-Zstandard is not exposed through Btrfs yet.
+normalized-header parsing is now also implemented and contracted, and the
+reusable initialized/peek/update stream API is now implemented and contracted.
+The read-only Btrfs extent path now dispatches Zstandard records and has a
+sector-checksummed compressed-extent contract.
 The predefined LL/offset/ML distributions and RLE sequence-table mode are now
 implemented and contracted. A shared sequence-table selector now handles
 predefined, RLE, FSE-compressed, and repeat modes with bounded consumption.
 Zstandard sequence-section count/mode header parsing is now implemented and
-contracted; FSE symbol tables and literal/match sequence execution remain
-before Btrfs exposure. The bounded overlap-safe match-copy primitive is now
+contracted; FSE-compressed Huffman literal streams and checksum verification
+remain bounded follow-up work. The bounded overlap-safe match-copy primitive is now
 implemented and contracted, including destination-underflow rejection.
 Zstandard sequence code expansion for literal lengths, match lengths, and
 offsets is now implemented and contracted. Sequence execution now copies

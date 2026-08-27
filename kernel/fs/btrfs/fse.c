@@ -202,6 +202,14 @@ int btrfs_fse_stream_peek(const btrfs_fse_table_t *table, uint32_t state,
     return 1;
 }
 
+int btrfs_fse_stream_seed(const btrfs_fse_table_t *table, const uint8_t *stream,
+                          uint32_t *state, int64_t *offset) {
+    if (!table || !stream || !state || !offset || !table->size ||
+        table->accuracy_log > 10U) return 0;
+    *state = stream_bits(stream, table->accuracy_log, offset);
+    return *state < table->size;
+}
+
 int btrfs_fse_stream_update(const btrfs_fse_table_t *table, const uint8_t *stream,
                             uint32_t *state, int64_t *offset) {
     if (!table || !stream || !state || !offset || *state >= table->size) return 0;

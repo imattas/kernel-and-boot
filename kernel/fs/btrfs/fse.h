@@ -31,6 +31,8 @@ int btrfs_fse_decode_interleaved2(const btrfs_fse_table_t *table,
                                   uint32_t *symbol_count);
 int btrfs_fse_stream_init(const btrfs_fse_table_t *table, const uint8_t *stream,
                           uint32_t stream_size, uint32_t *state, int64_t *offset);
+int btrfs_fse_stream_seed(const btrfs_fse_table_t *table, const uint8_t *stream,
+                          uint32_t *state, int64_t *offset);
 int btrfs_fse_stream_peek(const btrfs_fse_table_t *table, uint32_t state,
                           uint8_t *symbol);
 int btrfs_fse_stream_update(const btrfs_fse_table_t *table, const uint8_t *stream,

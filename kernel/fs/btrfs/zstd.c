@@ -1,4 +1,5 @@
 #include "zstd.h"
+#include "../../mm/heap/heap.h"
 
 static uint32_t le32(const uint8_t *p) {
     return (uint32_t)p[0] | ((uint32_t)p[1] << 8) |
@@ -345,14 +346,53 @@ static int decode_compressed_block(const uint8_t *input, uint32_t size,
                                    uint8_t *output, uint32_t capacity,
                                    uint32_t *decoded_size) {
     uint32_t literals_size, literals_decoded, sequences;
+    uint8_t *literals = 0;
     if (!input || !size || !output || !decoded_size ||
-        !decode_compressed_literals(input, size, output, capacity, &literals_decoded,
+        !(literals = (uint8_t *)kmalloc(capacity)) ||
+        !decode_compressed_literals(input, size, literals, capacity, &literals_decoded,
                                     &literals_size)) return 0;
-    if (literals_size >= size) return 0;
+    if (literals_size >= size) { kfree(literals); return 0; }
     sequences = input[literals_size];
-    if (sequences != 0U) return 0;
-    *decoded_size = literals_decoded;
-    return literals_size + 1U == size;
+    if (!sequences) {
+        if (literals_size + 1U != size || literals_decoded > capacity) {
+            kfree(literals); return 0;
+        }
+        for (uint32_t i = 0; i < literals_decoded; ++i) output[i] = literals[i];
+        *decoded_size = literals_decoded; kfree(literals); return 1;
+    }
+    btrfs_zstd_sequence_header_t header;
+    btrfs_fse_table_t tables[3];
+    uint32_t table_end, bit_start, bit_size, count;
+    if (!btrfs_zstd_read_sequence_header(&input[literals_size], size - literals_size, &header) ||
+        !btrfs_zstd_prepare_sequence_tables(&input[literals_size], size - literals_size,
+                                            &header, 0, tables, &table_end) ||
+        table_end > size - literals_size || table_end == size - literals_size) {
+        kfree(literals); return 0;
+    }
+    count = header.count;
+    if (count > 65536U) { kfree(literals); return 0; }
+    bit_start = literals_size + table_end;
+    bit_size = size - bit_start;
+    btrfs_zstd_sequence_t *decoded = (btrfs_zstd_sequence_t *)kmalloc(
+        count * (uint32_t)sizeof(*decoded));
+    uint32_t states[3] = {0, 0, 0};
+    int64_t offset = 0;
+    if (!decoded || !btrfs_fse_stream_begin(&input[bit_start], bit_size, &offset) ||
+        !btrfs_fse_stream_seed(&tables[0], &input[bit_start], &states[0], &offset) ||
+        !btrfs_fse_stream_seed(&tables[1], &input[bit_start], &states[2], &offset) ||
+        !btrfs_fse_stream_seed(&tables[2], &input[bit_start], &states[1], &offset) ||
+        !btrfs_zstd_decode_sequences(&tables[0], &tables[2], &tables[1], &states[0],
+                                     &states[1], &states[2], &input[bit_start], &offset,
+                                     count, decoded, count) || offset != 0) {
+        kfree(decoded); kfree(literals); return 0;
+    }
+    uint32_t output_size = 0;
+    if (!btrfs_zstd_execute_sequences(output, capacity, &output_size, literals,
+                                      literals_decoded, decoded, count)) {
+        kfree(decoded); kfree(literals); return 0;
+    }
+    *decoded_size = output_size;
+    kfree(decoded); kfree(literals); return 1;
 }
 
 int btrfs_zstd_decompress(const uint8_t *input, uint32_t input_size,

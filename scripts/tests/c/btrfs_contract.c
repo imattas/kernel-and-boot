@@ -28,6 +28,15 @@ static int compressed_extent_probe(btrfs_fs_t *fs, uint8_t *tree, uint8_t *csum)
     p64(&csum[160], 45056); p32(&csum[168], 408); p32(&csum[172], 4);
     p32(&csum[408], crc32c(&image[45056], 4096));
     p32(csum, crc32c(&csum[32], 4096 - 32));
+    if (!btrfs_read_extent_data(fs, 16384, 256, 0, 0, output, 3) ||
+        memcmp(output, "abc", 3) != 0) return 0;
+    static const uint8_t zstd_stream[] = {
+        0x28, 0xb5, 0x2f, 0xfd, 0x20, 0x03, 0x19, 0x00, 0x00, 'a', 'b', 'c'
+    };
+    memset(&image[45056], 0, 4096); memcpy(&image[45056], zstd_stream, sizeof(zstd_stream));
+    tree[416] = 3; p64(&tree[429], sizeof(zstd_stream)); p32(tree, crc32c(&tree[32], 4096 - 32));
+    p32(&csum[408], crc32c(&image[45056], 4096)); p32(csum, crc32c(&csum[32], 4096 - 32));
+    memset(output, 0, sizeof(output));
     return btrfs_read_extent_data(fs, 16384, 256, 0, 0, output, 3) &&
            memcmp(output, "abc", 3) == 0;
 }

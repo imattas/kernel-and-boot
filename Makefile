@@ -521,8 +521,8 @@ $(EXT4_TEST): scripts/tests/c/ext4_contract.c kernel/fs/ext4/ext4.c kernel/fs/ex
 $(XFS_TEST): scripts/tests/c/xfs_contract.c kernel/fs/xfs/xfs.c kernel/fs/xfs/xfs.h kernel/drivers/storage/storage.c kernel/drivers/storage/storage.h | $(TEST_DIR)
 	$(CC) -std=c11 -Wall -Wextra -Werror -I. -o $@ scripts/tests/c/xfs_contract.c kernel/fs/xfs/xfs.c kernel/drivers/storage/storage.c
 
-$(BTRFS_TEST): scripts/tests/c/btrfs_contract.c kernel/fs/btrfs/btrfs.c kernel/fs/btrfs/btrfs.h kernel/fs/btrfs/deflate.c kernel/fs/btrfs/deflate.h kernel/fs/btrfs/lzo.c kernel/fs/btrfs/lzo.h kernel/drivers/storage/storage.c kernel/drivers/storage/storage.h | $(TEST_DIR)
-	$(CC) -std=c11 -Wall -Wextra -Werror -I. -o $@ scripts/tests/c/btrfs_contract.c kernel/fs/btrfs/btrfs.c kernel/fs/btrfs/deflate.c kernel/fs/btrfs/lzo.c kernel/drivers/storage/storage.c
+$(BTRFS_TEST): scripts/tests/c/btrfs_contract.c kernel/fs/btrfs/btrfs.c kernel/fs/btrfs/btrfs.h kernel/fs/btrfs/deflate.c kernel/fs/btrfs/deflate.h kernel/fs/btrfs/lzo.c kernel/fs/btrfs/lzo.h kernel/fs/btrfs/zstd.c kernel/fs/btrfs/zstd.h kernel/fs/btrfs/fse.c kernel/fs/btrfs/fse.h kernel/drivers/storage/storage.c kernel/drivers/storage/storage.h | $(TEST_DIR)
+	$(CC) -std=c11 -Wall -Wextra -Werror -I. -o $@ scripts/tests/c/btrfs_contract.c kernel/fs/btrfs/btrfs.c kernel/fs/btrfs/deflate.c kernel/fs/btrfs/lzo.c kernel/fs/btrfs/zstd.c kernel/fs/btrfs/fse.c kernel/drivers/storage/storage.c
 
 $(DEFLATE_TEST): scripts/tests/c/deflate_contract.c kernel/fs/btrfs/deflate.c kernel/fs/btrfs/deflate.h | $(TEST_DIR)
 	$(CC) -std=c11 -Wall -Wextra -Werror -I. -o $@ scripts/tests/c/deflate_contract.c kernel/fs/btrfs/deflate.c

@@ -699,6 +699,8 @@ mapping, loads additional single-stripe mappings from the chunk tree, resolves
 the standard FS_TREE root item, validates CRC32C checksums for filesystem
 sector data through the checksum tree, and selects a valid primary or mirror
 superblock. Btrfs
+mapping and checksum paths now use strict chunk-end semantics and reject
+address arithmetic overflow before fallback reads.
 now decodes bounded inline and uncompressed regular EXTENT_DATA records,
 extracts inode metadata, and reads mapped data including unaligned byte
 ranges, sparse holes, and multi-extent files. Btrfs now performs hashed

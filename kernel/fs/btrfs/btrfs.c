@@ -39,7 +39,7 @@ static int btrfs_map_at(const btrfs_fs_t *fs, uint64_t logical, uint32_t bytes,
     if (!fs || !device || !physical || !bytes) return 0;
     for (uint32_t i = 0; i < fs->chunk_count; ++i) {
         const btrfs_chunk_t *chunk = &fs->chunks[i];
-        if (logical >= chunk->logical && logical - chunk->logical <= chunk->length &&
+        if (logical >= chunk->logical && logical - chunk->logical < chunk->length &&
             bytes <= chunk->length - (logical - chunk->logical)) {
             uint64_t delta = logical - chunk->logical;
             uint32_t mapped_device = mirror && chunk->mirror_physical ?
@@ -256,11 +256,13 @@ int btrfs_mount(btrfs_fs_t *fs, uint32_t device) {
     uint64_t total_bytes = le64(&sb[0x70]);
     uint64_t root = le64(&sb[0x50]);
     uint64_t chunk_root = le64(&sb[0x58]);
+    uint64_t device_blocks = storage_device_at(device)->block_count;
     if (sector_size < 512 || sector_size > 4096 || (sector_size & (sector_size - 1U)) != 0 ||
         node_size < sector_size || node_size > 65536 || (node_size & (node_size - 1U)) != 0 ||
         total_bytes < node_size || root < sector_size || chunk_root < sector_size ||
         root >= total_bytes || chunk_root >= total_bytes ||
-        total_bytes > storage_device_at(device)->block_count * (uint64_t)BTRFS_SECTOR_SIZE ||
+        device_blocks > UINT64_MAX / BTRFS_SECTOR_SIZE ||
+        total_bytes > device_blocks * (uint64_t)BTRFS_SECTOR_SIZE ||
         (root % sector_size) != 0 || (chunk_root % sector_size) != 0) return 0;
     fs->device = device; fs->sector_size = sector_size; fs->node_size = node_size;
     fs->total_bytes = total_bytes; fs->root_bytenr = root; fs->chunk_count = 0;
@@ -436,7 +438,8 @@ static int btrfs_validate_data(const btrfs_fs_t *fs, uint64_t logical,
         bytes % fs->sector_size != 0) return 0;
     for (uint32_t offset = 0; offset < bytes; offset += fs->sector_size) {
         uint32_t expected = 0;
-        if (!btrfs_find_data_csum((btrfs_fs_t *)fs, fs->csum_root_bytenr,
+        if (logical > UINT64_MAX - offset ||
+            !btrfs_find_data_csum((btrfs_fs_t *)fs, fs->csum_root_bytenr,
                                   logical + offset, 0, &expected) ||
             crc32c(data + offset, fs->sector_size) != expected) return 0;
     }

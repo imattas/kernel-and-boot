@@ -24,12 +24,14 @@ static int xfs_vfs_write(vfs_node_t *node, uint64_t offset,
     spinlock_unlock_irqrestore(&file->lock, flags);
     return result;
 }
-int xfs_vfs_attach_file(xfs_fs_t *fs, vfs_node_t *root,
-                        const char *filesystem_name, const char *name) {
+int xfs_vfs_attach_file_in_directory(xfs_fs_t *fs, vfs_node_t *root,
+                                     uint64_t directory,
+                                     const char *filesystem_name,
+                                     const char *name) {
     if (!fs || !fs->mounted || !root || root->type != VFS_NODE_DIRECTORY ||
         !filesystem_name || !name || !name[0]) return 0;
     uint64_t inode = 0, size = 0;
-    if (!xfs_lookup(fs, fs->root_inode, filesystem_name, &inode) ||
+    if (!xfs_lookup(fs, directory, filesystem_name, &inode) ||
         !xfs_inode_size(fs, inode, &size)) return 0;
     xfs_vfs_file_t *file = (xfs_vfs_file_t *)kmalloc(sizeof(*file));
     if (!file) return 0;
@@ -47,4 +49,10 @@ int xfs_vfs_attach_file(xfs_fs_t *fs, vfs_node_t *root,
         return 0;
     }
     vfs_node_release(node); return 1;
+}
+
+int xfs_vfs_attach_file(xfs_fs_t *fs, vfs_node_t *root,
+                        const char *filesystem_name, const char *name) {
+    return xfs_vfs_attach_file_in_directory(fs, root, fs ? fs->root_inode : 0,
+                                             filesystem_name, name);
 }

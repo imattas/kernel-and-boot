@@ -142,10 +142,16 @@ __attribute__((noreturn)) void scheduler_task_exit(void) {
 }
 
 int scheduler_block(task_t *task, task_wait_queue_t *queue) {
-    if (!task || !queue || task->state == TASK_TERMINATED || task->wait_node.queued)
-        return 0;
-    if (!task_wait_queue_enqueue(queue, &task->wait_node)) return 0;
+    if (!task || !queue) return 0;
     uint64_t flags = spinlock_lock_irqsave(&scheduler_lock);
+    if (task->state == TASK_TERMINATED || task->wait_node.queued) {
+        spinlock_unlock_irqrestore(&scheduler_lock, flags);
+        return 0;
+    }
+    if (!task_wait_queue_enqueue(queue, &task->wait_node)) {
+        spinlock_unlock_irqrestore(&scheduler_lock, flags);
+        return 0;
+    }
     task->state = TASK_BLOCKED;
     if (current_task == task) current_task = 0;
     spinlock_unlock_irqrestore(&scheduler_lock, flags);
@@ -153,18 +159,24 @@ int scheduler_block(task_t *task, task_wait_queue_t *queue) {
 }
 
 int scheduler_block_current(task_wait_queue_t *queue) {
-    task_t *blocked = scheduler_current();
+    uint64_t flags = spinlock_lock_irqsave(&scheduler_lock);
+    task_t *blocked = current_task;
     if (!blocked || blocked->state == TASK_TERMINATED ||
         blocked->wait_node.queued || !queue ||
-        !task_wait_queue_enqueue(queue, &blocked->wait_node)) return 0;
-
-    uint64_t flags = spinlock_lock_irqsave(&scheduler_lock);
+        !task_wait_queue_enqueue(queue, &blocked->wait_node)) {
+        spinlock_unlock_irqrestore(&scheduler_lock, flags);
+        return 0;
+    }
     blocked->state = TASK_BLOCKED;
+    current_task = 0;
     spinlock_unlock_irqrestore(&scheduler_lock, flags);
     task_t *next = scheduler_next();
     if (!next) {
         task_wait_queue_remove(queue, &blocked->wait_node);
+        flags = spinlock_lock_irqsave(&scheduler_lock);
         blocked->state = TASK_RUNNING;
+        current_task = blocked;
+        spinlock_unlock_irqrestore(&scheduler_lock, flags);
         return 0;
     }
 
@@ -177,21 +189,30 @@ int scheduler_block_current_with_lock(task_wait_queue_t *queue,
                                        spinlock_t *held_lock,
                                        uint64_t held_flags) {
     task_t *blocked = scheduler_current();
-    if (!held_lock || !queue || !blocked || blocked->state == TASK_TERMINATED ||
-        blocked->wait_node.queued || !task_wait_queue_enqueue(queue, &blocked->wait_node)) {
+    if (!held_lock || !queue || !blocked) {
         if (held_lock) spinlock_unlock_irqrestore(held_lock, held_flags);
         return 0;
     }
 
     uint64_t flags = spinlock_lock_irqsave(&scheduler_lock);
+    if (blocked->state == TASK_TERMINATED || blocked->wait_node.queued ||
+        !task_wait_queue_enqueue(queue, &blocked->wait_node)) {
+        spinlock_unlock_irqrestore(&scheduler_lock, flags);
+        spinlock_unlock_irqrestore(held_lock, held_flags);
+        return 0;
+    }
     blocked->state = TASK_BLOCKED;
+    if (current_task == blocked) current_task = 0;
     spinlock_unlock_irqrestore(&scheduler_lock, flags);
     spinlock_unlock_irqrestore(held_lock, held_flags);
 
     task_t *next = scheduler_next();
     if (!next) {
         (void)task_wait_queue_remove(queue, &blocked->wait_node);
+        flags = spinlock_lock_irqsave(&scheduler_lock);
         blocked->state = TASK_RUNNING;
+        current_task = blocked;
+        spinlock_unlock_irqrestore(&scheduler_lock, flags);
         return 0;
     }
     scheduler_set_current(next);
@@ -200,12 +221,26 @@ int scheduler_block_current_with_lock(task_wait_queue_t *queue,
 }
 
 task_t *scheduler_wake_one(task_wait_queue_t *queue) {
+    if (!queue) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&scheduler_lock);
     task_wait_node_t *node = task_wait_queue_dequeue(queue);
-    if (!node) return 0;
+    if (!node) {
+        spinlock_unlock_irqrestore(&scheduler_lock, flags);
+        return 0;
+    }
     task_t *task = (task_t *)node->owner;
-    if (task->state != TASK_BLOCKED) return 0;
+    if (!task || task->state != TASK_BLOCKED) {
+        spinlock_unlock_irqrestore(&scheduler_lock, flags);
+        return 0;
+    }
     task->state = TASK_READY;
-    if (!task_wait_queue_enqueue(&ready_queue, &task->wait_node)) return 0;
+    if (!task_wait_queue_enqueue(&ready_queue, &task->wait_node)) {
+        task->state = TASK_BLOCKED;
+        (void)task_wait_queue_enqueue(queue, &task->wait_node);
+        spinlock_unlock_irqrestore(&scheduler_lock, flags);
+        return 0;
+    }
+    spinlock_unlock_irqrestore(&scheduler_lock, flags);
     return task;
 }
 

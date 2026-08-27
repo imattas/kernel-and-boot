@@ -595,6 +595,9 @@ User address-space mappings now reject flags outside the defined writable,
 user, and executable set, with a boot-time invalid-flag regression probe.
 Scheduler current-task, idle-task, preemption, counter, and lifecycle state now
 use an IRQ-safe scheduler lock around shared metadata and queue transitions.
+Scheduler block and wake transitions now hold that lock across wait-queue
+ownership and state publication, preventing a concurrent wake from being lost
+between enqueue and `TASK_BLOCKED` publication.
 Scheduler host-context validity is now tracked separately from transient run
 state, preserving return-to-caller behavior across repeated task runs.
 Process-table startup now has an explicit initializer that resets table,

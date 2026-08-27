@@ -305,8 +305,9 @@ device signature, and are gated by real LBA0 FAT32 read and sector write/read-ba
 signature checks. Full controller I/O coverage, including remaining
 USB/NVMe/network error and interrupt paths, is still required before the kernel
 completion gate.
-AHCI now also exposes bounded multi-sector READ/WRITE DMA transfers within one
-page and the QEMU gate verifies a two-sector write/read-back operation.
+AHCI now also exposes bounded multi-sector READ/WRITE DMA transfers with a
+two-entry PRDT spanning two DMA pages; the QEMU gate verifies a sixteen-sector
+write/read-back operation across that boundary.
 AHCI public and storage-backed I/O now split larger valid requests into bounded
 8-sector DMA commands, and QEMU verifies a ten-sector request across that
 command boundary.

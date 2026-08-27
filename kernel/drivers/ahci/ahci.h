@@ -17,5 +17,6 @@ int ahci_read_sector(uint64_t lba, void *buffer);
 int ahci_write_sector(uint64_t lba, const void *buffer);
 int ahci_read_sectors(uint64_t lba, uint32_t count, void *buffer);
 int ahci_write_sectors(uint64_t lba, uint32_t count, const void *buffer);
+uint32_t ahci_last_io_prdt_length(void);
 
 #endif

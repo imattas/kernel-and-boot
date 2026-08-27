@@ -62,6 +62,8 @@ static volatile uint32_t *active_port;
 static uint64_t active_command_list;
 static uint64_t active_command_table;
 static uint64_t active_data;
+static uint32_t active_data_pages;
+static uint32_t ahci_last_prdt_length;
 static device_driver_t ahci_driver;
 static volatile uint32_t *active_abar;
 static uint32_t active_port_number;
@@ -106,9 +108,11 @@ static int ahci_stop_engine(void) {
 
 static void ahci_release_command_buffers(void) {
     if (active_command_table) physical_free_frame(active_command_table);
-    if (active_data) physical_free_frame(active_data);
+    if (active_data && active_data_pages)
+        physical_free_frames(active_data, active_data_pages);
     active_command_table = 0;
     active_data = 0;
+    active_data_pages = 0;
 }
 
 static int ahci_finish_command(int completed) {
@@ -159,7 +163,8 @@ static int ahci_probe(device_t *device) {
     ready_port_mask = 0;
     for (uint32_t port = 0; port < 32; ++port)
         port_state[port] = (ahci_port_state_t){0};
-    active_port = 0; active_command_list = 0; active_command_table = 0; active_data = 0;
+    active_port = 0; active_command_list = 0; active_command_table = 0;
+    active_data = 0; active_data_pages = 0; ahci_last_prdt_length = 0;
     ahci_io_disabled = 0;
     ahci_storage_registered = 0;
     for (uint32_t port = 0; port < 32; ++port) {
@@ -293,12 +298,14 @@ typedef struct {
     uint8_t atapi_command[16];
     uint8_t reserved[48];
     uint32_t data_base, data_base_high, reserved2, byte_count;
+    uint32_t data_base2, data_base_high2, reserved3, byte_count2;
 } __attribute__((packed)) ahci_command_table_t;
 
 static int ahci_identify_locked(uint16_t *words) {
     if (ahci_io_disabled || !active_port || !active_command_list || !words || active_data) return 0;
     active_command_table = physical_alloc_frame();
     active_data = physical_alloc_frame();
+    active_data_pages = 1;
     if (!active_command_table || !active_data) {
         if (active_command_table) physical_free_frame(active_command_table);
         if (active_data) physical_free_frame(active_data);
@@ -385,6 +392,7 @@ static int ahci_read_sector_locked(uint64_t lba, void *buffer) {
         !active_command_list || !buffer || active_data) return 0;
     active_command_table = physical_alloc_frame();
     active_data = physical_alloc_frame();
+    active_data_pages = 1;
     if (!active_command_table || !active_data) {
         if (active_command_table) physical_free_frame(active_command_table);
         if (active_data) physical_free_frame(active_data);
@@ -428,6 +436,7 @@ static int ahci_write_sector_locked(uint64_t lba, const void *buffer) {
         !active_command_list || !buffer || active_data) return 0;
     active_command_table = physical_alloc_frame();
     active_data = physical_alloc_frame();
+    active_data_pages = 1;
     if (!active_command_table || !active_data) {
         if (active_command_table) physical_free_frame(active_command_table);
         if (active_data) physical_free_frame(active_data);
@@ -468,12 +477,13 @@ static int ahci_write_sector_locked(uint64_t lba, const void *buffer) {
 static int ahci_io_sectors(uint64_t lba, uint32_t count, void *buffer, int write) {
     if (ahci_io_disabled || !ahci_lba_valid(lba, count) || !active_port ||
         !active_command_list || !buffer || active_data || count == 0 ||
-        count > 8) return 0;
+        count > 16) return 0;
     active_command_table = physical_alloc_frame();
-    active_data = physical_alloc_frame();
+    active_data_pages = count > 8 ? 2U : 1U;
+    active_data = physical_alloc_frames(active_data_pages);
     if (!active_command_table || !active_data) {
         if (active_command_table) physical_free_frame(active_command_table);
-        if (active_data) physical_free_frame(active_data);
+        if (active_data) physical_free_frames(active_data, active_data_pages);
         active_command_table = 0; active_data = 0;
         return 0;
     }
@@ -489,7 +499,8 @@ static int ahci_io_sectors(uint64_t lba, uint32_t count, void *buffer, int write
     ahci_command_header_t *header =
         (ahci_command_header_t *)(uintptr_t)active_command_list;
     header[0].flags = 5U | (write ? (1U << 6) : 0U);
-    header[0].prdt_length = 1; header[0].prdbc = 0;
+    header[0].prdt_length = (uint16_t)active_data_pages; header[0].prdbc = 0;
+    ahci_last_prdt_length = active_data_pages;
     header[0].ctba = (uint32_t)active_command_table; header[0].ctbau = 0;
     ahci_command_table_t *table =
         (ahci_command_table_t *)(uintptr_t)active_command_table;
@@ -507,7 +518,13 @@ static int ahci_io_sectors(uint64_t lba, uint32_t count, void *buffer, int write
     table->command_fis.count_low = (uint8_t)count;
     table->command_fis.count_high = (uint8_t)(count >> 8);
     table->data_base = (uint32_t)active_data; table->data_base_high = 0;
-    table->byte_count = count * 512U - 1U | (1U << 31);
+    table->byte_count = (active_data_pages > 1U ? 4095U : count * 512U - 1U) |
+                        (1U << 31);
+    if (active_data_pages > 1U) {
+        table->data_base2 = (uint32_t)(active_data + 4096U);
+        table->data_base_high2 = 0;
+        table->byte_count2 = (count * 512U - 4096U - 1U) | (1U << 31);
+    }
     active_port[AHCI_PORT_IS / 4] = UINT32_MAX;
     active_port[AHCI_PORT_CI / 4] = 1;
     int completed = 0;
@@ -531,7 +548,7 @@ static int ahci_io_range_locked(uint64_t lba, uint32_t count, void *buffer,
     uint32_t completed = 0;
     while (completed < count) {
         uint32_t chunk = count - completed;
-        if (chunk > 8U) chunk = 8U;
+        if (chunk > 16U) chunk = 16U;
         if (!ahci_io_sectors(lba + completed, chunk,
                              (uint8_t *)buffer + (uint64_t)completed * 512U,
                              write)) return 0;
@@ -632,3 +649,5 @@ int ahci_write_sectors(uint64_t lba, uint32_t count, const void *buffer) {
     spinlock_unlock_irqrestore(&ahci_lock, flags);
     return result;
 }
+
+uint32_t ahci_last_io_prdt_length(void) { return ahci_last_prdt_length; }

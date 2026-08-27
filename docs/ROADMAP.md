@@ -405,6 +405,8 @@ USB HID decoding is now an independently compiled and linked driver component;
 the USB descriptor parser no longer embeds another source file.
 USB endpoint parsing now rejects reserved `wMaxPacketSize` bits and zero
 interrupt intervals before publishing endpoint metadata.
+USB device-descriptor parsing now validates endpoint-0 maximum packet sizes
+against the USB-defined values before accepting a device.
 UHCI now programs its PCI legacy IRQ through the shared e1000/UHCI ISR and
 enables completion/error causes when ACPI routing is available. The current
 QEMU synchronous HID transfer remains the polling path.

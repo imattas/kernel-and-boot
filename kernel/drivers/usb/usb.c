@@ -8,7 +8,9 @@ int usb_device_parse_descriptor(usb_device_t *device,
                                 const uint8_t *descriptor, uint32_t length) {
     if (!device || !descriptor || length < 18 || descriptor[0] < 18 ||
         descriptor[1] != 1 || descriptor[0] > length || descriptor[2] != 0 ||
-        descriptor[3] != 2 || load16(&descriptor[8]) == 0) return 0;
+        descriptor[3] != 2 || load16(&descriptor[8]) == 0 ||
+        (descriptor[7] != 8 && descriptor[7] != 16 &&
+         descriptor[7] != 32 && descriptor[7] != 64)) return 0;
     device->address = 0;
     device->vendor_id = load16(&descriptor[8]);
     device->product_id = load16(&descriptor[10]);

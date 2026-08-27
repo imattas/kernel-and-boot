@@ -1594,8 +1594,14 @@ void kernel_main(void *boot_info) {
     };
     static const uint8_t usb_endpoint_descriptor[7] = {7, 5, 0x81, 2, 64, 0, 1};
     usb_device_t usb_device;
+    uint8_t invalid_usb_device_descriptor[18];
+    for (uint32_t descriptor_byte = 0; descriptor_byte < 18; ++descriptor_byte)
+        invalid_usb_device_descriptor[descriptor_byte] = usb_device_descriptor[descriptor_byte];
+    invalid_usb_device_descriptor[7] = 7;
     if (!usb_device_parse_descriptor(&usb_device, usb_device_descriptor,
                                      sizeof(usb_device_descriptor)) ||
+        usb_device_parse_descriptor(&usb_device, invalid_usb_device_descriptor,
+                                    sizeof(invalid_usb_device_descriptor)) ||
         usb_device.vendor_id != 0x1234 ||
         !usb_device_add_endpoint(&usb_device, usb_endpoint_descriptor,
                                   sizeof(usb_endpoint_descriptor)) ||

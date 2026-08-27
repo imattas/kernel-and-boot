@@ -268,6 +268,9 @@ can place UHCI and e1000 on one legacy GSI; the dispatcher explicitly services
 both device handlers before issuing APIC EOI.
 UHCI control and interrupt transfers now reclaim all allocated DMA frames on
 controller stop/restart failures and treat restart failure as a transfer error.
+The shared legacy ISR now increments e1000 delivery accounting only when an
+enabled e1000 interrupt cause is present, so UHCI-only interrupts cannot be
+mistaken for network interrupt delivery.
 The e1000 path now has independent build/link ownership, enables bounded
 RX/TX completion causes, and exposes a polling service that acknowledges
 causes and reclaims completed TX entries. TX/RX ring state is serialized with

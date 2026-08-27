@@ -41,6 +41,7 @@
 #define E1000_IMS_RXDMT0 (1U << 4)
 #define E1000_IMS_RXT0 (1U << 7)
 #define E1000_IMS_TXDW (1U << 0)
+#define E1000_INTERRUPT_MASK (E1000_IMS_RXDMT0 | E1000_IMS_RXT0 | E1000_IMS_TXDW)
 #define E1000_IRQ_VECTOR 0x51
 
 extern void arch_e1000_irq_stub(void);
@@ -152,7 +153,11 @@ int e1000_link_up(void) {
 }
 int e1000_interrupt_enabled(void) { return e1000_msi_enabled; }
 uint32_t e1000_interrupt_count(void) { return e1000_interrupts; }
-void e1000_interrupt_handler(void) { ++e1000_interrupts; }
+void e1000_interrupt_handler(void) {
+    if (!e1000_regs) return;
+    uint32_t causes = e1000_regs[E1000_ICR / 4];
+    if ((causes & E1000_INTERRUPT_MASK) != 0) ++e1000_interrupts;
+}
 
 int e1000_transmit(const void *data, uint16_t length) {
     if (!e1000_regs || !e1000_tx_ring || !data || length == 0 || length > 2048)

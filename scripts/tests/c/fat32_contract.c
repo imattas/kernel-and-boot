@@ -84,11 +84,11 @@ int main(void) {
     device.read = read_image; device.write = write_image;
     fat32_fs_t fs;
     const char name[11] = {'C','H','A','I','N',' ',' ',' ','B','I','N'};
-    uint32_t cluster, size; uint8_t output[700]; uint8_t is_directory = 0;
+    uint32_t cluster, size; uint8_t output[1100]; uint8_t is_directory = 0;
     if (!fat32_mount(&fs, 0)) return fail("mount failed");
     if (!fat32_lookup(&fs, name, &cluster, &size) || cluster != 3 || size != 700)
         return fail("lookup failed");
-    if (!fat32_read_file(&fs, name, 0, output, sizeof(output)) ||
+    if (!fat32_read_file(&fs, name, 0, output, 700) ||
         output[0] != 0 || output[511] != 0xff || output[512] != 0x80 || output[699] != 0x3b) {
         fprintf(stderr, "values %u %u %u %u\n", output[0], output[511], output[512], output[699]);
         return fail("cluster-chain read failed");
@@ -98,6 +98,13 @@ int main(void) {
         !fat32_read_file(&fs, name, 510, output, sizeof(update) - 1) ||
         memcmp(output, update, sizeof(update) - 1) != 0)
         return fail("cross-cluster write failed");
+    uint8_t appended[400];
+    for (uint32_t i = 0; i < sizeof(appended); ++i) appended[i] = (uint8_t)(i ^ 0x3cU);
+    if (!fat32_append_file(&fs, name, appended, sizeof(appended)) ||
+        !fat32_lookup(&fs, name, &cluster, &size) || size != 1100 ||
+        !fat32_read_file(&fs, name, 700, output, sizeof(appended)) ||
+        memcmp(output, appended, sizeof(appended)) != 0)
+        return fail("append growth failed");
     const char directory_name[11] = {'S','U','B','D','I','R',' ',' ',' ',' ',' '};
     const char nested_name[11] = {'N','E','S','T','E','D',' ',' ','T','X','T'};
     if (!fat32_lookup_in_directory(&fs, 2, directory_name, &cluster, &size, &is_directory) ||

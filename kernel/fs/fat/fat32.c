@@ -101,6 +101,50 @@ static int fat_next(fat32_fs_t *fs, uint32_t cluster, uint32_t *next) {
     return result;
 }
 
+static int fat_set(fat32_fs_t *fs, uint32_t cluster, uint32_t value) {
+    if (!fs || !cluster_valid(fs, cluster)) return 0;
+    uint32_t byte_offset = cluster * 4U;
+    uint32_t sector = byte_offset / FAT32_SECTOR_SIZE;
+    uint32_t offset = byte_offset % FAT32_SECTOR_SIZE;
+    if (sector >= fs->sectors_per_fat ||
+        (offset > FAT32_SECTOR_SIZE - 4U &&
+         sector + 1U >= fs->sectors_per_fat))
+        return 0;
+    uint8_t bytes[4] = {(uint8_t)value, (uint8_t)(value >> 8),
+                        (uint8_t)(value >> 16), (uint8_t)(value >> 24)};
+    uint64_t flags = spinlock_lock_irqsave(&fs->fat_lock);
+    for (uint32_t copy = 0; copy < fs->fat_count; ++copy) {
+        uint32_t base = fs->fat_start + copy * fs->sectors_per_fat;
+        uint8_t first[FAT32_SECTOR_SIZE], second[FAT32_SECTOR_SIZE];
+        if (!read_sector(fs->device, base + sector, first)) {
+            spinlock_unlock_irqrestore(&fs->fat_lock, flags); return 0;
+        }
+        if (offset > FAT32_SECTOR_SIZE - 4U) {
+            if (!read_sector(fs->device, base + sector + 1U, second)) {
+                spinlock_unlock_irqrestore(&fs->fat_lock, flags); return 0;
+            }
+            for (uint32_t i = 0; i < 4; ++i) {
+                if (i < FAT32_SECTOR_SIZE - offset)
+                    first[offset + i] = bytes[i];
+                else
+                    second[offset + i - FAT32_SECTOR_SIZE] = bytes[i];
+            }
+            if (!storage_write(fs->device, base + sector, 1, first) ||
+                !storage_write(fs->device, base + sector + 1U, 1, second)) {
+                spinlock_unlock_irqrestore(&fs->fat_lock, flags); return 0;
+            }
+        } else {
+            for (uint32_t i = 0; i < 4; ++i) first[offset + i] = bytes[i];
+            if (!storage_write(fs->device, base + sector, 1, first)) {
+                spinlock_unlock_irqrestore(&fs->fat_lock, flags); return 0;
+            }
+        }
+    }
+    fs->fat_sector_valid = 0;
+    spinlock_unlock_irqrestore(&fs->fat_lock, flags);
+    return 1;
+}
+
 int fat32_mount(fat32_fs_t *fs, uint32_t device) {
     if (!fs || !storage_device_at(device) ||
         storage_device_at(device)->block_size != FAT32_SECTOR_SIZE) return 0;
@@ -322,6 +366,138 @@ int fat32_write_file(fat32_fs_t *fs, const char short_name[11],
     if (!fs) return 0;
     uint64_t flags = spinlock_lock_irqsave(&fs->write_lock);
     int result = fat32_write_file_unlocked(fs, short_name, offset, buffer, size);
+    spinlock_unlock_irqrestore(&fs->write_lock, flags);
+    return result;
+}
+
+static int fat32_find_root_entry(fat32_fs_t *fs, const char short_name[11],
+                                 uint32_t *sector, uint32_t *entry_offset,
+                                 uint32_t *first_cluster, uint32_t *size) {
+    if (!fs || !short_name || !sector || !entry_offset || !first_cluster || !size)
+        return 0;
+    uint8_t directory[FAT32_MAX_SECTORS_PER_CLUSTER * FAT32_SECTOR_SIZE];
+    uint32_t cluster = fs->root_cluster;
+    for (uint32_t hops = 0; hops < fs->data_clusters; ++hops) {
+        if (!fat32_read_cluster(fs, cluster, directory)) return 0;
+        uint32_t cluster_bytes = fs->sectors_per_cluster * FAT32_SECTOR_SIZE;
+        for (uint32_t offset = 0; offset < cluster_bytes; offset += 32U) {
+            if (directory[offset] == 0x00) return 0;
+            if (directory[offset] == 0xe5 || directory[offset + 11] == 0x0f ||
+                (directory[offset + 11] & 0x08U) != 0) continue;
+            uint8_t match = 1;
+            for (uint32_t i = 0; i < 11; ++i)
+                if (directory[offset + i] != (uint8_t)short_name[i]) match = 0;
+            if (match) {
+                *sector = fs->data_start + (cluster - 2U) * fs->sectors_per_cluster +
+                          offset / FAT32_SECTOR_SIZE;
+                *entry_offset = offset % FAT32_SECTOR_SIZE;
+                *first_cluster = ((load32(&directory[offset + 20]) & 0x0fffU) << 16) |
+                                  load16(&directory[offset + 26]);
+                *size = load32(&directory[offset + 28]);
+                return (directory[offset + 11] & 0x10U) == 0;
+            }
+        }
+        uint32_t next;
+        if (!fat_next(fs, cluster, &next) || next >= 0x0ffffff8U ||
+            !cluster_valid(fs, next)) return 0;
+        cluster = next;
+    }
+    return 0;
+}
+
+static int fat32_update_root_entry(fat32_fs_t *fs, uint32_t sector,
+                                   uint32_t offset, uint32_t first_cluster,
+                                   uint32_t size) {
+    uint8_t data[FAT32_SECTOR_SIZE];
+    if (!fs || offset > FAT32_SECTOR_SIZE - 32U ||
+        !read_sector(fs->device, sector, data)) return 0;
+    data[offset + 20] = (uint8_t)(first_cluster >> 16);
+    data[offset + 21] = (uint8_t)(first_cluster >> 24);
+    data[offset + 26] = (uint8_t)first_cluster;
+    data[offset + 27] = (uint8_t)(first_cluster >> 8);
+    data[offset + 28] = (uint8_t)size;
+    data[offset + 29] = (uint8_t)(size >> 8);
+    data[offset + 30] = (uint8_t)(size >> 16);
+    data[offset + 31] = (uint8_t)(size >> 24);
+    return storage_write(fs->device, sector, 1, data);
+}
+
+static int fat32_find_free_cluster(fat32_fs_t *fs, uint32_t *cluster) {
+    if (!fs || !cluster) return 0;
+    for (uint32_t candidate = 2; candidate < fs->data_clusters + 2U; ++candidate) {
+        uint32_t value;
+        if (!fat_next(fs, candidate, &value)) return 0;
+        if (value == 0) { *cluster = candidate; return 1; }
+    }
+    return 0;
+}
+
+static void fat32_free_chain(fat32_fs_t *fs, uint32_t first) {
+    uint32_t cluster = first;
+    for (uint32_t hops = 0; fs && cluster_valid(fs, cluster) &&
+                              hops < fs->data_clusters; ++hops) {
+        uint32_t next;
+        if (!fat_next(fs, cluster, &next) || !fat_set(fs, cluster, 0)) return;
+        if (next >= 0x0ffffff8U || !cluster_valid(fs, next)) return;
+        cluster = next;
+    }
+}
+
+int fat32_append_file(fat32_fs_t *fs, const char short_name[11],
+                      const void *buffer, uint32_t size) {
+    if (!fs || !buffer || size == 0) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&fs->write_lock);
+    uint32_t entry_sector, entry_offset, first, old_size;
+    int result = 0;
+    if (!fat32_find_root_entry(fs, short_name, &entry_sector, &entry_offset,
+                               &first, &old_size) ||
+        size > UINT32_MAX - old_size) goto done;
+    uint32_t cluster_size = fs->sectors_per_cluster * FAT32_SECTOR_SIZE;
+    uint32_t old_count = 0, tail = 0, current = first;
+    while (cluster_valid(fs, current) && old_count < fs->data_clusters) {
+        tail = current; ++old_count;
+        uint32_t next;
+        if (!fat_next(fs, current, &next)) goto done;
+        if (next >= 0x0ffffff8U) break;
+        if (!cluster_valid(fs, next)) goto done;
+        current = next;
+    }
+    if (old_size != 0 && old_count == 0) goto done;
+    uint64_t required64 = ((uint64_t)old_size + size + cluster_size - 1U) /
+                          cluster_size;
+    if (required64 > fs->data_clusters) goto done;
+    uint32_t required = (uint32_t)required64;
+    uint32_t added_first = 0, added_last = 0;
+    while (old_count < required) {
+        uint32_t fresh;
+        if (!fat32_find_free_cluster(fs, &fresh) || !fat_set(fs, fresh, 0x0fffffffU)) {
+            if (added_first) fat32_free_chain(fs, added_first);
+            goto done;
+        }
+        if (!added_first) added_first = fresh;
+        if (added_last && !fat_set(fs, added_last, fresh)) {
+            (void)fat_set(fs, fresh, 0);
+            fat32_free_chain(fs, added_first); goto done;
+        }
+        added_last = fresh; ++old_count;
+    }
+    if (added_first && tail && !fat_set(fs, tail, added_first)) {
+        fat32_free_chain(fs, added_first); goto done;
+    }
+    if (added_first && !first) first = added_first;
+    if (!fat32_update_root_entry(fs, entry_sector, entry_offset, first,
+                                 old_size + size)) {
+        if (tail) (void)fat_set(fs, tail, 0x0fffffffU);
+        if (added_first) fat32_free_chain(fs, added_first);
+        goto done;
+    }
+    result = fat32_write_file_unlocked(fs, short_name, old_size, buffer, size);
+    if (!result) {
+        (void)fat32_update_root_entry(fs, entry_sector, entry_offset, first, old_size);
+        if (tail) (void)fat_set(fs, tail, 0x0fffffffU);
+        if (added_first) fat32_free_chain(fs, added_first);
+    }
+done:
     spinlock_unlock_irqrestore(&fs->write_lock, flags);
     return result;
 }

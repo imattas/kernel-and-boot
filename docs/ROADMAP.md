@@ -732,7 +732,11 @@ milestone groundwork only; they do not pass this gate.
 FAT32 and exFAT have filesystem parsers and VFS file adapters. ExFAT remains
 read-only, while FAT32 supports bounded in-place writes to existing file
 extents, including sector and cluster crossings, through its VFS adapter;
-allocation and file growth remain a separate milestone.
+FAT32 append growth now allocates free clusters, mirrors FAT updates, updates
+the directory size/first-cluster fields, and rolls back new chain state when
+metadata or data writes fail; arbitrary hole-punching and shrink remain later.
+The FAT32 VFS adapter now exposes both bounded in-place writes and append
+growth, serializing per-file size updates around the filesystem write path.
 FAT32 in-place writes now serialize the complete read-modify-write operation
 with a filesystem write lock, preventing concurrent writers from interleaving
 sector updates.

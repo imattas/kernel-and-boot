@@ -981,6 +981,32 @@ void kernel_main(void *boot_info) {
         serial_write("TCP retransmission ACK failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
+    if (!tcp_segment_build(tcp_probe_packet, sizeof(tcp_probe_packet),
+                           ipv4_probe_source, ipv4_probe_destination, 6000,
+                           6001, 101, 4, TCP_FLAG_ACK | TCP_FLAG_PSH, 4096,
+                           tcp_probe_payload, sizeof(tcp_probe_payload),
+                           &tcp_probe_length) ||
+        !tcp_segment_parse(tcp_probe_packet, tcp_probe_length,
+                           ipv4_probe_source, ipv4_probe_destination,
+                           &tcp_probe_view) ||
+        !tcp_connection_receive(&tcp_probe_connection, &tcp_probe_view,
+                                &tcp_probe_result) ||
+        tcp_probe_result.response_flags != TCP_FLAG_ACK ||
+        tcp_probe_result.response_acknowledgment != 104 ||
+        tcp_probe_result.accepted_payload != 0 ||
+        !tcp_segment_build(tcp_probe_packet, sizeof(tcp_probe_packet),
+                           ipv4_probe_source, ipv4_probe_destination, 6000,
+                           6001, 105, 4, TCP_FLAG_ACK, 4096, 0, 0,
+                           &tcp_probe_length) ||
+        !tcp_segment_parse(tcp_probe_packet, tcp_probe_length,
+                           ipv4_probe_source, ipv4_probe_destination,
+                           &tcp_probe_view) ||
+        !tcp_connection_receive(&tcp_probe_connection, &tcp_probe_view,
+                                &tcp_probe_result) ||
+        tcp_probe_result.response_acknowledgment != 104) {
+        serial_write("TCP duplicate ACK failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
     tcp_connection_t tcp_close_probe;
     tcp_connection_result_t tcp_close_result;
     tcp_segment_view_t tcp_close_view;

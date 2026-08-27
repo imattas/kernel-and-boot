@@ -460,6 +460,9 @@ transmits due retries through e1000.
 TCP orderly shutdown now validates peer FINs, acknowledges them through
 CLOSE-WAIT, emits the local FIN through LAST-ACK, and reaches CLOSED only after
 the final acknowledgement.
+Established TCP connections now return bounded duplicate ACKs for valid
+out-of-order or duplicate segments, preserving the current receive edge for
+retransmission recovery instead of silently discarding the peer’s progress.
 The network service loop now forwards validated UDP frames from the hardware
 packet queue into bound endpoint tables, and the QEMU boot probe exercises that
 end-to-end queue-to-endpoint delivery path.

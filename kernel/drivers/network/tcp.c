@@ -190,10 +190,15 @@ int tcp_connection_receive(tcp_connection_t *connection,
     }
     if (connection->state != TCP_CONNECTION_ESTABLISHED &&
         connection->state != TCP_CONNECTION_CLOSE_WAIT) return 0;
-    if (segment->sequence != connection->receive_next ||
-        (segment->flags & TCP_FLAG_ACK) == 0 ||
+    if ((segment->flags & TCP_FLAG_ACK) == 0 ||
         segment->acknowledgment < connection->send_unacknowledged ||
         segment->acknowledgment > connection->send_next) return 0;
+    if (segment->sequence != connection->receive_next) {
+        result->response_flags = TCP_FLAG_ACK;
+        result->response_sequence = connection->send_next;
+        result->response_acknowledgment = connection->receive_next;
+        return 1;
+    }
         connection->send_unacknowledged = segment->acknowledgment;
     connection->peer_window = segment->window;
     if (connection->retransmission_pending &&

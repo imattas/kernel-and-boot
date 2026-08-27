@@ -189,28 +189,51 @@ int e1000_receive(void *data, uint16_t capacity, uint16_t *length) {
     if (!e1000_regs || !e1000_rx_ring || !data || !length || capacity == 0)
         return 0;
     uint64_t flags = spinlock_lock_irqsave(&e1000_lock);
-    e1000_rx_desc_t *descriptor = &e1000_rx_ring[e1000_rx_index];
-    if ((descriptor->status & E1000_DESC_DONE) == 0) {
-        spinlock_unlock_irqrestore(&e1000_lock, flags);
-        return 0;
-    }
-    if ((descriptor->status & E1000_DESC_EOP) == 0 || descriptor->errors != 0 ||
-        descriptor->length == 0 || descriptor->length > 4096 ||
-        descriptor->length > capacity) {
+    uint32_t index = e1000_rx_index;
+    uint32_t total = 0;
+    uint32_t descriptors = 0;
+    int invalid = 0;
+    for (;;) {
+        e1000_rx_desc_t *descriptor = &e1000_rx_ring[index];
+        if ((descriptor->status & E1000_DESC_DONE) == 0) {
+            if (descriptors == 0) {
+                spinlock_unlock_irqrestore(&e1000_lock, flags);
+                return 0;
+            }
+            invalid = 1;
+            break;
+        }
+        uint32_t packet_length = descriptor->length;
+        if (descriptor->errors != 0 || packet_length == 0 ||
+            packet_length > 4096 || total > UINT32_MAX - packet_length ||
+            total + packet_length > capacity) {
+            invalid = 1;
+        } else if (!invalid) {
+            const uint8_t *source =
+                (const uint8_t *)(uintptr_t)e1000_rx_buffers[index];
+            uint8_t *destination = (uint8_t *)data;
+            for (uint32_t i = 0; i < packet_length; ++i)
+                destination[total + i] = source[i];
+        }
+        total += packet_length;
+        ++descriptors;
+        uint8_t end = descriptor->status & E1000_DESC_EOP;
         descriptor->status = 0;
         descriptor->errors = 0;
-        e1000_rx_index = (e1000_rx_index + 1U) % E1000_RING_COUNT;
-        e1000_regs[E1000_RDT / 4] = (e1000_rx_index + E1000_RING_COUNT - 1U) % E1000_RING_COUNT;
+        index = (index + 1U) % E1000_RING_COUNT;
+        e1000_rx_index = index;
+        e1000_regs[E1000_RDT / 4] =
+            (index + E1000_RING_COUNT - 1U) % E1000_RING_COUNT;
+        if (end || descriptors == E1000_RING_COUNT) {
+            if (!end) invalid = 1;
+            break;
+        }
+    }
+    if (invalid || total == 0 || total > UINT16_MAX) {
         spinlock_unlock_irqrestore(&e1000_lock, flags);
         return 0;
     }
-    uint16_t count = descriptor->length;
-    const uint8_t *source = (const uint8_t *)(uintptr_t)e1000_rx_buffers[e1000_rx_index];
-    uint8_t *destination = (uint8_t *)data;
-    for (uint16_t i = 0; i < count; ++i) destination[i] = source[i];
-    descriptor->status = 0; *length = count;
-    e1000_rx_index = (e1000_rx_index + 1U) % E1000_RING_COUNT;
-    e1000_regs[E1000_RDT / 4] = (e1000_rx_index + E1000_RING_COUNT - 1U) % E1000_RING_COUNT;
+    *length = (uint16_t)total;
     spinlock_unlock_irqrestore(&e1000_lock, flags);
     return 1;
 }

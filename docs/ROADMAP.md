@@ -269,6 +269,9 @@ causes and reclaims completed TX entries. TX/RX ring state is serialized with
 an interrupt-safe driver lock so polling and future interrupt delivery cannot
 race descriptor ownership. RX delivery rejects malformed, zero-length, and
 oversized descriptors instead of silently truncating packets.
+RX delivery now assembles bounded packets spanning multiple completed
+descriptors, recycles every consumed descriptor, and rejects incomplete,
+errored, and capacity-overflowing frames without exposing partial data.
 The driver reports whether PCI MSI or ACPI-MADT IOAPIC legacy routing was
 enabled. The standard QEMU e1000 model exposes no usable MSI capability, so
 the QEMU gate now validates the routed legacy interrupt path instead of

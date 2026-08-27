@@ -391,6 +391,8 @@ enabled.
 NVMe timeout handling now quarantines an in-flight PRP when controller abort
 cannot confirm `CSTS.RDY=0`, preventing DMA use-after-free and rejecting later
 queue commands on the wedged controller.
+NVMe recovery now permanently disables a controller after any timeout and
+releases admin and I/O queue frames only after `CSTS.RDY=0` confirms quiescence.
 AHCI now enables controller/port interrupt causes through a dedicated
 MSI/legacy vector, acknowledges port causes in its ISR, and the QEMU gate
 requires post-`sti` disk I/O to observe delivery when routing is enabled.

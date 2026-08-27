@@ -71,7 +71,16 @@ static int nvme_abort_controller(void) {
     active_regs[NVME_CC / 4] &= ~NVME_CC_EN;
     int stopped = nvme_wait_ready(active_regs, 0);
     active_io_ready = 0;
-    if (!stopped) nvme_disabled = 1;
+    if (stopped) {
+        if (active_io_sq) physical_free_frame(active_io_sq);
+        if (active_io_cq) physical_free_frame(active_io_cq);
+        if (active_asq) physical_free_frame(active_asq);
+        if (active_acq) physical_free_frame(active_acq);
+        active_io_sq = 0; active_io_cq = 0;
+        active_asq = 0; active_acq = 0;
+    }
+    /* A stopped controller has no queue reinitialization path yet. */
+    nvme_disabled = 1;
     return stopped;
 }
 

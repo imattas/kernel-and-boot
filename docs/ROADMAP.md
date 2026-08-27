@@ -375,6 +375,8 @@ current-process, and lock state before process/thread creation.
 Process state, image/stack ownership, signal state, and process-owned thread
 lists now use per-process IRQ-safe locking, with locked teardown helpers that
 avoid recursive lock acquisition.
+Current-process publication and lookup now use the process-table lock, so
+syscall and lifecycle paths cannot race on the active process pointer.
 Physical-memory initialization now rejects zero-sized or overflowing kernel
 ranges before reserving kernel frames, avoiding bitmap corruption from a bad
 firmware boot contract.

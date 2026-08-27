@@ -125,7 +125,9 @@ int process_activate(process_t *process) {
         return 0;
     }
     process->state = PROCESS_RUNNING;
+    uint64_t table_flags = spinlock_lock_irqsave(&process_table_lock);
     current_process = process;
+    spinlock_unlock_irqrestore(&process_table_lock, table_flags);
     spinlock_unlock_irqrestore(&process->lock, flags);
     return 1;
 }
@@ -133,7 +135,7 @@ int process_activate(process_t *process) {
 int process_destroy(process_t *process) {
     if (!process) return 0;
     uint64_t process_flags = spinlock_lock_irqsave(&process->lock);
-    if (process == current_process || process->state == PROCESS_RUNNING ||
+    if (process_current() == process || process->state == PROCESS_RUNNING ||
         !process_thread_destroy_all_locked(process)) {
         spinlock_unlock_irqrestore(&process->lock, process_flags);
         return 0;
@@ -156,7 +158,10 @@ int process_destroy(process_t *process) {
 }
 
 process_t *process_current(void) {
-    return current_process;
+    uint64_t flags = spinlock_lock_irqsave(&process_table_lock);
+    process_t *process = current_process;
+    spinlock_unlock_irqrestore(&process_table_lock, flags);
+    return process;
 }
 
 int process_send_signal(process_t *process, uint32_t signal) {

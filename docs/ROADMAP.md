@@ -277,6 +277,9 @@ when ACPI provides a valid route, and masks the PIC path only after that route
 is installed.
 The ATA PIO fallback now selects validated LBA48 task-file commands when the
 device advertises 48-bit addressing, while retaining the bounded LBA28 path.
+ATA PCI probing now rejects published memory BARs and port addresses outside
+the x86 I/O range before resource claim; absent BARs retain validated legacy
+IDE defaults.
 ATA PIO task-file access and shared IDENTIFY metadata are now serialized with
 an IRQ-safe driver lock, preventing concurrent SMP callers from interleaving
 register programming or observing partial geometry state.

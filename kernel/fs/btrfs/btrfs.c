@@ -777,7 +777,7 @@ int btrfs_read_file(btrfs_fs_t *fs, uint64_t tree_bytenr, uint64_t inode,
 int btrfs_write_file(btrfs_fs_t *fs, uint64_t tree_bytenr, uint64_t inode,
                      uint64_t offset, const void *buffer, uint32_t size) {
     uint64_t file_size = 0; uint32_t mode = 0;
-    uint8_t extent[53], data[4096];
+    uint8_t extent[53], data[4096], original[4096];
     if (!fs || !fs->mounted || !buffer || !size || fs->sector_size > sizeof(data) ||
         !btrfs_inode_stat(fs, tree_bytenr, inode, &file_size, &mode) ||
         (mode & 0170000U) != 0100000U || offset > file_size ||
@@ -807,6 +807,7 @@ int btrfs_write_file(btrfs_fs_t *fs, uint64_t tree_bytenr, uint64_t inode,
             sector_logical > UINT64_MAX - fs->sector_size ||
             sector_logical + fs->sector_size > disk_bytenr + data_offset + data_size ||
             !btrfs_read_checked(fs, sector_logical, fs->sector_size, data)) return 0;
+        for (uint32_t i = 0; i < fs->sector_size; ++i) original[i] = data[i];
         for (uint32_t i = 0; i < chunk; ++i) data[in_sector + i] = source[i];
         uint32_t device = 0; uint64_t physical = 0;
         if (!btrfs_map(fs, sector_logical, fs->sector_size, &device, &physical) ||
@@ -819,10 +820,21 @@ int btrfs_write_file(btrfs_fs_t *fs, uint64_t tree_bytenr, uint64_t inode,
             (mirror_device != device || mirror_physical != physical) &&
             (mirror_physical % BTRFS_SECTOR_SIZE != 0 ||
              !storage_write(mirror_device, mirror_physical / BTRFS_SECTOR_SIZE,
-                            fs->sector_size / BTRFS_SECTOR_SIZE, data))) return 0;
+                            fs->sector_size / BTRFS_SECTOR_SIZE, data))) {
+            (void)storage_write(device, physical / BTRFS_SECTOR_SIZE,
+                                fs->sector_size / BTRFS_SECTOR_SIZE, original);
+            return 0;
+        }
         if (fs->csum_root_bytenr &&
             !btrfs_update_data_csum(fs, fs->csum_root_bytenr, sector_logical,
-                                    crc32c(data, fs->sector_size), 0)) return 0;
+                                    crc32c(data, fs->sector_size), 0)) {
+            (void)storage_write(device, physical / BTRFS_SECTOR_SIZE,
+                                fs->sector_size / BTRFS_SECTOR_SIZE, original);
+            if (mirror_physical != physical)
+                (void)storage_write(mirror_device, mirror_physical / BTRFS_SECTOR_SIZE,
+                                    fs->sector_size / BTRFS_SECTOR_SIZE, original);
+            return 0;
+        }
         source += chunk; remaining -= chunk; offset += chunk;
     }
     return 1;

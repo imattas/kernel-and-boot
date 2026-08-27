@@ -285,7 +285,7 @@ The filesystem expansion phase has started after the completed UEFI milestone:
 the kernel now contains a bounded read-only exFAT parser and VFS adapter with
 boot-region validation, FAT/no-FAT-chain traversal, UTF-16 directory-name
 decoding, and file reads, backed by an independent in-memory contract test.
-The ext4, XFS, and Btrfs read-only filesystem milestones are complete; further
+The ext4, XFS, and Btrfs filesystem read/write milestones continue in bounded
 filesystem expansion is tracked separately from the kernel completion gate.
 
 ## Phase 8 — Kernel drivers
@@ -970,7 +970,7 @@ counts before issuing block I/O.
 Ext4 VFS regular files now support bounded read-modify-write updates to already
 allocated direct, indirect, or extent-mapped blocks; sparse allocation and
 file-size-changing metadata operations remain separate.
-Btrfs now have strict read-only superblock and geometry
+Btrfs now has strict superblock and geometry
 mount layers with contract tests. XFS now maps allocation-group inode numbers,
 reads v1/v2 inodes, supports short-form directories, inline files, extent
 records, and a VFS file adapter. XFS extent reads now decode the extent-state
@@ -995,12 +995,12 @@ now decodes bounded inline and uncompressed regular EXTENT_DATA records,
 extracts inode metadata, and reads mapped data including unaligned byte
 ranges, sparse holes, and multi-extent files. Btrfs now performs hashed
 DIR_ITEM lookup with variable-length entry checks and packed hash-collision
-entries; its multi-extent read path is integrated into a read-only VFS file
-adapter. Redundant same-device chunk layouts are now accepted by selecting a
+entries; its multi-extent read path is integrated into a VFS file adapter.
+Redundant same-device chunk layouts are now accepted by selecting a
 validated mirror stripe with read fallback after checksum failure. Btrfs now
 resolves matching filesystem devices by device ID and maps bounded RAID1
 mirrors across separate registered storage devices, with the same read
-fallback behavior. Encryption remains outside the current read-only filesystem
+fallback behavior. Encryption remains outside the current filesystem
 milestone. Btrfs regular extents now support bounded zlib-wrapped
 DEFLATE streams, including stored, fixed-Huffman, and dynamic-Huffman blocks,
 with Adler-32 validation and sector-checksum-protected input. Additional

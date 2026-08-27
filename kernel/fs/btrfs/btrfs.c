@@ -573,6 +573,48 @@ static int btrfs_update_inline_item(btrfs_fs_t *fs, uint64_t bytenr,
                                                  size, (uint8_t)(depth + 1U));
 }
 
+static int btrfs_grow_inline_item(btrfs_fs_t *fs, uint64_t bytenr,
+                                  uint64_t inode, uint64_t extent_offset,
+                                  uint64_t new_size, uint8_t depth) {
+    uint8_t node[65536];
+    if (!fs || depth > 8 || new_size > UINT32_MAX || fs->node_size > sizeof(node) ||
+        !btrfs_read_node(fs, bytenr, node)) return 0;
+    uint32_t count = le32(&node[96]);
+    if (node[100] != 0) {
+        if (node[100] > 8 || count == 0 || count > (fs->node_size - 101U) / 33U) return 0;
+        for (uint32_t i = 0; i < count; ++i) {
+            const uint8_t *item = &node[101U + i * 33U];
+            if (key_compare(item, inode, BTRFS_EXTENT_DATA_TYPE, extent_offset) <= 0 &&
+                btrfs_grow_inline_item(fs, le64(&item[17]), inode, extent_offset,
+                                       new_size, (uint8_t)(depth + 1U))) return 1;
+        }
+        return 0;
+    }
+    if (count > (fs->node_size - 101U) / 25U) return 0;
+    for (uint32_t i = 0; i < count; ++i) {
+        uint8_t *item = &node[101U + i * 25U];
+        if (key_compare(item, inode, BTRFS_EXTENT_DATA_TYPE, extent_offset) != 0) continue;
+        uint32_t data_offset = le32(&item[17]), data_size = le32(&item[21]);
+        if (data_size < 53U || data_offset > fs->node_size ||
+            data_size > fs->node_size - data_offset || new_size < data_size - 53U ||
+            new_size > fs->node_size - data_offset) return 0;
+        uint32_t new_data_size = 53U + (uint32_t)new_size;
+        for (uint32_t j = 0; j < count; ++j) {
+            if (j == i) continue;
+            const uint8_t *other = &node[101U + j * 25U];
+            uint32_t other_offset = le32(&other[17]), other_size = le32(&other[21]);
+            if (other_offset > fs->node_size || other_size > fs->node_size - other_offset ||
+                (data_offset < other_offset + other_size &&
+                 other_offset < data_offset + new_data_size)) return 0;
+        }
+        for (uint32_t j = data_size; j < new_data_size; ++j) node[data_offset + j] = 0;
+        store32(&item[21], new_data_size);
+        store64(&node[data_offset + 8], new_size);
+        return btrfs_write_node(fs, bytenr, node);
+    }
+    return 0;
+}
+
 static int btrfs_read_checked(btrfs_fs_t *fs, uint64_t logical, uint32_t bytes,
                               uint8_t *data) {
     uint32_t device = 0; uint64_t physical = 0;
@@ -819,7 +861,17 @@ int btrfs_read_file(btrfs_fs_t *fs, uint64_t tree_bytenr, uint64_t inode,
     if (!fs || !buffer || !size || !btrfs_inode_stat(fs, tree_bytenr, inode,
                                                      &file_size, &mode) ||
         (mode & 0170000U) != 0100000U || offset > file_size ||
-        size > file_size - offset) return 0;
+        offset > UINT64_MAX - size) return 0;
+    uint64_t end = offset + size;
+    if (end > file_size) {
+        uint8_t first_extent[53];
+        if (!btrfs_read_item(fs, tree_bytenr, inode, BTRFS_EXTENT_DATA_TYPE,
+                             0, first_extent, sizeof(first_extent)) ||
+            first_extent[20] != 0 ||
+            !btrfs_grow_inline_item(fs, tree_bytenr, inode, 0, end, 0) ||
+            !btrfs_update_inode_size(fs, tree_bytenr, inode, end, 0)) return 0;
+        file_size = end;
+    }
     uint8_t extent[53]; uint8_t *destination = buffer; uint32_t remaining = size;
     while (remaining) {
         uint64_t start = 0;

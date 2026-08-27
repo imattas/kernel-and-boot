@@ -434,6 +434,10 @@ for the future kernel socket boundary.
 The network decoder now delivers validated nested UDP frames into bound kernel
 endpoints, completing the first hardware-independent receive path above the
 e1000 adapter boundary.
+The network stack now validates TCP segment headers and pseudo-header
+checksums, exposes bounded SYN/ACK establishment and in-order payload/FIN
+state transitions, and routes TCP frames through the common network decoder.
+The QEMU kernel probe covers the handshake, payload sequencing, and reset path.
 The network service loop now forwards validated UDP frames from the hardware
 packet queue into bound endpoint tables, and the QEMU boot probe exercises that
 end-to-end queue-to-endpoint delivery path.

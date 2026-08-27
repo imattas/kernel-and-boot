@@ -56,6 +56,11 @@ int network_decode_frame(const void *frame, uint16_t length,
                               view->ipv4.source, view->ipv4.destination,
                               &view->udp)) return 0;
         view->kind = NETWORK_FRAME_UDP;
+    } else if (view->ipv4.protocol == 6U) {
+        if (!tcp_segment_parse(view->ipv4.payload, view->ipv4.payload_length,
+                               view->ipv4.source, view->ipv4.destination,
+                               &view->tcp)) return 0;
+        view->kind = NETWORK_FRAME_TCP;
     } else if (view->ipv4.protocol == 1U) {
         if (!icmp_echo_parse(view->ipv4.payload, view->ipv4.payload_length,
                              &view->icmp)) return 0;

@@ -41,6 +41,7 @@
 #include "../../../drivers/network/arp_cache.h"
 #include "../../../drivers/network/ipv4.h"
 #include "../../../drivers/network/udp.h"
+#include "../../../drivers/network/tcp.h"
 #include "../../../drivers/network/icmp.h"
 #include "../../../drivers/network/route.h"
 #include "../../../drivers/network/packet_queue.h"
@@ -898,6 +899,51 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("network frame decode ready\r\n");
+    static const uint8_t tcp_probe_payload[3] = {0x11, 0x22, 0x33};
+    static uint8_t tcp_probe_packet[TCP_MAX_PACKET_SIZE];
+    tcp_segment_view_t tcp_probe_view;
+    tcp_connection_t tcp_probe_connection;
+    tcp_connection_result_t tcp_probe_result;
+    uint16_t tcp_probe_length = 0;
+    tcp_connection_initialize(&tcp_probe_connection, 6001, 4096);
+    if (!tcp_connection_listen(&tcp_probe_connection) ||
+        !tcp_segment_build(tcp_probe_packet, sizeof(tcp_probe_packet),
+                           ipv4_probe_source, ipv4_probe_destination, 6000,
+                           6001, 100, 0, TCP_FLAG_SYN, 4096, 0, 0,
+                           &tcp_probe_length) ||
+        !tcp_segment_parse(tcp_probe_packet, tcp_probe_length,
+                           ipv4_probe_source, ipv4_probe_destination,
+                           &tcp_probe_view) ||
+        !tcp_connection_receive(&tcp_probe_connection, &tcp_probe_view,
+                                &tcp_probe_result) ||
+        tcp_probe_connection.state != TCP_CONNECTION_SYN_RECEIVED ||
+        tcp_probe_result.response_flags != (TCP_FLAG_SYN | TCP_FLAG_ACK) ||
+        !tcp_segment_build(tcp_probe_packet, sizeof(tcp_probe_packet),
+                           ipv4_probe_source, ipv4_probe_destination, 6000,
+                           6001, 101, 1, TCP_FLAG_ACK, 4096, 0, 0,
+                           &tcp_probe_length) ||
+        !tcp_segment_parse(tcp_probe_packet, tcp_probe_length,
+                           ipv4_probe_source, ipv4_probe_destination,
+                           &tcp_probe_view) ||
+        !tcp_connection_receive(&tcp_probe_connection, &tcp_probe_view,
+                                &tcp_probe_result) ||
+        tcp_probe_connection.state != TCP_CONNECTION_ESTABLISHED ||
+        !tcp_segment_build(tcp_probe_packet, sizeof(tcp_probe_packet),
+                           ipv4_probe_source, ipv4_probe_destination, 6000,
+                           6001, 101, 1, TCP_FLAG_ACK | TCP_FLAG_PSH, 4096,
+                           tcp_probe_payload, sizeof(tcp_probe_payload),
+                           &tcp_probe_length) ||
+        !tcp_segment_parse(tcp_probe_packet, tcp_probe_length,
+                           ipv4_probe_source, ipv4_probe_destination,
+                           &tcp_probe_view) ||
+        !tcp_connection_receive(&tcp_probe_connection, &tcp_probe_view,
+                                &tcp_probe_result) ||
+        tcp_probe_result.accepted_payload != sizeof(tcp_probe_payload) ||
+        tcp_probe_connection.receive_next != 104) {
+        serial_write("TCP transport failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("TCP transport ready\r\n");
     static uint8_t arp_reply_probe_request[ETHERNET_MAX_FRAME_SIZE];
     static uint8_t arp_reply_probe_reply[ETHERNET_MAX_FRAME_SIZE];
     uint16_t arp_reply_probe_request_length = 0;

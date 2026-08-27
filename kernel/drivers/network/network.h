@@ -7,6 +7,7 @@
 #include "arp_cache.h"
 #include "ipv4.h"
 #include "udp.h"
+#include "tcp.h"
 #include "icmp.h"
 #include "udp_endpoint.h"
 #include "reassembly.h"
@@ -16,6 +17,7 @@ typedef enum {
     NETWORK_FRAME_ARP,
     NETWORK_FRAME_IPV4,
     NETWORK_FRAME_UDP,
+    NETWORK_FRAME_TCP,
     NETWORK_FRAME_ICMP
 } network_frame_kind_t;
 
@@ -25,6 +27,7 @@ typedef struct {
     arp_packet_view_t arp;
     ipv4_packet_view_t ipv4;
     udp_packet_view_t udp;
+    tcp_segment_view_t tcp;
     icmp_echo_view_t icmp;
 } network_frame_view_t;
 

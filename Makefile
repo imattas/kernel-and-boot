@@ -71,6 +71,7 @@ KERNEL_ARP_OBJ := $(BUILD_DIR)/kernel/arp.o
 KERNEL_ARP_CACHE_OBJ := $(BUILD_DIR)/kernel/arp_cache.o
 KERNEL_IPV4_OBJ := $(BUILD_DIR)/kernel/ipv4.o
 KERNEL_UDP_OBJ := $(BUILD_DIR)/kernel/udp.o
+KERNEL_TCP_OBJ := $(BUILD_DIR)/kernel/tcp.o
 KERNEL_ICMP_OBJ := $(BUILD_DIR)/kernel/icmp.o
 KERNEL_ROUTE_OBJ := $(BUILD_DIR)/kernel/route.o
 KERNEL_PACKET_QUEUE_OBJ := $(BUILD_DIR)/kernel/packet_queue.o
@@ -278,7 +279,7 @@ KERNEL_AHCI_OBJ := $(BUILD_DIR)/kernel/ahci.o
 KERNEL_NVME_OBJ := $(BUILD_DIR)/kernel/nvme.o
 KERNEL_E1000_OBJ := $(BUILD_DIR)/kernel/e1000.o
 KERNEL_RTC_OBJ := $(BUILD_DIR)/kernel/rtc.o
-KERNEL_NVME_OBJ := $(KERNEL_NVME_OBJ) $(KERNEL_E1000_OBJ) $(KERNEL_ETHERNET_OBJ) $(KERNEL_ARP_OBJ) $(KERNEL_ARP_CACHE_OBJ) $(KERNEL_IPV4_OBJ) $(KERNEL_UDP_OBJ) $(KERNEL_ICMP_OBJ) $(KERNEL_ROUTE_OBJ) $(KERNEL_PACKET_QUEUE_OBJ) $(KERNEL_NETWORK_OBJ) $(KERNEL_REASSEMBLY_OBJ) $(KERNEL_UDP_ENDPOINT_OBJ) $(KERNEL_E1000_IRQ_OBJ) $(KERNEL_NVME_IRQ_OBJ) $(KERNEL_AHCI_IRQ_OBJ) $(KERNEL_HID_OBJ) $(KERNEL_STORAGE_BLOCK_OBJ) $(KERNEL_EXFAT_VFS_OBJ) $(KERNEL_EXT4_OBJ) $(KERNEL_EXT4_VFS_OBJ) $(KERNEL_XFS_OBJ) $(KERNEL_XFS_VFS_OBJ) $(KERNEL_BTRFS_OBJ) $(KERNEL_BTRFS_DEFLATE_OBJ) $(KERNEL_BTRFS_LZO_OBJ) $(KERNEL_BTRFS_ZSTD_OBJ) $(KERNEL_BTRFS_FSE_OBJ) $(KERNEL_BTRFS_VFS_OBJ) $(KERNEL_RTC_OBJ)
+KERNEL_NVME_OBJ := $(KERNEL_NVME_OBJ) $(KERNEL_E1000_OBJ) $(KERNEL_ETHERNET_OBJ) $(KERNEL_ARP_OBJ) $(KERNEL_ARP_CACHE_OBJ) $(KERNEL_IPV4_OBJ) $(KERNEL_UDP_OBJ) $(KERNEL_TCP_OBJ) $(KERNEL_ICMP_OBJ) $(KERNEL_ROUTE_OBJ) $(KERNEL_PACKET_QUEUE_OBJ) $(KERNEL_NETWORK_OBJ) $(KERNEL_REASSEMBLY_OBJ) $(KERNEL_UDP_ENDPOINT_OBJ) $(KERNEL_E1000_IRQ_OBJ) $(KERNEL_NVME_IRQ_OBJ) $(KERNEL_AHCI_IRQ_OBJ) $(KERNEL_HID_OBJ) $(KERNEL_STORAGE_BLOCK_OBJ) $(KERNEL_EXFAT_VFS_OBJ) $(KERNEL_EXT4_OBJ) $(KERNEL_EXT4_VFS_OBJ) $(KERNEL_XFS_OBJ) $(KERNEL_XFS_VFS_OBJ) $(KERNEL_BTRFS_OBJ) $(KERNEL_BTRFS_DEFLATE_OBJ) $(KERNEL_BTRFS_LZO_OBJ) $(KERNEL_BTRFS_ZSTD_OBJ) $(KERNEL_BTRFS_FSE_OBJ) $(KERNEL_BTRFS_VFS_OBJ) $(KERNEL_RTC_OBJ)
 KERNEL_NVME_OBJ := $(KERNEL_NVME_OBJ) $(KERNEL_VFS_PROBE_OBJ)
 KERNEL_NVME_OBJ := $(KERNEL_NVME_OBJ) $(KERNEL_VFS_FILE_OBJ)
 KERNEL_NVME_OBJ := $(KERNEL_NVME_OBJ) $(KERNEL_IPC_ENDPOINT_OBJ)
@@ -461,6 +462,10 @@ $(KERNEL_UDP_OBJ): kernel/drivers/network/udp.c kernel/drivers/network/udp.h | $
 	$(CC) -target x86_64-pc-none-elf -std=c11 -ffreestanding -fno-builtin -fno-stack-protector -fPIE -fno-plt \
 		-mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@
 
+$(KERNEL_TCP_OBJ): kernel/drivers/network/tcp.c kernel/drivers/network/tcp.h | $(BUILD_DIR)/kernel
+	$(CC) -target x86_64-pc-none-elf -std=c11 -ffreestanding -fno-builtin -fno-stack-protector -fPIE -fno-plt \
+		-mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@
+
 $(KERNEL_ICMP_OBJ): kernel/drivers/network/icmp.c kernel/drivers/network/icmp.h | $(BUILD_DIR)/kernel
 	$(CC) -target x86_64-pc-none-elf -std=c11 -ffreestanding -fno-builtin -fno-stack-protector -fPIE -fno-plt \
 		-mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@
@@ -473,7 +478,7 @@ $(KERNEL_PACKET_QUEUE_OBJ): kernel/drivers/network/packet_queue.c kernel/drivers
 	$(CC) -target x86_64-pc-none-elf -std=c11 -ffreestanding -fno-builtin -fno-stack-protector -fPIE -fno-plt \
 		-mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@
 
-$(KERNEL_NETWORK_OBJ): kernel/drivers/network/network.c kernel/drivers/network/network.h kernel/drivers/network/e1000.h kernel/drivers/network/packet_queue.h kernel/drivers/network/ethernet.h kernel/drivers/network/arp.h kernel/drivers/network/arp_cache.h kernel/drivers/network/ipv4.h kernel/drivers/network/udp.h kernel/drivers/network/icmp.h kernel/drivers/network/udp_endpoint.h | $(BUILD_DIR)/kernel
+$(KERNEL_NETWORK_OBJ): kernel/drivers/network/network.c kernel/drivers/network/network.h kernel/drivers/network/e1000.h kernel/drivers/network/packet_queue.h kernel/drivers/network/ethernet.h kernel/drivers/network/arp.h kernel/drivers/network/arp_cache.h kernel/drivers/network/ipv4.h kernel/drivers/network/udp.h kernel/drivers/network/tcp.h kernel/drivers/network/icmp.h kernel/drivers/network/udp_endpoint.h | $(BUILD_DIR)/kernel
 	$(CC) -target x86_64-pc-none-elf -std=c11 -ffreestanding -fno-builtin -fno-stack-protector -fPIE -fno-plt \
 		-mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@
 

@@ -5,6 +5,7 @@
 #include "../../arch/x86_64/cpu/tables.h"
 #include "../../arch/x86_64/time/timer.h"
 #include "../../mm/virtual/address_space.h"
+#include "../../fs/vfs/file.h"
 #include "../printk/serial.h"
 
 extern void arch_syscall_interrupt(void);
@@ -85,6 +86,52 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
             process_release(target);
             return valid ? 0 : OS_SYSCALL_ERROR;
         }
+        case OS_SYSCALL_OPEN: {
+            process_t *process = process_current();
+            if (!process || arg2 == 0 || arg2 > OS_SYSCALL_MAX_PATH ||
+                arg3 == 0 || (arg3 & ~(VFS_FILE_READ | VFS_FILE_WRITE)) != 0)
+                return OS_SYSCALL_ERROR;
+            char path[OS_SYSCALL_MAX_PATH + 1];
+            if (!syscall_copy_from_user(path, arg1, arg2)) return OS_SYSCALL_ERROR;
+            path[arg2] = '\0';
+            uint64_t flags = spinlock_lock_irqsave(&process->lock);
+            vfs_node_t *root = process->root_directory;
+            vfs_node_t *working = process->working_directory;
+            if (root) vfs_node_retain(root);
+            if (working) vfs_node_retain(working);
+            spinlock_unlock_irqrestore(&process->lock, flags);
+            vfs_node_t *base = working ? working : root;
+            int handle = base ? vfs_file_open_path_handle(&process->handles,
+                                                          base, path, (uint32_t)arg3) : 0;
+            if (working) vfs_node_release(working);
+            if (root) vfs_node_release(root);
+            return handle ? (uint64_t)(uint32_t)handle : OS_SYSCALL_ERROR;
+        }
+        case OS_SYSCALL_READ:
+        case OS_SYSCALL_WRITE_FILE: {
+            process_t *process = process_current();
+            if (!process || arg3 == 0 || arg3 > OS_SYSCALL_MAX_WRITE) return OS_SYSCALL_ERROR;
+            process_handle_ref_t ref = {0};
+            uint32_t rights = number == OS_SYSCALL_READ ? PROCESS_HANDLE_READ :
+                              PROCESS_HANDLE_WRITE;
+            if (!process_handle_get_retain(&process->handles, (uint32_t)arg1,
+                                           rights, &ref)) return OS_SYSCALL_ERROR;
+            uint8_t buffer[OS_SYSCALL_MAX_WRITE];
+            int result = number == OS_SYSCALL_READ ?
+                vfs_file_read((vfs_file_t *)ref.object, buffer, (uint32_t)arg3) : 0;
+            if (number == OS_SYSCALL_READ && result > 0 &&
+                !syscall_copy_to_user(arg2, buffer, (uint32_t)result)) result = 0;
+            if (number == OS_SYSCALL_WRITE_FILE) {
+                result = syscall_copy_from_user(buffer, arg2, arg3) ?
+                    vfs_file_write((vfs_file_t *)ref.object, buffer, (uint32_t)arg3) : 0;
+            }
+            process_handle_release_ref(&ref);
+            return result > 0 ? (uint64_t)(uint32_t)result : OS_SYSCALL_ERROR;
+        }
+        case OS_SYSCALL_CLOSE:
+            return process_current() && process_handle_close(&process_current()->handles,
+                                                             (uint32_t)arg1) ? 0 :
+                   OS_SYSCALL_ERROR;
         case OS_SYSCALL_SIGNAL_NEXT: {
             uint32_t signal = 0;
             if (!user_range(arg1, sizeof(signal), 1) ||

@@ -7,6 +7,7 @@
 #include "handle.h"
 #include "../../core/sync/spinlock.h"
 #include "../../core/task/wait_queue.h"
+#include "../../fs/vfs/vfs.h"
 
 typedef struct process_thread process_thread_t;
 
@@ -41,6 +42,8 @@ typedef struct process {
     task_wait_queue_t exit_waiters;
     int32_t exit_status;
     process_handle_table_t handles;
+    vfs_node_t *root_directory;
+    vfs_node_t *working_directory;
 } process_t;
 
 process_t *process_create(uint64_t id);
@@ -48,6 +51,8 @@ process_t *process_create_user(uint64_t id, const void *image, uint64_t image_si
                                uint64_t stack_base, uint32_t thread_id,
                                uint64_t kernel_stack_size);
 int process_initialize(void);
+int process_set_namespace(process_t *process, vfs_node_t *root,
+                          vfs_node_t *working_directory);
 process_t *process_lookup(uint64_t id);
 process_t *process_lookup_retain(uint64_t id);
 void process_release(process_t *process);

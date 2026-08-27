@@ -163,6 +163,13 @@ static int vfs_probe_write(vfs_node_t *node, uint64_t offset,
     for (uint32_t i = 0; i < size; ++i) storage[offset + i] = ((const uint8_t *)buffer)[i];
     return (int)size;
 }
+static int vfs_probe_read(vfs_node_t *node, uint64_t offset,
+                          void *buffer, uint32_t size) {
+    uint8_t *storage = node ? (uint8_t *)node->private_data : 0;
+    if (!storage || !buffer || offset > 16 || size > 16 - offset) return 0;
+    for (uint32_t i = 0; i < size; ++i) ((uint8_t *)buffer)[i] = storage[offset + i];
+    return (int)size;
+}
 
 static void preempt_task_a(void *argument) {
     uint64_t deadline = *(uint64_t *)argument;
@@ -1535,6 +1542,8 @@ void kernel_main(void *boot_info) {
                                                   0, 0, 0644);
     if (!vfs_write_node || !vfs_node_set_write(vfs_write_node, vfs_probe_write,
                                                vfs_write_storage) ||
+        !vfs_node_set_read(vfs_write_node, vfs_probe_read, vfs_write_storage) ||
+        !vfs_node_add_child(vfs_root, vfs_write_node) ||
         vfs_node_write(vfs_write_node, 4, vfs_write_data,
                        sizeof(vfs_write_data)) != sizeof(vfs_write_data) ||
         vfs_write_storage[4] != 'v' || vfs_write_storage[7] != '!') {
@@ -2112,6 +2121,7 @@ void kernel_main(void *boot_info) {
         !process_load_image(runtime_process, user_image_probe,
                             sizeof(user_image_probe)) ||
         !process_map_user_stack(runtime_process, 0x8000002000ULL) ||
+        !process_set_namespace(runtime_process, vfs_root, vfs_root) ||
         !address_space_user_range_valid(&runtime_process->address_space,
                                         0x8000002000ULL, 8 * 0x1000ULL, 1)) {
         serial_write("user process setup failure\r\n");
@@ -2288,6 +2298,36 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("signal syscalls ready\r\n");
+    static const char file_syscall_path[] = "/write_probe";
+    static const char file_syscall_data[] = "file";
+    char file_syscall_read[sizeof(file_syscall_data)] = {0};
+    uint64_t file_syscall_handle = OS_SYSCALL_ERROR;
+    if (!syscall_copy_to_user(0x8000002000ULL, file_syscall_path,
+                              sizeof(file_syscall_path)) ||
+        !syscall_copy_to_user(0x8000003000ULL, file_syscall_data,
+                              sizeof(file_syscall_data) - 1) ||
+        (file_syscall_handle = syscall_dispatch(OS_SYSCALL_OPEN,
+            0x8000002000ULL, sizeof(file_syscall_path) - 1,
+            VFS_FILE_WRITE)) == OS_SYSCALL_ERROR ||
+        syscall_dispatch(OS_SYSCALL_WRITE_FILE, file_syscall_handle,
+                         0x8000003000ULL, sizeof(file_syscall_data) - 1) !=
+            sizeof(file_syscall_data) - 1 ||
+        syscall_dispatch(OS_SYSCALL_CLOSE, file_syscall_handle, 0, 0) != 0 ||
+        (file_syscall_handle = syscall_dispatch(OS_SYSCALL_OPEN,
+            0x8000002000ULL, sizeof(file_syscall_path) - 1,
+            VFS_FILE_READ)) == OS_SYSCALL_ERROR ||
+        syscall_dispatch(OS_SYSCALL_READ, file_syscall_handle,
+                         0x8000004000ULL, sizeof(file_syscall_data) - 1) !=
+            sizeof(file_syscall_data) - 1 ||
+        syscall_dispatch(OS_SYSCALL_CLOSE, file_syscall_handle, 0, 0) != 0 ||
+        !syscall_copy_from_user(file_syscall_read, 0x8000004000ULL,
+                                sizeof(file_syscall_read) - 1) ||
+        file_syscall_read[0] != 'f' || file_syscall_read[3] != 'e' ||
+        vfs_write_storage[0] != 'f' || vfs_write_storage[3] != 'e') {
+        serial_write("file syscall failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("file syscalls ready\r\n");
     if (!kernel_init_state_advance(&init_state, KERNEL_INIT_SERVICES))
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     serial_write("user mode deferred until kernel completion\r\n");

@@ -239,6 +239,9 @@ Path-based descriptor opening now resolves a retained VFS node before creating
 the owned file handle, releasing the lookup reference on every path.
 Directory descriptors now support serialized retained-child iteration through a
 bounded `readdir` contract while regular-file reads remain type-safe.
+Processes now own a retained root/working-directory namespace, and the kernel
+ABI provides validated `open`, `read`, `write`, and `close` operations over VFS
+file descriptions without starting ring 3.
 The process registry now serializes duplicate-ID checks, insertion, lookup,
 and removal across concurrent lifecycle operations.
 The bootable `dist/os.img` is now a standards-compliant FAT32 superfloppy

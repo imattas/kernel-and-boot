@@ -54,6 +54,8 @@ process_t *process_create(uint64_t id) {
     task_wait_queue_initialize(&process->exit_waiters);
     process->exit_status = 0;
     process_handle_table_initialize(&process->handles);
+    process->root_directory = 0;
+    process->working_directory = 0;
     process->threads = 0;
     process->thread_count = 0;
     process->retained_thread_references = 0;
@@ -79,6 +81,30 @@ process_t *process_create(uint64_t id) {
     address_space_destroy(&process->address_space);
     kfree(process);
     return 0;
+}
+
+int process_set_namespace(process_t *process, vfs_node_t *root,
+                          vfs_node_t *working_directory) {
+    if (!process || !root || !working_directory ||
+        root->type != VFS_NODE_DIRECTORY ||
+        working_directory->type != VFS_NODE_DIRECTORY) return 0;
+    vfs_node_retain(root);
+    vfs_node_retain(working_directory);
+    uint64_t flags = spinlock_lock_irqsave(&process->lock);
+    if (process->state == PROCESS_EXITED) {
+        spinlock_unlock_irqrestore(&process->lock, flags);
+        vfs_node_release(working_directory);
+        vfs_node_release(root);
+        return 0;
+    }
+    vfs_node_t *old_root = process->root_directory;
+    vfs_node_t *old_working = process->working_directory;
+    process->root_directory = root;
+    process->working_directory = working_directory;
+    spinlock_unlock_irqrestore(&process->lock, flags);
+    if (old_working) vfs_node_release(old_working);
+    if (old_root) vfs_node_release(old_root);
+    return 1;
 }
 
 process_t *process_create_user(uint64_t id, const void *image,
@@ -233,11 +259,17 @@ int process_destroy(process_t *process) {
     process->user_stack_page_count = 0;
     process->state = PROCESS_EXITED;
     process_handle_table_close_all(&process->handles);
+    vfs_node_t *root = process->root_directory;
+    vfs_node_t *working = process->working_directory;
+    process->root_directory = 0;
+    process->working_directory = 0;
     uint64_t flags = spinlock_lock_irqsave(&process_table_lock);
     for (uint32_t i = 0; i < PROCESS_MAX; ++i)
         if (process_table[i] == process) process_table[i] = 0;
     spinlock_unlock_irqrestore(&process_table_lock, flags);
     spinlock_unlock_irqrestore(&process->lock, process_flags);
+    if (working) vfs_node_release(working);
+    if (root) vfs_node_release(root);
     process_release(process);
     return 1;
 }

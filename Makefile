@@ -141,7 +141,7 @@ $(UEFI_EFI): $(UEFI_OBJ) $(UEFI_ENTRY_OBJ) $(UEFI_CONSOLE_OBJ) $(UEFI_FIRMWARE_O
 $(BUILD_DIR)/kernel:
 	mkdir -p $@
 
-$(KERNEL_OBJ): kernel/arch/x86_64/entry/kernel_entry.c kernel/arch/x86_64/cpu/tables.h kernel/drivers/network/e1000.h kernel/drivers/network/ethernet.h kernel/drivers/network/arp.h kernel/drivers/network/arp_cache.h kernel/drivers/network/ipv4.h kernel/drivers/network/udp.h kernel/drivers/network/icmp.h kernel/drivers/network/route.h kernel/drivers/network/packet_queue.h kernel/drivers/network/network.h kernel/drivers/network/reassembly.h kernel/drivers/network/udp_endpoint.h kernel/fs/vfs/vfs.h | $(BUILD_DIR)/kernel
+$(KERNEL_OBJ): kernel/arch/x86_64/entry/kernel_entry.c kernel/arch/x86_64/cpu/tables.h kernel/drivers/network/e1000.h kernel/drivers/network/ethernet.h kernel/drivers/network/arp.h kernel/drivers/network/arp_cache.h kernel/drivers/network/ipv4.h kernel/drivers/network/udp.h kernel/drivers/network/icmp.h kernel/drivers/network/route.h kernel/drivers/network/packet_queue.h kernel/drivers/network/network.h kernel/drivers/network/reassembly.h kernel/drivers/network/udp_endpoint.h kernel/fs/vfs/vfs.h kernel/fs/vfs/file.h kernel/syscall/abi.h | $(BUILD_DIR)/kernel
 	$(CC) -target x86_64-pc-none-elf -std=c11 -ffreestanding -fno-builtin -Iboot/UEFI/core -fno-stack-protector \
 		-fPIE -fno-plt -mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@
 
@@ -555,7 +555,7 @@ $(KERNEL_PROCESS_OBJ): kernel/core/process/user_image.c kernel/core/process/user
 	$(CC) -target x86_64-pc-none-elf -std=c11 -ffreestanding -fno-builtin -fno-stack-protector -fPIE -fno-plt \
 		-mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@
 
-$(KERNEL_PROCESS_LIFECYCLE_OBJ): kernel/core/process/process.c kernel/core/process/process.h kernel/core/process/thread.h kernel/core/process/handle.c kernel/core/process/handle.h kernel/core/process/user_image.h kernel/security/credentials.h kernel/mm/heap/heap.h kernel/mm/physical/frame.h kernel/core/sync/spinlock.h kernel/core/task/wait_queue.h kernel/sched/core/scheduler.h | $(BUILD_DIR)/kernel
+$(KERNEL_PROCESS_LIFECYCLE_OBJ): kernel/core/process/process.c kernel/core/process/process.h kernel/fs/vfs/vfs.h kernel/core/process/thread.h kernel/core/process/handle.c kernel/core/process/handle.h kernel/core/process/user_image.h kernel/security/credentials.h kernel/mm/heap/heap.h kernel/mm/physical/frame.h kernel/core/sync/spinlock.h kernel/core/task/wait_queue.h kernel/sched/core/scheduler.h | $(BUILD_DIR)/kernel
 	$(CC) -target x86_64-pc-none-elf -std=c11 -ffreestanding -fno-builtin -fno-stack-protector -fPIE -fno-plt \
 		-mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@
 
@@ -567,7 +567,7 @@ $(KERNEL_PROCESS_THREAD_OBJ): kernel/core/process/thread.c kernel/core/process/t
 	$(CC) -target x86_64-pc-none-elf -std=c11 -ffreestanding -fno-builtin -fno-stack-protector -fPIE -fno-plt \
 		-mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@
 
-$(KERNEL_SYSCALL_OBJ): kernel/core/syscall/syscall.c kernel/core/syscall/syscall.h kernel/syscall/abi.h kernel/time/clock.h kernel/core/process/process.h kernel/arch/x86_64/cpu/tables.h kernel/arch/x86_64/time/timer.h kernel/mm/virtual/address_space.h | $(BUILD_DIR)/kernel
+$(KERNEL_SYSCALL_OBJ): kernel/core/syscall/syscall.c kernel/core/syscall/syscall.h kernel/syscall/abi.h kernel/time/clock.h kernel/core/process/process.h kernel/fs/vfs/file.h kernel/arch/x86_64/cpu/tables.h kernel/arch/x86_64/time/timer.h kernel/mm/virtual/address_space.h | $(BUILD_DIR)/kernel
 	$(CC) -target x86_64-pc-none-elf -std=c11 -ffreestanding -fno-builtin -fno-stack-protector -fPIE -fno-plt \
 		-mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@
 

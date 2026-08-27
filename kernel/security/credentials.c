@@ -18,7 +18,8 @@ int security_has_capability(const security_context_t *context,
 int security_can_access(const security_context_t *context,
                         uint64_t owner_uid, uint64_t owner_gid,
                         uint32_t mode, uint32_t requested) {
-    if (!context || requested == 0 || (requested & ~7U) != 0) return 0;
+    if (!context || (mode & ~0777U) != 0 || requested == 0 ||
+        (requested & ~7U) != 0) return 0;
     if (context->uid == 0) return 1;
 
     uint32_t permission;

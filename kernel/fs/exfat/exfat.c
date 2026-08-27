@@ -63,6 +63,7 @@ int exfat_mount(exfat_fs_t *fs, uint32_t device) {
         boot[7] != 'T' || boot[8] != ' ' || boot[9] != ' ' || boot[10] != ' ') return 0;
     if (!validate_boot_regions(device)) return 0;
     uint8_t bytes_shift = boot[108], sectors_shift = boot[109];
+    if (bytes_shift != 9 || sectors_shift > 3) return 0;
     uint32_t bytes_per_sector = 1U << bytes_shift;
     uint32_t sectors_per_cluster = 1U << sectors_shift;
     uint64_t volume_length = load64(&boot[72]);
@@ -71,13 +72,14 @@ int exfat_mount(exfat_fs_t *fs, uint32_t device) {
     uint32_t heap_start = load32(&boot[88]);
     uint32_t cluster_count = load32(&boot[92]);
     uint32_t root_cluster = load32(&boot[96]);
-    if (bytes_shift != 9 || bytes_per_sector != EXFAT_SECTOR_SIZE ||
-        sectors_shift > 3 || sectors_per_cluster == 0 ||
+    if (bytes_per_sector != EXFAT_SECTOR_SIZE || sectors_per_cluster == 0 ||
         sectors_per_cluster * EXFAT_SECTOR_SIZE > EXFAT_MAX_CLUSTER_BYTES ||
         volume_length == 0 || volume_length > storage_device_at(device)->block_count ||
         fat_start < 24 || fat_length == 0 || heap_start <= fat_start ||
         (uint64_t)fat_start + fat_length > volume_length ||
         heap_start >= volume_length || cluster_count == 0 ||
+        (uint64_t)fat_length * EXFAT_SECTOR_SIZE / 4U <
+            (uint64_t)cluster_count + 2U ||
         (uint64_t)heap_start + (uint64_t)cluster_count * sectors_per_cluster > volume_length ||
         !cluster_valid(&(exfat_fs_t){.cluster_count = cluster_count}, root_cluster)) return 0;
     fs->device = device; fs->fat_start = fat_start; fs->fat_sectors = fat_length;

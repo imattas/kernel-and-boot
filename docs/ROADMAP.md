@@ -680,6 +680,8 @@ FAT32 and exFAT have read-only parsers and VFS file adapters. exFAT now
 FAT32 mount validation now uses 64-bit geometry arithmetic, verifies the image
 fits its registered block device, and rejects FAT tables too small for the
 published cluster count.
+ExFAT mount validation now rejects invalid shift fields before evaluation and
+requires the FAT region to contain entries for every declared cluster.
 validates the primary and backup boot-region checksums, supports bounded
 directory-relative lookup and reads, validates directory entry-set checksums,
 and compares validated UTF-8 names with their on-disk UTF-16 names. Ext4 now has

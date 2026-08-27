@@ -1792,6 +1792,10 @@ void kernel_main(void *boot_info) {
             for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
         }
     serial_write("AHCI multi-sector I/O ready\r\n");
+    if (ahci_error_count() != 0) {
+        serial_write("AHCI completion error accounting failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
     }
     storage_initialize();
     if (ahci_storage_available && !ahci_register_storage_devices()) {

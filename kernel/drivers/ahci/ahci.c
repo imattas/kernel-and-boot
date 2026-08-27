@@ -72,6 +72,10 @@ static volatile uint32_t ahci_interrupts;
 static volatile uint32_t ahci_pending_port_status[32];
 static spinlock_t ahci_lock;
 static int ahci_io_disabled;
+static volatile uint32_t ahci_errors;
+static volatile uint32_t ahci_last_task_file;
+static volatile uint32_t ahci_last_interrupt_status_value;
+static volatile uint32_t ahci_last_serial_error_value;
 static uint64_t active_sector_count;
 static int active_lba48;
 static int ahci_storage_registered;
@@ -133,13 +137,18 @@ static int ahci_command_ok(uint32_t task_file, uint32_t transferred,
     interrupt_status |= __atomic_exchange_n(
         &ahci_pending_port_status[active_port_number], 0U, __ATOMIC_ACQUIRE);
     uint32_t serial_error = active_port[AHCI_PORT_SERR / 4];
+    ahci_last_task_file = task_file;
+    ahci_last_interrupt_status_value = interrupt_status;
+    ahci_last_serial_error_value = serial_error;
     if (interrupt_status & AHCI_PORT_IS_ERROR_MASK)
         active_port[AHCI_PORT_IS / 4] =
             interrupt_status & AHCI_PORT_IS_ERROR_MASK;
     if (serial_error) active_port[AHCI_PORT_SERR / 4] = serial_error;
-    return (task_file & 0x09U) == 0 && transferred == expected &&
+    int success = (task_file & 0x09U) == 0 && transferred == expected &&
            (interrupt_status & AHCI_PORT_IS_ERROR_MASK) == 0 &&
            serial_error == 0;
+    if (!success) ++ahci_errors;
+    return success;
 }
 
 static int ahci_match(const device_t *device) {
@@ -171,6 +180,10 @@ static int ahci_probe(device_t *device) {
     active_port = 0; active_command_list = 0; active_command_table = 0;
     active_data = 0; active_data_pages = 0; ahci_last_prdt_length = 0;
     ahci_io_disabled = 0;
+    ahci_errors = 0;
+    ahci_last_task_file = 0;
+    ahci_last_interrupt_status_value = 0;
+    ahci_last_serial_error_value = 0;
     ahci_storage_registered = 0;
     for (uint32_t port = 0; port < 32; ++port) {
         if ((implemented_ports & (1U << port)) == 0) continue;
@@ -658,3 +671,7 @@ int ahci_write_sectors(uint64_t lba, uint32_t count, const void *buffer) {
 }
 
 uint32_t ahci_last_io_prdt_length(void) { return ahci_last_prdt_length; }
+uint32_t ahci_error_count(void) { return ahci_errors; }
+uint32_t ahci_last_task_file_status(void) { return ahci_last_task_file; }
+uint32_t ahci_last_interrupt_status(void) { return ahci_last_interrupt_status_value; }
+uint32_t ahci_last_serial_error(void) { return ahci_last_serial_error_value; }

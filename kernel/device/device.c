@@ -5,6 +5,17 @@ static uint32_t registry_count;
 static const device_driver_t *drivers[DEVICE_DRIVER_CAPACITY];
 static uint32_t driver_count;
 
+static int same_name(const char *left, const char *right) {
+    while (*left && *left == *right) { ++left; ++right; }
+    return *left == *right;
+}
+
+static int same_pci_device(const device_t *left, const device_t *right) {
+    return left->bus == DEVICE_BUS_PCI && right->bus == DEVICE_BUS_PCI &&
+           left->bus_number == right->bus_number && left->slot == right->slot &&
+           left->function == right->function;
+}
+
 void device_registry_initialize(void) {
     registry_count = 0;
     driver_count = 0;
@@ -12,6 +23,8 @@ void device_registry_initialize(void) {
 
 int device_register(const device_t *device) {
     if (!device || registry_count >= DEVICE_REGISTRY_CAPACITY) return 0;
+    for (uint32_t i = 0; i < registry_count; ++i)
+        if (same_pci_device(&registry[i], device)) return 0;
     registry[registry_count++] = *device;
     return 1;
 }
@@ -25,6 +38,8 @@ const device_t *device_at(uint32_t index) {
 int device_driver_register(const device_driver_t *driver) {
     if (!driver || !driver->name || !driver->match || !driver->probe ||
         driver_count >= DEVICE_DRIVER_CAPACITY) return 0;
+    for (uint32_t i = 0; i < driver_count; ++i)
+        if (same_name(drivers[i]->name, driver->name)) return 0;
     drivers[driver_count++] = driver;
     return 1;
 }

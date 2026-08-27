@@ -8,7 +8,7 @@ static volatile uint64_t ticks;
 #define TIMER_NS_PER_TICK (1000000000ULL / TIMER_FREQUENCY_HZ)
 
 void timer_tick(void) {
-    ++ticks;
+    if (arch_apic_id() == 0) ++ticks;
 }
 void arch_scheduler_timer_interrupt(void) {
     if (arch_apic_id() == 0) scheduler_timer_interrupt();

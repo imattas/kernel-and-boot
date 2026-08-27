@@ -39,12 +39,24 @@ int ipc_channel_send_wait(ipc_channel_t *channel, uint64_t sender,
                           const void *data, uint32_t size) {
     if (!channel || !data || size == 0 || size > IPC_MESSAGE_MAX) return 0;
     for (;;) {
-        if (ipc_channel_send(channel, sender, data, size)) return 1;
         uint64_t flags = spinlock_lock_irqsave(&channel->lock);
-        int closed = !channel->open;
-        int full = channel->count == IPC_QUEUE_CAPACITY;
-        spinlock_unlock_irqrestore(&channel->lock, flags);
-        if (closed || !full || !scheduler_block_current(&channel->writers)) return 0;
+        if (!channel->open) {
+            spinlock_unlock_irqrestore(&channel->lock, flags);
+            return 0;
+        }
+        if (channel->count != IPC_QUEUE_CAPACITY) {
+            ipc_message_t *message = &channel->messages[channel->tail];
+            message->sender = sender;
+            message->size = size;
+            copy_bytes(message->data, (const uint8_t *)data, size);
+            channel->tail = (channel->tail + 1U) % IPC_QUEUE_CAPACITY;
+            ++channel->count;
+            spinlock_unlock_irqrestore(&channel->lock, flags);
+            (void)scheduler_wake_one(&channel->readers);
+            return 1;
+        }
+        if (!scheduler_block_current_with_lock(&channel->writers, &channel->lock, flags))
+            return 0;
     }
 }
 
@@ -72,15 +84,28 @@ int ipc_channel_receive(ipc_channel_t *channel, uint64_t receiver,
 int ipc_channel_receive_wait(ipc_channel_t *channel, uint64_t receiver,
                              void *data, uint32_t capacity,
                              uint64_t *sender, uint32_t *size) {
+    (void)receiver;
     if (!channel || !data || !sender || !size) return 0;
     for (;;) {
-        if (ipc_channel_receive(channel, receiver, data, capacity, sender, size))
-            return 1;
         uint64_t flags = spinlock_lock_irqsave(&channel->lock);
-        int closed = !channel->open;
-        int empty = channel->count == 0;
-        spinlock_unlock_irqrestore(&channel->lock, flags);
-        if (closed || !empty || !scheduler_block_current(&channel->readers)) return 0;
+        if (channel->count != 0 && capacity >= channel->messages[channel->head].size) {
+            ipc_message_t *message = &channel->messages[channel->head];
+            *sender = message->sender;
+            *size = message->size;
+            copy_bytes((uint8_t *)data, message->data, message->size);
+            channel->head = (channel->head + 1U) % IPC_QUEUE_CAPACITY;
+            --channel->count;
+            spinlock_unlock_irqrestore(&channel->lock, flags);
+            (void)scheduler_wake_one(&channel->writers);
+            return 1;
+        }
+        if (!channel->open || (channel->count != 0 &&
+                               capacity < channel->messages[channel->head].size)) {
+            spinlock_unlock_irqrestore(&channel->lock, flags);
+            return 0;
+        }
+        if (!scheduler_block_current_with_lock(&channel->readers, &channel->lock, flags))
+            return 0;
     }
 }
 

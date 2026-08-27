@@ -95,7 +95,7 @@ void tcp_connection_initialize(tcp_connection_t *connection,
                                uint16_t local_port, uint16_t window) {
     if (!connection) return;
     *connection = (tcp_connection_t){.state = TCP_CONNECTION_CLOSED,
-        .window = window, .local_port = local_port};
+        .window = window, .peer_window = window, .local_port = local_port};
 }
 
 int tcp_connection_listen(tcp_connection_t *connection) {
@@ -110,6 +110,7 @@ int tcp_connection_open(tcp_connection_t *connection, uint32_t sequence,
     if (!connection || connection->local_port == 0 || remote_port == 0 ||
         connection->state != TCP_CONNECTION_CLOSED) return 0;
     connection->remote_port = remote_port; connection->send_next = sequence + 1U;
+    connection->send_unacknowledged = sequence;
     connection->state = TCP_CONNECTION_SYN_SENT;
     return 1;
 }
@@ -131,6 +132,8 @@ int tcp_connection_receive(tcp_connection_t *connection,
         connection->remote_port = segment->source_port;
         connection->receive_next = segment->sequence + 1U;
         connection->send_next = 1;
+        connection->send_unacknowledged = 0;
+        connection->peer_window = segment->window;
         connection->state = TCP_CONNECTION_SYN_RECEIVED;
         result->response_flags = TCP_FLAG_SYN | TCP_FLAG_ACK;
         result->response_sequence = 0; result->response_acknowledgment = connection->receive_next;
@@ -140,6 +143,10 @@ int tcp_connection_receive(tcp_connection_t *connection,
         (segment->flags & (TCP_FLAG_SYN | TCP_FLAG_ACK)) ==
             (TCP_FLAG_SYN | TCP_FLAG_ACK) && segment->acknowledgment ==
             connection->send_next) {
+        if (segment->acknowledgment < connection->send_unacknowledged)
+            return 0;
+        connection->send_unacknowledged = connection->send_next;
+        connection->peer_window = segment->window;
         connection->receive_next = segment->sequence + 1U;
         connection->state = TCP_CONNECTION_ESTABLISHED;
         result->response_flags = TCP_FLAG_ACK;
@@ -150,12 +157,16 @@ int tcp_connection_receive(tcp_connection_t *connection,
     if (connection->state == TCP_CONNECTION_SYN_RECEIVED &&
         (segment->flags & TCP_FLAG_ACK) != 0 &&
         segment->acknowledgment == connection->send_next) {
+        connection->send_unacknowledged = connection->send_next;
+        connection->peer_window = segment->window;
         connection->state = TCP_CONNECTION_ESTABLISHED;
         return 1;
     }
     if (connection->state == TCP_CONNECTION_FIN_WAIT_1 &&
         (segment->flags & TCP_FLAG_ACK) != 0 &&
         segment->acknowledgment == connection->send_next) {
+        connection->send_unacknowledged = connection->send_next;
+        connection->peer_window = segment->window;
         connection->state = TCP_CONNECTION_FIN_WAIT_2;
         return 1;
     }
@@ -171,13 +182,17 @@ int tcp_connection_receive(tcp_connection_t *connection,
     if (connection->state == TCP_CONNECTION_LAST_ACK &&
         (segment->flags & TCP_FLAG_ACK) != 0 &&
         segment->acknowledgment == connection->send_next) {
+        connection->send_unacknowledged = connection->send_next;
         connection->state = TCP_CONNECTION_CLOSED; return 1;
     }
     if (connection->state != TCP_CONNECTION_ESTABLISHED &&
         connection->state != TCP_CONNECTION_CLOSE_WAIT) return 0;
     if (segment->sequence != connection->receive_next ||
         (segment->flags & TCP_FLAG_ACK) == 0 ||
+        segment->acknowledgment < connection->send_unacknowledged ||
         segment->acknowledgment > connection->send_next) return 0;
+    connection->send_unacknowledged = segment->acknowledgment;
+    connection->peer_window = segment->window;
     uint32_t advance = segment->payload_length +
                        ((segment->flags & TCP_FLAG_FIN) != 0);
     connection->receive_next += advance;
@@ -203,14 +218,19 @@ int tcp_connection_build(tcp_connection_t *connection,
         (payload_length != 0 && !payload)) return 0;
     if (payload_length != 0) flags |= TCP_FLAG_ACK | TCP_FLAG_PSH;
     if ((flags & TCP_FLAG_FIN) != 0) flags |= TCP_FLAG_ACK;
+    uint32_t sequence_space = payload_length +
+                              ((flags & TCP_FLAG_FIN) != 0);
+    uint32_t outstanding = connection->send_next -
+                           connection->send_unacknowledged;
+    if (sequence_space > connection->peer_window ||
+        outstanding > connection->peer_window - sequence_space) return 0;
     uint32_t sequence = connection->send_next;
     if (!tcp_segment_build(packet, capacity, source_address, destination_address,
                            connection->local_port, connection->remote_port,
                            sequence, connection->receive_next, flags,
                            connection->window, payload, payload_length,
                            packet_length)) return 0;
-    connection->send_next += payload_length +
-                             ((flags & TCP_FLAG_FIN) != 0);
+    connection->send_next += sequence_space;
     if ((flags & TCP_FLAG_FIN) != 0)
         connection->state = connection->state == TCP_CONNECTION_CLOSE_WAIT ?
             TCP_CONNECTION_LAST_ACK : TCP_CONNECTION_FIN_WAIT_1;

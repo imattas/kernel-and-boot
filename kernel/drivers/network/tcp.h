@@ -55,9 +55,11 @@ typedef enum {
 
 typedef struct {
     tcp_connection_state_t state;
+    uint32_t send_unacknowledged;
     uint32_t send_next;
     uint32_t receive_next;
     uint16_t window;
+    uint16_t peer_window;
     uint16_t local_port;
     uint16_t remote_port;
 } tcp_connection_t;

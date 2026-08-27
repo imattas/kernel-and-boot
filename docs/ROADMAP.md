@@ -448,6 +448,9 @@ FIN-WAIT/LAST-ACK transitions with bounded acknowledgment validation.
 TCP endpoint tables now support active opens, generating SYN segments and
 accepting a validated SYN-ACK with the correct ACK response and sequence state.
 The QEMU probe covers the client-side handshake path.
+TCP connections now track the unacknowledged send edge and peer-advertised
+window, advance it only on valid acknowledgements, and reject transmissions
+that exceed the bounded flow-control window.
 The network service loop now forwards validated UDP frames from the hardware
 packet queue into bound endpoint tables, and the QEMU boot probe exercises that
 end-to-end queue-to-endpoint delivery path.

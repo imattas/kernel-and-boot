@@ -6,6 +6,7 @@ static task_t *current_task;
 static task_t *idle_task;
 static task_context_t host_context;
 static int host_active;
+static int host_context_valid;
 static int preemption_enabled;
 static uint64_t preemptions;
 static spinlock_t scheduler_lock;
@@ -13,7 +14,7 @@ static spinlock_t scheduler_lock;
 void scheduler_initialize(void) {
     spinlock_init(&scheduler_lock);
     task_wait_queue_initialize(&ready_queue);
-    current_task = 0; idle_task = 0; host_active = 0;
+    current_task = 0; idle_task = 0; host_active = 0; host_context_valid = 0;
     preemption_enabled = 0; preemptions = 0;
 }
 
@@ -116,9 +117,11 @@ int scheduler_start(void) {
     if (!next || next == idle_task) return 0;
     flags = spinlock_lock_irqsave(&scheduler_lock);
     host_active = 1; current_task = next;
+    host_context_valid = 1;
     spinlock_unlock_irqrestore(&scheduler_lock, flags);
     task_context_switch(&host_context, &next->context);
     host_active = 0;
+    host_context_valid = 0;
     return 1;
 }
 
@@ -134,7 +137,7 @@ __attribute__((noreturn)) void scheduler_task_exit(void) {
         scheduler_set_current(next);
         task_context_switch(&finished->context, &next->context);
     }
-    if (host_active) task_context_switch(&finished->context, &host_context);
+    if (host_context_valid) task_context_switch(&finished->context, &host_context);
     for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
 }
 

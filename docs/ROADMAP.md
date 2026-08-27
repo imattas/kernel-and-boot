@@ -1058,6 +1058,8 @@ block allocator, extending contiguous records or appending validated leaf
 records, with zero-filled newly allocated blocks.
 Depth-1 ext4 extent trees now grow through validated existing leaf blocks,
 including leaf extent insertion and persistence of the updated leaf and inode.
+Depth-1 extent trees now also support bounded shrink: detached leaf data blocks
+are released, empty leaf metadata is removed, and the root index is cleared.
 Ext4 extent-root truncation now bounds and releases detached leaf blocks,
 removes empty extent records, and zeroes the retained partial block before
 persisting the reduced inode size.

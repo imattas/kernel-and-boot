@@ -76,6 +76,10 @@ int main(void) {
     assert(ext4_inode_size(&fs, 7, &size) && size == (12U + 256U + 1U) * 1024U);
     assert((image[3 * 1024 + 18 / 8] & (1U << (18 & 7))) == 0);
     memset(output, 0, sizeof(output)); assert(ext4_read_file(&fs, 5, 0, output, 4)); assert(memcmp(output, "deep", 4) == 0);
+    assert(ext4_truncate_file(&fs, 5, 1024));
+    assert(ext4_inode_size(&fs, 5, &size) && size == 1024);
+    assert(ext4_truncate_file(&fs, 5, 0));
+    assert(ext4_inode_size(&fs, 5, &size) && size == 0);
     uint64_t group_size = 0;
     memset(output, 0, sizeof(output)); assert(ext4_inode_size(&fs, 9, &group_size) && group_size == 5);
     assert(ext4_read_file(&fs, 9, 0, output, 5) && memcmp(output, "group", 5) == 0);

@@ -466,19 +466,37 @@ static int ext4_shrink_extent_file(ext4_fs_t *fs, uint32_t inode_number,
     uint64_t old_blocks = (old_size + fs->block_size - 1U) / fs->block_size;
     uint64_t new_blocks = (new_size + fs->block_size - 1U) / fs->block_size;
     uint64_t released = 0;
-    uint8_t *header = &inode[40];
+    uint8_t leaf_data[4096];
+    uint8_t *header = &inode[40], *records = &inode[52];
+    uint64_t leaf_block = 0;
     uint16_t entries = load16(&header[2]), maximum = load16(&header[4]);
     uint16_t depth = load16(&header[6]);
     if (new_size >= old_size) return 0;
     if (old_blocks - new_blocks > 1024U || load16(header) != EXT4_EXTENT_MAGIC ||
-        depth != 0 || entries > maximum || maximum > 4U ||
+        entries > maximum || maximum > 4U ||
         12U + (uint32_t)maximum * 12U > 60U) return 0;
+    if (depth == 1 && entries != 0) {
+        uint8_t *index = &inode[52];
+        leaf_block = (uint64_t)load32(&index[4]) |
+                     ((uint64_t)load16(&index[10]) << 32);
+        if (leaf_block >= fs->block_count || !read_block(fs, leaf_block, leaf_data))
+            return 0;
+        header = leaf_data;
+        records = &leaf_data[12];
+        entries = load16(&header[2]);
+        maximum = load16(&header[4]);
+        if (load16(header) != EXT4_EXTENT_MAGIC || load16(&header[6]) != 0 ||
+            entries > maximum || maximum > (fs->block_size - 12U) / 12U)
+            return 0;
+    } else if (depth != 0) {
+        return 0;
+    }
     if (new_size % fs->block_size != 0 && new_blocks != 0) {
         uint64_t logical = new_blocks - 1U, physical = 0;
         uint8_t hole = 0, found = 0;
         for (uint32_t i = 0; i < entries; ++i)
-            if (extent_data_block(fs, header, (uint32_t)logical, &physical,
-                                  &hole, 0, 1)) { found = 1; break; }
+            if (extent_data_block(fs, &inode[40], (uint32_t)logical, &physical,
+                                  &hole, (uint8_t)depth, 1)) { found = 1; break; }
         if (found && !hole) {
             uint8_t block[4096];
             if (!read_block(fs, physical, block)) return 0;
@@ -488,7 +506,7 @@ static int ext4_shrink_extent_file(ext4_fs_t *fs, uint32_t inode_number,
         }
     }
     for (uint32_t index = 0; index < entries;) {
-        uint8_t *extent = &inode[52U + index * 12U];
+        uint8_t *extent = &records[index * 12U];
         uint32_t first = load32(extent);
         uint32_t raw_length = load16(&extent[4]);
         uint32_t length = raw_length & 0x7fffU;
@@ -504,8 +522,8 @@ static int ext4_shrink_extent_file(ext4_fs_t *fs, uint32_t inode_number,
         if (keep == 0) {
             for (uint32_t move = index; move + 1U < entries; ++move)
                 for (uint32_t byte = 0; byte < 12U; ++byte)
-                    inode[52U + move * 12U + byte] =
-                        inode[52U + (move + 1U) * 12U + byte];
+                    records[move * 12U + byte] =
+                        records[(move + 1U) * 12U + byte];
             --entries;
             continue;
         }
@@ -514,6 +532,14 @@ static int ext4_shrink_extent_file(ext4_fs_t *fs, uint32_t inode_number,
         ++index;
     }
     store16(&header[2], entries);
+    if (depth == 1) {
+        if (entries == 0) {
+            if (!ext4_set_block_used(fs, leaf_block, 0)) return 0;
+            store16(&inode[42], 0);
+        } else if (!write_block(fs, leaf_block, leaf_data)) {
+            return 0;
+        }
+    }
     store32(&inode[4], (uint32_t)new_size);
     store32(&inode[108], (uint32_t)(new_size >> 32));
     return write_inode(fs, inode_number, inode);

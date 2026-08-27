@@ -87,7 +87,7 @@ static int mouse_command_id(uint8_t command, uint8_t *id) {
     out8(0x60, command);
     if (!wait_read() || in8(0x60) != 0xfa || !wait_read()) return 0;
     *id = in8(0x60);
-    return *id == 0 || *id == 3 || *id == 4 || *id == 5;
+    return *id == 0 || *id == 3;
 }
 
 int ps2_keyboard_initialize(input_queue_t *queue) {

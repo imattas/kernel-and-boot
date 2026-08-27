@@ -215,11 +215,13 @@ static int ext4_resize_blocks(ext4_fs_t *fs, uint32_t inode_number,
     uint64_t new_blocks = (new_size + fs->block_size - 1U) / fs->block_size;
     uint64_t pointers = fs->block_size / 4U;
     uint64_t double_limit = 12U + pointers + pointers * pointers;
-    if (new_blocks > double_limit ||
+    uint64_t triple_limit = double_limit + pointers * pointers * pointers;
+    if (new_blocks > triple_limit ||
         (new_size > UINT32_MAX && !fs->has_64bit)) return 0;
     if (new_blocks < old_blocks && old_blocks > 12U + pointers) return 0;
     uint32_t indirect = load32(&inode[88]);
     uint32_t double_indirect = load32(&inode[92]);
+    uint32_t triple_indirect = load32(&inode[96]);
     uint8_t table[4096];
     if (new_blocks > old_blocks) {
         for (uint64_t i = old_blocks; i < new_blocks; ++i) {
@@ -239,7 +241,7 @@ static int ext4_resize_blocks(ext4_fs_t *fs, uint32_t inode_number,
                 if (!ext4_alloc_block(fs, &block)) return 0;
                 store32(&table[table_index * 4U], (uint32_t)block);
                 if (!write_block(fs, indirect, table)) return 0;
-            } else {
+            } else if (i < double_limit) {
                 uint64_t relative = i - 12U - pointers;
                 uint32_t first_index = (uint32_t)(relative / pointers);
                 uint32_t second_index = (uint32_t)(relative % pointers);
@@ -261,6 +263,38 @@ static int ext4_resize_blocks(ext4_fs_t *fs, uint32_t inode_number,
                 if (!ext4_alloc_block(fs, &block)) return 0;
                 store32(&table[second_index * 4U], (uint32_t)block);
                 if (!write_block(fs, first, table)) return 0;
+            } else {
+                uint64_t relative = i - double_limit;
+                uint64_t span = pointers * pointers;
+                uint32_t first_index = (uint32_t)(relative / span);
+                uint32_t second_index = (uint32_t)((relative / pointers) % pointers);
+                uint32_t third_index = (uint32_t)(relative % pointers);
+                if (triple_indirect == 0) {
+                    if (!ext4_alloc_block(fs, &block) || !write_block(fs, block,
+                        (uint8_t[4096]){0})) return 0;
+                    triple_indirect = (uint32_t)block; store32(&inode[96], triple_indirect);
+                }
+                if (!read_block(fs, triple_indirect, table)) return 0;
+                uint32_t first = load32(&table[first_index * 4U]);
+                if (first == 0) {
+                    if (!ext4_alloc_block(fs, &block) || !write_block(fs, block,
+                        (uint8_t[4096]){0})) return 0;
+                    first = (uint32_t)block; store32(&table[first_index * 4U], first);
+                    if (!write_block(fs, triple_indirect, table)) return 0;
+                }
+                if (!read_block(fs, first, table)) return 0;
+                uint32_t second = load32(&table[second_index * 4U]);
+                if (second == 0) {
+                    if (!ext4_alloc_block(fs, &block) || !write_block(fs, block,
+                        (uint8_t[4096]){0})) return 0;
+                    second = (uint32_t)block; store32(&table[second_index * 4U], second);
+                    if (!write_block(fs, first, table)) return 0;
+                }
+                if (!read_block(fs, second, table)) return 0;
+                if (load32(&table[third_index * 4U]) != 0) return 0;
+                if (!ext4_alloc_block(fs, &block)) return 0;
+                store32(&table[third_index * 4U], (uint32_t)block);
+                if (!write_block(fs, second, table)) return 0;
             }
         }
     } else if (new_blocks < old_blocks) {

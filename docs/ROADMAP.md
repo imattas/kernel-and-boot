@@ -1080,6 +1080,9 @@ the aggregate free-record count against AGF free-block metadata before mutation,
 rejecting inconsistent free-space trees without changing them.
 The XFS allocator now also recognizes the authentic v4 AGF BNO-level field and
 v4 BNO leaf header/count encoding while retaining the existing contract format.
+XFS BNO allocation now traverses an authenticated two-level v4 root and leaf,
+updates the selected leaf and root key, recomputes AGF accounting, and rolls
+back all modified blocks if publication fails.
 Multi-level BNO/CNT trees and full transaction logging remain later hardening
 work.
 Btrfs regular-file truncation now accepts zero-length targets, updating the

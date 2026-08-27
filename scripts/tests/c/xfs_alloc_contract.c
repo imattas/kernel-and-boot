@@ -60,5 +60,18 @@ int main(void) {
            g32(&bno[20]) == 1 && g32(&agf[40]) == 1);
     assert(xfs_free_extent(&fs, 10, 2) && g32(&bno[16]) == 10 &&
            g32(&bno[20]) == 3 && g32(&agf[40]) == 3);
+    uint8_t *real_root = &image[2U * 4096U];
+    uint8_t *real_leaf = &image[3U * 4096U];
+    memset(real_root, 0, 4096); memset(real_leaf, 0, 4096);
+    p32(&agf[16], 2); p32(&agf[28], 2); p32(&agf[40], 3); p32(&agf[44], 3);
+    p32(real_root, 0x41425442U); p16(&real_root[4], 1); p16(&real_root[6], 1);
+    p32(&real_root[16], 10); p32(&real_root[20], 3);
+    p32(&real_root[2736], 3);
+    p32(real_leaf, 0x41425442U); p16(&real_leaf[4], 0); p16(&real_leaf[6], 1);
+    p32(&real_leaf[16], 10); p32(&real_leaf[20], 3);
+    assert(xfs_allocate_extent(&fs, 0, 2, &start) && start == 10);
+    assert(g32(&real_leaf[16]) == 12 && g32(&real_leaf[20]) == 1 &&
+           g32(&real_root[16]) == 12 && g32(&real_root[20]) == 1 &&
+           g32(&agf[40]) == 1);
     return 0;
 }

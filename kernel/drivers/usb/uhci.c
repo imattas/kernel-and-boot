@@ -49,6 +49,7 @@ static int uhci_low_speed;
 static int uhci_io_disabled;
 static spinlock_t uhci_lock;
 static uint64_t uhci_async_qh_frame;
+static uint64_t uhci_bulk_anchor_frame;
 static uint64_t uhci_async_td_frame;
 static uint64_t uhci_async_data_frame;
 static uint8_t *uhci_async_data;
@@ -170,12 +171,18 @@ static int uhci_probe(device_t *device) {
         return 0;
     }
     uint64_t frame_list = physical_alloc_frame();
-    if (!frame_list) {
+    uint64_t bulk_anchor = physical_alloc_frame();
+    if (!frame_list || !bulk_anchor) {
+        if (frame_list) physical_free_frame(frame_list);
+        if (bulk_anchor) physical_free_frame(bulk_anchor);
         device_release_resource(device, UHCI_BAR_INDEX, &uhci_driver);
         return 0;
     }
     uint32_t *entries = (uint32_t *)(uintptr_t)frame_list;
     for (uint32_t i = 0; i < 1024; ++i) entries[i] = 1;
+    uhci_qh_t *anchor = (uhci_qh_t *)(uintptr_t)bulk_anchor;
+    anchor->head = 1U;
+    anchor->element = 1U;
     __asm__ volatile ("outl %0, %1" :: "a"((uint32_t)frame_list),
                       "Nd"((uint16_t)(base + UHCI_FLBASEADD)));
     __asm__ volatile ("outb %0, %1" :: "a"((uint8_t)64), "Nd"((uint16_t)(base + UHCI_SOFMOD)));
@@ -187,6 +194,7 @@ static int uhci_probe(device_t *device) {
                       "Nd"((uint16_t)(base + UHCI_USBCMD)));
     controller_base = base;
     controller_frame_list = frame_list;
+    uhci_bulk_anchor_frame = bulk_anchor;
     for (uint32_t port = 0; port < UHCI_PORT_COUNT; ++port) {
         uint16_t port_address = (uint16_t)(base + UHCI_PORT_BASE + port * 2U);
         uint16_t status;
@@ -292,9 +300,9 @@ static int uhci_control_transfer_locked(uint8_t address, uint8_t endpoint,
     return complete;
 }
 
-static int uhci_interrupt_transfer_locked(uint8_t address, uint8_t endpoint, void *data,
+static int uhci_data_transfer_locked(uint8_t address, uint8_t endpoint, void *data,
                             uint16_t length, uint16_t max_packet,
-                            uint8_t *toggle) {
+                            uint8_t *toggle, int bulk) {
     if (uhci_io_disabled || !controller_base || !controller_frame_list || !data || address > 127 ||
         (endpoint & 0x7fU) > 15 || length == 0 || length > 4096 || max_packet == 0 ||
         max_packet > 64 || !toggle || *toggle > 1) return 0;
@@ -330,13 +338,27 @@ static int uhci_interrupt_transfer_locked(uint8_t address, uint8_t endpoint, voi
         td[i].buffer = (uint32_t)(data_frame + i * max_packet);
         current_toggle ^= 1U;
     }
+    if (bulk && (uhci_async_pending || !uhci_bulk_anchor_frame)) {
+        uhci_release_transfer_frames(qh_frame, td_frame, 0, td_pages, data_frame);
+        return 0;
+    }
     volatile uint32_t *frame_list =
         (volatile uint32_t *)(uintptr_t)controller_frame_list;
     if (!uhci_set_running(0)) {
         uhci_release_transfer_frames(qh_frame, td_frame, 0, td_pages, data_frame);
         return 0;
     }
-    for (uint32_t i = 0; i < 1024; ++i) frame_list[i] = (uint32_t)qh_frame | 2U;
+    if (bulk) {
+        uhci_qh_t *anchor =
+            (uhci_qh_t *)(uintptr_t)uhci_bulk_anchor_frame;
+        anchor->head = (uint32_t)qh_frame | 2U;
+        anchor->element = 1U;
+        for (uint32_t i = 0; i < 1024; ++i)
+            frame_list[i] = (uint32_t)uhci_bulk_anchor_frame | 2U;
+    } else {
+        for (uint32_t i = 0; i < 1024; ++i)
+            frame_list[i] = (uint32_t)qh_frame | 2U;
+    }
     __asm__ volatile ("outl %0, %1" :: "a"((uint32_t)controller_frame_list),
                       "Nd"((uint16_t)(controller_base + UHCI_FLBASEADD)));
     if (!uhci_set_running(1)) {
@@ -365,7 +387,15 @@ static int uhci_interrupt_transfer_locked(uint8_t address, uint8_t endpoint, voi
     complete = complete && (controller_status & (UHCI_STATUS_ERROR |
                         UHCI_STATUS_HOST_SYSTEM_ERROR |
                         UHCI_STATUS_PROCESS_ERROR)) == 0;
-    for (uint32_t i = 0; i < 1024; ++i) frame_list[i] = 1U;
+    if (bulk) {
+        uhci_qh_t *anchor =
+            (uhci_qh_t *)(uintptr_t)uhci_bulk_anchor_frame;
+        anchor->head = 1U;
+        for (uint32_t i = 0; i < 1024; ++i)
+            frame_list[i] = (uint32_t)uhci_bulk_anchor_frame | 2U;
+    } else {
+        for (uint32_t i = 0; i < 1024; ++i) frame_list[i] = 1U;
+    }
     if (!uhci_set_running(1)) complete = 0;
     if (complete) {
         if (input)
@@ -376,9 +406,6 @@ static int uhci_interrupt_transfer_locked(uint8_t address, uint8_t endpoint, voi
     return complete;
 }
 
-/* Bulk endpoints use the controller's asynchronous/bulk queue.  Keep this
- * entry point separate from the periodic interrupt API so callers cannot
- * accidentally couple bulk I/O to interrupt-transfer scheduling changes. */
 static int uhci_bulk_transfer_locked(uint8_t address, uint8_t endpoint, void *data,
                                      uint16_t length, uint16_t max_packet,
                                      uint8_t *toggle) {
@@ -387,11 +414,8 @@ static int uhci_bulk_transfer_locked(uint8_t address, uint8_t endpoint, void *da
         max_packet == 0 || max_packet > 64 || !toggle || *toggle > 1)
         return 0;
 
-    /* UHCI has no separate bulk register: bulk QHs are linked from the frame
-     * list and are serviced every frame.  The synchronous engine below builds
-     * exactly that non-periodic queue and waits for its completion. */
-    return uhci_interrupt_transfer_locked(address, endpoint, data, length,
-                                          max_packet, toggle);
+    return uhci_data_transfer_locked(address, endpoint, data, length,
+                                     max_packet, toggle, 1);
 }
 
 static int uhci_interrupt_submit_locked(uint8_t address, uint8_t endpoint,
@@ -490,6 +514,7 @@ int uhci_initialize(void) {
     root_ports = 0;
     controller_base = 0;
     controller_frame_list = 0;
+    uhci_bulk_anchor_frame = 0;
     uhci_low_speed = 0;
     uhci_io_disabled = 0;
     uhci_irq_enabled = 0;
@@ -539,8 +564,8 @@ int uhci_interrupt_transfer(uint8_t address, uint8_t endpoint, void *data,
                             uint16_t length, uint16_t max_packet,
                             uint8_t *toggle) {
     uint64_t flags = spinlock_lock_irqsave(&uhci_lock);
-    int result = uhci_interrupt_transfer_locked(address, endpoint, data, length,
-                                                max_packet, toggle);
+    int result = uhci_data_transfer_locked(address, endpoint, data, length,
+                                           max_packet, toggle, 0);
     spinlock_unlock_irqrestore(&uhci_lock, flags);
     return result;
 }

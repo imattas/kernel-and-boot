@@ -1080,9 +1080,9 @@ synchronous and persistent UHCI paths allocate enough contiguous TD frames for
 that range instead of overflowing a single 4 KiB descriptor page.
 Persistent interrupt scheduling now honors each USB interrupt endpoint's
 declared `bInterval` instead of submitting the queue head on every frame.
-UHCI bulk transfers now have a dedicated validated submission path rather than
-silently entering the interrupt-transfer API; bulk queue ownership and future
-non-periodic scheduling changes are isolated from HID interrupt transfers.
+UHCI bulk transfers now have a dedicated validated submission path and
+asynchronous queue-head anchor rather than entering the periodic interrupt
+schedule; bulk queue ownership is isolated from HID interrupt transfers.
 USB endpoint descriptor validation now rejects packet sizes that UHCI cannot
 represent and rejects nonstandard full-speed bulk packet sizes before endpoint
 metadata reaches a transfer driver.

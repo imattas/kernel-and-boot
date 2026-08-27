@@ -258,6 +258,9 @@ VFS path resolution now distinguishes absolute root paths from working-directory
 relative paths, with `..` confined at the process namespace root.
 VFS-backed `open` and `chdir` now enforce Unix owner/group/other mode bits
 against the calling process credentials, including directory search permission.
+Access-aware VFS path traversal now requires search permission on every
+directory crossed, preventing inaccessible parent directories from being used
+as a path-resolution side channel.
 Current-process exit now publishes an exit status, wakes signal and exit
 waiters, and terminates the scheduler task through a dedicated exit syscall;
 successful ring-3 invocation remains deferred with the rest of userland.

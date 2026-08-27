@@ -46,6 +46,9 @@ vfs_node_t *vfs_node_child(vfs_node_t *parent, uint32_t index);
 vfs_node_t *vfs_lookup_path(vfs_node_t *root, const char *path);
 vfs_node_t *vfs_lookup_path_at(vfs_node_t *root, vfs_node_t *working,
                                const char *path);
+vfs_node_t *vfs_lookup_path_at_access(vfs_node_t *root, vfs_node_t *working,
+                                      const char *path,
+                                      const security_context_t *context);
 int vfs_node_access(const vfs_node_t *node,
                     const security_context_t *context, uint32_t requested);
 void vfs_node_retain(vfs_node_t *node);

@@ -99,15 +99,12 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
             uint64_t flags = spinlock_lock_irqsave(&process->lock);
             vfs_node_t *root = process->root_directory;
             vfs_node_t *working = process->working_directory;
+            security_context_t security = process->security;
             if (root) vfs_node_retain(root);
             if (working) vfs_node_retain(working);
             spinlock_unlock_irqrestore(&process->lock, flags);
             vfs_node_t *node = root && working ?
-                vfs_lookup_path_at(root, working, path) : 0;
-            security_context_t security = {0};
-            flags = spinlock_lock_irqsave(&process->lock);
-            security = process->security;
-            spinlock_unlock_irqrestore(&process->lock, flags);
+                vfs_lookup_path_at_access(root, working, path, &security) : 0;
             uint32_t requested = (arg3 & VFS_FILE_READ ? 4U : 0U) |
                                  (arg3 & VFS_FILE_WRITE ? 2U : 0U);
             int handle = node && vfs_node_access(node, &security, requested) ?
@@ -234,13 +231,11 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
             path[arg2] = '\0';
             uint64_t flags = spinlock_lock_irqsave(&process->lock);
             vfs_node_t *root = process->root_directory;
+            security_context_t security = process->security;
             if (root) vfs_node_retain(root);
             spinlock_unlock_irqrestore(&process->lock, flags);
-            vfs_node_t *directory = root ? vfs_lookup_path_at(root, root, path) : 0;
-            security_context_t security = {0};
-            flags = spinlock_lock_irqsave(&process->lock);
-            security = process->security;
-            spinlock_unlock_irqrestore(&process->lock, flags);
+            vfs_node_t *directory = root ?
+                vfs_lookup_path_at_access(root, root, path, &security) : 0;
             int accessible = directory && directory->type == VFS_NODE_DIRECTORY &&
                              vfs_node_access(directory, &security, 1);
             if (root) vfs_node_release(root);

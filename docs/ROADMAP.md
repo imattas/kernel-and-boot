@@ -251,6 +251,9 @@ AHCI command timeouts now stop and restart the port engine with bounded CR/FR
 quiescence and error-state clearing before DMA buffers are released.
 The identified AHCI disk is now registered with the generic storage layer;
 the FAT32 and VFS probes therefore exercise the AHCI-backed storage device.
+The generic storage registry now serializes registration, enumeration, and
+backend dispatch, rejects duplicate device names, and has hosted contract-test
+build support without executing privileged interrupt-state instructions.
 The ATA PIO fallback now selects validated LBA48 task-file commands when the
 device advertises 48-bit addressing, while retaining the bounded LBA28 path.
 Driver enumeration and hardware

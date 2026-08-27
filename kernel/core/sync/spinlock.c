@@ -1,10 +1,12 @@
 #include "spinlock.h"
 
+#if !__STDC_HOSTED__
 static uint64_t read_flags(void) {
     uint64_t flags;
     __asm__ volatile ("pushfq\n\tpop %0" : "=r"(flags) :: "memory");
     return flags;
 }
+#endif
 
 void spinlock_init(spinlock_t *lock) {
     __atomic_store_n(&lock->state, 0, __ATOMIC_RELAXED);
@@ -21,13 +23,22 @@ void spinlock_unlock(spinlock_t *lock) {
 }
 
 uint64_t spinlock_lock_irqsave(spinlock_t *lock) {
+#if __STDC_HOSTED__
+    spinlock_lock(lock);
+    return 0;
+#else
     uint64_t flags = read_flags();
     __asm__ volatile ("cli" ::: "memory");
     spinlock_lock(lock);
     return flags;
+#endif
 }
 
 void spinlock_unlock_irqrestore(spinlock_t *lock, uint64_t flags) {
     spinlock_unlock(lock);
+#if !__STDC_HOSTED__
     __asm__ volatile ("push %0\n\tpopfq" :: "r"(flags) : "memory", "cc");
+#else
+    (void)flags;
+#endif
 }

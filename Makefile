@@ -531,17 +531,17 @@ zstd-test: $(ZSTD_TEST)
 fse-test: $(FSE_TEST)
 	$(FSE_TEST)
 
-$(EXFAT_TEST): scripts/tests/c/exfat_contract.c kernel/fs/exfat/exfat.c kernel/fs/exfat/exfat.h kernel/drivers/storage/storage.c kernel/drivers/storage/storage.h | $(TEST_DIR)
-	$(CC) -std=c11 -Wall -Wextra -Werror -I. -o $@ scripts/tests/c/exfat_contract.c kernel/fs/exfat/exfat.c kernel/drivers/storage/storage.c
+$(EXFAT_TEST): scripts/tests/c/exfat_contract.c kernel/fs/exfat/exfat.c kernel/fs/exfat/exfat.h kernel/drivers/storage/storage.c kernel/drivers/storage/storage.h kernel/core/sync/spinlock.c kernel/core/sync/spinlock.h | $(TEST_DIR)
+	$(CC) -std=c11 -Wall -Wextra -Werror -I. -o $@ scripts/tests/c/exfat_contract.c kernel/fs/exfat/exfat.c kernel/drivers/storage/storage.c kernel/core/sync/spinlock.c
 
-$(EXT4_TEST): scripts/tests/c/ext4_contract.c kernel/fs/ext4/ext4.c kernel/fs/ext4/ext4.h kernel/drivers/storage/storage.c kernel/drivers/storage/storage.h | $(TEST_DIR)
-	$(CC) -std=c11 -Wall -Wextra -Werror -I. -o $@ scripts/tests/c/ext4_contract.c kernel/fs/ext4/ext4.c kernel/drivers/storage/storage.c
+$(EXT4_TEST): scripts/tests/c/ext4_contract.c kernel/fs/ext4/ext4.c kernel/fs/ext4/ext4.h kernel/drivers/storage/storage.c kernel/drivers/storage/storage.h kernel/core/sync/spinlock.c kernel/core/sync/spinlock.h | $(TEST_DIR)
+	$(CC) -std=c11 -Wall -Wextra -Werror -I. -o $@ scripts/tests/c/ext4_contract.c kernel/fs/ext4/ext4.c kernel/drivers/storage/storage.c kernel/core/sync/spinlock.c
 
-$(XFS_TEST): scripts/tests/c/xfs_contract.c kernel/fs/xfs/xfs.c kernel/fs/xfs/xfs.h kernel/drivers/storage/storage.c kernel/drivers/storage/storage.h | $(TEST_DIR)
-	$(CC) -std=c11 -Wall -Wextra -Werror -I. -o $@ scripts/tests/c/xfs_contract.c kernel/fs/xfs/xfs.c kernel/drivers/storage/storage.c
+$(XFS_TEST): scripts/tests/c/xfs_contract.c kernel/fs/xfs/xfs.c kernel/fs/xfs/xfs.h kernel/drivers/storage/storage.c kernel/drivers/storage/storage.h kernel/core/sync/spinlock.c kernel/core/sync/spinlock.h | $(TEST_DIR)
+	$(CC) -std=c11 -Wall -Wextra -Werror -I. -o $@ scripts/tests/c/xfs_contract.c kernel/fs/xfs/xfs.c kernel/drivers/storage/storage.c kernel/core/sync/spinlock.c
 
-$(BTRFS_TEST): scripts/tests/c/btrfs_contract.c kernel/fs/btrfs/btrfs.c kernel/fs/btrfs/btrfs.h kernel/fs/btrfs/deflate.c kernel/fs/btrfs/deflate.h kernel/fs/btrfs/lzo.c kernel/fs/btrfs/lzo.h kernel/fs/btrfs/zstd.c kernel/fs/btrfs/zstd.h kernel/fs/btrfs/fse.c kernel/fs/btrfs/fse.h kernel/drivers/storage/storage.c kernel/drivers/storage/storage.h | $(TEST_DIR)
-	$(CC) -std=c11 -Wall -Wextra -Werror -I. -o $@ scripts/tests/c/btrfs_contract.c kernel/fs/btrfs/btrfs.c kernel/fs/btrfs/deflate.c kernel/fs/btrfs/lzo.c kernel/fs/btrfs/zstd.c kernel/fs/btrfs/fse.c kernel/drivers/storage/storage.c
+$(BTRFS_TEST): scripts/tests/c/btrfs_contract.c kernel/fs/btrfs/btrfs.c kernel/fs/btrfs/btrfs.h kernel/fs/btrfs/deflate.c kernel/fs/btrfs/deflate.h kernel/fs/btrfs/lzo.c kernel/fs/btrfs/lzo.h kernel/fs/btrfs/zstd.c kernel/fs/btrfs/zstd.h kernel/fs/btrfs/fse.c kernel/fs/btrfs/fse.h kernel/drivers/storage/storage.c kernel/drivers/storage/storage.h kernel/core/sync/spinlock.c kernel/core/sync/spinlock.h | $(TEST_DIR)
+	$(CC) -std=c11 -Wall -Wextra -Werror -I. -o $@ scripts/tests/c/btrfs_contract.c kernel/fs/btrfs/btrfs.c kernel/fs/btrfs/deflate.c kernel/fs/btrfs/lzo.c kernel/fs/btrfs/zstd.c kernel/fs/btrfs/fse.c kernel/drivers/storage/storage.c kernel/core/sync/spinlock.c
 
 $(DEFLATE_TEST): scripts/tests/c/deflate_contract.c kernel/fs/btrfs/deflate.c kernel/fs/btrfs/deflate.h | $(TEST_DIR)
 	$(CC) -std=c11 -Wall -Wextra -Werror -I. -o $@ scripts/tests/c/deflate_contract.c kernel/fs/btrfs/deflate.c

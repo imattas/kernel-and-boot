@@ -26,6 +26,7 @@ grep -F 'NVMe sector write I/O ready' "$log" >/dev/null
 grep -F 'NVMe interrupt delivery ready' "$log" >/dev/null
 grep -E 'e1000 driver ready controllers=0x[0-9a-fA-F]*[1-9a-fA-F]' "$log" >/dev/null
 grep -F 'e1000 network I/O ready' "$log" >/dev/null
+grep -F 'e1000 link ready' "$log" >/dev/null
 grep -F 'e1000 completion service ready' "$log" >/dev/null
 grep -F 'e1000 interrupt path ready' "$log" >/dev/null
 grep -F 'e1000 interrupt delivery ready' "$log" >/dev/null

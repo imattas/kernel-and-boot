@@ -418,6 +418,9 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     if (e1000_controller_count() != 0) serial_write("e1000 network I/O ready\r\n");
+    if (e1000_controller_count() != 0)
+        serial_write(e1000_link_up() ? "e1000 link ready\r\n" :
+                     "e1000 link down\r\n");
     if (e1000_controller_count() != 0) {
         (void)e1000_service();
         serial_write("e1000 completion service ready\r\n");

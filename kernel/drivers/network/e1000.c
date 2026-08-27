@@ -9,6 +9,7 @@
 #define E1000_BAR 0
 #define E1000_CTRL 0x0000
 #define E1000_STATUS 0x0008
+#define E1000_STATUS_LINK_UP (1U << 1)
 #define E1000_TCTL 0x0400
 #define E1000_TIPG 0x0410
 #define E1000_RCTL 0x0100
@@ -146,6 +147,9 @@ int e1000_initialize(void) {
     return device_driver_register(&e1000_driver) && device_bind_drivers();
 }
 uint32_t e1000_controller_count(void) { return controllers; }
+int e1000_link_up(void) {
+    return e1000_regs && (e1000_regs[E1000_STATUS / 4] & E1000_STATUS_LINK_UP) != 0;
+}
 int e1000_interrupt_enabled(void) { return e1000_msi_enabled; }
 uint32_t e1000_interrupt_count(void) { return e1000_interrupts; }
 void e1000_interrupt_handler(void) { ++e1000_interrupts; }

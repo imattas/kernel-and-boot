@@ -104,8 +104,11 @@ process_t *process_lookup_retain(uint64_t id) {
 void process_release(process_t *process) {
     if (!process) return;
     uint64_t flags = spinlock_lock_irqsave(&process_table_lock);
-    if (process->references != 0) --process->references;
-    int free_process = process->references == 0;
+    if (process->references == 0) {
+        spinlock_unlock_irqrestore(&process_table_lock, flags);
+        return;
+    }
+    int free_process = --process->references == 0;
     spinlock_unlock_irqrestore(&process_table_lock, flags);
     if (free_process) kfree(process);
 }

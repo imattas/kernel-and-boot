@@ -1125,6 +1125,9 @@ count non-success completions, with the boot storage gate asserting a clean
 completion-error count after its read/write coverage.
 NVMe submission queues and completion queues now use explicit x86 DMA
 write/read barriers around doorbells and ownership polling.
+NVMe admin command submission now retains a volatile hardware-owned command
+view through field writes, preventing compiler caching of queue entries before
+the submission doorbell.
 PCI bridge enumeration now walks each validated secondary-to-subordinate bus
 range with the existing cycle guard, instead of probing only the first child
 bus and silently missing devices behind deeper bridge topologies.

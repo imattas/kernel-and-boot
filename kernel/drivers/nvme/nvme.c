@@ -278,7 +278,7 @@ static int nvme_submit_admin_words(uint8_t opcode, uint32_t namespace_id,
     volatile nvme_command_t *sq = (volatile nvme_command_t *)(uintptr_t)active_asq;
     volatile nvme_completion_t *cq =
         (volatile nvme_completion_t *)(uintptr_t)active_acq;
-    nvme_command_t *command = (nvme_command_t *)&sq[active_sq_tail];
+    volatile nvme_command_t *command = &sq[active_sq_tail];
     for (uint32_t i = 0; i < sizeof(*command) / sizeof(uint32_t); ++i)
         ((volatile uint32_t *)command)[i] = 0;
     uint16_t command_id = active_command_id++;

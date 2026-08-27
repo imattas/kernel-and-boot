@@ -2678,6 +2678,9 @@ void kernel_main(void *boot_info) {
         process_thread_create_user(runtime_process, 3,
                                    runtime_process->user_stack_top,
                                    runtime_process->user_stack_top, 4096) ||
+        process_thread_create_user(runtime_process, 4,
+                                   runtime_process->image.entry,
+                                   1ULL << 48, 4096) ||
         !process_thread_destroy(user_context_probe)) {
         serial_write("user task context failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");

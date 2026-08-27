@@ -50,7 +50,7 @@ task_t *task_create_user(uint32_t id, struct process *process,
     if (!process || !space || kernel_stack_size < 4096 ||
         entry < (1ULL << 39) || entry >= (1ULL << 48) ||
         !address_space_page_executable(space, entry & ~0xfffULL) ||
-        user_stack <= (1ULL << 39) || user_stack > (1ULL << 48) ||
+        user_stack <= (1ULL << 39) || user_stack >= (1ULL << 48) ||
         !address_space_user_range_valid(space, user_stack - 1, 1, 1))
         return 0;
     task_t *task = (task_t *)kmalloc(sizeof(*task));

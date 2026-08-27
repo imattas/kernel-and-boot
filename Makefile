@@ -244,11 +244,12 @@ KERNEL_INPUT_OBJ := $(BUILD_DIR)/kernel/input.o
 KERNEL_PS2_OBJ := $(BUILD_DIR)/kernel/ps2.o
 KERNEL_FRAMEBUFFER_OBJ := $(BUILD_DIR)/kernel/framebuffer.o
 KERNEL_USB_OBJ := $(BUILD_DIR)/kernel/usb.o
+KERNEL_HID_OBJ := $(BUILD_DIR)/kernel/hid.o
 KERNEL_UHCI_OBJ := $(BUILD_DIR)/kernel/uhci.o
 KERNEL_AHCI_OBJ := $(BUILD_DIR)/kernel/ahci.o
 KERNEL_NVME_OBJ := $(BUILD_DIR)/kernel/nvme.o
 KERNEL_E1000_OBJ := $(BUILD_DIR)/kernel/e1000.o
-KERNEL_NVME_OBJ := $(KERNEL_NVME_OBJ) $(KERNEL_E1000_OBJ) $(KERNEL_EXFAT_VFS_OBJ) $(KERNEL_EXT4_OBJ) $(KERNEL_EXT4_VFS_OBJ) $(KERNEL_XFS_OBJ) $(KERNEL_XFS_VFS_OBJ) $(KERNEL_BTRFS_OBJ) $(KERNEL_BTRFS_DEFLATE_OBJ) $(KERNEL_BTRFS_LZO_OBJ) $(KERNEL_BTRFS_ZSTD_OBJ) $(KERNEL_BTRFS_FSE_OBJ) $(KERNEL_BTRFS_VFS_OBJ)
+KERNEL_NVME_OBJ := $(KERNEL_NVME_OBJ) $(KERNEL_E1000_OBJ) $(KERNEL_HID_OBJ) $(KERNEL_EXFAT_VFS_OBJ) $(KERNEL_EXT4_OBJ) $(KERNEL_EXT4_VFS_OBJ) $(KERNEL_XFS_OBJ) $(KERNEL_XFS_VFS_OBJ) $(KERNEL_BTRFS_OBJ) $(KERNEL_BTRFS_DEFLATE_OBJ) $(KERNEL_BTRFS_LZO_OBJ) $(KERNEL_BTRFS_ZSTD_OBJ) $(KERNEL_BTRFS_FSE_OBJ) $(KERNEL_BTRFS_VFS_OBJ)
 KERNEL_DEBUG_OBJ := $(BUILD_DIR)/kernel/debug_assert.o
 KERNEL_CLOCK_OBJ := $(BUILD_DIR)/kernel/clock.o
 
@@ -368,7 +369,11 @@ $(KERNEL_FRAMEBUFFER_OBJ): kernel/drivers/display/framebuffer.c kernel/drivers/d
 	$(CC) -target x86_64-pc-none-elf -std=c11 -ffreestanding -fno-builtin -fno-stack-protector -fPIE -fno-plt \
 		-mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@
 
-$(KERNEL_USB_OBJ): kernel/drivers/usb/usb.c kernel/drivers/usb/usb.h kernel/drivers/usb/hid.c kernel/drivers/usb/hid.h kernel/drivers/input/input.h | $(BUILD_DIR)/kernel
+$(KERNEL_USB_OBJ): kernel/drivers/usb/usb.c kernel/drivers/usb/usb.h | $(BUILD_DIR)/kernel
+	$(CC) -target x86_64-pc-none-elf -std=c11 -ffreestanding -fno-builtin -fno-stack-protector -fPIE -fno-plt \
+		-mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@
+
+$(KERNEL_HID_OBJ): kernel/drivers/usb/hid.c kernel/drivers/usb/hid.h kernel/drivers/input/input.h | $(BUILD_DIR)/kernel
 	$(CC) -target x86_64-pc-none-elf -std=c11 -ffreestanding -fno-builtin -fno-stack-protector -fPIE -fno-plt \
 		-mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@
 

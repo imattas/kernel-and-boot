@@ -1,5 +1,4 @@
 #include "usb.h"
-#include "hid.c"
 
 static uint16_t load16(const uint8_t *data) {
     return (uint16_t)data[0] | ((uint16_t)data[1] << 8);

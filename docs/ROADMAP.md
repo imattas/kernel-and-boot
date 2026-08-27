@@ -268,6 +268,8 @@ validate the setup transfer length, alternate data toggles, and verify every
 TD before releasing DMA frames.
 UHCI transfers now verify controller HALTED state before releasing transfer
 descriptors or data buffers after a stop/timeout path.
+USB HID decoding is now an independently compiled and linked driver component;
+the USB descriptor parser no longer embeds another source file.
 UHCI TD status handling now uses the controller’s low-speed and error-bit
 definitions; the QEMU gate performs a real USB keyboard device-descriptor
 control transfer and validates the returned descriptor.

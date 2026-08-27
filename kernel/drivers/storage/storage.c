@@ -16,8 +16,9 @@ static int same_name(const char *left, const char *right) {
 }
 
 int storage_register(const storage_device_t *device) {
-    if (!device || !device->name || !device->read || !device->write || device->block_size == 0 ||
-        device->block_count == 0)
+    if (!device || !device->name || !device->name[0] || !device->read ||
+        !device->write || device->block_size == 0 || device->block_count == 0 ||
+        device->block_count > UINT64_MAX / device->block_size)
         return 0;
     uint64_t flags = spinlock_lock_irqsave(&storage_lock);
     if (device_count >= STORAGE_DEVICE_CAPACITY) {

@@ -269,6 +269,9 @@ fits inside the published ABAR size before dereferencing its MMIO registers.
 The generic storage registry now serializes registration, enumeration, and
 backend dispatch, rejects duplicate device names, and has hosted contract-test
 build support without executing privileged interrupt-state instructions.
+Storage registration now rejects empty names and devices whose advertised
+capacity would overflow the 64-bit byte range, preserving a safe contract for
+all filesystem adapters and future DMA backends.
 The PS/2 keyboard backend now consumes Set-1 extended prefixes and emits
 distinct extended key codes while retaining make/break values.
 PS/2 initialization now validates the controller self-test and keyboard-port
@@ -430,6 +433,9 @@ binding layer.
 Driver registration now rejects empty names and unsupported bus identifiers,
 keeping the published driver table compatible with the device model’s actual
 binding domain.
+The exported PCI configuration accessors now reject invalid slot/function
+selectors and unaligned or out-of-range dword offsets before touching the
+configuration I/O ports.
 Device registration, driver registration, enumeration, and binding now use
 dedicated IRQ-safe synchronization, while probe callbacks do not hold the
 resource ownership lock.

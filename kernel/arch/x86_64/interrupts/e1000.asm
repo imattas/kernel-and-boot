@@ -3,6 +3,7 @@ bits 64
 global arch_pci_shared_irq_stub
 extern e1000_service
 extern e1000_interrupt_handler
+extern uhci_interrupt_handler
 extern arch_apic_eoi
 
 section .text
@@ -24,6 +25,7 @@ arch_pci_shared_irq_stub:
     push r15
     call e1000_interrupt_handler
     call e1000_service
+    call uhci_interrupt_handler
     call arch_apic_eoi
     pop r15
     pop r14

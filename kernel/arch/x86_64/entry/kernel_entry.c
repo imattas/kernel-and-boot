@@ -1361,6 +1361,13 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("block cache ready\r\n");
+    block_cache_invalidate_device(&block_cache, &block_registry, 0);
+    if (!block_cache_read(&block_cache, &block_registry, 0, 0,
+                          block_probe_data, sizeof(block_probe_data))) {
+        serial_write("block cache lifecycle failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("block cache lifecycle ready\r\n");
     uint8_t slab_storage[64] __attribute__((aligned(16)));
     uint8_t slab_used[2];
     slab_cache_t slab;

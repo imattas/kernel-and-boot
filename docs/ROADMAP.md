@@ -681,6 +681,8 @@ service when the FADT supplies a supported system-I/O GAS, and reports the
 capability absence without treating optional firmware support as a boot error.
 The VFS now has a common bounded filesystem probe dispatcher covering FAT32,
 exFAT, ext4, XFS, and Btrfs above the storage-device interface.
+The block cache now supports whole-device invalidation for storage lifecycle
+events and boot validates refetch after invalidation.
 UHCI and e1000 now use an explicit shared PCI interrupt dispatcher because
 legacy IRQ lines may be shared; each handler independently filters its device
 status before acknowledging its own controller.

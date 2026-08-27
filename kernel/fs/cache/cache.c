@@ -110,3 +110,16 @@ void block_cache_invalidate(block_cache_t *cache, block_registry_t *registry,
     if (entry) entry->valid = 0;
     spinlock_unlock_irqrestore(&cache->lock, flags);
 }
+
+void block_cache_invalidate_device(block_cache_t *cache,
+                                   block_registry_t *registry,
+                                   uint32_t device) {
+    if (!cache || !registry) return;
+    uint64_t flags = spinlock_lock_irqsave(&cache->lock);
+    for (uint32_t i = 0; i < BLOCK_CACHE_ENTRIES; ++i) {
+        block_cache_entry_t *entry = &cache->entries[i];
+        if (entry->valid && entry->registry == registry &&
+            entry->device == device) entry->valid = 0;
+    }
+    spinlock_unlock_irqrestore(&cache->lock, flags);
+}

@@ -32,5 +32,8 @@ int block_cache_write(block_cache_t *cache, block_registry_t *registry,
                       uint32_t size);
 void block_cache_invalidate(block_cache_t *cache, block_registry_t *registry,
                             uint32_t device, uint64_t sector);
+void block_cache_invalidate_device(block_cache_t *cache,
+                                   block_registry_t *registry,
+                                   uint32_t device);
 
 #endif

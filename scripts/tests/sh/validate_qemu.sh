@@ -52,6 +52,7 @@ grep -F 'devfs ready' "$log" >/dev/null
 grep -F 'procfs ready' "$log" >/dev/null
 grep -F 'block interface ready' "$log" >/dev/null
 grep -F 'block cache ready' "$log" >/dev/null
+grep -F 'block cache lifecycle ready' "$log" >/dev/null
 grep -F 'slab cache ready' "$log" >/dev/null
 grep -F 'input event queue ready' "$log" >/dev/null
 grep -F 'PS2 keyboard ready' "$log" >/dev/null

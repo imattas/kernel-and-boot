@@ -83,3 +83,15 @@ int storage_write(uint32_t device, uint64_t lba, uint32_t count,
     if (write_context) return write_context(lba, count, buffer, context);
     return write(lba, count, buffer);
 }
+
+int storage_flush(uint32_t device) {
+    uint64_t flags = spinlock_lock_irqsave(&storage_lock);
+    if (device >= device_count || !devices[device].flush) {
+        spinlock_unlock_irqrestore(&storage_lock, flags);
+        return 0;
+    }
+    storage_flush_fn flush = devices[device].flush;
+    void *context = devices[device].context;
+    spinlock_unlock_irqrestore(&storage_lock, flags);
+    return flush(context);
+}

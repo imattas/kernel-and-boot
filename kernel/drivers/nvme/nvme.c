@@ -590,6 +590,11 @@ int nvme_write_sectors(uint64_t lba, uint32_t count, const void *buffer) {
     return nvme_io_range(lba, (void *)buffer, count, 1) && nvme_flush();
 }
 
+int nvme_flush_device(void *context) {
+    (void)context;
+    return nvme_flush();
+}
+
 uint32_t nvme_last_io_page_count(void) { return nvme_last_io_pages; }
 
 int nvme_initialize(void) {

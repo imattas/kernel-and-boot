@@ -1860,7 +1860,8 @@ void kernel_main(void *boot_info) {
         storage_device_t nvme_storage = {
             .name = "nvme0", .block_size = 512,
             .block_count = nvme_namespace_sectors,
-            .read = nvme_read_sectors, .write = nvme_write_sectors
+            .read = nvme_read_sectors, .write = nvme_write_sectors,
+            .flush = nvme_flush_device
         };
         if (!storage_register(&nvme_storage)) {
             serial_write("NVMe storage registration failure\r\n");

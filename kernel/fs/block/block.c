@@ -80,3 +80,13 @@ int block_registry_write(block_registry_t *registry, uint32_t index,
     spinlock_unlock_irqrestore(&registry->lock, flags);
     return write ? write(context, sector, count, buffer) : 0;
 }
+
+int block_registry_flush(block_registry_t *registry, uint32_t index) {
+    if (!registry || index >= BLOCK_MAX_DEVICES) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&registry->lock);
+    block_device_t *device = &registry->devices[index];
+    block_flush_fn flush = device->registered ? device->flush : 0;
+    void *context = device->registered ? device->context : 0;
+    spinlock_unlock_irqrestore(&registry->lock, flags);
+    return flush ? flush(context) : 0;
+}

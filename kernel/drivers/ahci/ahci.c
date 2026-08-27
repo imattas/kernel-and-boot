@@ -670,6 +670,18 @@ static int ahci_storage_write_context(uint64_t lba, uint32_t count,
     return result;
 }
 
+static int ahci_storage_flush_context(void *context) {
+    uint32_t port = (uint32_t)(uintptr_t)context;
+    uint64_t flags = spinlock_lock_irqsave(&ahci_lock);
+    int result = port < 32 && port_state[port].identified;
+    if (result) {
+        ahci_select_port_locked(port);
+        result = ahci_flush_locked();
+    }
+    spinlock_unlock_irqrestore(&ahci_lock, flags);
+    return result;
+}
+
 int ahci_register_storage_devices(void) {
     uint64_t flags = spinlock_lock_irqsave(&ahci_lock);
     if (ahci_storage_registered) {
@@ -697,7 +709,8 @@ int ahci_register_storage_devices(void) {
             .block_count = port_state[port].sector_count,
             .context = (void *)(uintptr_t)port,
             .read_context = ahci_storage_read_context,
-            .write_context = ahci_storage_write_context
+            .write_context = ahci_storage_write_context,
+            .flush = ahci_storage_flush_context
         };
         if (!storage_register(&device)) {
             /* The storage registry has no rollback operation.  Freeze the

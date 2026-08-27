@@ -35,7 +35,7 @@ int main(void) {
     p32(&bno[0], 0x58414254U); p32(&bno[4], 0); p32(&bno[8], 1);
     p32(&bno[16], 10); p32(&bno[20], 3);
     storage_initialize();
-    storage_device_t device = {"xfs-alloc", 512, 128, rd, wr, 0, 0, 0};
+    storage_device_t device = {"xfs-alloc", 512, 128, rd, wr, 0, 0, 0, 0};
     assert(storage_register(&device));
     xfs_fs_t fs;
     assert(xfs_mount(&fs, 0));

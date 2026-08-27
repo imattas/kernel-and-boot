@@ -10,6 +10,7 @@ typedef int (*block_read_fn)(void *context, uint64_t sector,
                              uint32_t count, void *buffer);
 typedef int (*block_write_fn)(void *context, uint64_t sector,
                               uint32_t count, const void *buffer);
+typedef int (*block_flush_fn)(void *context);
 
 typedef struct {
     char name[32];
@@ -18,6 +19,7 @@ typedef struct {
     void *context;
     block_read_fn read;
     block_write_fn write;
+    block_flush_fn flush;
     uint8_t registered;
 } block_device_t;
 
@@ -34,5 +36,6 @@ int block_registry_read(block_registry_t *registry, uint32_t index,
                         uint64_t sector, uint32_t count, void *buffer);
 int block_registry_write(block_registry_t *registry, uint32_t index,
                          uint64_t sector, uint32_t count, const void *buffer);
+int block_registry_flush(block_registry_t *registry, uint32_t index);
 
 #endif

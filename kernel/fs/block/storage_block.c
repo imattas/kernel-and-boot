@@ -14,6 +14,11 @@ static int storage_block_write(void *opaque, uint64_t sector, uint32_t count,
                                     buffer);
 }
 
+static int storage_block_flush(void *opaque) {
+    storage_block_context_t *context = (storage_block_context_t *)opaque;
+    return context && storage_flush(context->storage_device);
+}
+
 int storage_block_bind(block_device_t *block, storage_block_context_t *context,
                        const char *name, uint32_t storage_device) {
     if (!block || !context || !name || !name[0]) return 0;
@@ -30,6 +35,7 @@ int storage_block_bind(block_device_t *block, storage_block_context_t *context,
     block->context = context;
     block->read = storage_block_read;
     block->write = storage_block_write;
+    block->flush = source->flush ? storage_block_flush : 0;
     block->registered = 0;
     return 1;
 }

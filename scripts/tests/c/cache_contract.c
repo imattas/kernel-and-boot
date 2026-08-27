@@ -6,6 +6,7 @@
 static uint8_t disk[32U * 512U];
 static uint32_t reads;
 static uint32_t writes;
+static uint32_t flushes;
 
 static int disk_read(void *context, uint64_t sector, uint32_t count,
                      void *buffer) {
@@ -25,12 +26,18 @@ static int disk_write(void *context, uint64_t sector, uint32_t count,
     return 1;
 }
 
+static int disk_flush(void *context) {
+    (void)context;
+    ++flushes;
+    return 1;
+}
+
 int main(void) {
     block_registry_t registry;
     block_cache_t cache;
     block_device_t device = {
         .name = "ram-cache", .sector_count = 32, .sector_size = 512,
-        .read = disk_read, .write = disk_write
+        .read = disk_read, .write = disk_write, .flush = disk_flush
     };
     uint8_t buffer[512];
     uint8_t value[512];
@@ -38,6 +45,7 @@ int main(void) {
     memset(value, 0x5a, sizeof(value));
     block_registry_initialize(&registry);
     assert(block_registry_register(&registry, &device));
+    assert(block_registry_flush(&registry, 0) && flushes == 1);
     block_cache_initialize(&cache);
 
     assert(block_cache_read(&cache, &registry, 0, 0, buffer, sizeof(buffer)));

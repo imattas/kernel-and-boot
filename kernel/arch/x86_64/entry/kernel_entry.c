@@ -2737,6 +2737,7 @@ void kernel_main(void *boot_info) {
             serial_write("e1000 interrupt delivery failure\r\n");
             for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
         }
+        (void)e1000_service();
         if (e1000_tx_error_count() != 0 || e1000_rx_error_count() != 0) {
             serial_write("e1000 completion error failure\r\n");
             for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");

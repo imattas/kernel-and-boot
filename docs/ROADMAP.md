@@ -680,6 +680,9 @@ and reclaims this context without starting ring 3.
 Process-thread creation now owns that user context directly, requires a READY
 process, and exercises invalid-entry rejection plus teardown through the normal
 process-thread lifetime path.
+User-task bootstrap contexts now retain their owning process and activate that
+process before the deferred privilege transition, ensuring future ring-3
+syscalls observe the correct process namespace and descriptor table.
 Processes now expose an exit wait primitive: waiters block on a dedicated
 queue, termination publishes the exit status and wakes them, and destruction
 refuses to reclaim a process while exit waiters remain.

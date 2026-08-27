@@ -2,12 +2,15 @@
 #include "../../mm/heap/heap.h"
 #include "../../mm/virtual/address_space.h"
 #include "../../sched/core/scheduler.h"
+#include "../process/process.h"
 
 extern void arch_enter_user(uint64_t entry, uint64_t user_stack);
 
 __attribute__((noreturn)) void arch_user_task_start(
-    const struct address_space *space, uint64_t entry, uint64_t user_stack) {
-    if (!address_space_activate(space))
+    struct process *process, const struct address_space *space,
+    uint64_t entry, uint64_t user_stack) {
+    (void)space;
+    if (!process_activate(process))
         scheduler_task_exit();
     arch_enter_user(entry, user_stack);
     scheduler_task_exit();
@@ -40,10 +43,11 @@ task_t *task_create_kernel(uint32_t id, void (*entry)(void *), void *argument,
     return task;
 }
 
-task_t *task_create_user(uint32_t id, const struct address_space *space,
+task_t *task_create_user(uint32_t id, struct process *process,
+                         const struct address_space *space,
                          uint64_t entry, uint64_t user_stack,
                          uint64_t kernel_stack_size) {
-    if (!space || kernel_stack_size < 4096 ||
+    if (!process || !space || kernel_stack_size < 4096 ||
         entry < (1ULL << 39) || entry >= (1ULL << 48) ||
         !address_space_page_executable(space, entry & ~0xfffULL) ||
         user_stack <= (1ULL << 39) || user_stack > (1ULL << 48) ||
@@ -61,7 +65,7 @@ task_t *task_create_user(uint32_t id, const struct address_space *space,
     task->stack_size = kernel_stack_size;
     task_context_initialize_user(&task->context,
                                  (uint8_t *)stack + kernel_stack_size,
-                                 space, entry, user_stack);
+                                 process, space, entry, user_stack);
     return task;
 }
 

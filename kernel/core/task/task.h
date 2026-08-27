@@ -6,6 +6,7 @@
 #include "wait_queue.h"
 
 struct address_space;
+struct process;
 
 typedef struct task {
     uint32_t id;
@@ -19,7 +20,8 @@ typedef struct task {
 void task_initialize(task_t *task, uint32_t id);
 task_t *task_create_kernel(uint32_t id, void (*entry)(void *), void *argument,
                            uint64_t stack_size);
-task_t *task_create_user(uint32_t id, const struct address_space *space,
+task_t *task_create_user(uint32_t id, struct process *process,
+                          const struct address_space *space,
                           uint64_t entry, uint64_t user_stack,
                           uint64_t kernel_stack_size);
 int task_destroy_kernel(task_t *task);

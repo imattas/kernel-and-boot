@@ -40,4 +40,5 @@ arch_user_task_bootstrap:
     mov rdi, r12
     mov rsi, r13
     mov rdx, r14
+    mov rcx, r15
     jmp arch_user_task_start

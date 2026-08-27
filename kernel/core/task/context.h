@@ -17,7 +17,8 @@ typedef struct {
 void task_context_initialize(task_context_t *context, void *stack_top,
                              void (*entry)(void *), void *argument);
 void task_context_initialize_user(task_context_t *context, void *stack_top,
-                                  const void *address_space, uint64_t entry,
+                                  const void *process, const void *address_space,
+                                  uint64_t entry,
                                   uint64_t user_stack);
 void task_context_switch(task_context_t *from, task_context_t *to);
 

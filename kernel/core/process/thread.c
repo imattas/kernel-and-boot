@@ -56,7 +56,7 @@ process_thread_t *process_thread_create_user(struct process *process, uint32_t i
         spinlock_unlock_irqrestore(&process->lock, flags);
         return 0;
     }
-    thread->task = task_create_user(id, &process->address_space, entry,
+    thread->task = task_create_user(id, process, &process->address_space, entry,
                                     user_stack, kernel_stack_size);
     if (!thread->task) {
         kfree(thread);

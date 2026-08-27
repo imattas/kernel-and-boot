@@ -2,6 +2,7 @@
 #include "../../device/device.h"
 #include "../pci/pci.h"
 #include "../../mm/physical/frame.h"
+#include "../../core/sync/spinlock.h"
 
 #define E1000_BAR 0
 #define E1000_CTRL 0x0000
@@ -51,6 +52,7 @@ static uint32_t e1000_tx_index;
 static uint32_t e1000_tx_reclaim_index;
 static uint32_t e1000_tx_pending;
 static uint32_t e1000_rx_index;
+static spinlock_t e1000_lock;
 
 static int e1000_match(const device_t *device) {
     return device && device->bus == DEVICE_BUS_PCI && device->class_code == 0x02 &&
@@ -119,6 +121,7 @@ fail:
 int e1000_initialize(void) {
     controllers = 0; e1000_regs = 0; e1000_tx_ring = 0; e1000_rx_ring = 0;
     e1000_tx_pending = 0;
+    spinlock_init(&e1000_lock);
     for (uint32_t i = 0; i < E1000_RING_COUNT; ++i) {
         e1000_rx_buffers[i] = 0;
         e1000_tx_buffers[i] = 0;
@@ -132,9 +135,13 @@ uint32_t e1000_controller_count(void) { return controllers; }
 int e1000_transmit(const void *data, uint16_t length) {
     if (!e1000_regs || !e1000_tx_ring || !data || length == 0 || length > 2048)
         return 0;
+    uint64_t flags = spinlock_lock_irqsave(&e1000_lock);
     e1000_tx_desc_t *descriptor = &e1000_tx_ring[e1000_tx_index];
     if (e1000_tx_pending == E1000_RING_COUNT ||
-        (descriptor->status & E1000_DESC_DONE) == 0) return 0;
+        (descriptor->status & E1000_DESC_DONE) == 0) {
+        spinlock_unlock_irqrestore(&e1000_lock, flags);
+        return 0;
+    }
     uint8_t *destination = (uint8_t *)(uintptr_t)e1000_tx_buffers[e1000_tx_index];
     const uint8_t *source = (const uint8_t *)data;
     for (uint16_t i = 0; i < length; ++i) destination[i] = source[i];
@@ -144,11 +151,13 @@ int e1000_transmit(const void *data, uint16_t length) {
     e1000_tx_index = (e1000_tx_index + 1U) % E1000_RING_COUNT;
     ++e1000_tx_pending;
     e1000_regs[E1000_TDT / 4] = e1000_tx_index;
+    spinlock_unlock_irqrestore(&e1000_lock, flags);
     return 1;
 }
 
 uint32_t e1000_service(void) {
     if (!e1000_regs || !e1000_tx_ring) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&e1000_lock);
     uint32_t causes = e1000_regs[E1000_ICR / 4];
     while (e1000_tx_pending != 0 &&
            (e1000_tx_ring[e1000_tx_reclaim_index].status & E1000_DESC_DONE) != 0) {
@@ -156,19 +165,25 @@ uint32_t e1000_service(void) {
             (e1000_tx_reclaim_index + 1U) % E1000_RING_COUNT;
         --e1000_tx_pending;
     }
+    spinlock_unlock_irqrestore(&e1000_lock, flags);
     return causes;
 }
 
 int e1000_receive(void *data, uint16_t capacity, uint16_t *length) {
     if (!e1000_regs || !e1000_rx_ring || !data || !length || capacity == 0)
         return 0;
+    uint64_t flags = spinlock_lock_irqsave(&e1000_lock);
     e1000_rx_desc_t *descriptor = &e1000_rx_ring[e1000_rx_index];
-    if ((descriptor->status & E1000_DESC_DONE) == 0) return 0;
+    if ((descriptor->status & E1000_DESC_DONE) == 0) {
+        spinlock_unlock_irqrestore(&e1000_lock, flags);
+        return 0;
+    }
     if ((descriptor->status & E1000_DESC_EOP) == 0 || descriptor->errors != 0) {
         descriptor->status = 0;
         descriptor->errors = 0;
         e1000_rx_index = (e1000_rx_index + 1U) % E1000_RING_COUNT;
         e1000_regs[E1000_RDT / 4] = (e1000_rx_index + E1000_RING_COUNT - 1U) % E1000_RING_COUNT;
+        spinlock_unlock_irqrestore(&e1000_lock, flags);
         return 0;
     }
     uint16_t count = descriptor->length < capacity ? descriptor->length : capacity;
@@ -178,5 +193,6 @@ int e1000_receive(void *data, uint16_t capacity, uint16_t *length) {
     descriptor->status = 0; *length = count;
     e1000_rx_index = (e1000_rx_index + 1U) % E1000_RING_COUNT;
     e1000_regs[E1000_RDT / 4] = (e1000_rx_index + E1000_RING_COUNT - 1U) % E1000_RING_COUNT;
+    spinlock_unlock_irqrestore(&e1000_lock, flags);
     return 1;
 }

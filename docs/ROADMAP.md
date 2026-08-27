@@ -257,7 +257,9 @@ so its controller path and bounded TX/RX descriptor operations can be exercised;
 the boot probe submits a real test frame to the TX ring.
 The e1000 path now has independent build/link ownership, enables bounded
 RX/TX completion causes, and exposes a polling service that acknowledges
-causes and reclaims completed TX entries.
+causes and reclaims completed TX entries. TX/RX ring state is serialized with
+an interrupt-safe driver lock so polling and future interrupt delivery cannot
+race descriptor ownership.
 UHCI control transfers now build a bounded multi-packet endpoint-0 TD chain,
 validate the setup transfer length, alternate data toggles, and verify every
 TD before releasing DMA frames.

@@ -321,6 +321,9 @@ AHCI command timeouts now stop and restart the port engine with bounded CR/FR
 quiescence and error-state clearing before DMA buffers are released.
 The identified AHCI disk is now registered with the generic storage layer;
 the FAT32 and VFS probes therefore exercise the AHCI-backed storage device.
+ATA PIO writes now issue and await the appropriate LBA48 or legacy FLUSH CACHE
+command before reporting success, matching the durability contract of the DMA
+storage backends.
 AHCI probe binding now requires a link-ready SATA port with the supported device
 signature, and releases the BAR instead of exposing an unusable controller.
 AHCI probe validation now rejects I/O BARs before treating the ABAR as MMIO.

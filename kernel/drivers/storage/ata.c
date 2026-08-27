@@ -121,7 +121,9 @@ static int ata_write_locked(uint64_t lba, uint32_t count, const void *buffer) {
                   ((uint16_t)input[sector * 512 + word * 2 + 1] << 8));
         if (!wait_status(0x80, 0)) return 0;
     }
-    return 1;
+    /* Do not report completion until the device has committed its write cache. */
+    out8(io_base + 7, lba48_supported ? 0xea : 0xe7);
+    return wait_status(0x80, 0);
 }
 
 static int ata_read(uint64_t lba, uint32_t count, void *buffer) {

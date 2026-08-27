@@ -247,3 +247,55 @@ int exfat_read_file_in_directory(exfat_fs_t *fs, uint32_t directory_cluster,
     return exfat_read_file_cluster(fs, cluster, file_size, no_fat_chain,
                                    offset, buffer, size);
 }
+
+int exfat_write_file(exfat_fs_t *fs, const char *name, uint64_t offset,
+                     const void *buffer, uint32_t size) {
+    uint32_t cluster = 0;
+    uint64_t file_size = 0;
+    uint8_t no_fat_chain = 0;
+    if (!exfat_lookup(fs, name, &cluster, &file_size, &no_fat_chain) ||
+        !buffer || size == 0 || offset > file_size ||
+        (uint64_t)size > file_size - offset || !cluster_valid(fs, cluster))
+        return 0;
+    uint32_t cluster_bytes = fs->sectors_per_cluster * EXFAT_SECTOR_SIZE;
+    uint64_t cluster_index = offset / cluster_bytes;
+    uint32_t in_cluster = (uint32_t)(offset % cluster_bytes);
+    for (uint64_t i = 0; i < cluster_index; ++i) {
+        uint32_t next = 0;
+        if (no_fat_chain) {
+            if (cluster == UINT32_MAX) return 0;
+            next = cluster + 1U;
+        } else if (!fat_next(fs, cluster, &next)) return 0;
+        if (!cluster_valid(fs, next)) return 0;
+        cluster = next;
+    }
+    const uint8_t *source = (const uint8_t *)buffer;
+    uint8_t sector_data[EXFAT_SECTOR_SIZE];
+    uint32_t remaining = size;
+    while (remaining != 0) {
+        uint64_t sector = fs->heap_start +
+            (uint64_t)(cluster - 2U) * fs->sectors_per_cluster +
+            in_cluster / EXFAT_SECTOR_SIZE;
+        uint32_t in_sector = in_cluster % EXFAT_SECTOR_SIZE;
+        uint32_t chunk = EXFAT_SECTOR_SIZE - in_sector;
+        if (chunk > remaining) chunk = remaining;
+        if (!read_sector(fs, sector, sector_data)) return 0;
+        for (uint32_t i = 0; i < chunk; ++i)
+            sector_data[in_sector + i] = source[i];
+        if (!storage_write(fs->device, sector, 1, sector_data)) return 0;
+        source += chunk;
+        remaining -= chunk;
+        in_cluster += chunk;
+        if (remaining != 0 && in_cluster == cluster_bytes) {
+            uint32_t next = 0;
+            if (no_fat_chain) {
+                if (cluster == UINT32_MAX) return 0;
+                next = cluster + 1U;
+            } else if (!fat_next(fs, cluster, &next)) return 0;
+            if (!cluster_valid(fs, next)) return 0;
+            cluster = next;
+            in_cluster = 0;
+        }
+    }
+    return 1;
+}

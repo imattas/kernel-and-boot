@@ -26,5 +26,7 @@ int exfat_read_file(exfat_fs_t *fs, const char *name, uint64_t offset,
 int exfat_read_file_in_directory(exfat_fs_t *fs, uint32_t directory_cluster,
                                  const char *name, uint64_t offset,
                                  void *buffer, uint32_t size);
+int exfat_write_file(exfat_fs_t *fs, const char *name, uint64_t offset,
+                     const void *buffer, uint32_t size);
 
 #endif

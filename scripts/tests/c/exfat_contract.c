@@ -44,6 +44,11 @@ int main(void) {
     exfat_fs_t fs; assert(exfat_mount(&fs, 0)); uint32_t cluster = 0; uint64_t size = 0; uint8_t no_fat = 0;
     assert(exfat_lookup(&fs, "hello.txt", &cluster, &size, &no_fat)); assert(cluster == 3 && size == 5 && no_fat);
     char output[6] = {0}; assert(exfat_read_file(&fs, "HELLO.TXT", 0, output, 5)); assert(memcmp(output, "hello", 5) == 0);
+    assert(exfat_write_file(&fs, "HELLO.TXT", 1, "i", 1));
+    memset(output, 0, sizeof(output));
+    assert(exfat_read_file(&fs, "HELLO.TXT", 0, output, 5));
+    assert(memcmp(output, "hillo", 5) == 0);
+    assert(exfat_write_file(&fs, "HELLO.TXT", 1, "e", 1));
     root[96] = 0x85; root[97] = 2; root[128] = 0xc0; root[129] = 2; root[131] = 3; put32(&root[148], 4); put64(&root[152], 0);
     root[160] = 0xc1; put16(&root[162], 'D'); put16(&root[164], 'I'); put16(&root[166], 'R');
     uint8_t *subdir = &image[27 * 512]; subdir[0] = 0x85; subdir[1] = 2;

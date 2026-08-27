@@ -11,6 +11,15 @@ static int exfat_vfs_read(vfs_node_t *node, uint64_t offset,
     return exfat_read_file(file->fs, file->name, offset, buffer, size) ? (int)size : 0;
 }
 
+static int exfat_vfs_write(vfs_node_t *node, uint64_t offset,
+                           const void *buffer, uint32_t size) {
+    exfat_vfs_file_t *file = node ? (exfat_vfs_file_t *)node->private_data : 0;
+    if (!file || offset > file->size || (uint64_t)size > file->size - offset)
+        return 0;
+    return exfat_write_file(file->fs, file->name, offset, buffer, size) ?
+           (int)size : 0;
+}
+
 int exfat_vfs_attach_file(exfat_fs_t *fs, vfs_node_t *root,
                           const char *filesystem_name, const char *name) {
     if (!fs || !fs->mounted || !root || root->type != VFS_NODE_DIRECTORY ||
@@ -26,8 +35,9 @@ int exfat_vfs_attach_file(exfat_fs_t *fs, vfs_node_t *root,
         file->name[i] = filesystem_name[i];
     if (filesystem_name[i] || name[0] == 0) { kfree(file); return 0; }
     file->name[i] = 0;
-    vfs_node_t *node = vfs_node_create(name, VFS_NODE_REGULAR, 0, 0, 0444);
+    vfs_node_t *node = vfs_node_create(name, VFS_NODE_REGULAR, 0, 0, 0644);
     if (!node || !vfs_node_set_read(node, exfat_vfs_read, file) ||
+        !vfs_node_set_write(node, exfat_vfs_write, file) ||
         !vfs_node_set_private_destructor(node, exfat_vfs_destroy) ||
         !vfs_node_add_child(root, node)) {
         if (node) {

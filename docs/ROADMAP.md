@@ -926,7 +926,7 @@ evidence, but individual milestone evidence does not by itself pass this gate.
 ## Filesystem milestone before drivers
 
 FAT32 and exFAT have filesystem parsers and VFS file adapters. ExFAT remains
-read-only, while FAT32 supports bounded in-place writes to existing file
+bounded-write capable for existing file extents, while FAT32 supports bounded in-place writes to existing file
 extents, including sector and cluster crossings, through its VFS adapter;
 FAT32 append growth now allocates free clusters, mirrors FAT updates, updates
 the directory size/first-cluster fields, and rolls back new chain state when
@@ -950,6 +950,11 @@ FAT32 FAT-cache and cluster-chain traversal now use a per-filesystem IRQ-safe
 lock, preventing concurrent readers from mixing cached FAT sectors.
 ExFAT mount validation now rejects invalid shift fields before evaluation and
 requires the FAT region to contain entries for every declared cluster.
+ExFAT VFS regular files now support bounded sector read-modify-write updates
+within existing contiguous or FAT-linked extents; allocation, append, and
+truncate remain separate metadata operations.
+The exFAT contract now exercises an actual write followed by a readback on the
+synthetic filesystem image.
 ExFAT lookup now accepts zero-length regular files, including files with no
 allocated data cluster, and the contract covers this case.
 validates the primary and backup boot-region checksums, supports bounded

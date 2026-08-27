@@ -460,6 +460,36 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
                              (uint64_t)(uint32_t)result : 0) :
                    OS_SYSCALL_ERROR;
         }
+        case OS_SYSCALL_RENAME: {
+            process_t *process = process_current();
+            uint32_t old_length = (uint32_t)arg3;
+            uint32_t new_length = (uint32_t)(arg3 >> 32);
+            if (!process || old_length == 0 || old_length > OS_SYSCALL_MAX_PATH ||
+                new_length == 0 || new_length > OS_SYSCALL_MAX_PATH)
+                return OS_SYSCALL_ERROR;
+            char old_path[OS_SYSCALL_MAX_PATH + 1];
+            char new_path[OS_SYSCALL_MAX_PATH + 1];
+            char old_leaf[32], new_leaf[32];
+            security_context_t old_security, new_security;
+            if (!syscall_copy_from_user(old_path, arg1, old_length) ||
+                !syscall_copy_from_user(new_path, arg2, new_length))
+                return OS_SYSCALL_ERROR;
+            old_path[old_length] = '\0'; new_path[new_length] = '\0';
+            vfs_node_t *old_parent = syscall_parent(process, old_path, old_length,
+                                                     old_leaf, &old_security);
+            vfs_node_t *new_parent = syscall_parent(process, new_path, new_length,
+                                                     new_leaf, &new_security);
+            if (!old_parent || !new_parent || old_parent != new_parent) {
+                if (new_parent) vfs_node_release(new_parent);
+                if (old_parent) vfs_node_release(old_parent);
+                return OS_SYSCALL_ERROR;
+            }
+            vfs_node_t *child = vfs_node_lookup(old_parent, old_leaf);
+            int result = child && vfs_node_rename(old_parent, child, new_leaf);
+            if (child) vfs_node_release(child);
+            vfs_node_release(new_parent); vfs_node_release(old_parent);
+            return result ? 0 : OS_SYSCALL_ERROR;
+        }
         case OS_SYSCALL_SIGNAL_NEXT: {
             uint32_t signal = 0;
             if (!user_range(arg1, sizeof(signal), 1) ||

@@ -56,6 +56,7 @@ int vfs_node_access(const vfs_node_t *node,
 void vfs_node_retain(vfs_node_t *node);
 void vfs_node_release(vfs_node_t *node);
 int vfs_node_remove(vfs_node_t *parent, vfs_node_t *child);
+int vfs_node_rename(vfs_node_t *parent, vfs_node_t *child, const char *name);
 int vfs_node_set_read(vfs_node_t *node, vfs_read_fn read, void *private_data);
 int vfs_node_set_write(vfs_node_t *node, vfs_write_fn write, void *private_data);
 int vfs_node_set_truncate(vfs_node_t *node, vfs_truncate_fn truncate);

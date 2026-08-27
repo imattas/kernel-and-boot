@@ -406,3 +406,33 @@ int vfs_node_remove(vfs_node_t *parent, vfs_node_t *child) {
     try_destroy(parent);
     return 1;
 }
+
+int vfs_node_rename(vfs_node_t *parent, vfs_node_t *child, const char *name) {
+    if (!parent || !child || !name || parent == child ||
+        parent->type != VFS_NODE_DIRECTORY) return 0;
+    uint32_t length = string_length(name);
+    if (length == 0 || length >= sizeof(child->name) ||
+        (length == 1 && name[0] == '.') ||
+        (length == 2 && name[0] == '.' && name[1] == '.')) return 0;
+    int parent_first = (uintptr_t)parent < (uintptr_t)child;
+    vfs_node_t *first = parent_first ? parent : child;
+    vfs_node_t *second = parent_first ? child : parent;
+    uint64_t first_flags = spinlock_lock_irqsave(&first->lock);
+    uint64_t second_flags = spinlock_lock_irqsave(&second->lock);
+    if (child->parent != parent || child->destroying || child->references == 0) {
+        spinlock_unlock_irqrestore(&second->lock, second_flags);
+        spinlock_unlock_irqrestore(&first->lock, first_flags);
+        return 0;
+    }
+    for (vfs_node_t *existing = parent->first_child; existing;
+         existing = existing->next_sibling)
+        if (existing != child && string_equal(existing->name, name)) {
+            spinlock_unlock_irqrestore(&second->lock, second_flags);
+            spinlock_unlock_irqrestore(&first->lock, first_flags);
+            return 0;
+        }
+    for (uint32_t i = 0; i <= length; ++i) child->name[i] = name[i];
+    spinlock_unlock_irqrestore(&second->lock, second_flags);
+    spinlock_unlock_irqrestore(&first->lock, first_flags);
+    return 1;
+}

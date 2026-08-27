@@ -290,6 +290,9 @@ against the calling process credentials, including directory search permission.
 The ABI now provides permission-checked `create`, `mkdir`, and `unlink`
 operations with safe parent-path resolution; the QEMU syscall probe exercises
 creation, descriptor closure, directory creation, and removal.
+The ABI now also provides same-directory `rename` with packed dual-path length
+validation, parent permission checks, and duplicate-name rejection; the QEMU
+probe covers rename before removal.
 Access-aware VFS path traversal now requires search permission on every
 directory crossed, preventing inaccessible parent directories from being used
 as a path-resolution side channel.

@@ -17,6 +17,7 @@
 #include "../../../fs/vfs/vfs.h"
 #include "../../../fs/vfs/mount.h"
 #include "../../../fs/block/block.h"
+#include "../../../fs/block/storage_block.h"
 #include "../../../fs/cache/cache.h"
 #include "../../../fs/devfs/devfs.h"
 #include "../../../fs/procfs/procfs.h"
@@ -1310,6 +1311,22 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("block interface ready\r\n");
+    block_registry_t storage_block_registry;
+    block_device_t storage_block = {0};
+    storage_block_context_t storage_block_context = {0};
+    uint8_t storage_block_probe[512];
+    block_registry_initialize(&storage_block_registry);
+    if (!storage_block_bind(&storage_block, &storage_block_context, "disk0", 0) ||
+        !block_registry_register(&storage_block_registry, &storage_block) ||
+        !block_registry_read(&storage_block_registry, 0, 0, 1,
+                             storage_block_probe) ||
+        storage_block_probe[82] != 'F' || storage_block_probe[83] != 'A' ||
+        storage_block_probe[84] != 'T' || storage_block_probe[85] != '3' ||
+        storage_block_probe[86] != '2') {
+        serial_write("storage block adapter failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("storage block adapter ready\r\n");
     block_cache_t block_cache;
     uint8_t cache_data[16];
     block_cache_initialize(&block_cache);

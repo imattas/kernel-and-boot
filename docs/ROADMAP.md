@@ -670,6 +670,8 @@ USB HID boot-mouse reports now decode into validated button, X-axis, and
 Y-axis input events.
 The network service now drains bounded NIC input, learns validated ARP
 senders, and transmits ARP and ICMP echo replies through the adapter boundary.
+The generic block layer now has a storage-backed adapter, with boot-time
+verification reading the FAT32 image through the registered storage device.
 
 ## Phase 10 — Userland begins after the kernel gate
 

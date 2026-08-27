@@ -1056,6 +1056,9 @@ file-size-changing metadata operations remain separate.
 Ext4 extent-root regular files now support bounded growth through the existing
 block allocator, extending contiguous records or appending validated leaf
 records, with zero-filled newly allocated blocks.
+Ext4 extent-root truncation now bounds and releases detached leaf blocks,
+removes empty extent records, and zeroes the retained partial block before
+persisting the reduced inode size.
 Ext4 now supports bounded nonzero shrink/truncation by persistently updating
 the inode low/high size fields, with the VFS adapter synchronizing its cached
 file size and the contract verifying the on-disk result.

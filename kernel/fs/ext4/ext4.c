@@ -22,6 +22,10 @@ static uint64_t inode_size_value(const uint8_t *inode) {
     return (uint64_t)load32(&inode[4]) | ((uint64_t)load32(&inode[108]) << 32);
 }
 
+static int extent_data_block(const ext4_fs_t *fs, const uint8_t *header,
+                             uint32_t logical, uint64_t *physical,
+                             uint8_t *hole, uint8_t depth, uint8_t root);
+
 static int read_block(const ext4_fs_t *fs, uint64_t block, void *buffer) {
     if (!fs || !buffer || block >= fs->block_count || fs->block_size > 4096U) return 0;
     return storage_read(fs->device, block * (fs->block_size / EXT4_SECTOR_SIZE),
@@ -433,6 +437,65 @@ fail:
     return 0;
 }
 
+static int ext4_shrink_extent_file(ext4_fs_t *fs, uint32_t inode_number,
+                                   uint8_t *inode, uint64_t new_size) {
+    uint64_t old_size = inode_size_value(inode);
+    uint64_t old_blocks = (old_size + fs->block_size - 1U) / fs->block_size;
+    uint64_t new_blocks = (new_size + fs->block_size - 1U) / fs->block_size;
+    uint64_t released = 0;
+    uint8_t *header = &inode[40];
+    uint16_t entries = load16(&header[2]), maximum = load16(&header[4]);
+    uint16_t depth = load16(&header[6]);
+    if (new_size >= old_size) return 0;
+    if (old_blocks - new_blocks > 1024U || load16(header) != EXT4_EXTENT_MAGIC ||
+        depth != 0 || entries > maximum || maximum > 4U ||
+        12U + (uint32_t)maximum * 12U > 60U) return 0;
+    if (new_size % fs->block_size != 0 && new_blocks != 0) {
+        uint64_t logical = new_blocks - 1U, physical = 0;
+        uint8_t hole = 0, found = 0;
+        for (uint32_t i = 0; i < entries; ++i)
+            if (extent_data_block(fs, header, (uint32_t)logical, &physical,
+                                  &hole, 0, 1)) { found = 1; break; }
+        if (found && !hole) {
+            uint8_t block[4096];
+            if (!read_block(fs, physical, block)) return 0;
+            for (uint32_t i = (uint32_t)(new_size % fs->block_size);
+                 i < fs->block_size; ++i) block[i] = 0;
+            if (!write_block(fs, physical, block)) return 0;
+        }
+    }
+    for (uint32_t index = 0; index < entries;) {
+        uint8_t *extent = &inode[52U + index * 12U];
+        uint32_t first = load32(extent);
+        uint32_t raw_length = load16(&extent[4]);
+        uint32_t length = raw_length & 0x7fffU;
+        uint64_t physical = ((uint64_t)load16(&extent[6]) << 32) |
+                            load32(&extent[8]);
+        uint64_t keep = new_blocks > first ? new_blocks - first : 0;
+        if (keep > length) keep = length;
+        uint32_t release = length - (uint32_t)keep;
+        if (released > 1024U - release) return 0;
+        for (uint32_t block = 0; block < release; ++block)
+            if (!ext4_set_block_used(fs, physical + keep + block, 0)) return 0;
+        released += release;
+        if (keep == 0) {
+            for (uint32_t move = index; move + 1U < entries; ++move)
+                for (uint32_t byte = 0; byte < 12U; ++byte)
+                    inode[52U + move * 12U + byte] =
+                        inode[52U + (move + 1U) * 12U + byte];
+            --entries;
+            continue;
+        }
+        if (release) store16(&extent[4], (uint16_t)keep |
+                                      (raw_length & 0x8000U));
+        ++index;
+    }
+    store16(&header[2], entries);
+    store32(&inode[4], (uint32_t)new_size);
+    store32(&inode[108], (uint32_t)(new_size >> 32));
+    return write_inode(fs, inode_number, inode);
+}
+
 static int extent_data_block(const ext4_fs_t *fs, const uint8_t *header,
                              uint32_t logical, uint64_t *physical, uint8_t *hole,
                              uint8_t depth, uint8_t root) {
@@ -631,6 +694,11 @@ int ext4_truncate_file(ext4_fs_t *fs, uint32_t inode_number, uint64_t size) {
     if (!read_inode(fs, inode_number, inode) ||
         (load16(inode) & 0xf000U) != 0x8000U ||
         size > inode_size_value(inode)) return 0;
-    if ((load32(&inode[32]) & EXT4_EXTENTS_FL) != 0) return write_inode_size(fs, inode_number, size);
+    if ((load32(&inode[32]) & EXT4_EXTENTS_FL) != 0) {
+        if (size == inode_size_value(inode)) return 1;
+        if (size < inode_size_value(inode))
+            return ext4_shrink_extent_file(fs, inode_number, inode, size);
+        return write_inode_size(fs, inode_number, size);
+    }
     return ext4_resize_blocks(fs, inode_number, inode, size);
 }

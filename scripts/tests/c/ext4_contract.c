@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <stdint.h>
 #include <string.h>
+#include <stdio.h>
 #include "../../../kernel/fs/ext4/ext4.h"
 #include "../../../kernel/drivers/storage/storage.h"
 static uint8_t image[128 * 512];
@@ -53,6 +54,14 @@ int main(void) {
            memcmp(grown, growth, sizeof(growth)) == 0);
     assert(ext4_truncate_file(&fs, inode, 3));
     assert(ext4_inode_size(&fs, inode, &size) && size == 3);
+    assert(ext4_write_file(&fs, 8, 1024, "growth", 6));
+    assert(ext4_inode_size(&fs, 8, &size) && size == 1030);
+    memset(output, 0, sizeof(output)); assert(ext4_read_file(&fs, 8, 1024, output, 6) && memcmp(output, "growth", 6) == 0);
+    assert(ext4_truncate_file(&fs, 8, 1024));
+    assert(ext4_inode_size(&fs, 8, &size) && size == 1024);
+    assert((image[3 * 1024 + 20 / 8] & (1U << (20 & 7))) == 0);
+    assert(ext4_truncate_file(&fs, 8, 0));
+    assert((image[3 * 1024 + 19 / 8] & (1U << (19 & 7))) == 0);
     memset(output, 0, sizeof(output)); assert(ext4_read_file(&fs, 4, 1024U * 12U, output, 5)); assert(memcmp(output, "indir", 5) == 0);
     uint8_t indirect_growth[1024]; memset(indirect_growth, 'z', sizeof(indirect_growth));
     assert(ext4_write_file(&fs, 4, 12293, indirect_growth, sizeof(indirect_growth)));
@@ -63,9 +72,6 @@ int main(void) {
     assert(ext4_truncate_file(&fs, 7, (12U + 256U + 1U) * 1024U));
     assert(ext4_inode_size(&fs, 7, &size) && size == (12U + 256U + 1U) * 1024U);
     assert((image[3 * 1024 + 18 / 8] & (1U << (18 & 7))) == 0);
-    assert(ext4_write_file(&fs, 8, 1024, "growth", 6));
-    assert(ext4_inode_size(&fs, 8, &size) && size == 1030);
-    memset(output, 0, sizeof(output)); assert(ext4_read_file(&fs, 8, 1024, output, 6) && memcmp(output, "growth", 6) == 0);
     memset(output, 0, sizeof(output)); assert(ext4_read_file(&fs, 5, 0, output, 4)); assert(memcmp(output, "deep", 4) == 0);
     uint64_t group_size = 0;
     memset(output, 0, sizeof(output)); assert(ext4_inode_size(&fs, 9, &group_size) && group_size == 5);

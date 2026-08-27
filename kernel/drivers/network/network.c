@@ -88,6 +88,43 @@ int network_build_arp_reply(const void *frame, uint16_t length,
     return 1;
 }
 
+uint32_t network_service(network_packet_queue_t *queue,
+                         const uint8_t local_hardware[ETHERNET_ADDRESS_SIZE],
+                         const uint8_t local_protocol[4], arp_cache_t *cache,
+                         uint64_t now, uint32_t budget) {
+    if (!queue || !local_hardware || !local_protocol || !cache ||
+        budget == 0) return 0;
+    (void)network_e1000_poll(queue, budget);
+    uint32_t serviced = 0;
+    while (serviced < budget) {
+        uint8_t frame[ETHERNET_MAX_FRAME_SIZE];
+        uint16_t length = 0;
+        if (!network_packet_queue_pop(queue, frame, sizeof(frame), &length))
+            break;
+        network_frame_view_t view;
+        if (!network_decode_frame(frame, length, &view)) {
+            ++serviced;
+            continue;
+        }
+        uint8_t reply[ETHERNET_MAX_FRAME_SIZE];
+        uint16_t reply_length = 0;
+        if (view.kind == NETWORK_FRAME_ARP) {
+            (void)arp_cache_update(cache, view.arp.sender_protocol,
+                                   view.arp.sender_hardware, now);
+            if (network_build_arp_reply(frame, length, local_hardware,
+                                        local_protocol, reply, sizeof(reply),
+                                        &reply_length))
+                (void)network_e1000_transmit(reply, reply_length);
+        } else if (view.kind == NETWORK_FRAME_ICMP &&
+                   view.icmp.type == ICMP_TYPE_ECHO_REQUEST &&
+                   network_build_icmp_echo_reply(frame, length, reply,
+                                                 sizeof(reply), &reply_length))
+            (void)network_e1000_transmit(reply, reply_length);
+        ++serviced;
+    }
+    return serviced;
+}
+
 int network_deliver_frame(const void *frame, uint16_t length,
                           udp_endpoint_table_t *udp_table) {
     if (!udp_table) return 0;

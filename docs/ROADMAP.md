@@ -668,6 +668,8 @@ PS/2 mouse packets now have a validated decoder that rejects bad sync and
 overflow bits and emits button, X-axis, and Y-axis input events.
 USB HID boot-mouse reports now decode into validated button, X-axis, and
 Y-axis input events.
+The network service now drains bounded NIC input, learns validated ARP
+senders, and transmits ARP and ICMP echo replies through the adapter boundary.
 
 ## Phase 10 — Userland begins after the kernel gate
 

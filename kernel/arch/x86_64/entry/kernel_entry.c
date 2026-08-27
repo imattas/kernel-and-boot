@@ -916,6 +916,18 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("network UDP delivery ready\r\n");
+    static network_packet_queue_t network_service_probe_queue;
+    static arp_cache_t network_service_probe_cache;
+    network_packet_queue_initialize(&network_service_probe_queue);
+    arp_cache_initialize(&network_service_probe_cache);
+    if (network_service(&network_service_probe_queue, ethernet_probe_source,
+                        ipv4_probe_destination, &network_service_probe_cache,
+                        1, 4) != 0 ||
+        network_packet_queue_count(&network_service_probe_queue) != 0) {
+        serial_write("network service failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("network service ready\r\n");
     if (e1000_controller_count() != 0)
         serial_write(e1000_link_up() ? "e1000 link ready\r\n" :
                      "e1000 link down\r\n");

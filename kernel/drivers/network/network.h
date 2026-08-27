@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include "packet_queue.h"
 #include "arp.h"
+#include "arp_cache.h"
 #include "ipv4.h"
 #include "udp.h"
 #include "icmp.h"
@@ -37,6 +38,10 @@ int network_build_arp_reply(const void *frame, uint16_t length,
                             const uint8_t local_hardware[ETHERNET_ADDRESS_SIZE],
                             const uint8_t local_protocol[4], void *reply,
                             uint16_t capacity, uint16_t *reply_length);
+uint32_t network_service(network_packet_queue_t *queue,
+                         const uint8_t local_hardware[ETHERNET_ADDRESS_SIZE],
+                         const uint8_t local_protocol[4], arp_cache_t *cache,
+                         uint64_t now, uint32_t budget);
 int network_deliver_frame(const void *frame, uint16_t length,
                           udp_endpoint_table_t *udp_table);
 

@@ -497,6 +497,8 @@ endpoint toggles; the boot path discovers an interrupt-IN endpoint from the
 configuration descriptors and exercises the USB HID polling path.
 UHCI interrupt transfers now reject endpoint values before token bit-packing,
 preventing invalid endpoint numbers from being silently truncated.
+The UHCI data-transfer engine is now also exposed through a bounded bulk-transfer
+API with endpoint validation and persistent DATA-toggle ownership.
 UHCI interrupt transfers now accept the USB endpoint direction bit while still
 validating the four-bit endpoint number, enabling real interrupt-IN HID paths.
 The UHCI HID startup probe now retries bounded interrupt polls to absorb

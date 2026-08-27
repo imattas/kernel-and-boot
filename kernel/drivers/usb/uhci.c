@@ -527,6 +527,15 @@ int uhci_interrupt_transfer(uint8_t address, uint8_t endpoint, void *data,
     return result;
 }
 
+int uhci_bulk_transfer(uint8_t address, uint8_t endpoint, void *data,
+                       uint16_t length, uint16_t max_packet, uint8_t *toggle) {
+    uint64_t flags = spinlock_lock_irqsave(&uhci_lock);
+    int result = uhci_interrupt_transfer_locked(address, endpoint, data, length,
+                                                max_packet, toggle);
+    spinlock_unlock_irqrestore(&uhci_lock, flags);
+    return result;
+}
+
 void uhci_interrupt_handler(void) {
     uint64_t flags = spinlock_lock_irqsave(&uhci_lock);
     if (!controller_base) {

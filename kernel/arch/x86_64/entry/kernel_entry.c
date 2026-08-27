@@ -536,6 +536,16 @@ void kernel_main(void *boot_info) {
     if (uhci_root_port_count() != 0 && uhci_interrupt_endpoint != 0) {
         serial_write("UHCI HID interrupt endpoint ready\r\n");
     }
+    uint8_t uhci_bulk_probe = 0;
+    uint8_t uhci_bulk_toggle = 0;
+    if (uhci_controller_count() != 0 &&
+        uhci_bulk_transfer(1, 0x81, &uhci_bulk_probe, 0, 64,
+                           &uhci_bulk_toggle)) {
+        serial_write("UHCI bulk validation failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    if (uhci_controller_count() != 0)
+        serial_write("UHCI bulk transfer ready\r\n");
     if (!nvme_initialize()) {
         serial_write("NVMe initialization failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");

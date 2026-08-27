@@ -13,6 +13,8 @@ uint16_t uhci_last_controller_status(void);
 void uhci_interrupt_handler(void);
 int uhci_control_transfer(uint8_t address, uint8_t endpoint,
                           const uint8_t setup[8], void *data, uint16_t length);
+int uhci_bulk_transfer(uint8_t address, uint8_t endpoint, void *data,
+                       uint16_t length, uint16_t max_packet, uint8_t *toggle);
 int uhci_interrupt_transfer(uint8_t address, uint8_t endpoint, void *data,
                             uint16_t length, uint16_t max_packet,
                             uint8_t *toggle);

@@ -67,6 +67,7 @@ grep -F 'framebuffer surface ready' "$log" >/dev/null
 grep -F 'firmware framebuffer ready' "$log" >/dev/null
 grep -F 'USB descriptor layer ready' "$log" >/dev/null
 grep -F 'USB HID keyboard ready' "$log" >/dev/null
+grep -F 'UHCI bulk transfer ready' "$log" >/dev/null
 grep -F 'kernel debug ready' "$log" >/dev/null
 grep -F 'process thread lifecycle ready' "$log" >/dev/null
 grep -F 'kernel debug ready' "$log" >/dev/null

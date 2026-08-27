@@ -18,6 +18,10 @@ int btrfs_fse_build(btrfs_fse_table_t *table, const int16_t *normalized,
 int btrfs_fse_decode(const btrfs_fse_table_t *table, const uint8_t *stream,
                      uint32_t stream_size, uint8_t *symbols,
                      uint32_t symbol_count);
+int btrfs_fse_decode_interleaved2(const btrfs_fse_table_t *table,
+                                  const uint8_t *stream, uint32_t stream_size,
+                                  uint8_t *symbols, uint32_t capacity,
+                                  uint32_t *symbol_count);
 int btrfs_fse_read_header(btrfs_fse_table_t *table, const uint8_t *stream,
                           uint32_t stream_size, uint32_t max_accuracy_log,
                           uint32_t *consumed);

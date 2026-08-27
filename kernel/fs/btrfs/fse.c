@@ -97,6 +97,46 @@ int btrfs_fse_decode(const btrfs_fse_table_t *table, const uint8_t *stream,
     return 1;
 }
 
+int btrfs_fse_decode_interleaved2(const btrfs_fse_table_t *table,
+                                  const uint8_t *stream, uint32_t stream_size,
+                                  uint8_t *symbols, uint32_t capacity,
+                                  uint32_t *symbol_count) {
+    int64_t offset;
+    uint32_t state1, state2, count = 0;
+    uint8_t last;
+    if (!table || !stream || !stream_size || !symbols || !capacity || !symbol_count ||
+        !table->size || table->accuracy_log > 10U || !stream[stream_size - 1U]) return 0;
+    last = stream[stream_size - 1U];
+    offset = (int64_t)stream_size * 8 - (int64_t)(8U - highest_bit(last));
+    state1 = stream_bits(stream, table->accuracy_log, &offset);
+    state2 = stream_bits(stream, table->accuracy_log, &offset);
+    if (state1 >= table->size || state2 >= table->size) return 0;
+    while (count < capacity) {
+        uint32_t bits;
+        symbols[count++] = table->symbols[state1];
+        bits = table->bits[state1];
+        state1 = table->new_state[state1] + stream_bits(stream, bits, &offset);
+        if (state1 >= table->size) return 0;
+        if (offset < 0) {
+            if (count == capacity) return 0;
+            symbols[count++] = table->symbols[state2];
+            break;
+        }
+        symbols[count++] = table->symbols[state2];
+        bits = table->bits[state2];
+        state2 = table->new_state[state2] + stream_bits(stream, bits, &offset);
+        if (state2 >= table->size) return 0;
+        if (offset < 0) {
+            if (count == capacity) return 0;
+            symbols[count++] = table->symbols[state1];
+            break;
+        }
+    }
+    if (count == capacity) return 0;
+    *symbol_count = count;
+    return 1;
+}
+
 int btrfs_fse_read_header(btrfs_fse_table_t *table, const uint8_t *stream,
                           uint32_t stream_size, uint32_t max_accuracy_log,
                           uint32_t *consumed) {

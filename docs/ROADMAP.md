@@ -750,6 +750,8 @@ window handling, BCD/binary decoding, and 12/24-hour conversion.
 ACPI now validates and exposes the firmware reset register as a guarded kernel
 service when the FADT supplies a supported system-I/O GAS, and reports the
 capability absence without treating optional firmware support as a boot error.
+ACPI reset publication now requires the FADT reset GAS to describe an exact
+8-bit, byte-access system-I/O register, matching the kernel’s reset write.
 The VFS now has a common bounded filesystem probe dispatcher covering FAT32,
 exFAT, ext4, XFS, and Btrfs above the storage-device interface.
 The block cache now supports whole-device invalidation for storage lifecycle

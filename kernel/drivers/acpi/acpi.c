@@ -104,7 +104,7 @@ int acpi_initialize(uint64_t rsdp_address) {
             const acpi_gas_t *gas = (const acpi_gas_t *)
                 ((const uint8_t *)table + 116);
             if (gas->address_space == 1 && gas->bit_offset == 0 &&
-                gas->bit_width >= 8 && gas->access_size <= 2 &&
+                gas->bit_width == 8 && gas->access_size == 1 &&
                 gas->address <= 0xffffU) {
                 reset_port = (uint16_t)gas->address;
                 reset_value = *((const uint8_t *)table + 128);

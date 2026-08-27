@@ -22,6 +22,7 @@ typedef enum {
 
 typedef struct process {
     spinlock_t lock;
+    uint32_t references;
     uint64_t id;
     process_state_t state;
     address_space_t address_space;
@@ -41,6 +42,8 @@ typedef struct process {
 process_t *process_create(uint64_t id);
 int process_initialize(void);
 process_t *process_lookup(uint64_t id);
+process_t *process_lookup_retain(uint64_t id);
+void process_release(process_t *process);
 int process_load_image(process_t *process, const void *image, uint64_t size);
 int process_map_user_stack(process_t *process, uint64_t page_address);
 int process_activate(process_t *process);

@@ -36,6 +36,7 @@ process_t *process_create(uint64_t id) {
     process_t *process = (process_t *)kmalloc(sizeof(*process));
     if (!process) return 0;
     spinlock_init(&process->lock);
+    process->references = 1;
     process->id = id;
     process->state = PROCESS_NEW;
     process->address_space.root = 0;
@@ -84,6 +85,29 @@ process_t *process_lookup(uint64_t id) {
         if (process_table[i] && process_table[i]->id == id) { result = process_table[i]; break; }
     spinlock_unlock_irqrestore(&process_table_lock, flags);
     return result;
+}
+
+process_t *process_lookup_retain(uint64_t id) {
+    if (id == 0) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&process_table_lock);
+    process_t *result = 0;
+    for (uint32_t i = 0; i < PROCESS_MAX; ++i)
+        if (process_table[i] && process_table[i]->id == id) {
+            ++process_table[i]->references;
+            result = process_table[i];
+            break;
+        }
+    spinlock_unlock_irqrestore(&process_table_lock, flags);
+    return result;
+}
+
+void process_release(process_t *process) {
+    if (!process) return;
+    uint64_t flags = spinlock_lock_irqsave(&process_table_lock);
+    if (process->references != 0) --process->references;
+    int free_process = process->references == 0;
+    spinlock_unlock_irqrestore(&process_table_lock, flags);
+    if (free_process) kfree(process);
 }
 
 int process_load_image(process_t *process, const void *image, uint64_t size) {
@@ -160,7 +184,7 @@ int process_destroy(process_t *process) {
         if (process_table[i] == process) process_table[i] = 0;
     spinlock_unlock_irqrestore(&process_table_lock, flags);
     spinlock_unlock_irqrestore(&process->lock, process_flags);
-    kfree(process);
+    process_release(process);
     return 1;
 }
 

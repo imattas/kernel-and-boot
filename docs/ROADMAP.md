@@ -630,6 +630,9 @@ process-table accessor instead of racing activation against an unlocked
 global-pointer read.
 Current-process publication and lookup now use the process-table lock, so
 syscall and lifecycle paths cannot race on the active process pointer.
+Cross-process signal lookup now retains a process reference under the table
+lock and releases it after delivery; process teardown drops its table-owned
+reference, preventing concurrent target lookup from becoming a use-after-free.
 Cross-process signal syscalls now require the same UID or
 `SECURITY_CAP_SYS_ADMIN`; self-signaling remains valid for every live process.
 Blocking signal waits now use the scheduler wait-queue handoff, and QEMU

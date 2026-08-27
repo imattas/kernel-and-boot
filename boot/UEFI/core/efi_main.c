@@ -34,6 +34,9 @@ efi_status_t efi_main(efi_handle_t image_handle, efi_system_table_t *st) {
     kernel_entry_t entry = 0;
     if (uefi_elf_load(bs, file_buffer, read_size, &load_address,
                       &image_size, &entry) != 0) return uefi_fail(st, '9', 9);
+    if (bs->free_pool && ((efi_status_t (*)(void *))bs->free_pool)(file_buffer) != 0)
+        return uefi_fail(st, 'A', 10);
+    file_buffer = 0;
     uint8_t *memory_map = 0; os_boot_info_t *boot_info = 0;
     efi_uintn_t memory_map_capacity = 256 * 1024, map_key = 0;
     if (!bs->exit_boot_services ||

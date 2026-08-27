@@ -32,6 +32,7 @@ efi_status_t uefi_capture_memory_map(efi_boot_services_t *bs, uint8_t **buffer,
         size = available;
         status = get_memory_map(&size, candidate, map_key, &descriptor_size, &version);
         if (status == 0) {
+            free_pool(*buffer);
             *buffer = candidate; *capacity = available;
             info->memory_map = (uint64_t)(uintptr_t)candidate;
             info->memory_map_size = size;

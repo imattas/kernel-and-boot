@@ -322,6 +322,8 @@ was removed; BIOS remains a separate later boot path.
 UEFI memory-map retries now release rejected candidate pools and validate boot
 services before dereferencing them, keeping ExitBootServices preparation
 bounded without leaking retry buffers.
+Successful memory-map replacement now releases the original pool, and the
+UEFI loader releases the relocated kernel-file buffer before ExitBootServices.
 
 ## Phase 9 — Userspace boundary
 

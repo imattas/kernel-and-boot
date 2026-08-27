@@ -2855,6 +2855,8 @@ void kernel_main(void *boot_info) {
             0x8000002000ULL, sizeof(file_syscall_path) - 1,
             VFS_FILE_READ)) == OS_SYSCALL_ERROR ||
         syscall_dispatch(OS_SYSCALL_READ, file_syscall_handle,
+                         0x8000009fffULL, 2) != OS_SYSCALL_ERROR ||
+        syscall_dispatch(OS_SYSCALL_READ, file_syscall_handle,
                          0x8000004000ULL, 2) != 2 ||
         syscall_dispatch(OS_SYSCALL_CLOSE, file_syscall_handle, 0, 0) != 0 ||
         !syscall_copy_from_user(file_syscall_read, 0x8000004000ULL,
@@ -2902,6 +2904,8 @@ void kernel_main(void *boot_info) {
         0x8000002000ULL, 1, VFS_FILE_READ);
     os_syscall_dirent_t syscall_dirent = {0};
     if (directory_syscall_handle == OS_SYSCALL_ERROR ||
+        syscall_dispatch(OS_SYSCALL_READDIR, directory_syscall_handle,
+                         0x8000009fffULL, 0) != OS_SYSCALL_ERROR ||
         syscall_dispatch(OS_SYSCALL_READDIR, directory_syscall_handle,
                          0x8000005000ULL, 0) != 1 ||
         !syscall_copy_from_user(&syscall_dirent, 0x8000005000ULL,

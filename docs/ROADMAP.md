@@ -807,6 +807,9 @@ Signal syscall arguments now reject values outside their declared 32-bit and
 signal-number ranges instead of silently truncating oversized inputs.
 The QEMU kernel probe now verifies that a failed signal dequeue leaves the
 pending signal available for a subsequent valid destination.
+Stateful read, readdir, and process-wait syscalls now validate writable user
+destinations before consuming file state or entering a wait, preventing an
+invalid output pointer from losing data or advancing a directory cursor.
 APIC PIT calibration now uses a bounded wait budget and retains a validated
 fallback count, preventing slow firmware emulation from blocking kernel boot.
 UEFI memory-map retries now release rejected candidate pools and validate boot

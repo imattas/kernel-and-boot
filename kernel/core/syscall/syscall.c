@@ -80,6 +80,7 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
         }
         case OS_SYSCALL_PROCESS_WAIT: {
             process_t *caller = process_current();
+            if (!user_range(arg2, sizeof(int32_t), 1)) return OS_SYSCALL_ERROR;
             process_t *target = process_lookup_retain(arg1);
             int32_t status = 0;
             int valid = caller && target && target != caller &&
@@ -118,6 +119,8 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
         case OS_SYSCALL_WRITE_FILE: {
             process_t *process = process_current();
             if (!process || arg3 == 0 || arg3 > OS_SYSCALL_MAX_WRITE) return OS_SYSCALL_ERROR;
+            if (number == OS_SYSCALL_READ && !user_range(arg2, arg3, 1))
+                return OS_SYSCALL_ERROR;
             process_handle_ref_t ref = {0};
             uint32_t rights = number == OS_SYSCALL_READ ? PROCESS_HANDLE_READ :
                               PROCESS_HANDLE_WRITE;
@@ -166,7 +169,8 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
             process_t *process = process_current();
             process_handle_ref_t ref = {0};
             vfs_dirent_t entry = {0};
-            if (!process || !process_handle_get_retain(&process->handles,
+            if (!process || !user_range(arg2, sizeof(entry), 1) ||
+                !process_handle_get_retain(&process->handles,
                     (uint32_t)arg1, PROCESS_HANDLE_READ, &ref) ||
                 !vfs_file_readdir((vfs_file_t *)ref.object, &entry) ||
                 !syscall_copy_to_user(arg2, &entry, sizeof(entry))) {

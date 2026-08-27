@@ -454,6 +454,9 @@ that exceed the bounded flow-control window.
 Outbound TCP segments now retain a bounded retransmission record, expose
 timeout-driven retry polling with a three-retry ceiling, and clear the record
 only when a valid acknowledgement reaches the stored sequence end.
+The persistent network service now polls those records, resolves the peer
+hardware address from the ARP cache, rebuilds the IPv4/Ethernet envelope, and
+transmits due retries through e1000.
 The network service loop now forwards validated UDP frames from the hardware
 packet queue into bound endpoint tables, and the QEMU boot probe exercises that
 end-to-end queue-to-endpoint delivery path.

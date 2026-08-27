@@ -188,6 +188,29 @@ uint32_t network_service(network_packet_queue_t *queue,
         }
         ++serviced;
     }
+    if (tcp_table) {
+        uint32_t cursor = 0;
+        uint8_t local_address[4], remote_address[4];
+        uint8_t remote_hardware[ETHERNET_ADDRESS_SIZE];
+        uint8_t segment[TCP_RETRANSMIT_MAX_SIZE];
+        uint8_t ip_packet[ETHERNET_MAX_PAYLOAD_SIZE];
+        uint8_t reply[ETHERNET_MAX_FRAME_SIZE];
+        uint16_t segment_length = 0, ip_length = 0, reply_length = 0;
+        for (uint32_t retries = 0; retries < TCP_ENDPOINT_CAPACITY; ++retries) {
+            if (!tcp_endpoint_retransmit_next(tcp_table, &cursor, now, 1000,
+                                               local_address, remote_address,
+                                               segment, sizeof(segment),
+                                               &segment_length)) break;
+            if (arp_cache_lookup(cache, remote_address, remote_hardware) &&
+                ipv4_packet_build(ip_packet, sizeof(ip_packet), local_address,
+                                  remote_address, 6, 64, 0, segment,
+                                  segment_length, &ip_length) &&
+                ethernet_frame_build(reply, sizeof(reply), remote_hardware,
+                                     local_hardware, 0x0800, ip_packet,
+                                     ip_length, &reply_length))
+                (void)network_e1000_transmit(reply, reply_length);
+        }
+    }
     return serviced;
 }
 

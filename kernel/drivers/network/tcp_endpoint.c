@@ -170,6 +170,32 @@ int tcp_endpoint_retransmit_due(tcp_endpoint_table_t *table,
     return result;
 }
 
+int tcp_endpoint_retransmit_next(tcp_endpoint_table_t *table,
+                                 uint32_t *cursor, uint64_t now,
+                                 uint64_t timeout, uint8_t local_address[4],
+                                 uint8_t remote_address[4], void *segment,
+                                 uint16_t capacity, uint16_t *length) {
+    if (!table || !cursor || !local_address || !remote_address || !segment ||
+        !length || *cursor >= TCP_ENDPOINT_CAPACITY) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&table->lock);
+    for (uint32_t i = *cursor; i < TCP_ENDPOINT_CAPACITY; ++i) {
+        tcp_endpoint_t *endpoint = &table->endpoints[i];
+        if (!endpoint->valid) continue;
+        if (!tcp_connection_retransmit_due(&endpoint->connection, now, timeout,
+                                           segment, capacity, length)) continue;
+        for (uint32_t j = 0; j < 4; ++j) {
+            local_address[j] = endpoint->local_address[j];
+            remote_address[j] = endpoint->remote_address[j];
+        }
+        *cursor = i + 1U;
+        spinlock_unlock_irqrestore(&table->lock, flags);
+        return 1;
+    }
+    *cursor = TCP_ENDPOINT_CAPACITY;
+    spinlock_unlock_irqrestore(&table->lock, flags);
+    return 0;
+}
+
 int tcp_endpoint_receive(tcp_endpoint_table_t *table, tcp_endpoint_handle_t handle,
                          uint8_t source_address[4], void *payload,
                          uint16_t capacity, uint16_t *length) {

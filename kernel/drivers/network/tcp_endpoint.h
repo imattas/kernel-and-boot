@@ -56,6 +56,11 @@ int tcp_endpoint_retransmit_due(tcp_endpoint_table_t *table,
                                 tcp_endpoint_handle_t handle, uint64_t now,
                                 uint64_t timeout, void *segment,
                                 uint16_t capacity, uint16_t *length);
+int tcp_endpoint_retransmit_next(tcp_endpoint_table_t *table,
+                                 uint32_t *cursor, uint64_t now,
+                                 uint64_t timeout, uint8_t local_address[4],
+                                 uint8_t remote_address[4], void *segment,
+                                 uint16_t capacity, uint16_t *length);
 int tcp_endpoint_receive(tcp_endpoint_table_t *table,
                          tcp_endpoint_handle_t handle,
                          uint8_t source_address[4], void *payload,

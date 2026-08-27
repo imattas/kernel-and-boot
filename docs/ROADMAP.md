@@ -304,11 +304,11 @@ bounded leaf items through single-stripe system-chunk logical-to-physical
 mapping, and resolves the standard FS_TREE root item from the root tree. Btrfs
 now decodes bounded inline and uncompressed regular EXTENT_DATA records,
 extracts inode metadata, and reads mapped data including unaligned byte
-ranges. Compressed, encrypted, and
-multi-extent file reads remain before the filesystem milestone is complete.
-Btrfs now performs hashed DIR_ITEM lookup with variable-length entry checks;
-its multi-extent read path is integrated into a read-only VFS file adapter.
-complete file-read support must be completed before the driver phase resumes; a
+ranges, sparse holes, and multi-extent files. Btrfs now performs hashed
+DIR_ITEM lookup with variable-length entry checks; its multi-extent read path
+is integrated into a read-only VFS file adapter. Compression, encryption,
+directory-hash collisions, cross-leaf extent lookup, data checksums, and full
+chunk-tree mapping remain before the filesystem milestone is complete. A
 format is not considered complete merely because its superblock is recognized.
 
 ## Phase 10 — Userland begins after the kernel gate

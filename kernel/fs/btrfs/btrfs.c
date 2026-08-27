@@ -284,6 +284,37 @@ static int btrfs_find_extent_start(btrfs_fs_t *fs, uint64_t tree_bytenr,
     }
 }
 
+static int btrfs_find_extent_after(btrfs_fs_t *fs, uint64_t tree_bytenr,
+                                   uint64_t inode, uint64_t file_offset,
+                                   uint64_t *extent_start) {
+    uint8_t node[65536];
+    if (!fs || !extent_start || fs->node_size > sizeof(node) ||
+        !btrfs_read_node(fs, tree_bytenr, node)) return 0;
+    for (;;) {
+        uint32_t count = le32(&node[96]);
+        if (node[100] == 0) {
+            if (count > (fs->node_size - 101U) / 25U) return 0;
+            uint64_t next = UINT64_MAX;
+            for (uint32_t i = 0; i < count; ++i) {
+                const uint8_t *item = &node[101U + i * 25U];
+                uint64_t key_offset = le64(&item[9]);
+                if (le64(item) == inode && item[8] == BTRFS_EXTENT_DATA_TYPE &&
+                    key_offset > file_offset && key_offset < next) next = key_offset;
+            }
+            if (next != UINT64_MAX) { *extent_start = next; return 1; }
+            return 0;
+        }
+        if (node[100] > 8 || count == 0 || count > (fs->node_size - 101U) / 33U) return 0;
+        const uint8_t *selected = 0;
+        for (uint32_t i = 0; i < count; ++i) {
+            const uint8_t *item = &node[101U + i * 33U];
+            if (key_compare(item, inode, BTRFS_EXTENT_DATA_TYPE, file_offset) > 0) break;
+            selected = item;
+        }
+        if (!selected || !btrfs_read_node(fs, le64(&selected[17]), node)) return 0;
+    }
+}
+
 int btrfs_read_file(btrfs_fs_t *fs, uint64_t tree_bytenr, uint64_t inode,
                     uint64_t offset, void *buffer, uint32_t size) {
     uint64_t file_size = 0; uint32_t mode = 0;
@@ -294,12 +325,28 @@ int btrfs_read_file(btrfs_fs_t *fs, uint64_t tree_bytenr, uint64_t inode,
     uint8_t extent[53]; uint8_t *destination = buffer; uint32_t remaining = size;
     while (remaining) {
         uint64_t start = 0;
-        if (!btrfs_find_extent_start(fs, tree_bytenr, inode, offset, &start) ||
-            !btrfs_read_item(fs, tree_bytenr, inode, BTRFS_EXTENT_DATA_TYPE,
+        if (!btrfs_find_extent_start(fs, tree_bytenr, inode, offset, &start)) {
+            uint64_t next = 0;
+            uint64_t hole = remaining;
+            if (btrfs_find_extent_after(fs, tree_bytenr, inode, offset, &next) && next - offset < hole)
+                hole = next - offset;
+            for (uint64_t i = 0; i < hole; ++i) destination[i] = 0;
+            offset += hole; destination += hole; remaining -= (uint32_t)hole;
+            if (hole == 0) return 0;
+            continue;
+        }
+        if (!btrfs_read_item(fs, tree_bytenr, inode, BTRFS_EXTENT_DATA_TYPE,
                              start, extent, sizeof(extent))) return 0;
         uint64_t relative = offset - start;
         uint64_t length = extent[20] == 0 ? le64(&extent[8]) : le64(&extent[45]);
-        if (relative >= length) return 0;
+        if (relative >= length) {
+            uint64_t next = 0;
+            if (!btrfs_find_extent_after(fs, tree_bytenr, inode, offset, &next)) return 0;
+            uint64_t hole = next - offset; if (hole > remaining) hole = remaining;
+            for (uint64_t i = 0; i < hole; ++i) destination[i] = 0;
+            offset += hole; destination += hole; remaining -= (uint32_t)hole;
+            continue;
+        }
         uint64_t chunk = length - relative; if (chunk > remaining) chunk = remaining;
         if (chunk > UINT32_MAX || !btrfs_read_extent_data(fs, tree_bytenr, inode,
                                                            start, offset, destination,

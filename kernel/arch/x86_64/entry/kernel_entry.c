@@ -999,6 +999,20 @@ void kernel_main(void *boot_info) {
     task_context_switch(&task_demo_main, &task_demo_worker);
     serial_write("task context returned\r\n");
     interrupts_initialize();
+    if (uhci_controller_count() != 0 && uhci_interrupt_enabled() != 0) {
+        static const uint8_t uhci_irq_probe_setup[8] =
+            {0x80, 0x06, 0, 1, 0, 0, 8, 0};
+        static uint8_t uhci_irq_probe_descriptor[8];
+        uint32_t before = uhci_interrupt_count();
+        if (!uhci_control_transfer(1, 0, uhci_irq_probe_setup,
+                                   uhci_irq_probe_descriptor,
+                                   sizeof(uhci_irq_probe_descriptor)) ||
+            uhci_interrupt_count() == before) {
+            serial_write("UHCI interrupt delivery failure\r\n");
+            for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+        }
+        serial_write("UHCI interrupt delivery ready\r\n");
+    }
     if (nvme_controller_count() != 0 && nvme_interrupt_enabled() != 0) {
         static uint8_t nvme_interrupt_probe[512];
         if (!nvme_read_sector(0, nvme_interrupt_probe)) {

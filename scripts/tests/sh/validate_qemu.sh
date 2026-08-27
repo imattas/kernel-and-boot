@@ -19,6 +19,7 @@ grep -E 'UHCI driver ready controllers=0x[0-9a-fA-F]*[1-9a-fA-F]' "$log" >/dev/n
 grep -E 'UHCI root hub ready ports=0x[0-9a-fA-F]*[1-9a-fA-F]' "$log" >/dev/null
 grep -F 'UHCI control transfer ready' "$log" >/dev/null
 grep -F 'UHCI device enumeration ready' "$log" >/dev/null
+grep -F 'UHCI interrupt delivery ready' "$log" >/dev/null
 grep -F 'NVMe driver ready' "$log" >/dev/null
 grep -F 'NVMe admin I/O ready' "$log" >/dev/null
 grep -F 'NVMe sector I/O ready' "$log" >/dev/null

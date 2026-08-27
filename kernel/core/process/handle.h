@@ -9,21 +9,36 @@
 #define PROCESS_HANDLE_SLOT_BITS 5U
 #define PROCESS_HANDLE_SLOT_MASK (PROCESS_HANDLE_CAPACITY - 1U)
 typedef void (*process_handle_release_fn)(void *object);
+typedef struct process_handle_table process_handle_table_t;
 typedef struct {
     void *object;
     uint32_t rights;
     process_handle_release_fn release;
+    uint32_t retained_references;
+    uint8_t closing;
 } process_handle_t;
 typedef struct {
+    process_handle_table_t *table;
+    process_handle_t *entry;
+    void *object;
+    process_handle_release_fn release;
+    uint8_t active;
+} process_handle_ref_t;
+struct process_handle_table {
     spinlock_t lock;
     process_handle_t entries[PROCESS_HANDLE_CAPACITY];
     uint16_t generations[PROCESS_HANDLE_CAPACITY];
-} process_handle_table_t;
+    uint32_t retained_references;
+};
 void process_handle_table_initialize(process_handle_table_t *table);
 int process_handle_open(process_handle_table_t *table, void *object, uint32_t rights);
 int process_handle_open_owned(process_handle_table_t *table, void *object,
                               uint32_t rights, process_handle_release_fn release);
 void *process_handle_get(const process_handle_table_t *table, uint32_t handle, uint32_t required_rights);
+int process_handle_get_retain(process_handle_table_t *table, uint32_t handle,
+                              uint32_t required_rights, process_handle_ref_t *ref);
+void process_handle_release_ref(process_handle_ref_t *ref);
+int process_handle_table_has_retained(const process_handle_table_t *table);
 int process_handle_close(process_handle_table_t *table, uint32_t handle);
 void process_handle_table_close_all(process_handle_table_t *table);
 #endif

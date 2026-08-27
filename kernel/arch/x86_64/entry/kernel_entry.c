@@ -2115,6 +2115,7 @@ void kernel_main(void *boot_info) {
     int handle_probe = signal_process ? process_handle_open(&signal_process->handles,
         &handle_probe_object, PROCESS_HANDLE_READ | PROCESS_HANDLE_WRITE) : 0;
     int replacement_handle = 0;
+    process_handle_ref_t owned_handle_ref = {0};
     owned_handle_release_count = 0;
     int owned_handle = signal_process ? process_handle_open_owned(
         &signal_process->handles, &handle_probe_object, PROCESS_HANDLE_READ,
@@ -2122,6 +2123,11 @@ void kernel_main(void *boot_info) {
     uint32_t signal = 0;
     if (!signal_process || process_lookup(2) != signal_process || !handle_probe ||
         !owned_handle ||
+        !process_handle_get_retain(&signal_process->handles, (uint32_t)owned_handle,
+                                   PROCESS_HANDLE_READ, &owned_handle_ref) ||
+        !process_handle_close(&signal_process->handles, (uint32_t)owned_handle) ||
+        process_handle_get(&signal_process->handles, (uint32_t)owned_handle,
+                           PROCESS_HANDLE_READ) != 0 ||
         process_handle_get(&signal_process->handles, (uint32_t)handle_probe,
                            PROCESS_HANDLE_READ) != &handle_probe_object ||
         process_handle_get(&signal_process->handles, (uint32_t)handle_probe,
@@ -2139,8 +2145,16 @@ void kernel_main(void *boot_info) {
         !process_take_signal(signal_process, &signal) || signal != 2 ||
         process_take_signal(signal_process, &signal) ||
         !process_terminate(signal_process, 42) ||
-        signal_process->exit_status != 42 || !process_destroy(signal_process) ||
-        owned_handle_release_count != 1) {
+        signal_process->exit_status != 42) {
+        serial_write("process signal lifecycle failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    if (process_destroy(signal_process) || owned_handle_release_count != 0) {
+        serial_write("process handle lifetime failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    process_handle_release_ref(&owned_handle_ref);
+    if (!process_destroy(signal_process) || owned_handle_release_count != 1) {
         serial_write("process signal lifecycle failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }

@@ -212,6 +212,10 @@ int process_destroy(process_t *process) {
         spinlock_unlock_irqrestore(&process->lock, process_flags);
         return 0;
     }
+    if (process_handle_table_has_retained(&process->handles)) {
+        spinlock_unlock_irqrestore(&process->lock, process_flags);
+        return 0;
+    }
     if (process_current() == process || process->state == PROCESS_RUNNING ||
         task_wait_queue_count(&process->signal_waiters) != 0 ||
         task_wait_queue_count(&process->exit_waiters) != 0 ||

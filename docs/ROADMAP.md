@@ -40,6 +40,9 @@ the complete user stack, and the initial user task, with teardown on failure.
 Process handles now optionally own release callbacks, and close/process teardown
 detaches entries before invoking callbacks so object destruction cannot run under
 the handle-table lock.
+Retained handle references now keep an entry alive across concurrent close,
+defer its release callback until the last reference is dropped, and block
+process teardown until those retained descriptors are released.
 
 Establish early stack/state assumptions, descriptor tables, exception handling, interrupt infrastructure, CPU feature discovery, panic/diagnostic paths, and a documented boot-to-kernel contract.
 

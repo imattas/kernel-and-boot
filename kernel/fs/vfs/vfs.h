@@ -16,6 +16,7 @@ typedef int (*vfs_read_fn)(vfs_node_t *node, uint64_t offset,
                           void *buffer, uint32_t size);
 typedef int (*vfs_write_fn)(vfs_node_t *node, uint64_t offset,
                            const void *buffer, uint32_t size);
+typedef int (*vfs_truncate_fn)(vfs_node_t *node, uint32_t size);
 typedef void (*vfs_private_destroy_fn)(void *private_data);
 
 struct vfs_node {
@@ -33,6 +34,7 @@ struct vfs_node {
     char name[32];
     vfs_read_fn read;
     vfs_write_fn write;
+    vfs_truncate_fn truncate;
     void *private_data;
     vfs_private_destroy_fn private_destroy;
 };
@@ -56,10 +58,12 @@ void vfs_node_release(vfs_node_t *node);
 int vfs_node_remove(vfs_node_t *parent, vfs_node_t *child);
 int vfs_node_set_read(vfs_node_t *node, vfs_read_fn read, void *private_data);
 int vfs_node_set_write(vfs_node_t *node, vfs_write_fn write, void *private_data);
+int vfs_node_set_truncate(vfs_node_t *node, vfs_truncate_fn truncate);
 int vfs_node_set_private_destructor(vfs_node_t *node,
                                      vfs_private_destroy_fn destroy);
 int vfs_node_read(vfs_node_t *node, uint64_t offset, void *buffer, uint32_t size);
 int vfs_node_write(vfs_node_t *node, uint64_t offset, const void *buffer,
                    uint32_t size);
+int vfs_node_truncate(vfs_node_t *node, uint32_t size);
 
 #endif

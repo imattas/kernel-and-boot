@@ -50,6 +50,7 @@ vfs_node_t *vfs_node_create(const char *name, vfs_node_type_t type,
     node->type = type;
     node->read = 0;
     node->write = 0;
+    node->truncate = 0;
     node->private_data = 0;
     node->private_destroy = 0;
     for (uint32_t i = 0; i <= length; ++i) node->name[i] = name[i];
@@ -95,6 +96,18 @@ int vfs_node_set_write(vfs_node_t *node, vfs_write_fn write, void *private_data)
     return 1;
 }
 
+int vfs_node_set_truncate(vfs_node_t *node, vfs_truncate_fn truncate) {
+    if (!node || !truncate) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&node->lock);
+    if (node->truncate) {
+        spinlock_unlock_irqrestore(&node->lock, flags);
+        return 0;
+    }
+    node->truncate = truncate;
+    spinlock_unlock_irqrestore(&node->lock, flags);
+    return 1;
+}
+
 static void try_destroy(vfs_node_t *node) {
     if (!node) return;
     uint64_t flags = spinlock_lock_irqsave(&node->lock);
@@ -127,6 +140,14 @@ int vfs_node_write(vfs_node_t *node, uint64_t offset, const void *buffer,
     vfs_write_fn write = node->write;
     spinlock_unlock_irqrestore(&node->lock, flags);
     return write ? write(node, offset, buffer, size) : 0;
+}
+
+int vfs_node_truncate(vfs_node_t *node, uint32_t size) {
+    if (!node || node->type != VFS_NODE_REGULAR) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&node->lock);
+    vfs_truncate_fn truncate = node->truncate;
+    spinlock_unlock_irqrestore(&node->lock, flags);
+    return truncate ? truncate(node, size) : 0;
 }
 
 int vfs_node_add_child(vfs_node_t *parent, vfs_node_t *child) {

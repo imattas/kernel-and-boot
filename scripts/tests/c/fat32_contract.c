@@ -121,6 +121,9 @@ int main(void) {
         !vfs_node_read(vfs_file, 1100, output, 3) ||
         memcmp(output, vfs_append, 3) != 0)
         return fail("VFS append failed");
+    if (!vfs_node_truncate(vfs_file, 512) ||
+        vfs_node_read(vfs_file, 512, output, 1) != 0)
+        return fail("VFS truncate failed");
     vfs_node_release(vfs_file);
     if (!fat32_truncate_file(&fs, name, 512) ||
         !fat32_lookup(&fs, name, &cluster, &size) || size != 512 ||

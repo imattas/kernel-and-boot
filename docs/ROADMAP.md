@@ -827,8 +827,9 @@ the directory size/first-cluster fields, and rolls back new chain state when
 metadata or data writes fail. FAT32 truncation now safely shrinks regular files,
 updates directory metadata, terminates the retained chain, and releases detached
 clusters; arbitrary hole-punching remains later.
-The FAT32 VFS adapter now exposes both bounded in-place writes and append
-growth, serializing per-file size updates around the filesystem write path.
+The FAT32 VFS adapter now exposes bounded in-place writes, append growth, and
+safe shrink/truncation, serializing per-file size updates around the filesystem
+write path. VFS nodes now have an explicit regular-file truncation callback.
 The FAT32 contract now exercises append growth through `vfs_node_write()` and
 reads the appended bytes back through the VFS adapter.
 Image validation now also runs `fsck.fat -n` when available, adding a real

@@ -45,6 +45,14 @@
 
 extern void arch_ahci_irq_stub(void);
 
+static void ahci_dma_write_barrier(void) {
+    __asm__ volatile ("sfence" ::: "memory");
+}
+
+static void ahci_dma_read_barrier(void) {
+    __asm__ volatile ("lfence" ::: "memory");
+}
+
 static uint32_t controllers;
 static uint32_t ports;
 static uint32_t ready_ports;
@@ -351,9 +359,11 @@ static int ahci_identify_locked(uint16_t *words) {
     table->data_base_high = 0;
     table->byte_count = 511U | (1U << 31);
     active_port[AHCI_PORT_IS / 4] = UINT32_MAX;
+    ahci_dma_write_barrier();
     active_port[AHCI_PORT_CI / 4] = 1;
     int completed = 0;
     for (uint32_t wait = 0; wait < 1000000; ++wait) {
+        ahci_dma_read_barrier();
         uint32_t status = active_port[AHCI_PORT_TFD / 4];
         if ((active_port[AHCI_PORT_CI / 4] & 1U) == 0) {
             completed = ahci_command_ok(status, header[0].prdbc, 512);
@@ -437,9 +447,12 @@ static int ahci_read_sector_locked(uint64_t lba, void *buffer) {
     table->command_fis.count_low = 1; table->command_fis.count_high = 0;
     table->data_base = (uint32_t)active_data; table->data_base_high = 0;
     table->byte_count = 511U | (1U << 31);
-    active_port[AHCI_PORT_IS / 4] = UINT32_MAX; active_port[AHCI_PORT_CI / 4] = 1;
+    active_port[AHCI_PORT_IS / 4] = UINT32_MAX;
+    ahci_dma_write_barrier();
+    active_port[AHCI_PORT_CI / 4] = 1;
     int completed = 0;
     for (uint32_t wait = 0; wait < 1000000; ++wait) {
+        ahci_dma_read_barrier();
         uint32_t status = active_port[AHCI_PORT_TFD / 4];
         if ((active_port[AHCI_PORT_CI / 4] & 1U) == 0) {
             completed = ahci_command_ok(status, header[0].prdbc, 512); break;
@@ -485,9 +498,12 @@ static int ahci_write_sector_locked(uint64_t lba, const void *buffer) {
     table->command_fis.count_low = 1; table->command_fis.count_high = 0;
     table->data_base = (uint32_t)active_data; table->data_base_high = 0;
     table->byte_count = 511U | (1U << 31);
-    active_port[AHCI_PORT_IS / 4] = UINT32_MAX; active_port[AHCI_PORT_CI / 4] = 1;
+    active_port[AHCI_PORT_IS / 4] = UINT32_MAX;
+    ahci_dma_write_barrier();
+    active_port[AHCI_PORT_CI / 4] = 1;
     int completed = 0;
     for (uint32_t wait = 0; wait < 1000000; ++wait) {
+        ahci_dma_read_barrier();
         uint32_t status = active_port[AHCI_PORT_TFD / 4];
         if ((active_port[AHCI_PORT_CI / 4] & 1U) == 0) {
             completed = ahci_command_ok(status, header[0].prdbc, 512); break;
@@ -548,9 +564,11 @@ static int ahci_io_sectors(uint64_t lba, uint32_t count, void *buffer, int write
         table->byte_count2 = (count * 512U - 4096U - 1U) | (1U << 31);
     }
     active_port[AHCI_PORT_IS / 4] = UINT32_MAX;
+    ahci_dma_write_barrier();
     active_port[AHCI_PORT_CI / 4] = 1;
     int completed = 0;
     for (uint32_t wait = 0; wait < 1000000; ++wait) {
+        ahci_dma_read_barrier();
         uint32_t status = active_port[AHCI_PORT_TFD / 4];
         if ((active_port[AHCI_PORT_CI / 4] & 1U) == 0) {
             completed = ahci_command_ok(status, header[0].prdbc,

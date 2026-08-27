@@ -720,6 +720,8 @@ link-ready implemented SATA port instead of silently skipping all but the first.
 AHCI command completions now retain task-file, interrupt-status, and serial-error
 diagnostics and count failed completions; the boot disk gate asserts a clean
 completion-error count after identify and read/write coverage.
+AHCI command-table and PRDT ownership transitions now use explicit x86 DMA
+write/read barriers around command issuance and completion observation.
 The storage interface now supports optional per-device contexts, and AHCI
 registers each identified port as an independently routable block device;
 QEMU verifies secondary-disk read/write through the generic storage layer.

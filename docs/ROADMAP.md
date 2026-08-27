@@ -1092,6 +1092,9 @@ bus and silently missing devices behind deeper bridge topologies.
 Bridge traversal also validates the bridge's primary-bus field against the
 currently scanned bus before following child ranges, rejecting malformed
 firmware topology metadata without probing an unrelated bus.
+AHCI now preserves each port's interrupt-status bits across IRQ acknowledgement
+until the active command consumes them, preventing the interrupt handler from
+erasing DMA error evidence before completion validation.
 The UEFI memory-map capture now rejects malformed successful firmware results
 unless descriptor size and map length satisfy the boot contract, and bounds
 replacement-map publication to the allocated buffer.

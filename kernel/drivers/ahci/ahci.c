@@ -69,6 +69,7 @@ static volatile uint32_t *active_abar;
 static uint32_t active_port_number;
 static int ahci_irq_enabled;
 static volatile uint32_t ahci_interrupts;
+static volatile uint32_t ahci_pending_port_status[32];
 static spinlock_t ahci_lock;
 static int ahci_io_disabled;
 static uint64_t active_sector_count;
@@ -129,6 +130,8 @@ static int ahci_finish_command(int completed) {
 static int ahci_command_ok(uint32_t task_file, uint32_t transferred,
                            uint32_t expected) {
     uint32_t interrupt_status = active_port[AHCI_PORT_IS / 4];
+    interrupt_status |= __atomic_exchange_n(
+        &ahci_pending_port_status[active_port_number], 0U, __ATOMIC_ACQUIRE);
     uint32_t serial_error = active_port[AHCI_PORT_SERR / 4];
     if (interrupt_status & AHCI_PORT_IS_ERROR_MASK)
         active_port[AHCI_PORT_IS / 4] =
@@ -163,6 +166,8 @@ static int ahci_probe(device_t *device) {
     ready_port_mask = 0;
     for (uint32_t port = 0; port < 32; ++port)
         port_state[port] = (ahci_port_state_t){0};
+    for (uint32_t port = 0; port < 32; ++port)
+        ahci_pending_port_status[port] = 0;
     active_port = 0; active_command_list = 0; active_command_table = 0;
     active_data = 0; active_data_pages = 0; ahci_last_prdt_length = 0;
     ahci_io_disabled = 0;
@@ -272,7 +277,9 @@ void ahci_interrupt_handler(void) {
             continue;
         uint32_t status = port_state[port].regs[AHCI_PORT_IS / 4];
         if (status == 0) continue;
-        ++ahci_interrupts;
+        __atomic_fetch_or(&ahci_pending_port_status[port], status,
+                          __ATOMIC_RELEASE);
+        __atomic_fetch_add(&ahci_interrupts, 1U, __ATOMIC_RELAXED);
         port_state[port].regs[AHCI_PORT_IS / 4] = status;
         handled |= 1U << port;
     }

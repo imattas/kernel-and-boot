@@ -490,6 +490,9 @@ duplicate driver names before binding.
 Device publication now accepts only supported PCI devices and clears any
 caller-supplied driver/resource-owner state before exposing the device to the
 binding layer.
+PCI device publication now rejects same-space BAR ranges that overflow or
+overlap, preventing distinct resource claims from aliasing one hardware range.
+The QEMU boot probe exercises rejection of overlapping PCI resource ranges.
 Driver registration now rejects empty names and unsupported bus identifiers,
 keeping the published driver table compatible with the device model’s actual
 binding domain.

@@ -400,6 +400,16 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("device model ready\r\n");
+    device_t invalid_resource_device = {0};
+    invalid_resource_device.bus = DEVICE_BUS_PCI;
+    invalid_resource_device.resources[0].address = 0x1000;
+    invalid_resource_device.resources[0].size = 0x100;
+    invalid_resource_device.resources[1].address = 0x1080;
+    invalid_resource_device.resources[1].size = 0x80;
+    if (device_register(&invalid_resource_device)) {
+        serial_write("device resource validation failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
     if (!kernel_init_state_advance(&init_state, KERNEL_INIT_DRIVERS))
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     if (!uhci_initialize()) {

@@ -32,8 +32,23 @@ int device_register(const device_t *device) {
     if (!device || device->bus != DEVICE_BUS_PCI) return 0;
     device_t published = *device;
     published.driver = 0;
-    for (uint32_t resource = 0; resource < 6; ++resource)
+    for (uint32_t resource = 0; resource < 6; ++resource) {
         published.resource_owner[resource] = 0;
+        if (published.resources[resource].size != 0 &&
+            published.resources[resource].address > UINT64_MAX -
+                published.resources[resource].size)
+            return 0;
+        for (uint32_t previous = 0; previous < resource; ++previous) {
+            device_resource_t *left = &published.resources[previous];
+            device_resource_t *right = &published.resources[resource];
+            if (left->size == 0 || right->size == 0 ||
+                (left->flags & 1U) != (right->flags & 1U)) continue;
+            uint64_t left_end = left->address + left->size;
+            uint64_t right_end = right->address + right->size;
+            if (left->address < right_end && right->address < left_end)
+                return 0;
+        }
+    }
     uint64_t flags = spinlock_lock_irqsave(&registry_lock);
     if (registry_count >= DEVICE_REGISTRY_CAPACITY) {
         spinlock_unlock_irqrestore(&registry_lock, flags);

@@ -94,6 +94,21 @@ void ps2_keyboard_irq(void) {
     if (keyboard_queue) (void)ps2_keyboard_poll(keyboard_queue);
 }
 
+int ps2_mouse_decode(const uint8_t packet[3], input_event_t events[3],
+                     uint32_t *event_count) {
+    if (!packet || !events || !event_count || (packet[0] & 0x08U) == 0 ||
+        (packet[0] & 0xc0U) != 0) return 0;
+    int32_t x = (int32_t)(int8_t)packet[1];
+    int32_t y = (int32_t)(int8_t)packet[2];
+    uint64_t timestamp = timer_ticks();
+    events[0] = (input_event_t){INPUT_EVENT_BUTTON, 0,
+                                (int32_t)(packet[0] & 0x07U), timestamp};
+    events[1] = (input_event_t){INPUT_EVENT_AXIS, 0, x, timestamp};
+    events[2] = (input_event_t){INPUT_EVENT_AXIS, 1, y, timestamp};
+    *event_count = 3;
+    return 1;
+}
+
 int ps2_keyboard_poll(input_queue_t *queue) {
     if (!queue || (in8(0x64) & 1) == 0) return 0;
     uint8_t scancode = in8(0x60);

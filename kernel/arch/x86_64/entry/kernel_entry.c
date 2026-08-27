@@ -1434,6 +1434,22 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("PS2 keyboard ready\r\n");
+    static const uint8_t ps2_mouse_probe_packet[3] = {0x09, 0x05, 0xfb};
+    input_event_t ps2_mouse_probe_events[3];
+    uint32_t ps2_mouse_probe_count = 0;
+    if (!ps2_mouse_decode(ps2_mouse_probe_packet, ps2_mouse_probe_events,
+                          &ps2_mouse_probe_count) ||
+        ps2_mouse_probe_count != 3 ||
+        ps2_mouse_probe_events[0].type != INPUT_EVENT_BUTTON ||
+        ps2_mouse_probe_events[0].value != 1 ||
+        ps2_mouse_probe_events[1].type != INPUT_EVENT_AXIS ||
+        ps2_mouse_probe_events[1].value != 5 ||
+        ps2_mouse_probe_events[2].code != 1 ||
+        ps2_mouse_probe_events[2].value != -5) {
+        serial_write("PS2 mouse packet failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("PS2 mouse packet ready\r\n");
     kernel_assert(kernel_debug_range_valid(0x100, 0x200, 0x1000),
                   "debug range assertion failure");
     kernel_assert(!kernel_debug_range_valid(0x1000, 1, 0x1000),

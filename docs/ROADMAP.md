@@ -664,6 +664,8 @@ AHCI sector I/O now uses ATA 48-bit DMA commands and rejects LBAs outside the
 48-bit address range instead of silently truncating them.
 NVMe I/O now enforces the namespace size reported by IDENTIFY before PRP
 allocation and command submission.
+PS/2 mouse packets now have a validated decoder that rejects bad sync and
+overflow bits and emits button, X-axis, and Y-axis input events.
 
 ## Phase 10 — Userland begins after the kernel gate
 

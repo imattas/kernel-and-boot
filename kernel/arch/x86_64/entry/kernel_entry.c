@@ -100,6 +100,13 @@ static int block_probe_write(void *context, uint64_t sector, uint32_t count,
         destination[sector * 16U + i] = source[i];
     return 1;
 }
+static int vfs_probe_write(vfs_node_t *node, uint64_t offset,
+                           const void *buffer, uint32_t size) {
+    uint8_t *storage = (uint8_t *)node->private_data;
+    if (!storage || offset > 16 || size > 16 - offset) return 0;
+    for (uint32_t i = 0; i < size; ++i) storage[offset + i] = ((const uint8_t *)buffer)[i];
+    return (int)size;
+}
 
 static void preempt_task_a(void *argument) {
     uint64_t deadline = *(uint64_t *)argument;
@@ -1294,6 +1301,21 @@ void kernel_main(void *boot_info) {
     }
     vfs_node_release(vfs_first_child);
     serial_write("VFS directory iteration ready\r\n");
+    uint8_t vfs_write_storage[16] = {0};
+    static const uint8_t vfs_write_data[4] = {'v', 'f', 's', '!'};
+    vfs_node_t *vfs_write_node = vfs_node_create("write_probe", VFS_NODE_REGULAR,
+                                                  0, 0, 0644);
+    if (!vfs_write_node || !vfs_node_set_write(vfs_write_node, vfs_probe_write,
+                                               vfs_write_storage) ||
+        vfs_node_write(vfs_write_node, 4, vfs_write_data,
+                       sizeof(vfs_write_data)) != sizeof(vfs_write_data) ||
+        vfs_write_storage[4] != 'v' || vfs_write_storage[7] != '!') {
+        if (vfs_write_node) vfs_node_release(vfs_write_node);
+        serial_write("VFS write failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    vfs_node_release(vfs_write_node);
+    serial_write("VFS write ready\r\n");
     vfs_node_t *proc_root = procfs_create(42);
     vfs_node_t *proc_pid = proc_root ?
         vfs_lookup_path(proc_root, "/self/pid") : 0;

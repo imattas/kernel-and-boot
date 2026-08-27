@@ -49,6 +49,7 @@ grep -F 'ipc blocking ready' "$log" >/dev/null
 grep -F 'security policy ready' "$log" >/dev/null
 grep -F 'VFS core ready' "$log" >/dev/null
 grep -F 'VFS directory iteration ready' "$log" >/dev/null
+grep -F 'VFS write ready' "$log" >/dev/null
 grep -F 'devfs ready' "$log" >/dev/null
 grep -F 'procfs ready' "$log" >/dev/null
 grep -F 'block interface ready' "$log" >/dev/null

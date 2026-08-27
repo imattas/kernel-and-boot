@@ -37,6 +37,7 @@ vfs_node_t *vfs_node_create(const char *name, vfs_node_type_t type,
     node->mode = mode;
     node->type = type;
     node->read = 0;
+    node->write = 0;
     node->private_data = 0;
     node->private_destroy = 0;
     for (uint32_t i = 0; i <= length; ++i) node->name[i] = name[i];
@@ -59,12 +60,25 @@ int vfs_node_set_private_destructor(vfs_node_t *node,
 int vfs_node_set_read(vfs_node_t *node, vfs_read_fn read, void *private_data) {
     if (!node || !read) return 0;
     uint64_t flags = spinlock_lock_irqsave(&node->lock);
-    if (node->read || node->private_data) {
+    if (node->read || (node->private_data && node->private_data != private_data)) {
         spinlock_unlock_irqrestore(&node->lock, flags);
         return 0;
     }
     node->read = read;
     node->private_data = private_data;
+    spinlock_unlock_irqrestore(&node->lock, flags);
+    return 1;
+}
+
+int vfs_node_set_write(vfs_node_t *node, vfs_write_fn write, void *private_data) {
+    if (!node || !write) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&node->lock);
+    if (node->write || (node->private_data && node->private_data != private_data)) {
+        spinlock_unlock_irqrestore(&node->lock, flags);
+        return 0;
+    }
+    node->write = write;
+    if (!node->private_data) node->private_data = private_data;
     spinlock_unlock_irqrestore(&node->lock, flags);
     return 1;
 }
@@ -92,6 +106,15 @@ int vfs_node_read(vfs_node_t *node, uint64_t offset, void *buffer, uint32_t size
     vfs_read_fn read = node->read;
     spinlock_unlock_irqrestore(&node->lock, flags);
     return read ? read(node, offset, buffer, size) : 0;
+}
+
+int vfs_node_write(vfs_node_t *node, uint64_t offset, const void *buffer,
+                   uint32_t size) {
+    if (!node || !buffer || size == 0) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&node->lock);
+    vfs_write_fn write = node->write;
+    spinlock_unlock_irqrestore(&node->lock, flags);
+    return write ? write(node, offset, buffer, size) : 0;
 }
 
 int vfs_node_add_child(vfs_node_t *parent, vfs_node_t *child) {

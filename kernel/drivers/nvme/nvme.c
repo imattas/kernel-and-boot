@@ -73,6 +73,12 @@ static int nvme_wait_ready(volatile uint32_t *regs, uint32_t expected) {
     return 0;
 }
 
+static int nvme_stop_controller(volatile uint32_t *regs) {
+    if (!regs) return 0;
+    regs[NVME_CC / 4] &= ~NVME_CC_EN;
+    return nvme_wait_ready(regs, 0);
+}
+
 static int nvme_abort_controller(void) {
     if (!active_regs) {
         nvme_disabled = 1;
@@ -150,6 +156,12 @@ static int nvme_probe(device_t *device) {
     ++controllers;
     return 1;
 fail:
+    if (active_regs == regs && nvme_disabled) return 0;
+    if (active_regs == regs && !nvme_stop_controller(regs)) {
+        nvme_disabled = 1;
+        return 0;
+    }
+    active_regs = 0;
     if (asq) physical_free_frame(asq);
     if (acq) physical_free_frame(acq);
     active_regs = 0; active_asq = 0; active_acq = 0;
@@ -302,6 +314,15 @@ static int nvme_initialize_io(void) {
     active_io_ready = 1;
     return 1;
 fail:
+    if (!nvme_stop_controller(active_regs)) {
+        active_io_sq = io_sq;
+        active_io_cq = io_cq;
+        nvme_disabled = 1;
+        return 0;
+    }
+    active_io_ready = 0;
+    active_io_sq = 0;
+    active_io_cq = 0;
     physical_free_frame(io_sq);
     physical_free_frame(io_cq);
     return 0;

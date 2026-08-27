@@ -688,6 +688,10 @@ cannot confirm `CSTS.RDY=0`, preventing DMA use-after-free and rejecting later
 queue commands on the wedged controller.
 NVMe recovery now permanently disables a controller after any timeout and
 releases admin and I/O queue frames only after `CSTS.RDY=0` confirms quiescence.
+NVMe initialization failures now use the same bounded controller-stop contract
+before releasing failed admin/I/O queues; if readiness cannot be cleared, the
+queues remain quarantined and the controller stays disabled instead of risking
+DMA use-after-free.
 NVMe public I/O now splits larger valid requests into bounded 8-sector commands,
 and QEMU verifies a ten-sector write/read-back across that boundary.
 NVMe probing now validates the CAP-advertised doorbell stride against the full

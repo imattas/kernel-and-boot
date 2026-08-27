@@ -403,7 +403,7 @@ $(KERNEL_E1000_OBJ): kernel/drivers/network/e1000.c kernel/drivers/network/e1000
 	$(CC) -target x86_64-pc-none-elf -std=c11 -ffreestanding -fno-builtin -fno-stack-protector -fPIE -fno-plt \
 		-mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@
 
-$(KERNEL_E1000_IRQ_OBJ): kernel/arch/x86_64/interrupts/e1000.asm | $(BUILD_DIR)/kernel
+$(KERNEL_E1000_IRQ_OBJ): kernel/arch/x86_64/interrupts/e1000.asm kernel/drivers/network/e1000.h | $(BUILD_DIR)/kernel
 	$(NASM) -f elf64 $< -o $@
 
 

@@ -18,6 +18,7 @@
 #define NVME_CAP_MQES_MASK 0xffffU
 #define NVME_CAP_DSTRD_SHIFT 32
 #define NVME_ADMIN_SQ_DOORBELL 0x1000
+#define NVME_TIMEOUT_ATTEMPTS 10000000U
 
 static uint32_t controllers;
 static volatile uint32_t *active_regs;
@@ -49,7 +50,7 @@ static int nvme_match(const device_t *device) {
 }
 
 static int nvme_wait_ready(volatile uint32_t *regs, uint32_t expected) {
-    for (uint32_t i = 0; i < 1000000; ++i)
+    for (uint32_t i = 0; i < NVME_TIMEOUT_ATTEMPTS; ++i)
         if ((regs[NVME_CSTS / 4] & NVME_CSTS_RDY) == expected) return 1;
     return 0;
 }
@@ -155,7 +156,7 @@ static int nvme_submit_admin_words(uint8_t opcode, uint32_t namespace_id,
     volatile uint32_t *sq_tail_doorbell =
         (volatile uint32_t *)((uintptr_t)active_regs + NVME_ADMIN_SQ_DOORBELL);
     *sq_tail_doorbell = active_sq_tail;
-    for (uint32_t wait = 0; wait < 1000000; ++wait) {
+    for (uint32_t wait = 0; wait < NVME_TIMEOUT_ATTEMPTS; ++wait) {
         volatile nvme_completion_t *completion = &cq[active_cq_head];
         uint16_t status = completion->status;
         if ((status & 1U) != active_cq_phase) continue;
@@ -285,7 +286,7 @@ static int nvme_io(uint64_t lba, void *buffer, uint32_t count, int write) {
     *sq_doorbell = active_io_sq_tail;
     int success = 0;
     int completed = 0;
-    for (uint32_t wait = 0; wait < 1000000; ++wait) {
+    for (uint32_t wait = 0; wait < NVME_TIMEOUT_ATTEMPTS; ++wait) {
         volatile nvme_completion_t *completion = &cq[active_io_cq_head];
         uint16_t status = completion->status;
         if ((status & 1U) != active_io_cq_phase ||

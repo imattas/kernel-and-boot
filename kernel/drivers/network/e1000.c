@@ -59,6 +59,7 @@ static uint32_t e1000_tx_pending;
 static uint32_t e1000_rx_index;
 static spinlock_t e1000_lock;
 static int e1000_msi_enabled;
+static volatile uint32_t e1000_interrupts;
 
 static int e1000_match(const device_t *device) {
     return device && device->bus == DEVICE_BUS_PCI && device->class_code == 0x02 &&
@@ -131,6 +132,7 @@ int e1000_initialize(void) {
     controllers = 0; e1000_regs = 0; e1000_tx_ring = 0; e1000_rx_ring = 0;
     e1000_tx_pending = 0;
     e1000_msi_enabled = 0;
+    e1000_interrupts = 0;
     spinlock_init(&e1000_lock);
     for (uint32_t i = 0; i < E1000_RING_COUNT; ++i) {
         e1000_rx_buffers[i] = 0;
@@ -142,6 +144,8 @@ int e1000_initialize(void) {
 }
 uint32_t e1000_controller_count(void) { return controllers; }
 int e1000_interrupt_enabled(void) { return e1000_msi_enabled; }
+uint32_t e1000_interrupt_count(void) { return e1000_interrupts; }
+void e1000_interrupt_handler(void) { ++e1000_interrupts; }
 
 int e1000_transmit(const void *data, uint16_t length) {
     if (!e1000_regs || !e1000_tx_ring || !data || length == 0 || length > 2048)

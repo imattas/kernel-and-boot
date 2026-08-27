@@ -996,6 +996,20 @@ void kernel_main(void *boot_info) {
     task_context_switch(&task_demo_main, &task_demo_worker);
     serial_write("task context returned\r\n");
     interrupts_initialize();
+    if (e1000_controller_count() != 0) {
+        static const uint8_t e1000_interrupt_packet[60] = {0};
+        if (!e1000_transmit(e1000_interrupt_packet,
+                            sizeof(e1000_interrupt_packet))) {
+            serial_write("e1000 interrupt probe transmit failure\r\n");
+            for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+        }
+        timer_wait(10);
+        if (e1000_interrupt_count() == 0) {
+            serial_write("e1000 interrupt delivery failure\r\n");
+            for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+        }
+        serial_write("e1000 interrupt delivery ready\r\n");
+    }
     timer_wait(10);
     serial_write("timer ticks="); serial_write_hex(timer_ticks()); serial_write("\r\n");
     serial_write("time ns="); serial_write_hex(timer_now_ns()); serial_write(" hz=");

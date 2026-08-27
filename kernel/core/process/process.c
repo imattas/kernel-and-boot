@@ -176,6 +176,12 @@ int process_send_signal(process_t *process, uint32_t signal) {
     return 1;
 }
 
+int process_can_signal(const process_t *caller, const process_t *target) {
+    if (!caller || !target) return 0;
+    return caller == target || caller->security.uid == target->security.uid ||
+           security_has_capability(&caller->security, SECURITY_CAP_SYS_ADMIN);
+}
+
 int process_set_signal_mask(process_t *process, uint32_t mask) {
     if (!process) return 0;
     uint64_t flags = spinlock_lock_irqsave(&process->lock);

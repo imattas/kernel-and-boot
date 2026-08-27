@@ -45,6 +45,7 @@ int process_activate(process_t *process);
 int process_destroy(process_t *process);
 process_t *process_current(void);
 int process_send_signal(process_t *process, uint32_t signal);
+int process_can_signal(const process_t *caller, const process_t *target);
 int process_set_signal_mask(process_t *process, uint32_t mask);
 int process_take_signal(process_t *process, uint32_t *signal);
 int process_terminate(process_t *process, int32_t status);

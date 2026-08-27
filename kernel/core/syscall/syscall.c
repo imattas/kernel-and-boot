@@ -67,8 +67,10 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
                    !process_send_signal(process_current(), (uint32_t)arg1) ?
                    OS_SYSCALL_ERROR : 0;
         case OS_SYSCALL_SIGNAL_SEND_TO: {
+            process_t *caller = process_current();
             process_t *target = process_lookup(arg1);
-            return !valid_signal_number(arg2) ||
+            return !process_can_signal(caller, target) ||
+                   !valid_signal_number(arg2) ||
                    !process_send_signal(target, (uint32_t)arg2) ?
                    OS_SYSCALL_ERROR : 0;
         }

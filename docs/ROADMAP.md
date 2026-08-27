@@ -433,6 +433,8 @@ lists now use per-process IRQ-safe locking, with locked teardown helpers that
 avoid recursive lock acquisition.
 Current-process publication and lookup now use the process-table lock, so
 syscall and lifecycle paths cannot race on the active process pointer.
+Cross-process signal syscalls now require the same UID or
+`SECURITY_CAP_SYS_ADMIN`; self-signaling remains valid for every live process.
 Physical-memory initialization now rejects zero-sized or overflowing kernel
 ranges before reserving kernel frames, avoiding bitmap corruption from a bad
 firmware boot contract.

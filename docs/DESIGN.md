@@ -205,8 +205,9 @@ Owns kernel debugging infrastructure, assertions, tracing, symbol-related facili
 
 ### `security`
 Owns process credentials, capability bits, and deterministic owner/group/other
-access checks. Security context is part of every process object so later
-syscall and VFS policy can enforce the same boundary.
+access checks. Security context is part of every process object so syscall and
+VFS policy can enforce the same boundary. Cross-process signal delivery is
+limited to same-UID callers or callers holding `CAP_SYS_ADMIN`.
 
 ## Toolchain
 

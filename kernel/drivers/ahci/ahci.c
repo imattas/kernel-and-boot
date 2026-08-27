@@ -32,6 +32,8 @@
 #define AHCI_SIGNATURE_SATA 0x00000101U
 #define AHCI_ATA_READ_DMA_EXT 0x25U
 #define AHCI_ATA_WRITE_DMA_EXT 0x35U
+#define AHCI_ATA_FLUSH_CACHE 0xe7U
+#define AHCI_ATA_FLUSH_CACHE_EXT 0xeaU
 #define AHCI_MAX_LBA 0x0000ffffffffffffULL
 #define AHCI_LEGACY_MAX_LBA 0x0fffffffULL
 #define AHCI_IRQ_VECTOR 0x54
@@ -419,6 +421,43 @@ static int ahci_identify_ready_ports_locked(void) {
     return ready_ports != 0;
 }
 
+static int ahci_flush_locked(void) {
+    if (ahci_io_disabled || !active_port || !active_command_list ||
+        active_data || !active_sector_count) return 0;
+    active_command_table = physical_alloc_frame();
+    if (!active_command_table) return 0;
+    active_data_pages = 0;
+    for (uint32_t i = 0; i < 1024; ++i)
+        ((uint32_t *)(uintptr_t)active_command_table)[i] = 0;
+    ahci_command_header_t *header =
+        (ahci_command_header_t *)(uintptr_t)active_command_list;
+    header[0].flags = 5U;
+    header[0].prdt_length = 0;
+    header[0].prdbc = 0;
+    header[0].ctba = (uint32_t)active_command_table;
+    header[0].ctbau = 0;
+    ahci_command_table_t *table =
+        (ahci_command_table_t *)(uintptr_t)active_command_table;
+    table->command_fis.fis_type = 0x27;
+    table->command_fis.flags = 0x80;
+    table->command_fis.command = active_lba48 ?
+        AHCI_ATA_FLUSH_CACHE_EXT : AHCI_ATA_FLUSH_CACHE;
+    table->command_fis.device = 0x40;
+    active_port[AHCI_PORT_IS / 4] = UINT32_MAX;
+    ahci_dma_write_barrier();
+    active_port[AHCI_PORT_CI / 4] = 1;
+    int completed = 0;
+    for (uint32_t wait = 0; wait < 1000000; ++wait) {
+        ahci_dma_read_barrier();
+        uint32_t status = active_port[AHCI_PORT_TFD / 4];
+        if ((active_port[AHCI_PORT_CI / 4] & 1U) == 0) {
+            completed = ahci_command_ok(status, header[0].prdbc, 0);
+            break;
+        }
+    }
+    return ahci_finish_command(completed);
+}
+
 static int ahci_read_sector_locked(uint64_t lba, void *buffer) {
     if (ahci_io_disabled || !ahci_lba_valid(lba, 1) || !active_port ||
         !active_command_list || !buffer || active_data) return 0;
@@ -617,7 +656,8 @@ static int ahci_storage_write_context(uint64_t lba, uint32_t count,
     int result = port < 32 && port_state[port].identified;
     if (result) {
         ahci_select_port_locked(port);
-        result = ahci_io_range_locked(lba, count, (void *)buffer, 1);
+        result = ahci_io_range_locked(lba, count, (void *)buffer, 1) &&
+                 ahci_flush_locked();
     }
     spinlock_unlock_irqrestore(&ahci_lock, flags);
     return result;
@@ -684,7 +724,7 @@ int ahci_read_sector(uint64_t lba, void *buffer) {
 
 int ahci_write_sector(uint64_t lba, const void *buffer) {
     uint64_t flags = spinlock_lock_irqsave(&ahci_lock);
-    int result = ahci_write_sector_locked(lba, buffer);
+    int result = ahci_write_sector_locked(lba, buffer) && ahci_flush_locked();
     spinlock_unlock_irqrestore(&ahci_lock, flags);
     return result;
 }
@@ -698,7 +738,8 @@ int ahci_read_sectors(uint64_t lba, uint32_t count, void *buffer) {
 
 int ahci_write_sectors(uint64_t lba, uint32_t count, const void *buffer) {
     uint64_t flags = spinlock_lock_irqsave(&ahci_lock);
-    int result = ahci_io_range_locked(lba, count, (void *)buffer, 1);
+    int result = ahci_io_range_locked(lba, count, (void *)buffer, 1) &&
+                 ahci_flush_locked();
     spinlock_unlock_irqrestore(&ahci_lock, flags);
     return result;
 }

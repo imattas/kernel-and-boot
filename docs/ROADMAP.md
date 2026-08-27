@@ -725,6 +725,9 @@ diagnostics and count failed completions; the boot disk gate asserts a clean
 completion-error count after identify and read/write coverage.
 AHCI command-table and PRDT ownership transitions now use explicit x86 DMA
 write/read barriers around command issuance and completion observation.
+AHCI write entry points now issue and validate ATA FLUSH CACHE commands after
+successful DMA writes, extending the durability boundary to AHCI-backed
+storage devices.
 The storage interface now supports optional per-device contexts, and AHCI
 registers each identified port as an independently routable block device;
 QEMU verifies secondary-disk read/write through the generic storage layer.

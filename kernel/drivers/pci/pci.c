@@ -84,10 +84,11 @@ int pci_enable_msix(const device_t *device, uint8_t vector) {
             uint32_t bir = table & 7U;
             uint64_t offset = table & ~7U;
             if (table_entries == 0 || bir >= 6 ||
-                device->resources[bir].size < offset + 16U ||
+                (device->resources[bir].flags & 1U) != 0 ||
+                offset > device->resources[bir].size ||
+                device->resources[bir].size - offset < 16U ||
                 device->resources[bir].address == 0 ||
-                device->resources[bir].address >= 0x100000000ULL ||
-                offset > UINT64_MAX - 16U) return 0;
+                device->resources[bir].address >= 0x100000000ULL) return 0;
             volatile uint32_t *entry = (volatile uint32_t *)(uintptr_t)
                 (device->resources[bir].address + offset);
             uint16_t masked_control = (uint16_t)(control | (1U << 14));

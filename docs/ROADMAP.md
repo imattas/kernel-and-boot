@@ -345,6 +345,8 @@ ACPI IOAPIC discovery now retains bounded multi-IOAPIC GSI ranges and routes
 each legacy PCI IRQ through the controller that owns its GSI.
 PCI now programs a validated single-entry MSI-X table when available, with
 MSI and ACPI IOAPIC fallback retained for devices without usable MSI-X.
+PCI MSI-X table validation now rejects I/O BARs and uses overflow-safe resource
+offset arithmetic before touching the table entry.
 NVMe namespace I/O now supports bounded multi-sector transfers within one DMA
 page and is covered by a real two-sector write/read-back QEMU check. Admin and
 namespace queue state is serialized with an interrupt-safe lock; timed-out

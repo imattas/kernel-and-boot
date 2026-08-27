@@ -1095,6 +1095,9 @@ firmware topology metadata without probing an unrelated bus.
 The kernel now exercises its privilege boundary with a mapped user image that
 enters ring 3, invokes the user-callable exit gate, returns through the
 scheduler, and is reaped without populating `userland/`.
+The ring-3 probe now performs a real user `write` syscall from a user-mapped
+buffer before exiting, covering the syscall register ABI and copy-from-user
+path during the same scheduler return test.
 The ring-3 entry stub now initializes user argument registers instead of
 leaking the kernel bootstrap's entry pointer into the first syscall argument;
 the exit transition probe validates the corrected boundary.

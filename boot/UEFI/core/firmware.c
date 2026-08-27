@@ -37,6 +37,11 @@ void uefi_find_framebuffer(efi_boot_services_t *bs, os_boot_info_t *info) {
         !mode->vertical_resolution ||
         mode->pixels_per_scan_line < mode->horizontal_resolution ||
         !gop->mode->framebuffer_base) return;
+    uint64_t pixels = (uint64_t)mode->pixels_per_scan_line *
+                      mode->vertical_resolution;
+    if (pixels > UINT64_MAX / 4ULL ||
+        gop->mode->framebuffer_size < pixels * 4ULL ||
+        gop->mode->framebuffer_base > UINT64_MAX - pixels * 4ULL) return;
     info->framebuffer_base = gop->mode->framebuffer_base;
     info->framebuffer_size = gop->mode->framebuffer_size;
     info->framebuffer_width = mode->horizontal_resolution;

@@ -326,6 +326,8 @@ Successful memory-map replacement now releases the original pool, and the
 UEFI loader releases the relocated kernel-file buffer before ExitBootServices.
 The ELF loader now falls back from its preferred physical base to a bounded
 below-4-GiB allocation when that address is unavailable.
+UEFI GOP handoff now validates pitch/height multiplication, framebuffer size,
+and address-range overflow before publishing framebuffer metadata.
 
 ## Phase 9 — Userspace boundary
 

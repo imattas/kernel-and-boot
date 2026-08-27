@@ -15,7 +15,7 @@ static uint64_t frame_content_size(const uint8_t *header, uint32_t descriptor,
     uint32_t size = 0;
     if (single_segment) {
         if (flag == 0) return header[0];
-        if (flag == 1) return (uint32_t)header[0] | ((uint32_t)header[1] << 8) + 256U;
+        if (flag == 1) return ((uint32_t)header[0] | ((uint32_t)header[1] << 8)) + 256U;
         if (flag == 2) return le32(header);
         return le64(header);
     }

@@ -188,12 +188,13 @@ int pci_enable_legacy_irq(const device_t *device, uint8_t vector) {
            arch_ioapic_route_irq(device->irq_line, vector);
 }
 
-static void enable_device(uint8_t bus, uint8_t slot, uint8_t function) {
+static int enable_device(uint8_t bus, uint8_t slot, uint8_t function) {
     uint32_t command_status = config_read(bus, slot, function, 0x04);
     uint16_t command = (uint16_t)command_status;
     command = (uint16_t)(command | 0x0007U);
     config_write(bus, slot, function, 0x04,
                  (command_status & 0xffff0000U) | command);
+    return (config_read(bus, slot, function, 0x04) & 0x0007U) == 0x0007U;
 }
 
 static uint64_t bar_size(uint32_t mask, uint64_t high_mask, int wide) {
@@ -292,8 +293,8 @@ static void scan_function(uint8_t bus, uint8_t slot, uint8_t function) {
     };
     uint8_t header = config_read8(bus, slot, function, PCI_HEADER_TYPE);
     read_resources(&device, header);
-    enable_device(bus, slot, function);
-    if (device_register(&device)) ++discovered;
+    if (enable_device(bus, slot, function) && device_register(&device))
+        ++discovered;
 
     if ((header & 0x7fu) == 1u && device.class_code == 0x06u &&
         device.subclass == 0x04u) {

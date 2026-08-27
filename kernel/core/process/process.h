@@ -44,6 +44,9 @@ typedef struct process {
 } process_t;
 
 process_t *process_create(uint64_t id);
+process_t *process_create_user(uint64_t id, const void *image, uint64_t image_size,
+                               uint64_t stack_base, uint32_t thread_id,
+                               uint64_t kernel_stack_size);
 int process_initialize(void);
 process_t *process_lookup(uint64_t id);
 process_t *process_lookup_retain(uint64_t id);

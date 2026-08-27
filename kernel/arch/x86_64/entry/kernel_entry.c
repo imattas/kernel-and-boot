@@ -2083,6 +2083,15 @@ void kernel_main(void *boot_info) {
         serial_write("user process setup failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
+    process_t *constructed_process = process_create_user(
+        7, user_image_probe, sizeof(user_image_probe), 0x8000010000ULL,
+        70, 4096);
+    if (!constructed_process || constructed_process->state != PROCESS_READY ||
+        constructed_process->thread_count != 1 ||
+        !process_destroy(constructed_process)) {
+        serial_write("user process construction failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
     process_thread_t *user_context_probe = process_thread_create_user(
         runtime_process, 2, runtime_process->image.entry,
         runtime_process->user_stack_top, 4096);

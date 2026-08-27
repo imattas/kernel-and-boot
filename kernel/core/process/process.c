@@ -81,6 +81,21 @@ process_t *process_create(uint64_t id) {
     return 0;
 }
 
+process_t *process_create_user(uint64_t id, const void *image,
+                               uint64_t image_size, uint64_t stack_base,
+                               uint32_t thread_id, uint64_t kernel_stack_size) {
+    if (thread_id == 0 || kernel_stack_size < PAGE_SIZE) return 0;
+    process_t *process = process_create(id);
+    if (!process || !process_load_image(process, image, image_size) ||
+        !process_map_user_stack(process, stack_base) ||
+        !process_thread_create_user(process, thread_id, process->image.entry,
+                                    process->user_stack_top, kernel_stack_size)) {
+        if (process) process_destroy(process);
+        return 0;
+    }
+    return process;
+}
+
 process_t *process_lookup(uint64_t id) {
     if (id == 0) return 0;
     uint64_t flags = spinlock_lock_irqsave(&process_table_lock);

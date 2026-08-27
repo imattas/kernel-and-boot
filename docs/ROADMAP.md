@@ -35,6 +35,8 @@ Create the UEFI executable environment and loader architecture. Establish firmwa
 The syscall ABI now exposes validated waiting for an exited process, including
 retained process lookup, user-status copyout, self-wait rejection, and cleanup
 of the retained process object.
+Process construction now has an atomic kernel helper that owns ELF loading,
+the complete user stack, and the initial user task, with teardown on failure.
 
 Establish early stack/state assumptions, descriptor tables, exception handling, interrupt infrastructure, CPU feature discovery, panic/diagnostic paths, and a documented boot-to-kernel contract.
 

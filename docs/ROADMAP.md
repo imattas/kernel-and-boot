@@ -292,7 +292,9 @@ ATA PIO probing now also requires aligned task-file/control BARs with register
 spans large enough for the complete ATA register windows before port access.
 ATA PIO task-file access and shared IDENTIFY metadata are now serialized with
 an IRQ-safe driver lock, preventing concurrent SMP callers from interleaving
-register programming or observing partial geometry state.
+register programming or observing partial geometry state. ATA PIO writes now
+issue and validate the appropriate cache-flush command before reporting
+completion, and IDENTIFY rejects ATAPI/non-LBA disk types.
 Driver enumeration and hardware
 coverage remain incomplete. The QEMU gate now supplies an emulated e1000 NIC
 so its controller path and bounded TX/RX descriptor operations can be exercised;

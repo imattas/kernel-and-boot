@@ -54,6 +54,9 @@ static int identify(void) {
     if (!wait_status(0x88, 0x08)) return 0;
     uint16_t identify_data[256];
     for (uint32_t i = 0; i < 256; ++i) identify_data[i] = in16(io_base);
+    /* Word zero distinguishes ATA disks from ATAPI devices. */
+    if ((identify_data[0] & 0x8000U) != 0 ||
+        (identify_data[49] & (1U << 9)) == 0) return 0;
     uint64_t lba48 = (uint64_t)identify_data[100] |
                      ((uint64_t)identify_data[101] << 16) |
                      ((uint64_t)identify_data[102] << 32) |
@@ -101,7 +104,8 @@ static int ata_read_locked(uint64_t lba, uint32_t count, void *buffer) {
             output[sector * 512 + word * 2 + 1] = (uint8_t)(value >> 8);
         }
     }
-    return 1;
+    out8(io_base + 7, lba48_supported ? 0xea : 0xe7);
+    return wait_status(0x80, 0);
 }
 
 static int ata_write_locked(uint64_t lba, uint32_t count, const void *buffer) {

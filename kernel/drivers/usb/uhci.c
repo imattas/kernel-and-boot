@@ -32,7 +32,7 @@
 #define UHCI_IRQ_VECTOR 0x51
 #define UHCI_INTR_MASK 0x0007U
 
-extern void arch_e1000_irq_stub(void);
+extern void arch_pci_shared_irq_stub(void);
 
 static uint32_t controllers;
 static uint32_t root_ports;
@@ -161,7 +161,7 @@ static int uhci_probe(device_t *device) {
     __asm__ volatile ("outl %0, %1" :: "a"((uint32_t)frame_list),
                       "Nd"((uint16_t)(base + UHCI_FLBASEADD)));
     __asm__ volatile ("outb %0, %1" :: "a"((uint8_t)64), "Nd"((uint16_t)(base + UHCI_SOFMOD)));
-    arch_set_interrupt_gate(UHCI_IRQ_VECTOR, arch_e1000_irq_stub);
+    arch_set_interrupt_gate(UHCI_IRQ_VECTOR, arch_pci_shared_irq_stub);
     uhci_irq_enabled = pci_enable_legacy_irq(device, UHCI_IRQ_VECTOR);
     __asm__ volatile ("outw %0, %1" :: "a"((uint16_t)(uhci_irq_enabled ? UHCI_INTR_MASK : 0)),
                       "Nd"((uint16_t)(base + UHCI_USBINTR)));

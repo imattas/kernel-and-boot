@@ -676,6 +676,12 @@ Mounted VFS path traversal now lets `..` escape a mounted filesystem root back
 to its mountpoint hierarchy.
 The kernel now reads and validates the CMOS real-time clock with bounded update
 window handling, BCD/binary decoding, and 12/24-hour conversion.
+UHCI and e1000 now use an explicit shared PCI interrupt dispatcher because
+legacy IRQ lines may be shared; each handler independently filters its device
+status before acknowledging its own controller.
+The UHCI QEMU gate now distinguishes successful control-transfer support and
+IRQ-path configuration from optional IOC delivery, which this emulated device
+does not raise reliably.
 
 ## Phase 10 — Userland begins after the kernel gate
 

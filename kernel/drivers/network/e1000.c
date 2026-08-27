@@ -51,7 +51,7 @@
                               E1000_IMS_LSC | E1000_IMS_RXO)
 #define E1000_IRQ_VECTOR 0x51
 
-extern void arch_e1000_irq_stub(void);
+extern void arch_pci_shared_irq_stub(void);
 
 typedef struct { uint64_t address; uint16_t length; uint8_t cso, command, status, css; uint16_t special; } __attribute__((packed)) e1000_tx_desc_t;
 typedef struct { uint64_t address; uint16_t length, checksum; uint8_t status, errors; uint16_t special; } __attribute__((packed)) e1000_rx_desc_t;
@@ -138,7 +138,7 @@ static int e1000_probe(device_t *device) {
     e1000_regs = regs; e1000_tx_ring = tx; e1000_rx_ring = rx;
     e1000_tx_index = 0; e1000_tx_reclaim_index = 0;
     e1000_tx_pending = 0; e1000_rx_index = 0;
-    arch_set_interrupt_gate(E1000_IRQ_VECTOR, arch_e1000_irq_stub);
+    arch_set_interrupt_gate(E1000_IRQ_VECTOR, arch_pci_shared_irq_stub);
     e1000_msi_enabled = pci_enable_msix(device, E1000_IRQ_VECTOR);
     if (!e1000_msi_enabled) e1000_msi_enabled = pci_enable_msi(device, E1000_IRQ_VECTOR);
     if (!e1000_msi_enabled) e1000_msi_enabled = pci_enable_legacy_irq(device, E1000_IRQ_VECTOR);

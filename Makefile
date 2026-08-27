@@ -477,6 +477,7 @@ $(KERNEL_AHCI_IRQ_OBJ): kernel/arch/x86_64/interrupts/ahci.asm kernel/drivers/ah
 
 
 
+
 $(KERNEL_DEBUG_OBJ): kernel/debug/assert.c kernel/debug/assert.h kernel/core/panic/panic.h | $(BUILD_DIR)/kernel
 	$(CC) -target x86_64-pc-none-elf -std=c11 -ffreestanding -fno-builtin -fno-stack-protector -fPIE -fno-plt \
 		-mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@

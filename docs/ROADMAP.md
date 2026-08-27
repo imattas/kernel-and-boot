@@ -795,6 +795,9 @@ VFS removal now unlocks both nodes when a non-child is supplied, with a boot
 regression probe covering that failure path before later traversal operations.
 VFS mount validation now rejects self-mounts and mounts whose root contains the
 mountpoint, preventing cyclic mounted-path traversal.
+VFS child attach and removal now use a canonical node lock order, while child
+lookups rely on the parent structural lock, preventing parent/child lock
+inversion during concurrent tree mutation.
 VFS nodes now expose bounded write callbacks alongside reads, with boot-time
 write-path validation.
 Physical frame allocation now zero-fills reclaimed pages, with boot-time

@@ -14,6 +14,8 @@
 #define TCP_FLAG_ECE 0x40U
 #define TCP_FLAG_CWR 0x80U
 #define TCP_FLAG_KNOWN 0xffU
+#define TCP_RETRANSMIT_MAX_SIZE 1500U
+#define TCP_RETRANSMIT_MAX_RETRIES 3U
 
 typedef struct {
     uint16_t source_port;
@@ -62,6 +64,12 @@ typedef struct {
     uint16_t peer_window;
     uint16_t local_port;
     uint16_t remote_port;
+    uint8_t retransmission_pending;
+    uint8_t retransmission_retries;
+    uint16_t retransmission_length;
+    uint32_t retransmission_sequence_end;
+    uint64_t retransmission_last_tick;
+    uint8_t retransmission_segment[TCP_RETRANSMIT_MAX_SIZE];
 } tcp_connection_t;
 
 typedef struct {
@@ -86,5 +94,11 @@ int tcp_connection_build(tcp_connection_t *connection,
                           uint16_t payload_length, void *packet,
                           uint16_t capacity, uint16_t *packet_length);
 int tcp_connection_close(tcp_connection_t *connection);
+int tcp_connection_record_segment(tcp_connection_t *connection,
+                                  const void *segment, uint16_t length);
+int tcp_connection_retransmit_due(tcp_connection_t *connection,
+                                  uint64_t now, uint64_t timeout,
+                                  void *segment, uint16_t capacity,
+                                  uint16_t *length);
 
 #endif

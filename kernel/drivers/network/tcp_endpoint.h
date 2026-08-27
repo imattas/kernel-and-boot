@@ -52,6 +52,10 @@ int tcp_endpoint_send_segment(tcp_endpoint_table_t *table,
                               const void *payload, uint16_t payload_length,
                               uint8_t flags, void *segment, uint16_t capacity,
                               uint16_t *segment_length);
+int tcp_endpoint_retransmit_due(tcp_endpoint_table_t *table,
+                                tcp_endpoint_handle_t handle, uint64_t now,
+                                uint64_t timeout, void *segment,
+                                uint16_t capacity, uint16_t *length);
 int tcp_endpoint_receive(tcp_endpoint_table_t *table,
                          tcp_endpoint_handle_t handle,
                          uint8_t source_address[4], void *payload,

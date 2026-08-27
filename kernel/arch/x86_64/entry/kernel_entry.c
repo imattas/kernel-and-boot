@@ -952,6 +952,35 @@ void kernel_main(void *boot_info) {
         serial_write("TCP window enforcement failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
+    tcp_probe_connection.peer_window = 4096;
+    if (!tcp_connection_build(&tcp_probe_connection, ipv4_probe_source,
+                               ipv4_probe_destination, 0, tcp_probe_payload,
+                               sizeof(tcp_probe_payload), tcp_probe_packet,
+                               sizeof(tcp_probe_packet), &tcp_probe_length) ||
+        !tcp_connection_retransmit_due(&tcp_probe_connection, 100, 100,
+                                       tcp_probe_packet,
+                                       TCP_RETRANSMIT_MAX_SIZE,
+                                       &tcp_probe_length) ||
+        tcp_probe_length != TCP_HEADER_SIZE + sizeof(tcp_probe_payload)) {
+        serial_write("TCP retransmission failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    if (!tcp_segment_build(tcp_probe_packet, sizeof(tcp_probe_packet),
+                           ipv4_probe_source, ipv4_probe_destination, 6000,
+                           6001, 104, 4, TCP_FLAG_ACK, 4096, 0, 0,
+                           &tcp_probe_length) ||
+        !tcp_segment_parse(tcp_probe_packet, tcp_probe_length,
+                           ipv4_probe_source, ipv4_probe_destination,
+                           &tcp_probe_view) ||
+        !tcp_connection_receive(&tcp_probe_connection, &tcp_probe_view,
+                                &tcp_probe_result) ||
+        tcp_connection_retransmit_due(&tcp_probe_connection, 200, 100,
+                                      tcp_probe_packet,
+                                      sizeof(tcp_probe_packet),
+                                      &tcp_probe_length)) {
+        serial_write("TCP retransmission ACK failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
     serial_write("TCP transport ready\r\n");
     static tcp_endpoint_table_t tcp_endpoint_probe_table;
     static uint8_t tcp_endpoint_probe_ip[ETHERNET_MAX_PAYLOAD_SIZE];

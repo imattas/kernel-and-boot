@@ -147,6 +147,7 @@ int tcp_connection_receive(tcp_connection_t *connection,
             return 0;
         connection->send_unacknowledged = connection->send_next;
         connection->peer_window = segment->window;
+        connection->retransmission_pending = 0;
         connection->receive_next = segment->sequence + 1U;
         connection->state = TCP_CONNECTION_ESTABLISHED;
         result->response_flags = TCP_FLAG_ACK;
@@ -159,6 +160,7 @@ int tcp_connection_receive(tcp_connection_t *connection,
         segment->acknowledgment == connection->send_next) {
         connection->send_unacknowledged = connection->send_next;
         connection->peer_window = segment->window;
+        connection->retransmission_pending = 0;
         connection->state = TCP_CONNECTION_ESTABLISHED;
         return 1;
     }
@@ -167,6 +169,7 @@ int tcp_connection_receive(tcp_connection_t *connection,
         segment->acknowledgment == connection->send_next) {
         connection->send_unacknowledged = connection->send_next;
         connection->peer_window = segment->window;
+        connection->retransmission_pending = 0;
         connection->state = TCP_CONNECTION_FIN_WAIT_2;
         return 1;
     }
@@ -191,8 +194,11 @@ int tcp_connection_receive(tcp_connection_t *connection,
         (segment->flags & TCP_FLAG_ACK) == 0 ||
         segment->acknowledgment < connection->send_unacknowledged ||
         segment->acknowledgment > connection->send_next) return 0;
-    connection->send_unacknowledged = segment->acknowledgment;
+        connection->send_unacknowledged = segment->acknowledgment;
     connection->peer_window = segment->window;
+    if (connection->retransmission_pending &&
+        segment->acknowledgment >= connection->retransmission_sequence_end)
+        connection->retransmission_pending = 0;
     uint32_t advance = segment->payload_length +
                        ((segment->flags & TCP_FLAG_FIN) != 0);
     connection->receive_next += advance;
@@ -215,6 +221,7 @@ int tcp_connection_build(tcp_connection_t *connection,
         !packet_length || (connection->state != TCP_CONNECTION_ESTABLISHED &&
                            connection->state != TCP_CONNECTION_CLOSE_WAIT) ||
         (flags & (TCP_FLAG_SYN | TCP_FLAG_RST)) != 0 ||
+        payload_length > TCP_RETRANSMIT_MAX_SIZE - TCP_HEADER_SIZE ||
         (payload_length != 0 && !payload)) return 0;
     if (payload_length != 0) flags |= TCP_FLAG_ACK | TCP_FLAG_PSH;
     if ((flags & TCP_FLAG_FIN) != 0) flags |= TCP_FLAG_ACK;
@@ -231,6 +238,9 @@ int tcp_connection_build(tcp_connection_t *connection,
                            connection->window, payload, payload_length,
                            packet_length)) return 0;
     connection->send_next += sequence_space;
+    if (!tcp_connection_record_segment(connection, packet, *packet_length))
+        return 0;
+    connection->retransmission_sequence_end = connection->send_next;
     if ((flags & TCP_FLAG_FIN) != 0)
         connection->state = connection->state == TCP_CONNECTION_CLOSE_WAIT ?
             TCP_CONNECTION_LAST_ACK : TCP_CONNECTION_FIN_WAIT_1;
@@ -240,4 +250,36 @@ int tcp_connection_build(tcp_connection_t *connection,
 int tcp_connection_close(tcp_connection_t *connection) {
     return connection && (connection->state == TCP_CONNECTION_ESTABLISHED ||
                           connection->state == TCP_CONNECTION_CLOSE_WAIT);
+}
+
+int tcp_connection_record_segment(tcp_connection_t *connection,
+                                  const void *segment, uint16_t length) {
+    if (!connection || !segment || length == 0 ||
+        length > TCP_RETRANSMIT_MAX_SIZE) return 0;
+    const uint8_t *source = (const uint8_t *)segment;
+    for (uint16_t i = 0; i < length; ++i)
+        connection->retransmission_segment[i] = source[i];
+    connection->retransmission_length = length;
+    connection->retransmission_retries = 0;
+    connection->retransmission_last_tick = 0;
+    connection->retransmission_pending = 1;
+    return 1;
+}
+
+int tcp_connection_retransmit_due(tcp_connection_t *connection,
+                                  uint64_t now, uint64_t timeout,
+                                  void *segment, uint16_t capacity,
+                                  uint16_t *length) {
+    if (!connection || !segment || !length || timeout == 0 ||
+        !connection->retransmission_pending ||
+        connection->retransmission_length > capacity ||
+        connection->retransmission_retries >= TCP_RETRANSMIT_MAX_RETRIES ||
+        now < connection->retransmission_last_tick ||
+        now - connection->retransmission_last_tick < timeout) return 0;
+    for (uint16_t i = 0; i < connection->retransmission_length; ++i)
+        ((uint8_t *)segment)[i] = connection->retransmission_segment[i];
+    *length = connection->retransmission_length;
+    connection->retransmission_last_tick = now;
+    ++connection->retransmission_retries;
+    return 1;
 }

@@ -451,6 +451,9 @@ The QEMU probe covers the client-side handshake path.
 TCP connections now track the unacknowledged send edge and peer-advertised
 window, advance it only on valid acknowledgements, and reject transmissions
 that exceed the bounded flow-control window.
+Outbound TCP segments now retain a bounded retransmission record, expose
+timeout-driven retry polling with a three-retry ceiling, and clear the record
+only when a valid acknowledgement reaches the stored sequence end.
 The network service loop now forwards validated UDP frames from the hardware
 packet queue into bound endpoint tables, and the QEMU boot probe exercises that
 end-to-end queue-to-endpoint delivery path.

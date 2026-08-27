@@ -30,6 +30,9 @@ int network_e1000_transmit(const void *frame, uint16_t length);
 uint32_t network_e1000_poll(network_packet_queue_t *queue, uint32_t budget);
 int network_decode_frame(const void *frame, uint16_t length,
                          network_frame_view_t *view);
+int network_build_icmp_echo_reply(const void *frame, uint16_t length,
+                                  void *reply, uint16_t capacity,
+                                  uint16_t *reply_length);
 int network_deliver_frame(const void *frame, uint16_t length,
                           udp_endpoint_table_t *udp_table);
 

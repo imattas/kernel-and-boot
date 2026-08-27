@@ -653,6 +653,9 @@ Zstandard sequence-table preparation now consumes and validates LL/offset/ML
 mode tables in order, including inherited repeat tables.
 The multi-sequence coordinator now decodes exactly the declared count and
 applies the final-sequence state-update rule.
+The network service now generates bounded ICMP echo replies from validated
+Ethernet/IPv4 requests, swapping addresses and preserving identifiers,
+sequences, and payloads through the complete protocol stack.
 
 ## Phase 10 — Userland begins after the kernel gate
 

@@ -31,6 +31,35 @@ int network_decode_frame(const void *frame, uint16_t length,
     return 1;
 }
 
+int network_build_icmp_echo_reply(const void *frame, uint16_t length,
+                                  void *reply, uint16_t capacity,
+                                  uint16_t *reply_length) {
+    if (!frame || !reply || !reply_length) return 0;
+    network_frame_view_t view;
+    if (!network_decode_frame(frame, length, &view) ||
+        view.kind != NETWORK_FRAME_ICMP ||
+        view.icmp.type != ICMP_TYPE_ECHO_REQUEST)
+        return 0;
+
+    uint8_t icmp_packet[ICMP_ECHO_HEADER_SIZE + ETHERNET_MAX_PAYLOAD_SIZE];
+    uint8_t ipv4_packet[ETHERNET_MAX_PAYLOAD_SIZE];
+    uint16_t icmp_length = 0;
+    uint16_t ipv4_length = 0;
+    if (!icmp_echo_build(icmp_packet, sizeof(icmp_packet),
+                         ICMP_TYPE_ECHO_REPLY, view.icmp.identifier,
+                         view.icmp.sequence, view.icmp.payload,
+                         view.icmp.payload_length, &icmp_length) ||
+        !ipv4_packet_build(ipv4_packet, sizeof(ipv4_packet),
+                           view.ipv4.destination, view.ipv4.source, 1, 64,
+                           view.ipv4.identification, icmp_packet, icmp_length,
+                           &ipv4_length) ||
+        !ethernet_frame_build(reply, capacity, view.ethernet.source,
+                              view.ethernet.destination, 0x0800,
+                              ipv4_packet, ipv4_length, reply_length))
+        return 0;
+    return 1;
+}
+
 int network_deliver_frame(const void *frame, uint16_t length,
                           udp_endpoint_table_t *udp_table) {
     if (!udp_table) return 0;

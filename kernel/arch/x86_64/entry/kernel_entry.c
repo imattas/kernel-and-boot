@@ -732,6 +732,55 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("network frame decode ready\r\n");
+    static const uint8_t icmp_reply_probe_payload[4] =
+        {0x10, 0x20, 0x30, 0x40};
+    static uint8_t icmp_reply_probe_packet[ICMP_ECHO_HEADER_SIZE +
+                                           sizeof(icmp_reply_probe_payload)];
+    static uint8_t icmp_reply_probe_ipv4[IPV4_MIN_HEADER_SIZE +
+                                         sizeof(icmp_reply_probe_packet)];
+    static uint8_t icmp_reply_probe_request[ETHERNET_MAX_FRAME_SIZE];
+    static uint8_t icmp_reply_probe_reply[ETHERNET_MAX_FRAME_SIZE];
+    uint16_t icmp_reply_probe_packet_length = 0;
+    uint16_t icmp_reply_probe_ipv4_length = 0;
+    uint16_t icmp_reply_probe_request_length = 0;
+    uint16_t icmp_reply_probe_reply_length = 0;
+    network_frame_view_t icmp_reply_probe_view;
+    if (!icmp_echo_build(icmp_reply_probe_packet,
+                         sizeof(icmp_reply_probe_packet),
+                         ICMP_TYPE_ECHO_REQUEST, 0x5678, 9,
+                         icmp_reply_probe_payload,
+                         sizeof(icmp_reply_probe_payload),
+                         &icmp_reply_probe_packet_length) ||
+        !ipv4_packet_build(icmp_reply_probe_ipv4,
+                           sizeof(icmp_reply_probe_ipv4),
+                           ipv4_probe_source, ipv4_probe_destination, 1, 64,
+                           0x2468, icmp_reply_probe_packet,
+                           icmp_reply_probe_packet_length,
+                           &icmp_reply_probe_ipv4_length) ||
+        !ethernet_frame_build(icmp_reply_probe_request,
+                              sizeof(icmp_reply_probe_request),
+                              ethernet_probe_destination, ethernet_probe_source,
+                              0x0800, icmp_reply_probe_ipv4,
+                              icmp_reply_probe_ipv4_length,
+                              &icmp_reply_probe_request_length) ||
+        !network_build_icmp_echo_reply(icmp_reply_probe_request,
+                                       icmp_reply_probe_request_length,
+                                       icmp_reply_probe_reply,
+                                       sizeof(icmp_reply_probe_reply),
+                                       &icmp_reply_probe_reply_length) ||
+        !network_decode_frame(icmp_reply_probe_reply,
+                              icmp_reply_probe_reply_length,
+                              &icmp_reply_probe_view) ||
+        icmp_reply_probe_view.kind != NETWORK_FRAME_ICMP ||
+        icmp_reply_probe_view.icmp.type != ICMP_TYPE_ECHO_REPLY ||
+        icmp_reply_probe_view.icmp.identifier != 0x5678 ||
+        icmp_reply_probe_view.ethernet.destination[0] != ethernet_probe_source[0] ||
+        icmp_reply_probe_view.ipv4.destination[3] != 2 ||
+        icmp_reply_probe_view.icmp.payload[3] != 0x40) {
+        serial_write("ICMP echo reply failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("ICMP echo reply ready\r\n");
     static ipv4_reassembly_table_t reassembly_probe_table;
     static const uint8_t reassembly_probe_data[16] =
         {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};

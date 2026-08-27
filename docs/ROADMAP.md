@@ -268,7 +268,8 @@ directory crossed, preventing inaccessible parent directories from being used
 as a path-resolution side channel.
 Current-process exit now publishes an exit status, wakes signal and exit
 waiters, and terminates the scheduler task through a dedicated exit syscall;
-successful ring-3 invocation remains deferred with the rest of userland.
+the kernel gate now exercises a successful ring-3 write/exit invocation before
+userland is populated.
 The process registry now serializes duplicate-ID checks, insertion, lookup,
 and removal across concurrent lifecycle operations.
 The bootable `dist/os.img` is now a standards-compliant FAT32 superfloppy
@@ -888,8 +889,8 @@ path.
 
 This gate includes all non-driver kernel core services and VFS abstractions,
 then the complete driver phase, with build integration, focused tests, and QEMU
-evidence for each. The current syscall/ring-3 probe and ATA driver are
-milestone groundwork only; they do not pass this gate.
+evidence for each. The syscall/ring-3 probe and ATA driver now have runtime
+evidence, but individual milestone evidence does not by itself pass this gate.
 
 ## Filesystem milestone before drivers
 

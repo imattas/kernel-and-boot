@@ -444,6 +444,8 @@ offset arithmetic before touching the table entry.
 PCI MSI and MSI-X setup now rejects capability offsets whose variable-length
 payload would wrap configuration space, and MSI-X rejects table addresses that
 would leave the below-4-GiB identity-mapped MMIO window.
+PCI capability walking now rejects malformed, unaligned, and out-of-range next
+links instead of silently masking them into a different configuration offset.
 PCI configuration-port transactions are now serialized with an IRQ-safe lock,
 preventing concurrent SMP probes from interleaving `0xCF8/0xCFC` accesses.
 NVMe namespace I/O now supports bounded multi-sector transfers within one DMA

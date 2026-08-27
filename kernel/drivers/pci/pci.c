@@ -72,10 +72,22 @@ static uint8_t config_read8(uint8_t bus, uint8_t slot, uint8_t function,
 
 static void scan_bus(uint8_t bus);
 
+static int next_capability(uint32_t header, uint8_t *capability) {
+    uint32_t next = (header >> 8) & 0xffU;
+    if (!capability || (next != 0 &&
+                        (next < 0x40U || next > 0xfcu || (next & 3U) != 0)))
+        return 0;
+    *capability = (uint8_t)next;
+    return 1;
+}
+
 int pci_enable_msix(const device_t *device, uint8_t vector) {
     if (!device || vector < 0x20 || vector > 0xfe) return 0;
     uint8_t capability = config_read8(device->bus_number, device->slot,
-                                       device->function, 0x34) & 0xfcu;
+                                       device->function, 0x34);
+    if (capability != 0 &&
+        (capability < 0x40U || capability > 0xfcu || (capability & 3U) != 0))
+        return 0;
     for (uint32_t step = 0; capability >= 0x40 && step < 48; ++step) {
         if (capability > 0xfcu) return 0;
         uint32_t header = config_read(device->bus_number, device->slot,
@@ -120,7 +132,7 @@ int pci_enable_msix(const device_t *device, uint8_t vector) {
                          ((uint32_t)enabled_control << 16));
             return 1;
         }
-        capability = (uint8_t)(header >> 8) & 0xfcu;
+        if (!next_capability(header, &capability)) return 0;
     }
     return 0;
 }
@@ -128,7 +140,10 @@ int pci_enable_msix(const device_t *device, uint8_t vector) {
 int pci_enable_msi(const device_t *device, uint8_t vector) {
     if (!device || vector < 0x20 || vector > 0xfe) return 0;
     uint8_t capability = config_read8(device->bus_number, device->slot,
-                                       device->function, 0x34) & 0xfcu;
+                                       device->function, 0x34);
+    if (capability != 0 &&
+        (capability < 0x40U || capability > 0xfcu || (capability & 3U) != 0))
+        return 0;
     for (uint32_t step = 0; capability >= 0x40 && step < 48; ++step) {
         if (capability > 0xfcu) return 0;
         uint32_t header = config_read(device->bus_number, device->slot,
@@ -159,7 +174,7 @@ int pci_enable_msi(const device_t *device, uint8_t vector) {
                          0x0001U) << 16));
             return 1;
         }
-        capability = (uint8_t)(header >> 8) & 0xfcu;
+        if (!next_capability(header, &capability)) return 0;
     }
     return 0;
 }

@@ -171,6 +171,9 @@ frame, allowing an address space to be reused without stale mappings; the
 kernel image probe exercises this unload path.
 Active address-space page flag updates and unmaps now issue `invlpg`, so
 permission and lifetime changes cannot remain hidden behind stale TLB entries.
+Page-flag replacement now clears stale writable, user, and NX state before
+applying the requested user-page policy, and failed page-table allocation
+rolls back newly installed table links and owned frames.
 
 ## Phase 7 — VFS and kernel abstractions
 

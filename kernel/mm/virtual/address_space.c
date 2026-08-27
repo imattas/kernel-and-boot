@@ -92,6 +92,16 @@ static uint64_t address_space_allocate_table(address_space_t *space) {
     return frame;
 }
 
+static void address_space_rollback_tables(address_space_t *space, uint32_t owned_before,
+                                          uint64_t *root_table, uint64_t *pdpt,
+                                          uint64_t pml4_index, uint64_t pdpt_index,
+                                          uint8_t made_root, uint8_t made_pdpt) {
+    if (made_pdpt && pdpt) pdpt[pdpt_index] = 0;
+    if (made_root && root_table) root_table[pml4_index] = 0;
+    while (space->owned_count > owned_before)
+        physical_free_frame(space->owned_frames[--space->owned_count]);
+}
+
 int address_space_create(address_space_t *space) {
     if (!space || space->root != 0) return 0;
     space->owned_count = 0;
@@ -135,6 +145,9 @@ int address_space_map_page(address_space_t *space, uint64_t virtual_address,
         virtual_address >= (1ULL << 48) || physical_address >= 0x100000000ULL)
         return 0;
     uint64_t *new_root = (uint64_t *)(uintptr_t)space->root;
+    uint32_t owned_before = space->owned_count;
+    uint64_t *new_pdpt = 0, *pd = 0;
+    uint8_t made_root = 0, made_pdpt = 0;
     uint64_t table_flags = PAGE_PRESENT | PAGE_WRITABLE;
     if ((flags & PAGE_USER) != 0) table_flags |= PAGE_USER;
     uint64_t pml4_index = (virtual_address >> 39) & 0x1ff;
@@ -158,17 +171,29 @@ int address_space_map_page(address_space_t *space, uint64_t virtual_address,
         uint64_t frame = address_space_allocate_table(space);
         if (!frame) return 0;
         new_root[pml4_index] = frame | table_flags;
+        made_root = 1;
     }
-    uint64_t *new_pdpt = (uint64_t *)(uintptr_t)(new_root[pml4_index] & ~(PAGE_SIZE - 1));
+    new_pdpt = (uint64_t *)(uintptr_t)(new_root[pml4_index] & ~(PAGE_SIZE - 1));
     if ((new_pdpt[pdpt_index] & PAGE_PRESENT) == 0) {
         uint64_t frame = address_space_allocate_table(space);
-        if (!frame) return 0;
+        if (!frame) {
+            address_space_rollback_tables(space, owned_before, new_root, new_pdpt,
+                                          pml4_index, pdpt_index,
+                                          made_root, 0);
+            return 0;
+        }
         new_pdpt[pdpt_index] = frame | table_flags;
+        made_pdpt = 1;
     }
-    uint64_t *pd = (uint64_t *)(uintptr_t)(new_pdpt[pdpt_index] & ~(PAGE_SIZE - 1));
+    pd = (uint64_t *)(uintptr_t)(new_pdpt[pdpt_index] & ~(PAGE_SIZE - 1));
     if ((pd[pd_index] & PAGE_PRESENT) == 0) {
         uint64_t frame = address_space_allocate_table(space);
-        if (!frame) return 0;
+        if (!frame) {
+            address_space_rollback_tables(space, owned_before, new_root, new_pdpt,
+                                          pml4_index, pdpt_index,
+                                          made_root, made_pdpt);
+            return 0;
+        }
         pd[pd_index] = frame | table_flags;
     }
     uint64_t *pt = (uint64_t *)(uintptr_t)(pd[pd_index] & ~(PAGE_SIZE - 1));
@@ -195,8 +220,9 @@ int address_space_update_page_flags(address_space_t *space, uint64_t virtual_add
     uint64_t *pt = (uint64_t *)(uintptr_t)(pde & ~(PAGE_SIZE - 1));
     uint64_t *pte = &pt[(virtual_address >> 12) & 0x1ff];
     if ((*pte & (PAGE_PRESENT | PAGE_USER)) != (PAGE_PRESENT | PAGE_USER)) return 0;
-    *pte |= flags | PAGE_PRESENT;
-    if ((flags & ADDRESS_SPACE_EXECUTABLE) != 0) *pte &= ~PAGE_NX;
+    *pte = (*pte & ~(PAGE_WRITABLE | PAGE_USER | PAGE_NX)) | PAGE_PRESENT | PAGE_USER;
+    if ((flags & ADDRESS_SPACE_WRITABLE) != 0) *pte |= PAGE_WRITABLE;
+    if ((flags & ADDRESS_SPACE_EXECUTABLE) == 0) *pte |= PAGE_NX;
     invalidate_active_page(space, virtual_address);
     return 1;
 }

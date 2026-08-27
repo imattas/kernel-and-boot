@@ -9,6 +9,7 @@
 #define NVME_CAP 0x00
 #define NVME_CC 0x14
 #define NVME_CSTS 0x1c
+#define NVME_CSTS_CFS (1U << 1)
 #define NVME_AQA 0x24
 #define NVME_ASQ 0x28
 #define NVME_ACQ 0x30
@@ -293,6 +294,7 @@ static int nvme_submit_admin_words(uint8_t opcode, uint32_t namespace_id,
     nvme_dma_write_barrier();
     *sq_tail_doorbell = active_sq_tail;
     for (uint32_t wait = 0; wait < NVME_TIMEOUT_ATTEMPTS; ++wait) {
+        if ((active_regs[NVME_CSTS / 4] & NVME_CSTS_CFS) != 0) break;
         nvme_dma_read_barrier();
         volatile nvme_completion_t *completion = &cq[active_cq_head];
         uint16_t status = completion->status;
@@ -458,6 +460,7 @@ static int nvme_io(uint64_t lba, void *buffer, uint32_t count, int write) {
     int success = 0;
     int completed = 0;
     for (uint32_t wait = 0; wait < NVME_TIMEOUT_ATTEMPTS; ++wait) {
+        if ((active_regs[NVME_CSTS / 4] & NVME_CSTS_CFS) != 0) break;
         nvme_dma_read_barrier();
         volatile nvme_completion_t *completion = &cq[active_io_cq_head];
         uint16_t status = completion->status;

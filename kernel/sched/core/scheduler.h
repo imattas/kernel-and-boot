@@ -5,6 +5,7 @@
 
 void scheduler_initialize(void);
 int scheduler_enqueue(task_t *task);
+int scheduler_start_task(task_t *task);
 int scheduler_remove(task_t *task);
 task_t *scheduler_next(void);
 void scheduler_set_current(task_t *task);

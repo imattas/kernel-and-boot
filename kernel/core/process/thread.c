@@ -52,12 +52,11 @@ int process_thread_start(process_thread_t *thread) {
     if (!thread || !thread->process || !thread->task) return 0;
     process_t *process = thread->process;
     uint64_t flags = spinlock_lock_irqsave(&process->lock);
-    if (process->state == PROCESS_EXITED || thread->task->state != TASK_READY ||
-        task_wait_node_queued(&thread->task->wait_node)) {
+    if (process->state == PROCESS_EXITED) {
         spinlock_unlock_irqrestore(&process->lock, flags);
         return 0;
     }
-    int result = scheduler_enqueue(thread->task);
+    int result = scheduler_start_task(thread->task);
     spinlock_unlock_irqrestore(&process->lock, flags);
     return result;
 }

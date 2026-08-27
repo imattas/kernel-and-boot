@@ -603,6 +603,9 @@ use an IRQ-safe scheduler lock around shared metadata and queue transitions.
 Scheduler block and wake transitions now hold that lock across wait-queue
 ownership and state publication, preventing a concurrent wake from being lost
 between enqueue and `TASK_BLOCKED` publication.
+Process-thread startup now uses a scheduler-owned ready-state transition, so a
+thread cannot pass a stale state check and be queued after it is already running
+or waiting.
 Scheduler host-context validity is now tracked separately from transient run
 state, preserving return-to-caller behavior across repeated task runs.
 Process-table startup now has an explicit initializer that resets table,

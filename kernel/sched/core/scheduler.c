@@ -31,6 +31,19 @@ int scheduler_enqueue(task_t *task) {
     return 1;
 }
 
+int scheduler_start_task(task_t *task) {
+    if (!task) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&scheduler_lock);
+    if (task->state != TASK_READY ||
+        task_wait_node_queued(&task->wait_node) ||
+        !task_wait_queue_enqueue(&ready_queue, &task->wait_node)) {
+        spinlock_unlock_irqrestore(&scheduler_lock, flags);
+        return 0;
+    }
+    spinlock_unlock_irqrestore(&scheduler_lock, flags);
+    return 1;
+}
+
 int scheduler_remove(task_t *task) {
     if (!task) return 0;
     uint64_t flags = spinlock_lock_irqsave(&scheduler_lock);

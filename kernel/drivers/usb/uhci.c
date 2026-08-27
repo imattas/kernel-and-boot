@@ -55,6 +55,7 @@ static uint8_t *uhci_async_data;
 static uint16_t uhci_async_length;
 static uint8_t *uhci_async_toggle;
 static uint16_t uhci_async_packet_count;
+static uint32_t uhci_async_td_pages;
 static uint8_t uhci_async_input;
 static uint8_t uhci_async_pending;
 
@@ -72,9 +73,10 @@ typedef struct {
 
 static void uhci_release_transfer_frames(uint64_t qh_frame, uint64_t td_frame,
                                          uint64_t setup_frame,
+                                         uint32_t td_pages,
                                          uint64_t data_frame) {
     if (qh_frame) physical_free_frame(qh_frame);
-    if (td_frame) physical_free_frame(td_frame);
+    if (td_frame && td_pages) physical_free_frames(td_frame, td_pages);
     if (setup_frame) physical_free_frame(setup_frame);
     if (data_frame) physical_free_frame(data_frame);
 }
@@ -213,7 +215,7 @@ static int uhci_control_transfer_locked(uint8_t address, uint8_t endpoint,
     uint64_t setup_frame = physical_alloc_frame();
     uint64_t data_frame = length ? physical_alloc_frame() : 0;
     if (!qh_frame || !td_frame || !setup_frame || (length && !data_frame)) {
-        uhci_release_transfer_frames(qh_frame, td_frame, setup_frame, data_frame);
+        uhci_release_transfer_frames(qh_frame, td_frame, setup_frame, 1, data_frame);
         return 0;
     }
     uhci_qh_t *qh = (uhci_qh_t *)(uintptr_t)qh_frame;
@@ -250,7 +252,7 @@ static int uhci_control_transfer_locked(uint8_t address, uint8_t endpoint,
     qh->element = (uint32_t)td_frame;
     volatile uint32_t *frame_list = (volatile uint32_t *)(uintptr_t)controller_frame_list;
     if (!uhci_set_running(0)) {
-        uhci_release_transfer_frames(qh_frame, td_frame, setup_frame, data_frame);
+        uhci_release_transfer_frames(qh_frame, td_frame, setup_frame, 1, data_frame);
         return 0;
     }
     uhci_acknowledge_status(uhci_status() & 0x001fU);
@@ -258,7 +260,7 @@ static int uhci_control_transfer_locked(uint8_t address, uint8_t endpoint,
     __asm__ volatile ("outl %0, %1" :: "a"((uint32_t)controller_frame_list),
                       "Nd"((uint16_t)(controller_base + UHCI_FLBASEADD)));
     if (!uhci_set_running(1)) {
-        uhci_release_transfer_frames(qh_frame, td_frame, setup_frame, data_frame);
+        uhci_release_transfer_frames(qh_frame, td_frame, setup_frame, 1, data_frame);
         return 0;
     }
     int complete = 0;
@@ -286,7 +288,7 @@ static int uhci_control_transfer_locked(uint8_t address, uint8_t endpoint,
     if (!uhci_set_running(1)) complete = 0;
     if (complete && length && (setup[0] & 0x80U))
         for (uint32_t i = 0; i < length; ++i) ((uint8_t *)data)[i] = data_copy[i];
-    uhci_release_transfer_frames(qh_frame, td_frame, setup_frame, data_frame);
+    uhci_release_transfer_frames(qh_frame, td_frame, setup_frame, 1, data_frame);
     return complete;
 }
 
@@ -298,10 +300,12 @@ static int uhci_interrupt_transfer_locked(uint8_t address, uint8_t endpoint, voi
         max_packet > 64 || !toggle || *toggle > 1) return 0;
     uint32_t packet_count = (length + max_packet - 1U) / max_packet;
     uint64_t qh_frame = physical_alloc_frame();
-    uint64_t td_frame = physical_alloc_frame();
+    uint32_t td_pages = (uint32_t)(((uint64_t)packet_count * sizeof(uhci_td_t) +
+                                    4095U) / 4096U);
+    uint64_t td_frame = physical_alloc_frames(td_pages);
     uint64_t data_frame = physical_alloc_frame();
     if (!qh_frame || !td_frame || !data_frame) {
-        uhci_release_transfer_frames(qh_frame, td_frame, 0, data_frame);
+        uhci_release_transfer_frames(qh_frame, td_frame, 0, td_pages, data_frame);
         return 0;
     }
     uhci_qh_t *qh = (uhci_qh_t *)(uintptr_t)qh_frame;
@@ -310,7 +314,8 @@ static int uhci_interrupt_transfer_locked(uint8_t address, uint8_t endpoint, voi
     int input = (endpoint & 0x80U) != 0;
     if (!input)
         for (uint16_t i = 0; i < length; ++i) transfer[i] = ((uint8_t *)data)[i];
-    for (uint32_t i = 0; i < 4096 / 4; ++i) ((uint32_t *)td)[i] = 0;
+    for (uint32_t i = 0; i < td_pages * 4096U / 4U; ++i)
+        ((uint32_t *)td)[i] = 0;
     qh->head = 1U;
     qh->element = (uint32_t)td_frame;
     uint8_t current_toggle = *toggle;
@@ -328,14 +333,14 @@ static int uhci_interrupt_transfer_locked(uint8_t address, uint8_t endpoint, voi
     volatile uint32_t *frame_list =
         (volatile uint32_t *)(uintptr_t)controller_frame_list;
     if (!uhci_set_running(0)) {
-        uhci_release_transfer_frames(qh_frame, td_frame, 0, data_frame);
+        uhci_release_transfer_frames(qh_frame, td_frame, 0, td_pages, data_frame);
         return 0;
     }
     for (uint32_t i = 0; i < 1024; ++i) frame_list[i] = (uint32_t)qh_frame | 2U;
     __asm__ volatile ("outl %0, %1" :: "a"((uint32_t)controller_frame_list),
                       "Nd"((uint16_t)(controller_base + UHCI_FLBASEADD)));
     if (!uhci_set_running(1)) {
-        uhci_release_transfer_frames(qh_frame, td_frame, 0, data_frame);
+        uhci_release_transfer_frames(qh_frame, td_frame, 0, td_pages, data_frame);
         return 0;
     }
     int complete = 0;
@@ -367,7 +372,7 @@ static int uhci_interrupt_transfer_locked(uint8_t address, uint8_t endpoint, voi
             for (uint16_t i = 0; i < length; ++i) ((uint8_t *)data)[i] = transfer[i];
         *toggle = current_toggle;
     }
-    uhci_release_transfer_frames(qh_frame, td_frame, 0, data_frame);
+    uhci_release_transfer_frames(qh_frame, td_frame, 0, td_pages, data_frame);
     return complete;
 }
 
@@ -383,15 +388,18 @@ static int uhci_interrupt_submit_locked(uint8_t address, uint8_t endpoint,
         return 0;
     uint32_t packet_count = (length + max_packet - 1U) / max_packet;
     uint64_t qh_frame = physical_alloc_frame();
-    uint64_t td_frame = physical_alloc_frame();
+    uint32_t td_pages = (uint32_t)(((uint64_t)packet_count * sizeof(uhci_td_t) +
+                                    4095U) / 4096U);
+    uint64_t td_frame = physical_alloc_frames(td_pages);
     uint64_t data_frame = physical_alloc_frame();
     if (!qh_frame || !td_frame || !data_frame) {
-        uhci_release_transfer_frames(qh_frame, td_frame, 0, data_frame);
+        uhci_release_transfer_frames(qh_frame, td_frame, 0, td_pages, data_frame);
         return 0;
     }
     uhci_qh_t *qh = (uhci_qh_t *)(uintptr_t)qh_frame;
     uhci_td_t *td = (uhci_td_t *)(uintptr_t)td_frame;
-    for (uint32_t i = 0; i < 4096 / 4; ++i) ((uint32_t *)td)[i] = 0;
+    for (uint32_t i = 0; i < td_pages * 4096U / 4U; ++i)
+        ((uint32_t *)td)[i] = 0;
     int input = (endpoint & 0x80U) != 0;
     if (!input)
         for (uint16_t i = 0; i < length; ++i)
@@ -418,13 +426,14 @@ static int uhci_interrupt_submit_locked(uint8_t address, uint8_t endpoint,
                       "Nd"((uint16_t)(controller_base + UHCI_FLBASEADD)));
     if (!uhci_set_running(1)) goto fail;
     uhci_async_qh_frame = qh_frame; uhci_async_td_frame = td_frame;
+    uhci_async_td_pages = td_pages;
     uhci_async_data_frame = data_frame; uhci_async_data = (uint8_t *)data;
     uhci_async_length = length;
     uhci_async_toggle = toggle; uhci_async_packet_count = (uint16_t)packet_count;
     uhci_async_input = (uint8_t)input; uhci_async_pending = 1;
     return 1;
 fail:
-    uhci_release_transfer_frames(qh_frame, td_frame, 0, data_frame);
+    uhci_release_transfer_frames(qh_frame, td_frame, 0, td_pages, data_frame);
     return 0;
 }
 
@@ -453,7 +462,7 @@ static int uhci_interrupt_poll_locked(void) {
         *uhci_async_toggle = next_toggle;
     }
     uhci_release_transfer_frames(uhci_async_qh_frame, uhci_async_td_frame,
-                                 0, uhci_async_data_frame);
+                                 0, uhci_async_td_pages, uhci_async_data_frame);
     uhci_async_pending = 0;
     return complete && restarted ? 1 : -1;
 }

@@ -993,7 +993,9 @@ UHCI interrupt-IN transfers now have a persistent bounded frame-list slot and
 completion poller; idle NAKs remain scheduled, while completed reports are
 copied, toggles advanced, and DMA frames reclaimed before resubmission.
 The persistent transfer slot now retains the full bounded packet-count range,
-including 4096-byte transfers split across one-byte maximum packets.
+including 4096-byte transfers split across one-byte maximum packets; both
+synchronous and persistent UHCI paths allocate enough contiguous TD frames for
+that range instead of overflowing a single 4 KiB descriptor page.
 Persistent interrupt scheduling now honors each USB interrupt endpoint's
 declared `bInterval` instead of submitting the queue head on every frame.
 The UEFI memory-map capture now rejects malformed successful firmware results

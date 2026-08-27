@@ -247,6 +247,8 @@ USB/NVMe/network error and interrupt paths, is still required before the kernel
 completion gate.
 AHCI now also exposes bounded multi-sector READ/WRITE DMA transfers within one
 page and the QEMU gate verifies a two-sector write/read-back operation.
+AHCI command timeouts now stop and restart the port engine with bounded CR/FR
+quiescence and error-state clearing before DMA buffers are released.
 The identified AHCI disk is now registered with the generic storage layer;
 the FAT32 and VFS probes therefore exercise the AHCI-backed storage device.
 Driver enumeration and hardware

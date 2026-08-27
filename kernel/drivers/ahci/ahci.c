@@ -35,6 +35,21 @@ static uint64_t active_command_table;
 static uint64_t active_data;
 static device_driver_t ahci_driver;
 
+static int ahci_stop_engine(void) {
+    if (!active_port) return 0;
+    active_port[AHCI_PORT_CMD / 4] &= ~(AHCI_CMD_ST | AHCI_CMD_FRE);
+    for (uint32_t wait = 0; wait < 1000000; ++wait) {
+        if ((active_port[AHCI_PORT_CMD / 4] & (AHCI_CMD_CR | AHCI_CMD_FR)) == 0) {
+            active_port[AHCI_PORT_IS / 4] = UINT32_MAX;
+            active_port[AHCI_PORT_SERR / 4] = UINT32_MAX;
+            active_port[AHCI_PORT_CMD / 4] |= AHCI_CMD_FRE | AHCI_CMD_ST;
+            return 1;
+        }
+        __asm__ volatile ("pause" ::: "memory");
+    }
+    return 0;
+}
+
 static int ahci_match(const device_t *device) {
     return device && device->bus == DEVICE_BUS_PCI &&
            device->class_code == PCI_CLASS_MASS_STORAGE &&
@@ -175,6 +190,7 @@ int ahci_identify(uint16_t *words) {
         const uint16_t *source = (const uint16_t *)(uintptr_t)active_data;
         for (uint32_t i = 0; i < 256; ++i) words[i] = source[i];
     }
+    if (!completed && !ahci_stop_engine()) return 0;
     physical_free_frame(active_command_table);
     physical_free_frame(active_data);
     active_command_table = 0; active_data = 0;
@@ -219,6 +235,7 @@ int ahci_read_sector(uint64_t lba, void *buffer) {
         uint8_t *destination = (uint8_t *)buffer;
         for (uint32_t i = 0; i < 512; ++i) destination[i] = source[i];
     }
+    if (!completed && !ahci_stop_engine()) return 0;
     physical_free_frame(active_command_table); physical_free_frame(active_data);
     active_command_table = 0; active_data = 0;
     return completed;
@@ -261,6 +278,7 @@ int ahci_write_sector(uint64_t lba, const void *buffer) {
             completed = (status & 0x09U) == 0 && header[0].prdbc == 512; break;
         }
     }
+    if (!completed && !ahci_stop_engine()) return 0;
     physical_free_frame(active_command_table); physical_free_frame(active_data);
     active_command_table = 0; active_data = 0;
     return completed;
@@ -320,6 +338,7 @@ static int ahci_io_sectors(uint64_t lba, uint32_t count, void *buffer, int write
     if (completed && !write)
         for (uint32_t i = 0; i < count * 512U; ++i)
             ((uint8_t *)buffer)[i] = dma[i];
+    if (!completed && !ahci_stop_engine()) return 0;
     physical_free_frame(active_command_table); physical_free_frame(active_data);
     active_command_table = 0; active_data = 0;
     return completed;

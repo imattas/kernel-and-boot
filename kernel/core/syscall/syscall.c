@@ -6,6 +6,7 @@
 #include "../../arch/x86_64/time/timer.h"
 #include "../../mm/virtual/address_space.h"
 #include "../../fs/vfs/file.h"
+#include "../../ipc/endpoint.h"
 #include "../printk/serial.h"
 
 extern void arch_syscall_interrupt(void);
@@ -161,6 +162,46 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
         case OS_SYSCALL_EXIT:
             if (arg1 > UINT32_MAX) return OS_SYSCALL_ERROR;
             process_exit_current((int32_t)(uint32_t)arg1);
+        case OS_SYSCALL_CHANNEL_CREATE: {
+            process_t *process = process_current();
+            ipc_endpoint_t *endpoint = ipc_endpoint_create();
+            if (!process || !endpoint) {
+                if (endpoint) ipc_endpoint_release(endpoint);
+                return OS_SYSCALL_ERROR;
+            }
+            int handle = process_handle_open_owned(&process->handles, endpoint,
+                PROCESS_HANDLE_READ | PROCESS_HANDLE_WRITE,
+                (process_handle_release_fn)ipc_endpoint_release);
+            if (!handle) ipc_endpoint_release(endpoint);
+            return handle ? (uint64_t)(uint32_t)handle : OS_SYSCALL_ERROR;
+        }
+        case OS_SYSCALL_CHANNEL_SEND:
+        case OS_SYSCALL_CHANNEL_RECEIVE: {
+            process_t *process = process_current();
+            if (!process || arg3 == 0 || arg3 > OS_SYSCALL_MAX_MESSAGE) return OS_SYSCALL_ERROR;
+            process_handle_ref_t ref = {0};
+            uint32_t rights = number == OS_SYSCALL_CHANNEL_SEND ?
+                              PROCESS_HANDLE_WRITE : PROCESS_HANDLE_READ;
+            if (!process_handle_get_retain(&process->handles, (uint32_t)arg1,
+                                           rights, &ref)) return OS_SYSCALL_ERROR;
+            uint8_t buffer[OS_SYSCALL_MAX_MESSAGE];
+            int result = 0;
+            if (number == OS_SYSCALL_CHANNEL_SEND) {
+                if (syscall_copy_from_user(buffer, arg2, arg3))
+                    result = ipc_endpoint_send((ipc_endpoint_t *)ref.object,
+                                               process->id, buffer, (uint32_t)arg3) ?
+                             (int)arg3 : 0;
+            } else if (user_range(arg2, arg3, 1)) {
+                uint32_t received = 0;
+                if (ipc_endpoint_receive((ipc_endpoint_t *)ref.object,
+                                         process->id, buffer, (uint32_t)arg3,
+                                         &received) &&
+                    syscall_copy_to_user(arg2, buffer, received))
+                    result = (int)received;
+            }
+            process_handle_release_ref(&ref);
+            return result > 0 ? (uint64_t)(uint32_t)result : OS_SYSCALL_ERROR;
+        }
         case OS_SYSCALL_SIGNAL_NEXT: {
             uint32_t signal = 0;
             if (!user_range(arg1, sizeof(signal), 1) ||

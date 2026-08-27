@@ -13,6 +13,7 @@
 #include "../time/timer.h"
 #include "../../../core/sync/spinlock.h"
 #include "../../../ipc/channel.h"
+#include "../../../ipc/endpoint.h"
 #include "../../../security/credentials.h"
 #include "../../../fs/vfs/vfs.h"
 #include "../../../fs/vfs/file.h"
@@ -2347,6 +2348,27 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("directory syscalls ready\r\n");
+    uint64_t channel_syscall_handle = syscall_dispatch(OS_SYSCALL_CHANNEL_CREATE,
+                                                        0, 0, 0);
+    static const char channel_message[] = "ipc";
+    char channel_result[sizeof(channel_message)] = {0};
+    if (channel_syscall_handle == OS_SYSCALL_ERROR ||
+        !syscall_copy_to_user(0x8000003000ULL, channel_message,
+                              sizeof(channel_message) - 1) ||
+        syscall_dispatch(OS_SYSCALL_CHANNEL_SEND, channel_syscall_handle,
+                         0x8000003000ULL, sizeof(channel_message) - 1) !=
+            sizeof(channel_message) - 1 ||
+        syscall_dispatch(OS_SYSCALL_CHANNEL_RECEIVE, channel_syscall_handle,
+                         0x8000005000ULL, sizeof(channel_result) - 1) !=
+            sizeof(channel_message) - 1 ||
+        !syscall_copy_from_user(channel_result, 0x8000005000ULL,
+                                sizeof(channel_result) - 1) ||
+        channel_result[0] != 'i' || channel_result[2] != 'c' ||
+        syscall_dispatch(OS_SYSCALL_CLOSE, channel_syscall_handle, 0, 0) != 0) {
+        serial_write("IPC syscall failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("IPC syscalls ready\r\n");
     if (!kernel_init_state_advance(&init_state, KERNEL_INIT_SERVICES))
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     serial_write("user mode deferred until kernel completion\r\n");

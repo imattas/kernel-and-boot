@@ -141,7 +141,7 @@ $(UEFI_EFI): $(UEFI_OBJ) $(UEFI_ENTRY_OBJ) $(UEFI_CONSOLE_OBJ) $(UEFI_FIRMWARE_O
 $(BUILD_DIR)/kernel:
 	mkdir -p $@
 
-$(KERNEL_OBJ): kernel/arch/x86_64/entry/kernel_entry.c kernel/arch/x86_64/cpu/tables.h kernel/drivers/network/e1000.h kernel/drivers/network/ethernet.h kernel/drivers/network/arp.h kernel/drivers/network/arp_cache.h kernel/drivers/network/ipv4.h kernel/drivers/network/udp.h kernel/drivers/network/icmp.h kernel/drivers/network/route.h kernel/drivers/network/packet_queue.h kernel/drivers/network/network.h kernel/drivers/network/reassembly.h kernel/drivers/network/udp_endpoint.h kernel/fs/vfs/vfs.h kernel/fs/vfs/file.h kernel/syscall/abi.h | $(BUILD_DIR)/kernel
+$(KERNEL_OBJ): kernel/arch/x86_64/entry/kernel_entry.c kernel/arch/x86_64/cpu/tables.h kernel/drivers/network/e1000.h kernel/drivers/network/ethernet.h kernel/drivers/network/arp.h kernel/drivers/network/arp_cache.h kernel/drivers/network/ipv4.h kernel/drivers/network/udp.h kernel/drivers/network/icmp.h kernel/drivers/network/route.h kernel/drivers/network/packet_queue.h kernel/drivers/network/network.h kernel/drivers/network/reassembly.h kernel/drivers/network/udp_endpoint.h kernel/fs/vfs/vfs.h kernel/fs/vfs/file.h kernel/ipc/endpoint.h kernel/syscall/abi.h | $(BUILD_DIR)/kernel
 	$(CC) -target x86_64-pc-none-elf -std=c11 -ffreestanding -fno-builtin -Iboot/UEFI/core -fno-stack-protector \
 		-fPIE -fno-plt -mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@
 
@@ -240,6 +240,7 @@ KERNEL_MEMORY_OBJ := $(BUILD_DIR)/kernel/memory.o
 KERNEL_STORAGE_OBJ := $(BUILD_DIR)/kernel/storage.o
 KERNEL_ATA_OBJ := $(BUILD_DIR)/kernel/ata.o
 KERNEL_IPC_OBJ := $(BUILD_DIR)/kernel/ipc_channel.o
+KERNEL_IPC_ENDPOINT_OBJ := $(BUILD_DIR)/kernel/ipc_endpoint.o
 KERNEL_SECURITY_OBJ := $(BUILD_DIR)/kernel/security_credentials.o
 KERNEL_VFS_OBJ := $(BUILD_DIR)/kernel/vfs.o
 KERNEL_VFS_FILE_OBJ := $(BUILD_DIR)/kernel/vfs_file.o
@@ -280,6 +281,7 @@ KERNEL_RTC_OBJ := $(BUILD_DIR)/kernel/rtc.o
 KERNEL_NVME_OBJ := $(KERNEL_NVME_OBJ) $(KERNEL_E1000_OBJ) $(KERNEL_ETHERNET_OBJ) $(KERNEL_ARP_OBJ) $(KERNEL_ARP_CACHE_OBJ) $(KERNEL_IPV4_OBJ) $(KERNEL_UDP_OBJ) $(KERNEL_ICMP_OBJ) $(KERNEL_ROUTE_OBJ) $(KERNEL_PACKET_QUEUE_OBJ) $(KERNEL_NETWORK_OBJ) $(KERNEL_REASSEMBLY_OBJ) $(KERNEL_UDP_ENDPOINT_OBJ) $(KERNEL_E1000_IRQ_OBJ) $(KERNEL_NVME_IRQ_OBJ) $(KERNEL_AHCI_IRQ_OBJ) $(KERNEL_HID_OBJ) $(KERNEL_STORAGE_BLOCK_OBJ) $(KERNEL_EXFAT_VFS_OBJ) $(KERNEL_EXT4_OBJ) $(KERNEL_EXT4_VFS_OBJ) $(KERNEL_XFS_OBJ) $(KERNEL_XFS_VFS_OBJ) $(KERNEL_BTRFS_OBJ) $(KERNEL_BTRFS_DEFLATE_OBJ) $(KERNEL_BTRFS_LZO_OBJ) $(KERNEL_BTRFS_ZSTD_OBJ) $(KERNEL_BTRFS_FSE_OBJ) $(KERNEL_BTRFS_VFS_OBJ) $(KERNEL_RTC_OBJ)
 KERNEL_NVME_OBJ := $(KERNEL_NVME_OBJ) $(KERNEL_VFS_PROBE_OBJ)
 KERNEL_NVME_OBJ := $(KERNEL_NVME_OBJ) $(KERNEL_VFS_FILE_OBJ)
+KERNEL_NVME_OBJ := $(KERNEL_NVME_OBJ) $(KERNEL_IPC_ENDPOINT_OBJ)
 KERNEL_DEBUG_OBJ := $(BUILD_DIR)/kernel/debug_assert.o
 KERNEL_CLOCK_OBJ := $(BUILD_DIR)/kernel/clock.o
 
@@ -288,6 +290,10 @@ $(KERNEL_MEMORY_OBJ): kernel/lib/memory.c kernel/lib/memory.h | $(BUILD_DIR)/ker
 		-mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@
 
 $(KERNEL_IPC_OBJ): kernel/ipc/channel.c kernel/ipc/channel.h kernel/core/sync/spinlock.h kernel/core/task/wait_queue.h kernel/sched/core/scheduler.h kernel/sched/core/scheduler.c | $(BUILD_DIR)/kernel
+	$(CC) -target x86_64-pc-none-elf -std=c11 -ffreestanding -fno-builtin -fno-stack-protector -fPIE -fno-plt \
+		-mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@
+
+$(KERNEL_IPC_ENDPOINT_OBJ): kernel/ipc/endpoint.c kernel/ipc/endpoint.h kernel/ipc/channel.h kernel/mm/heap/heap.h | $(BUILD_DIR)/kernel
 	$(CC) -target x86_64-pc-none-elf -std=c11 -ffreestanding -fno-builtin -fno-stack-protector -fPIE -fno-plt \
 		-mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@
 
@@ -567,7 +573,7 @@ $(KERNEL_PROCESS_THREAD_OBJ): kernel/core/process/thread.c kernel/core/process/t
 	$(CC) -target x86_64-pc-none-elf -std=c11 -ffreestanding -fno-builtin -fno-stack-protector -fPIE -fno-plt \
 		-mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@
 
-$(KERNEL_SYSCALL_OBJ): kernel/core/syscall/syscall.c kernel/core/syscall/syscall.h kernel/syscall/abi.h kernel/time/clock.h kernel/core/process/process.h kernel/fs/vfs/file.h kernel/arch/x86_64/cpu/tables.h kernel/arch/x86_64/time/timer.h kernel/mm/virtual/address_space.h | $(BUILD_DIR)/kernel
+$(KERNEL_SYSCALL_OBJ): kernel/core/syscall/syscall.c kernel/core/syscall/syscall.h kernel/syscall/abi.h kernel/time/clock.h kernel/core/process/process.h kernel/fs/vfs/file.h kernel/ipc/endpoint.h kernel/arch/x86_64/cpu/tables.h kernel/arch/x86_64/time/timer.h kernel/mm/virtual/address_space.h | $(BUILD_DIR)/kernel
 	$(CC) -target x86_64-pc-none-elf -std=c11 -ffreestanding -fno-builtin -fno-stack-protector -fPIE -fno-plt \
 		-mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@
 

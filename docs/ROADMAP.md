@@ -244,6 +244,8 @@ ABI provides validated `open`, `read`, `write`, and `close` operations over VFS
 file descriptions without starting ring 3.
 The ABI now also provides validated descriptor seek and directory enumeration,
 including typed dirent copyout and directory/file operation separation.
+Heap-backed IPC endpoints can now be owned by process handles, with validated
+message copy-in/copy-out and create/send/receive syscall coverage.
 Current-process exit now publishes an exit status, wakes signal and exit
 waiters, and terminates the scheduler task through a dedicated exit syscall;
 successful ring-3 invocation remains deferred with the rest of userland.

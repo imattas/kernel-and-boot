@@ -29,18 +29,22 @@ void device_registry_initialize(void) {
 }
 
 int device_register(const device_t *device) {
-    if (!device) return 0;
+    if (!device || device->bus != DEVICE_BUS_PCI) return 0;
+    device_t published = *device;
+    published.driver = 0;
+    for (uint32_t resource = 0; resource < 6; ++resource)
+        published.resource_owner[resource] = 0;
     uint64_t flags = spinlock_lock_irqsave(&registry_lock);
     if (registry_count >= DEVICE_REGISTRY_CAPACITY) {
         spinlock_unlock_irqrestore(&registry_lock, flags);
         return 0;
     }
     for (uint32_t i = 0; i < registry_count; ++i)
-        if (same_pci_device(&registry[i], device)) {
+        if (same_pci_device(&registry[i], &published)) {
             spinlock_unlock_irqrestore(&registry_lock, flags);
             return 0;
         }
-    registry[registry_count++] = *device;
+    registry[registry_count++] = published;
     spinlock_unlock_irqrestore(&registry_lock, flags);
     return 1;
 }

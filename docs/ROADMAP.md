@@ -263,6 +263,9 @@ causes and reclaims completed TX entries. TX/RX ring state is serialized with
 an interrupt-safe driver lock so polling and future interrupt delivery cannot
 race descriptor ownership. RX delivery rejects malformed, zero-length, and
 oversized descriptors instead of silently truncating packets.
+The driver reports whether PCI MSI was enabled; the current QEMU e1000 model
+uses the validated polling fallback because no usable MSI capability is
+exposed, so interrupt delivery remains an open driver milestone.
 UHCI control transfers now build a bounded multi-packet endpoint-0 TD chain,
 validate the setup transfer length, alternate data toggles, and verify every
 TD before releasing DMA frames.

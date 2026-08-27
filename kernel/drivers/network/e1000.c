@@ -3,6 +3,8 @@
 #include "../pci/pci.h"
 #include "../../mm/physical/frame.h"
 #include "../../core/sync/spinlock.h"
+#include "../../arch/x86_64/cpu/tables.h"
+#include "../../arch/x86_64/interrupts/apic.h"
 
 #define E1000_BAR 0
 #define E1000_CTRL 0x0000
@@ -37,6 +39,9 @@
 #define E1000_IMS_RXDMT0 (1U << 4)
 #define E1000_IMS_RXT0 (1U << 7)
 #define E1000_IMS_TXDW (1U << 0)
+#define E1000_IRQ_VECTOR 0x51
+
+extern void arch_e1000_irq_stub(void);
 
 typedef struct { uint64_t address; uint16_t length; uint8_t cso, command, status, css; uint16_t special; } __attribute__((packed)) e1000_tx_desc_t;
 typedef struct { uint64_t address; uint16_t length, checksum; uint8_t status, errors; uint16_t special; } __attribute__((packed)) e1000_rx_desc_t;
@@ -53,6 +58,7 @@ static uint32_t e1000_tx_reclaim_index;
 static uint32_t e1000_tx_pending;
 static uint32_t e1000_rx_index;
 static spinlock_t e1000_lock;
+static int e1000_msi_enabled;
 
 static int e1000_match(const device_t *device) {
     return device && device->bus == DEVICE_BUS_PCI && device->class_code == 0x02 &&
@@ -103,6 +109,8 @@ static int e1000_probe(device_t *device) {
     e1000_regs = regs; e1000_tx_ring = tx; e1000_rx_ring = rx;
     e1000_tx_index = 0; e1000_tx_reclaim_index = 0;
     e1000_tx_pending = 0; e1000_rx_index = 0;
+    arch_set_interrupt_gate(E1000_IRQ_VECTOR, arch_e1000_irq_stub);
+    e1000_msi_enabled = pci_enable_msi(device, E1000_IRQ_VECTOR);
     ++controllers;
     return 1;
 fail:
@@ -121,6 +129,7 @@ fail:
 int e1000_initialize(void) {
     controllers = 0; e1000_regs = 0; e1000_tx_ring = 0; e1000_rx_ring = 0;
     e1000_tx_pending = 0;
+    e1000_msi_enabled = 0;
     spinlock_init(&e1000_lock);
     for (uint32_t i = 0; i < E1000_RING_COUNT; ++i) {
         e1000_rx_buffers[i] = 0;
@@ -131,6 +140,7 @@ int e1000_initialize(void) {
     return device_driver_register(&e1000_driver) && device_bind_drivers();
 }
 uint32_t e1000_controller_count(void) { return controllers; }
+int e1000_interrupt_enabled(void) { return e1000_msi_enabled; }
 
 int e1000_transmit(const void *data, uint16_t length) {
     if (!e1000_regs || !e1000_tx_ring || !data || length == 0 || length > 2048)

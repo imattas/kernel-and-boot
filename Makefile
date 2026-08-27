@@ -63,6 +63,7 @@ KERNEL_TRAMPOLINE_OBJ := $(BUILD_DIR)/kernel/trampoline.o
 KERNEL_TIMER_OBJ := $(BUILD_DIR)/kernel/timer.o
 KERNEL_TIMER_ASM_OBJ := $(BUILD_DIR)/kernel/timer.asm.o
 KERNEL_KEYBOARD_ASM_OBJ := $(BUILD_DIR)/kernel/keyboard.asm.o
+KERNEL_E1000_IRQ_OBJ := $(BUILD_DIR)/kernel/e1000_irq.asm.o
 KERNEL_ELF := $(BUILD_DIR)/kernel/kernel.elf
 IMAGE := $(DIST_DIR)/os.img
 OVMF_CODE ?= /usr/share/edk2/x64/OVMF_CODE.4m.fd
@@ -125,7 +126,7 @@ $(UEFI_EFI): $(UEFI_OBJ) $(UEFI_ENTRY_OBJ) $(UEFI_CONSOLE_OBJ) $(UEFI_FIRMWARE_O
 $(BUILD_DIR)/kernel:
 	mkdir -p $@
 
-$(KERNEL_OBJ): kernel/arch/x86_64/entry/kernel_entry.c kernel/arch/x86_64/cpu/tables.h | $(BUILD_DIR)/kernel
+$(KERNEL_OBJ): kernel/arch/x86_64/entry/kernel_entry.c kernel/arch/x86_64/cpu/tables.h kernel/drivers/network/e1000.h | $(BUILD_DIR)/kernel
 	$(CC) -target x86_64-pc-none-elf -std=c11 -ffreestanding -fno-builtin -Iboot/UEFI/core -fno-stack-protector \
 		-fPIE -fno-plt -mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@
 
@@ -249,7 +250,7 @@ KERNEL_UHCI_OBJ := $(BUILD_DIR)/kernel/uhci.o
 KERNEL_AHCI_OBJ := $(BUILD_DIR)/kernel/ahci.o
 KERNEL_NVME_OBJ := $(BUILD_DIR)/kernel/nvme.o
 KERNEL_E1000_OBJ := $(BUILD_DIR)/kernel/e1000.o
-KERNEL_NVME_OBJ := $(KERNEL_NVME_OBJ) $(KERNEL_E1000_OBJ) $(KERNEL_HID_OBJ) $(KERNEL_EXFAT_VFS_OBJ) $(KERNEL_EXT4_OBJ) $(KERNEL_EXT4_VFS_OBJ) $(KERNEL_XFS_OBJ) $(KERNEL_XFS_VFS_OBJ) $(KERNEL_BTRFS_OBJ) $(KERNEL_BTRFS_DEFLATE_OBJ) $(KERNEL_BTRFS_LZO_OBJ) $(KERNEL_BTRFS_ZSTD_OBJ) $(KERNEL_BTRFS_FSE_OBJ) $(KERNEL_BTRFS_VFS_OBJ)
+KERNEL_NVME_OBJ := $(KERNEL_NVME_OBJ) $(KERNEL_E1000_OBJ) $(KERNEL_E1000_IRQ_OBJ) $(KERNEL_HID_OBJ) $(KERNEL_EXFAT_VFS_OBJ) $(KERNEL_EXT4_OBJ) $(KERNEL_EXT4_VFS_OBJ) $(KERNEL_XFS_OBJ) $(KERNEL_XFS_VFS_OBJ) $(KERNEL_BTRFS_OBJ) $(KERNEL_BTRFS_DEFLATE_OBJ) $(KERNEL_BTRFS_LZO_OBJ) $(KERNEL_BTRFS_ZSTD_OBJ) $(KERNEL_BTRFS_FSE_OBJ) $(KERNEL_BTRFS_VFS_OBJ)
 KERNEL_DEBUG_OBJ := $(BUILD_DIR)/kernel/debug_assert.o
 KERNEL_CLOCK_OBJ := $(BUILD_DIR)/kernel/clock.o
 
@@ -392,6 +393,9 @@ $(BUILD_DIR)/kernel/nvme.o: kernel/drivers/nvme/nvme.c kernel/drivers/nvme/nvme.
 $(KERNEL_E1000_OBJ): kernel/drivers/network/e1000.c kernel/drivers/network/e1000.h kernel/device/device.h kernel/drivers/pci/pci.h kernel/mm/physical/frame.h | $(BUILD_DIR)/kernel
 	$(CC) -target x86_64-pc-none-elf -std=c11 -ffreestanding -fno-builtin -fno-stack-protector -fPIE -fno-plt \
 		-mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@
+
+$(KERNEL_E1000_IRQ_OBJ): kernel/arch/x86_64/interrupts/e1000.asm | $(BUILD_DIR)/kernel
+	$(NASM) -f elf64 $< -o $@
 
 
 $(KERNEL_DEBUG_OBJ): kernel/debug/assert.c kernel/debug/assert.h kernel/core/panic/panic.h | $(BUILD_DIR)/kernel

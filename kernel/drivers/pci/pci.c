@@ -64,6 +64,43 @@ static uint8_t config_read8(uint8_t bus, uint8_t slot, uint8_t function,
 
 static void scan_bus(uint8_t bus);
 
+int pci_enable_msi(const device_t *device, uint8_t vector) {
+    if (!device || vector < 0x20 || vector > 0xfe) return 0;
+    uint8_t capability = config_read8(device->bus_number, device->slot,
+                                       device->function, 0x34) & 0xfcu;
+    for (uint32_t step = 0; capability >= 0x40 && step < 48; ++step) {
+        uint32_t header = config_read(device->bus_number, device->slot,
+                                      device->function, capability);
+        if ((header & 0xffU) == 0x05U) {
+            uint32_t control = config_read(device->bus_number, device->slot,
+                                            device->function,
+                                            (uint8_t)(capability + 2));
+            uint16_t message_control = (uint16_t)(control >> 16);
+            int address_64 = (message_control & (1U << 7)) != 0;
+            uint8_t data_offset = (uint8_t)(capability + (address_64 ? 12 : 8));
+            config_write(device->bus_number, device->slot, device->function,
+                         (uint8_t)(capability + 2),
+                         (control & 0x0000ffffU) | ((uint32_t)(message_control &
+                         (uint16_t)~0x0070U) << 16));
+            config_write(device->bus_number, device->slot, device->function,
+                         (uint8_t)(capability + 4), 0xfee00000U);
+            if (address_64)
+                config_write(device->bus_number, device->slot, device->function,
+                             (uint8_t)(capability + 8), 0);
+            config_write(device->bus_number, device->slot, device->function,
+                         data_offset, vector);
+            config_write(device->bus_number, device->slot, device->function,
+                         (uint8_t)(capability + 2),
+                         (control & 0x0000ffffU) |
+                         ((uint32_t)((message_control & (uint16_t)~0x0070U) |
+                         0x0001U) << 16));
+            return 1;
+        }
+        capability = (uint8_t)(header >> 8) & 0xfcu;
+    }
+    return 0;
+}
+
 static void enable_device(uint8_t bus, uint8_t slot, uint8_t function) {
     uint32_t command_status = config_read(bus, slot, function, 0x04);
     uint16_t command = (uint16_t)command_status;

@@ -751,6 +751,10 @@ and QEMU verifies a ten-sector write/read-back across that boundary.
 NVMe probing now validates the CAP-advertised doorbell stride against the full
 BAR and rejects BAR ranges crossing the supported below-4-GiB MMIO window before
 controller enablement.
+NVMe completion consumption now validates the completion queue shape, including
+reserved fields, submission-queue ownership, and the reported submission-queue
+head range, before accepting admin or I/O status. Malformed or cross-queue
+completions remain pending and cannot advance driver state.
 AHCI now enables controller/port interrupt causes through a dedicated
 MSI/legacy vector, acknowledges port causes in its ISR, and the QEMU gate
 requires post-`sti` disk I/O to observe delivery when routing is enabled.

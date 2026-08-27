@@ -270,6 +270,13 @@ void nvme_interrupt_handler(void) {
     __atomic_store_n(&nvme_completion_pending, 1U, __ATOMIC_RELEASE);
 }
 
+static int nvme_completion_shape_valid(const volatile nvme_completion_t *completion,
+                                       uint16_t expected_sq_id) {
+    return completion && completion->reserved == 0 &&
+           completion->sq_id == expected_sq_id &&
+           completion->sq_head < active_queue_entries;
+}
+
 static int nvme_submit_admin_words(uint8_t opcode, uint32_t namespace_id,
                                    uint64_t prp1, const uint32_t words[6],
                                    uint32_t *result) {
@@ -299,6 +306,7 @@ static int nvme_submit_admin_words(uint8_t opcode, uint32_t namespace_id,
         volatile nvme_completion_t *completion = &cq[active_cq_head];
         uint16_t status = completion->status;
         if ((status & 1U) != active_cq_phase) continue;
+        if (!nvme_completion_shape_valid(completion, 0)) continue;
         if (completion->command_id != command_id) continue;
         __atomic_store_n(&nvme_last_status, status, __ATOMIC_RELEASE);
         *result = completion->result;
@@ -465,6 +473,7 @@ static int nvme_io(uint64_t lba, void *buffer, uint32_t count, int write) {
         volatile nvme_completion_t *completion = &cq[active_io_cq_head];
         uint16_t status = completion->status;
         if ((status & 1U) != active_io_cq_phase ||
+            !nvme_completion_shape_valid(completion, 1) ||
             completion->command_id != command_id) continue;
         __atomic_store_n(&nvme_last_status, status, __ATOMIC_RELEASE);
         success = (status >> 1) == 0;
@@ -542,6 +551,7 @@ static int nvme_flush(void) {
         volatile nvme_completion_t *completion = &cq[active_io_cq_head];
         uint16_t status = completion->status;
         if ((status & 1U) != active_io_cq_phase ||
+            !nvme_completion_shape_valid(completion, 1) ||
             completion->command_id != command_id) continue;
         __atomic_store_n(&nvme_last_status, status, __ATOMIC_RELEASE);
         success = (status >> 1) == 0;

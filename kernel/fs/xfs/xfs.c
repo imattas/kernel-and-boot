@@ -205,10 +205,18 @@ int xfs_write_file(xfs_fs_t *fs, uint64_t inode, uint64_t offset,
         if (end > file_size) store_be64(&data[56], end);
         return xfs_write_inode(fs, inode, data);
     }
-    if (data[5] != XFS_FORMAT_EXTENTS || (uint64_t)size > file_size - offset) return 0;
+    if (data[5] != XFS_FORMAT_EXTENTS) return 0;
     uint32_t extent_count = be32(&data[76]);
     if (extent_count == 0 || extent_count > (fs->inode_size - core) / 16U)
         return 0;
+    uint64_t end = offset + size;
+    int grew = end > file_size;
+    if (grew) {
+        uint64_t physical = 0, extent_length = 0;
+        uint8_t unwritten = 0;
+        if (!xfs_extent(&data[core], (end - 1U) / fs->block_size,
+                        &physical, &extent_length, &unwritten)) return 0;
+    }
     uint64_t logical = offset / fs->block_size;
     uint32_t in_block = (uint32_t)(offset % fs->block_size);
     uint32_t remaining = size;
@@ -221,12 +229,31 @@ int xfs_write_file(xfs_fs_t *fs, uint64_t inode, uint64_t offset,
                            &extent_length, &unwritten)) { found = 1; break; }
         uint32_t chunk = fs->block_size - in_block;
         if (chunk > remaining) chunk = remaining;
-        if (!found || unwritten || physical >= fs->block_count ||
-            !xfs_read_block(fs, physical, block)) return 0;
+        if (!found || physical >= fs->block_count) return 0;
+        if (unwritten) {
+            for (uint32_t i = 0; i < fs->block_size; ++i) block[i] = 0;
+        } else if (!xfs_read_block(fs, physical, block)) return 0;
         for (uint32_t i = 0; i < chunk; ++i)
             block[in_block + i] = source[i];
         if (!xfs_write_block(fs, physical, block)) return 0;
+        if (unwritten) {
+            for (uint32_t i = 0; i < extent_count; ++i) {
+                uint64_t candidate = 0, candidate_length = 0;
+                uint8_t candidate_unwritten = 0;
+                if (xfs_extent(&data[core + i * 16U], logical, &candidate,
+                               &candidate_length, &candidate_unwritten) &&
+                    candidate == physical && candidate_unwritten) {
+                    store_be64(&data[core + i * 16U],
+                               be64(&data[core + i * 16U]) & 0x7fffffffffffffffULL);
+                    break;
+                }
+            }
+        }
         source += chunk; remaining -= chunk; ++logical; in_block = 0;
+    }
+    if (grew) {
+        store_be64(&data[56], end);
+        return xfs_write_inode(fs, inode, data);
     }
     return 1;
 }

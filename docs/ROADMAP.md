@@ -1011,6 +1011,9 @@ trees, while partial deep-tree shrink remains guarded.
 XFS local-format regular files now support bounded append growth within the
 inode payload and zero-length truncation with inline data clearing; extent
 allocation remains a separate XFS metadata milestone.
+XFS extent files now accept writes to preallocated unwritten extents, treating
+untouched bytes as zero, converting written extents to initialized state, and
+allowing file-size growth only within verified allocated extent coverage.
 Btrfs regular-file truncation now accepts zero-length targets, updating the
 inode item through the checksum-protected tree-node path.
 Btrfs inline extents now support bounded growth when the leaf node has

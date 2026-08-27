@@ -294,8 +294,8 @@ milestone groundwork only; they do not pass this gate.
 ## Filesystem milestone before drivers
 
 FAT32 and exFAT have read-only parsers and VFS file adapters. Ext4 now has
-read-only inode, directory, direct-block/extent-depth-zero file reads, and a
-VFS adapter. XFS and Btrfs now have strict read-only superblock and geometry
+read-only inode, directory, direct/indirect-block reads, and extent-tree file
+reads through a VFS adapter. XFS and Btrfs now have strict read-only superblock and geometry
 mount layers with contract tests. XFS now maps allocation-group inode numbers,
 reads v1/v2 inodes, supports short-form directories, inline files, extent
 records, and a VFS file adapter. Btrfs validates its CRC32C superblock checksum

@@ -63,24 +63,48 @@ static int read_inode(const ext4_fs_t *fs, uint32_t number, uint8_t *inode) {
     return 1;
 }
 
+static int extent_data_block(const ext4_fs_t *fs, const uint8_t *header,
+                             uint32_t logical, uint64_t *physical, uint8_t depth,
+                             uint8_t root) {
+    if (!fs || !header || !physical || depth > 5 || load16(header) != EXT4_EXTENT_MAGIC)
+        return 0;
+    uint16_t entries = load16(header + 2), maximum = load16(header + 4);
+    uint16_t node_depth = load16(header + 6);
+    uint32_t header_bytes = root ? 60U : fs->block_size;
+    if (node_depth != depth || entries > maximum || 12U + (uint32_t)entries * 12U > header_bytes)
+        return 0;
+    if (depth == 0) {
+        for (uint16_t i = 0; i < entries; ++i) {
+            const uint8_t *extent = header + 12U + i * 12U;
+            uint32_t first = load32(extent);
+            uint16_t length = load16(extent + 4) & 0x7fffU;
+            if (!length || logical < first || logical - first >= length) continue;
+            uint64_t start = ((uint64_t)load16(extent + 6) << 32) | load32(extent + 8);
+            if (start > UINT64_MAX - (logical - first)) return 0;
+            *physical = start + logical - first;
+            return *physical < fs->block_count;
+        }
+        return 0;
+    }
+    const uint8_t *selected = 0;
+    for (uint16_t i = 0; i < entries; ++i) {
+        const uint8_t *index = header + 12U + i * 12U;
+        if (load32(index) > logical) break;
+        selected = index;
+    }
+    if (!selected) return 0;
+    uint64_t child = load32(selected + 4) | ((uint64_t)load16(selected + 8) << 32);
+    uint8_t block[4096];
+    return read_block(fs, child, block) && extent_data_block(fs, block, logical,
+                                                               physical, (uint8_t)(depth - 1U), 0);
+}
+
 static int inode_data_block(const ext4_fs_t *fs, const uint8_t *inode,
                             uint32_t logical, uint64_t *physical) {
     if (!fs || !inode || !physical) return 0;
     if ((load32(&inode[32]) & EXT4_EXTENTS_FL) != 0) {
         const uint8_t *header = &inode[40];
-        if (load16(header) != EXT4_EXTENT_MAGIC || load16(header + 6) != 0) return 0;
-        uint16_t entries = load16(header + 2);
-        if (entries > load16(header + 4) || 12U + (uint32_t)entries * 12U > 60U) return 0;
-        for (uint16_t i = 0; i < entries; ++i) {
-            const uint8_t *extent = header + 12U + i * 12U;
-            uint32_t first = load32(extent);
-            uint16_t length = load16(extent + 4) & 0x7fffU;
-            if (logical < first || logical - first >= length) continue;
-            uint64_t start = ((uint64_t)load16(extent + 6) << 32) | load32(extent + 8);
-            *physical = start + logical - first;
-            return *physical < fs->block_count;
-        }
-        return 0;
+        return extent_data_block(fs, header, logical, physical, load16(header + 6), 1);
     }
     uint64_t index = logical;
     if (index < 12U) {

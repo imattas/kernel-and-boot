@@ -248,6 +248,8 @@ Heap-backed IPC endpoints can now be owned by process handles, with validated
 message copy-in/copy-out and create/send/receive syscall coverage.
 Blocking IPC send/receive operations are now exposed through the same ABI with
 validated buffers preserved across the wait-capable path.
+The syscall ABI now exposes cooperative scheduler yield, completing the first
+explicit task-scheduling operation available to future user tasks.
 Current-process exit now publishes an exit status, wakes signal and exit
 waiters, and terminates the scheduler task through a dedicated exit syscall;
 successful ring-3 invocation remains deferred with the rest of userland.

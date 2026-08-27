@@ -2388,6 +2388,11 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("blocking IPC syscalls ready\r\n");
+    if (syscall_dispatch(OS_SYSCALL_YIELD, 0, 0, 0) != 0) {
+        serial_write("yield syscall failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("yield syscall ready\r\n");
     if (!kernel_init_state_advance(&init_state, KERNEL_INIT_SERVICES))
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     serial_write("user mode deferred until kernel completion\r\n");

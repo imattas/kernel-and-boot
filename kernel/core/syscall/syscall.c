@@ -7,6 +7,7 @@
 #include "../../mm/virtual/address_space.h"
 #include "../../fs/vfs/file.h"
 #include "../../ipc/endpoint.h"
+#include "../../sched/core/scheduler.h"
 #include "../printk/serial.h"
 
 extern void arch_syscall_interrupt(void);
@@ -213,6 +214,9 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
             process_handle_release_ref(&ref);
             return result > 0 ? (uint64_t)(uint32_t)result : OS_SYSCALL_ERROR;
         }
+        case OS_SYSCALL_YIELD:
+            scheduler_yield();
+            return 0;
         case OS_SYSCALL_SIGNAL_NEXT: {
             uint32_t signal = 0;
             if (!user_range(arg1, sizeof(signal), 1) ||

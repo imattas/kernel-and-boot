@@ -357,6 +357,8 @@ current-process, and lock state before process/thread creation.
 Physical-memory initialization now rejects zero-sized or overflowing kernel
 ranges before reserving kernel frames, avoiding bitmap corruption from a bad
 firmware boot contract.
+VFS node read callbacks and private destructors now publish through the node
+lock, preventing concurrent metadata readers from observing partial setup.
 APIC PIT calibration now uses a bounded wait budget and retains a validated
 fallback count, preventing slow firmware emulation from blocking kernel boot.
 UEFI memory-map retries now release rejected candidate pools and validate boot

@@ -52,21 +52,36 @@ vfs_node_t *vfs_node_create(const char *name, vfs_node_type_t type,
 
 int vfs_node_set_private_destructor(vfs_node_t *node,
                                     vfs_private_destroy_fn destroy) {
-    if (!node || !node->private_data || node->private_destroy || !destroy) return 0;
+    if (!node || !destroy) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&node->lock);
+    if (!node->private_data || node->private_destroy) {
+        spinlock_unlock_irqrestore(&node->lock, flags);
+        return 0;
+    }
     node->private_destroy = destroy;
+    spinlock_unlock_irqrestore(&node->lock, flags);
     return 1;
 }
 
 int vfs_node_set_read(vfs_node_t *node, vfs_read_fn read, void *private_data) {
-    if (!node || !read || node->read || node->private_data) return 0;
+    if (!node || !read) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&node->lock);
+    if (node->read || node->private_data) {
+        spinlock_unlock_irqrestore(&node->lock, flags);
+        return 0;
+    }
     node->read = read;
     node->private_data = private_data;
+    spinlock_unlock_irqrestore(&node->lock, flags);
     return 1;
 }
 
 int vfs_node_read(vfs_node_t *node, uint64_t offset, void *buffer, uint32_t size) {
-    if (!node || !buffer || size == 0 || !node->read) return 0;
-    return node->read(node, offset, buffer, size);
+    if (!node || !buffer || size == 0) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&node->lock);
+    vfs_read_fn read = node->read;
+    spinlock_unlock_irqrestore(&node->lock, flags);
+    return read ? read(node, offset, buffer, size) : 0;
 }
 
 int vfs_node_add_child(vfs_node_t *parent, vfs_node_t *child) {

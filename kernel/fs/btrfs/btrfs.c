@@ -236,13 +236,18 @@ int btrfs_read_extent_data(btrfs_fs_t *fs, uint64_t tree_bytenr, uint64_t inode,
         data_offset > disk_size || relative > disk_size - data_offset ||
         size > disk_size - data_offset - relative ||
         file_offset > UINT64_MAX - disk_bytenr - data_offset) return 0;
+    uint64_t logical = disk_bytenr + data_offset + relative;
+    uint64_t sector_logical = logical - logical % BTRFS_SECTOR_SIZE;
+    uint32_t in_sector = (uint32_t)(logical - sector_logical);
+    uint32_t transfer = in_sector + size;
     uint64_t physical = 0;
-    if (!btrfs_map(fs, disk_bytenr + data_offset + relative, size, &physical) ||
-        physical % BTRFS_SECTOR_SIZE != 0 || size > sizeof(data) ||
+    if (transfer < size || transfer > sizeof(data) ||
+        !btrfs_map(fs, sector_logical, transfer, &physical) ||
+        physical % BTRFS_SECTOR_SIZE != 0 ||
         !storage_read(fs->device, physical / BTRFS_SECTOR_SIZE,
-                      (size + BTRFS_SECTOR_SIZE - 1U) / BTRFS_SECTOR_SIZE, data)) return 0;
+                      (transfer + BTRFS_SECTOR_SIZE - 1U) / BTRFS_SECTOR_SIZE, data)) return 0;
     available = size;
-    for (uint32_t i = 0; i < available; ++i) ((uint8_t *)buffer)[i] = data[i];
+    for (uint32_t i = 0; i < available; ++i) ((uint8_t *)buffer)[i] = data[in_sector + i];
     return 1;
 }
 

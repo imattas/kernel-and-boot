@@ -303,7 +303,8 @@ and supported checksum type, validates tree-node checksums/identity, and reads
 bounded leaf items through single-stripe system-chunk logical-to-physical
 mapping, and resolves the standard FS_TREE root item from the root tree. Btrfs
 now decodes bounded inline and uncompressed regular EXTENT_DATA records,
-extracts inode metadata, and reads mapped data. Compressed, encrypted, and
+extracts inode metadata, and reads mapped data including unaligned byte
+ranges. Compressed, encrypted, and
 multi-extent file reads remain before the filesystem milestone is complete.
 Btrfs now performs hashed DIR_ITEM lookup with variable-length entry checks;
 its multi-extent read path is integrated into a read-only VFS file adapter.

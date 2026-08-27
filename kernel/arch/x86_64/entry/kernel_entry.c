@@ -87,9 +87,13 @@ static process_t *signal_wait_probe_process;
 static volatile uint8_t signal_wait_probe_result;
 static uint8_t ahci_read_probe[512];
 static volatile uint32_t owned_handle_release_count;
+static volatile uint32_t inherited_handle_retain_count;
 
 static void owned_handle_release_probe(void *object) {
     if (object) ++owned_handle_release_count;
+}
+static void inherited_handle_retain_probe(void *object) {
+    if (object) ++inherited_handle_retain_count;
 }
 typedef struct {
     network_packet_queue_t *queue;
@@ -2915,6 +2919,27 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("process namespace inheritance ready\r\n");
+    static uint32_t inherited_handle_object;
+    inherited_handle_retain_count = 0;
+    owned_handle_release_count = 0;
+    int inherited_handle = process_handle_open_owned_retain(
+        &runtime_process->handles, &inherited_handle_object,
+        PROCESS_HANDLE_READ, owned_handle_release_probe,
+        inherited_handle_retain_probe);
+    process_t *handle_child = process_create_auto();
+    if (!inherited_handle || !handle_child ||
+        !process_inherit_handles(handle_child, runtime_process) ||
+        !process_handle_get(&handle_child->handles, (uint32_t)inherited_handle,
+                            PROCESS_HANDLE_READ) ||
+        inherited_handle_retain_count != 1 ||
+        !process_destroy(handle_child) ||
+        !process_handle_close(&runtime_process->handles,
+                              (uint32_t)inherited_handle) ||
+        owned_handle_release_count != 2) {
+        serial_write("process handle inheritance failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("process handle inheritance ready\r\n");
     syscall_initialize();
     if (!process_activate(runtime_process)) {
         serial_write("user address space activation failure\r\n");

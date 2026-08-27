@@ -33,6 +33,8 @@ struct process_handle_table {
     uint32_t retained_references;
 };
 void process_handle_table_initialize(process_handle_table_t *table);
+int process_handle_table_inherit(process_handle_table_t *destination,
+                                 process_handle_table_t *source);
 int process_handle_open(process_handle_table_t *table, void *object, uint32_t rights);
 int process_handle_open_owned(process_handle_table_t *table, void *object,
                               uint32_t rights, process_handle_release_fn release);

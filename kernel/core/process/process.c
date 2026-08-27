@@ -183,6 +183,19 @@ int process_inherit_namespace(process_t *child, process_t *parent) {
     return 1;
 }
 
+int process_inherit_handles(process_t *child, process_t *parent) {
+    if (!child || !parent || child == parent) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&parent->lock);
+    int parent_live = parent->state != PROCESS_EXITED;
+    spinlock_unlock_irqrestore(&parent->lock, flags);
+    if (!parent_live) return 0;
+    flags = spinlock_lock_irqsave(&child->lock);
+    int child_new = child->state == PROCESS_NEW;
+    spinlock_unlock_irqrestore(&child->lock, flags);
+    return child_new ? process_handle_table_inherit(&child->handles,
+                                                    &parent->handles) : 0;
+}
+
 int process_set_working_directory(process_t *process, vfs_node_t *directory) {
     if (!process || !directory || directory->type != VFS_NODE_DIRECTORY) return 0;
     vfs_node_retain(directory);

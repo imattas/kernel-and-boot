@@ -291,6 +291,9 @@ available for controlled kernel tests.
 New processes can now inherit a retained root and working-directory namespace
 from a live parent while remaining in the NEW state; the kernel gate exercises
 the ownership and teardown path without entering userland.
+New processes can also inherit retain-capable process handles with canonical
+table-lock ordering and atomic rejection of non-inheritable descriptors; the
+QEMU gate verifies duplicate ownership and release after child teardown.
 The bootable `dist/os.img` is now a standards-compliant FAT32 superfloppy
 with two FAT copies, backup boot/FSInfo sectors, and valid directory metadata;
 `fsck.fat`, `mdir`, and the QEMU UEFI/AHCI/NVMe paths all validate the same

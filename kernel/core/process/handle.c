@@ -27,6 +27,45 @@ static int decode_handle(uint32_t handle, uint32_t *slot, uint16_t *generation) 
     *generation = (uint16_t)encoded_generation;
     return 1;
 }
+
+int process_handle_table_inherit(process_handle_table_t *destination,
+                                 process_handle_table_t *source) {
+    if (!destination || !source || destination == source) return 0;
+    int destination_first = (uintptr_t)destination < (uintptr_t)source;
+    process_handle_table_t *first = destination_first ? destination : source;
+    process_handle_table_t *second = destination_first ? source : destination;
+    uint64_t first_flags = spinlock_lock_irqsave(&first->lock);
+    uint64_t second_flags = spinlock_lock_irqsave(&second->lock);
+    for (uint32_t i = 0; i < PROCESS_HANDLE_CAPACITY; ++i) {
+        if (destination->entries[i].object) {
+            spinlock_unlock_irqrestore(&second->lock, second_flags);
+            spinlock_unlock_irqrestore(&first->lock, first_flags);
+            return 0;
+        }
+        process_handle_t *entry = &source->entries[i];
+        if (entry->object && !entry->closing && !entry->retain) {
+            spinlock_unlock_irqrestore(&second->lock, second_flags);
+            spinlock_unlock_irqrestore(&first->lock, first_flags);
+            return 0;
+        }
+    }
+    for (uint32_t i = 0; i < PROCESS_HANDLE_CAPACITY; ++i) {
+        process_handle_t *source_entry = &source->entries[i];
+        process_handle_t *destination_entry = &destination->entries[i];
+        if (!source_entry->object || source_entry->closing) continue;
+        source_entry->retain(source_entry->object);
+        destination_entry->object = source_entry->object;
+        destination_entry->rights = source_entry->rights;
+        destination_entry->release = source_entry->release;
+        destination_entry->retain = source_entry->retain;
+        destination_entry->retained_references = 0;
+        destination_entry->closing = 0;
+    }
+    spinlock_unlock_irqrestore(&second->lock, second_flags);
+    spinlock_unlock_irqrestore(&first->lock, first_flags);
+    return 1;
+}
+
 int process_handle_open(process_handle_table_t *table, void *object, uint32_t rights) {
     return process_handle_open_owned(table, object, rights, 0);
 }

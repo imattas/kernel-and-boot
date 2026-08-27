@@ -55,6 +55,7 @@ int process_initialize(void);
 int process_set_namespace(process_t *process, vfs_node_t *root,
                           vfs_node_t *working_directory);
 int process_inherit_namespace(process_t *child, process_t *parent);
+int process_inherit_handles(process_t *child, process_t *parent);
 int process_set_working_directory(process_t *process, vfs_node_t *directory);
 process_t *process_lookup(uint64_t id);
 process_t *process_lookup_retain(uint64_t id);

@@ -8,6 +8,7 @@ int e1000_mac_address(uint8_t address[6]);
 int e1000_interrupt_enabled(void);
 uint32_t e1000_interrupt_count(void);
 uint32_t e1000_tx_error_count(void);
+uint32_t e1000_rx_error_count(void);
 uint32_t e1000_link_event_count(void);
 uint32_t e1000_rx_overrun_count(void);
 void e1000_interrupt_handler(void);

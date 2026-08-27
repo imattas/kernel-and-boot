@@ -82,6 +82,7 @@ static uint8_t e1000_mac[6];
 static volatile uint32_t e1000_interrupts;
 static volatile uint32_t e1000_pending_causes;
 static volatile uint32_t e1000_tx_errors;
+static volatile uint32_t e1000_rx_errors;
 static volatile uint32_t e1000_link_events;
 static volatile uint32_t e1000_rx_overruns;
 
@@ -181,6 +182,7 @@ int e1000_initialize(void) {
     e1000_interrupts = 0;
     e1000_pending_causes = 0;
     e1000_tx_errors = 0;
+    e1000_rx_errors = 0;
     e1000_link_events = 0;
     e1000_rx_overruns = 0;
     for (uint32_t i = 0; i < 6; ++i) e1000_mac[i] = 0;
@@ -210,6 +212,9 @@ uint32_t e1000_interrupt_count(void) {
 }
 uint32_t e1000_tx_error_count(void) {
     return __atomic_load_n(&e1000_tx_errors, __ATOMIC_ACQUIRE);
+}
+uint32_t e1000_rx_error_count(void) {
+    return __atomic_load_n(&e1000_rx_errors, __ATOMIC_ACQUIRE);
 }
 uint32_t e1000_link_event_count(void) {
     return __atomic_load_n(&e1000_link_events, __ATOMIC_ACQUIRE);
@@ -315,6 +320,7 @@ int e1000_receive(void *data, uint16_t capacity, uint16_t *length) {
         }
     }
     if (invalid || total == 0 || total > UINT16_MAX) {
+        __atomic_fetch_add(&e1000_rx_errors, 1U, __ATOMIC_RELAXED);
         uint32_t recycle = e1000_rx_index;
         for (uint32_t consumed = 0; consumed < descriptors; ++consumed) {
             e1000_rx_ring[recycle].status = 0;

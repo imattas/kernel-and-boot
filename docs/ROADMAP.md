@@ -425,6 +425,8 @@ oversized descriptors instead of silently truncating packets.
 RX delivery now assembles bounded packets spanning multiple completed
 descriptors, recycles every consumed descriptor, and rejects incomplete,
 errored, and capacity-overflowing frames without exposing partial data.
+Rejected RX frames now increment a published error counter, and the QEMU
+completion gate requires no TX or RX descriptor errors during its probe.
 The e1000 RX rejection path now recycles by consumed-descriptor count, so a
 malformed frame spanning the entire ring cannot wrap the index and strand all
 RX descriptors.

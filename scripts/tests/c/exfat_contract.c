@@ -42,6 +42,8 @@ int main(void) {
     put32(&image[24 * 512 + 4 * 4], 0xfffffff8U);
     assert(exfat_lookup_in_directory(&fs, 4, "hello.txt", &cluster, &size, &no_fat) &&
            cluster == 3 && size == 5);
+    memset(output, 0, sizeof(output)); assert(exfat_read_file_in_directory(&fs, 4, "HELLO.TXT", 0, output, 5) &&
+                                             memcmp(output, "hello", 5) == 0);
     image[11 * 512] ^= 1; assert(!exfat_mount(&fs, 0)); image[11 * 512] ^= 1;
     image[0] = 0; assert(!exfat_mount(&fs, 0)); return 0;
 }

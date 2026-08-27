@@ -154,11 +154,10 @@ int exfat_lookup(exfat_fs_t *fs, const char *name, uint32_t *first_cluster,
                                      first_cluster, size, no_fat_chain);
 }
 
-int exfat_read_file(exfat_fs_t *fs, const char *name, uint64_t offset,
-                    void *buffer, uint32_t size) {
-    if (!fs || !buffer || size == 0) return 0;
-    uint32_t cluster = 0; uint64_t file_size = 0; uint8_t no_fat_chain = 0;
-    if (!exfat_lookup(fs, name, &cluster, &file_size, &no_fat_chain) ||
+static int exfat_read_file_cluster(exfat_fs_t *fs, uint32_t cluster,
+                                   uint64_t file_size, uint8_t no_fat_chain,
+                                   uint64_t offset, void *buffer, uint32_t size) {
+    if (!fs || !buffer || size == 0 || !cluster_valid(fs, cluster) ||
         offset > file_size || size > file_size - offset) return 0;
     uint32_t cluster_bytes = fs->sectors_per_cluster * EXFAT_SECTOR_SIZE;
     uint64_t cluster_index = offset / cluster_bytes;
@@ -187,4 +186,22 @@ int exfat_read_file(exfat_fs_t *fs, const char *name, uint64_t offset,
         }
     }
     return 1;
+}
+
+int exfat_read_file(exfat_fs_t *fs, const char *name, uint64_t offset,
+                    void *buffer, uint32_t size) {
+    uint32_t cluster = 0; uint64_t file_size = 0; uint8_t no_fat_chain = 0;
+    if (!exfat_lookup(fs, name, &cluster, &file_size, &no_fat_chain)) return 0;
+    return exfat_read_file_cluster(fs, cluster, file_size, no_fat_chain,
+                                   offset, buffer, size);
+}
+
+int exfat_read_file_in_directory(exfat_fs_t *fs, uint32_t directory_cluster,
+                                 const char *name, uint64_t offset,
+                                 void *buffer, uint32_t size) {
+    uint32_t cluster = 0; uint64_t file_size = 0; uint8_t no_fat_chain = 0;
+    if (!exfat_lookup_in_directory(fs, directory_cluster, name, &cluster,
+                                   &file_size, &no_fat_chain)) return 0;
+    return exfat_read_file_cluster(fs, cluster, file_size, no_fat_chain,
+                                   offset, buffer, size);
 }

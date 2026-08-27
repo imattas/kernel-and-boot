@@ -37,6 +37,7 @@
 #include "../../../drivers/network/arp_cache.h"
 #include "../../../drivers/network/ipv4.h"
 #include "../../../drivers/network/udp.h"
+#include "../../../drivers/network/icmp.h"
 #include "../../../time/clock.h"
 #include "../../../debug/assert.h"
 #include "../../../core/task/context.h"
@@ -598,6 +599,31 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("UDP packet ready\r\n");
+    static const uint8_t icmp_probe_payload[5] = {9, 8, 7, 6, 5};
+    static uint8_t icmp_probe_packet[ICMP_ECHO_HEADER_SIZE +
+                                     sizeof(icmp_probe_payload)];
+    uint16_t icmp_probe_length = 0;
+    icmp_echo_view_t icmp_probe_view;
+    if (!icmp_echo_build(icmp_probe_packet, sizeof(icmp_probe_packet),
+                         ICMP_TYPE_ECHO_REQUEST, 0x1234, 7,
+                         icmp_probe_payload, sizeof(icmp_probe_payload),
+                         &icmp_probe_length) ||
+        !icmp_echo_parse(icmp_probe_packet, icmp_probe_length,
+                         &icmp_probe_view) ||
+        icmp_probe_view.identifier != 0x1234 ||
+        icmp_probe_view.sequence != 7 ||
+        icmp_probe_view.payload_length != sizeof(icmp_probe_payload) ||
+        icmp_probe_view.payload[4] != 5) {
+        serial_write("ICMP packet failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    icmp_probe_packet[2] ^= 1U;
+    if (icmp_echo_parse(icmp_probe_packet, icmp_probe_length,
+                        &icmp_probe_view)) {
+        serial_write("ICMP checksum failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("ICMP packet ready\r\n");
     if (e1000_controller_count() != 0 &&
         !e1000_transmit(network_probe_packet, sizeof(network_probe_packet))) {
         serial_write("e1000 transmit failure\r\n");

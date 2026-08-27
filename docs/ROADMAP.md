@@ -331,6 +331,9 @@ packets until a reassembly component is available.
 The bounded UDP layer now constructs and validates port/length fields and the
 IPv4 pseudo-header checksum, with explicit corruption rejection before payload
 delivery.
+The bounded ICMPv4 echo layer now constructs and validates request/reply
+headers, identifiers, sequences, payloads, and Internet checksums, rejecting
+corrupted control packets before dispatch.
 The e1000 ISR now records delivery, and the post-interrupt-enable QEMU probe
 transmits a frame and requires an observed interrupt before continuing.
 The e1000 ISR now preserves cleared interrupt causes for the polling/service

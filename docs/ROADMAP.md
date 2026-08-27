@@ -1078,6 +1078,8 @@ coalesces adjacent free records while maintaining the same AGF accounting.
 XFS BNO allocation and release now also verify sorted non-overlapping records and
 the aggregate free-record count against AGF free-block metadata before mutation,
 rejecting inconsistent free-space trees without changing them.
+The XFS allocator now also recognizes the authentic v4 AGF BNO-level field and
+v4 BNO leaf header/count encoding while retaining the existing contract format.
 Multi-level BNO/CNT trees and full transaction logging remain later hardening
 work.
 Btrfs regular-file truncation now accepts zero-length targets, updating the

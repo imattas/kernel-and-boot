@@ -52,5 +52,13 @@ int main(void) {
     assert(!xfs_allocate_extent(&fs, 0, 1, &start));
     assert(g32(&bno[8]) == 1 && g32(&bno[16]) == 10 && g32(&bno[20]) == 3 &&
            g32(&agf[40]) == 2);
+    p32(&agf[4], 1); p32(&agf[24], 0); p32(&agf[28], 1);
+    p32(&bno[0], 0x41425442U); p16(&bno[4], 0); p16(&bno[6], 1);
+    p32(&bno[16], 10); p32(&bno[20], 3); p32(&agf[40], 3); p32(&agf[44], 3);
+    assert(xfs_allocate_extent(&fs, 0, 2, &start) && start == 10);
+    assert(((uint16_t)bno[6] << 8 | bno[7]) == 1 && g32(&bno[16]) == 12 &&
+           g32(&bno[20]) == 1 && g32(&agf[40]) == 1);
+    assert(xfs_free_extent(&fs, 10, 2) && g32(&bno[16]) == 10 &&
+           g32(&bno[20]) == 3 && g32(&agf[40]) == 3);
     return 0;
 }

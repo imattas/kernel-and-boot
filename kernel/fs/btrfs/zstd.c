@@ -32,6 +32,34 @@ static uint32_t zstd_highest_bit(uint32_t value) {
     return bit;
 }
 
+int btrfs_zstd_read_sequence_header(const uint8_t *input, uint32_t input_size,
+                                    btrfs_zstd_sequence_header_t *header) {
+    uint8_t first, modes;
+    if (!input || !header || !input_size) return 0;
+    first = input[0];
+    if (first < 128U) {
+        header->count = first; header->header_size = 1;
+    } else if (first < 255U) {
+        if (input_size < 2U) return 0;
+        header->count = ((uint32_t)(first - 128U) << 8) | input[1];
+        header->header_size = 2;
+    } else {
+        if (input_size < 3U) return 0;
+        header->count = 0x7f00U + input[1] + ((uint32_t)input[2] << 8);
+        header->header_size = 3;
+    }
+    header->literal_length_mode = header->offset_mode = header->match_length_mode = 0;
+    if (!header->count) return 1;
+    if (header->header_size >= input_size) return 0;
+    modes = input[header->header_size];
+    if (modes & 3U) return 0;
+    header->literal_length_mode = (uint8_t)(modes >> 6);
+    header->offset_mode = (uint8_t)((modes >> 4) & 3U);
+    header->match_length_mode = (uint8_t)((modes >> 2) & 3U);
+    ++header->header_size;
+    return 1;
+}
+
 static uint32_t zstd_stream_bits(const uint8_t *source, uint32_t bits,
                                  int64_t *offset) {
     int64_t start = *offset - (int64_t)bits;

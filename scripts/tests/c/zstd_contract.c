@@ -16,6 +16,7 @@ int main(void) {
                            0x2b, 0x08, 0x00, 'A'};
     uint8_t output[261] = {0};
     uint32_t size = 0;
+    btrfs_zstd_sequence_header_t sequence;
     assert(btrfs_zstd_decompress(raw, sizeof(raw), output, sizeof(output), &size));
     assert(size == 5 && memcmp(output, "hello", 5) == 0);
     assert(btrfs_zstd_decompress(huffman, sizeof(huffman), output, sizeof(output), &size));
@@ -27,5 +28,13 @@ int main(void) {
     assert(size == 5 && memcmp(output, "hello", 5) == 0);
     assert(!btrfs_zstd_decompress(raw, sizeof(raw) - 1, output, sizeof(output), &size));
     assert(!btrfs_zstd_decompress(raw, sizeof(raw), output, 4, &size));
+    assert(btrfs_zstd_read_sequence_header((const uint8_t[]){0}, 1, &sequence));
+    assert(sequence.count == 0 && sequence.header_size == 1);
+    assert(btrfs_zstd_read_sequence_header((const uint8_t[]){5, 0x90}, 2, &sequence));
+    assert(sequence.count == 5 && sequence.literal_length_mode == 2 &&
+           sequence.offset_mode == 1 && sequence.match_length_mode == 0 &&
+           sequence.header_size == 2);
+    assert(btrfs_zstd_read_sequence_header((const uint8_t[]){255, 0, 1, 0}, 4, &sequence));
+    assert(sequence.count == 0x8000 && sequence.header_size == 4);
     return 0;
 }

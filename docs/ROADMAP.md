@@ -338,6 +338,9 @@ contracted, including the two-state interleaved stream form. FSE
 normalized-header parsing is now also implemented and
 contracted, so
 Zstandard is not exposed through Btrfs yet.
+Zstandard sequence-section count/mode header parsing is now implemented and
+contracted; FSE symbol tables and literal/match sequence execution remain
+before Btrfs exposure.
 
 ## Phase 10 — Userland begins after the kernel gate
 

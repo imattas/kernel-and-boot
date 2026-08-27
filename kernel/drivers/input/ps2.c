@@ -113,6 +113,7 @@ int ps2_mouse_initialize(input_queue_t *queue) {
     config |= 0x02U;
     if (!controller_write_config(config) || !mouse_command_noarg(0xf4))
         return 0;
+    mouse_packet_length = 0;
     mouse_queue = queue;
     mouse_enabled = 1;
     return 1;
@@ -121,8 +122,9 @@ int ps2_mouse_initialize(input_queue_t *queue) {
 int ps2_mouse_enabled(void) { return mouse_enabled; }
 
 int ps2_mouse_poll(input_queue_t *queue) {
-    if (!queue || !mouse_enabled || (in8(0x64) & 1U) == 0 ||
-        (in8(0x64) & 0x20U) == 0) return 0;
+    uint8_t status = in8(0x64);
+    if (!queue || !mouse_enabled || (status & 1U) == 0 ||
+        (status & 0x20U) == 0) return 0;
     uint8_t byte = in8(0x60);
     if (mouse_packet_length == 0 && (byte & 0x08U) == 0) return 0;
     mouse_packet[mouse_packet_length++] = byte;
@@ -160,7 +162,8 @@ int ps2_mouse_decode(const uint8_t packet[3], input_event_t events[3],
 }
 
 int ps2_keyboard_poll(input_queue_t *queue) {
-    if (!queue || (in8(0x64) & 1) == 0) return 0;
+    uint8_t status = in8(0x64);
+    if (!queue || (status & 1U) == 0 || (status & 0x20U) != 0) return 0;
     uint8_t scancode = in8(0x60);
     if (scancode == 0xe0) {
         extended_scancode = 1;

@@ -666,6 +666,9 @@ NVMe I/O now enforces the namespace size reported by IDENTIFY before PRP
 allocation and command submission.
 PS/2 mouse packets now have a validated decoder that rejects bad sync and
 overflow bits and emits button, X-axis, and Y-axis input events.
+Keyboard polling now checks the controller source bit, so a keyboard IRQ path
+cannot consume mouse data from the shared output buffer; mouse status is read
+once per poll and packet state is reset when mouse scanning is enabled.
 USB HID boot-mouse reports now decode into validated button, X-axis, and
 Y-axis input events.
 The network service now drains bounded NIC input, learns validated ARP

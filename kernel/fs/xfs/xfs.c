@@ -271,6 +271,7 @@ int xfs_write_file(xfs_fs_t *fs, uint64_t inode, uint64_t offset,
         return 0;
     uint64_t end = offset + size;
     int grew = end > file_size;
+    int metadata_changed = 0;
     if (grew) {
         uint64_t physical = 0, extent_length = 0;
         uint8_t unwritten = 0;
@@ -315,11 +316,12 @@ int xfs_write_file(xfs_fs_t *fs, uint64_t inode, uint64_t offset,
                     (fs->inode_size - core) / 16U, record_index, logical,
                     physical, extent_length)) return 0;
             store_be32(&data[76], extent_count);
+            metadata_changed = 1;
         }
         source += chunk; remaining -= chunk; ++logical; in_block = 0;
     }
-    if (grew) {
-        store_be64(&data[56], end);
+    if (grew || metadata_changed) {
+        if (grew) store_be64(&data[56], end);
         return xfs_write_inode(fs, inode, data);
     }
     return 1;

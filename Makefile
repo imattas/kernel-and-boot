@@ -518,10 +518,20 @@ run: $(IMAGE)
 	@test -f "$(OVMF_CODE)" || (echo "OVMF_CODE not found: $(OVMF_CODE)" >&2; exit 2)
 	@test -f "$(OVMF_VARS)" || (echo "OVMF_VARS not found: $(OVMF_VARS)" >&2; exit 2)
 	cp "$(OVMF_VARS)" $(BUILD_DIR)/OVMF_VARS.4m.fd
+	cp "$(IMAGE)" $(BUILD_DIR)/ahci-test.img
+	cp "$(IMAGE)" $(BUILD_DIR)/nvme-test.img
 	qemu-system-x86_64 -machine pc -smp 2 -m 128M \
 		-drive if=pflash,format=raw,readonly=on,file="$(OVMF_CODE)" \
 		-drive if=pflash,format=raw,file=$(BUILD_DIR)/OVMF_VARS.4m.fd \
-		-drive format=raw,file=$(IMAGE) -serial stdio
+		-drive format=raw,file=$(IMAGE) -serial stdio \
+		-netdev user,id=osnet -device e1000,netdev=osnet \
+		-device piix3-usb-uhci \
+		-device usb-kbd \
+		-device ich9-ahci,id=ahci \
+		-drive if=none,id=ahcidisk,format=raw,file=$(BUILD_DIR)/ahci-test.img \
+		-device ide-hd,drive=ahcidisk,bus=ahci.1 \
+		-device nvme,drive=nvmedisk,serial=OSNVME01 \
+		-drive if=none,id=nvmedisk,format=raw,file=$(BUILD_DIR)/nvme-test.img
 
 clean:
 	rm -rf $(BUILD_DIR)

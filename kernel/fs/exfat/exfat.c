@@ -250,10 +250,18 @@ int exfat_read_file_in_directory(exfat_fs_t *fs, uint32_t directory_cluster,
 
 int exfat_write_file(exfat_fs_t *fs, const char *name, uint64_t offset,
                      const void *buffer, uint32_t size) {
+    return exfat_write_file_in_directory(fs, fs ? fs->root_cluster : 0,
+                                         name, offset, buffer, size);
+}
+
+int exfat_write_file_in_directory(exfat_fs_t *fs, uint32_t directory_cluster,
+                                  const char *name, uint64_t offset,
+                                  const void *buffer, uint32_t size) {
     uint32_t cluster = 0;
     uint64_t file_size = 0;
     uint8_t no_fat_chain = 0;
-    if (!exfat_lookup(fs, name, &cluster, &file_size, &no_fat_chain) ||
+    if (!exfat_lookup_in_directory(fs, directory_cluster, name, &cluster,
+                                   &file_size, &no_fat_chain) ||
         !buffer || size == 0 || offset > file_size ||
         (uint64_t)size > file_size - offset || !cluster_valid(fs, cluster))
         return 0;

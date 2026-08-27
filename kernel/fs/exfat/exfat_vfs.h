@@ -4,4 +4,8 @@
 #include "../vfs/vfs.h"
 int exfat_vfs_attach_file(exfat_fs_t *fs, vfs_node_t *root,
                           const char *filesystem_name, const char *name);
+int exfat_vfs_attach_file_in_directory(exfat_fs_t *fs, vfs_node_t *root,
+                                        uint32_t directory_cluster,
+                                        const char *filesystem_name,
+                                        const char *name);
 #endif

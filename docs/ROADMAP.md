@@ -1008,6 +1008,9 @@ XFS VFS file attachment now likewise accepts an explicit directory inode, so
 validated files in nested short-form directories use the same adapter boundary.
 Ext4 VFS file attachment now accepts an explicit directory inode and validates
 the inode type while carrying its on-disk permission bits into the VFS node.
+ExFAT VFS files now retain their source directory cluster and use directory-
+relative read/write operations, enabling nested attachment without silently
+reinterpreting the name from the volume root.
 Btrfs
 validates its CRC32C superblock checksum
 and supported checksum type, validates tree-node checksums/identity, and reads

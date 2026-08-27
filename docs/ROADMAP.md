@@ -429,6 +429,9 @@ accesses to unrelated ports.
 The boot path now attempts a HID interrupt poll, tolerates an idle keyboard’s
 valid no-report response, and feeds any completed decoded report into the
 shared input event queue.
+USB HID keyboard decoding now validates and exposes all six boot-report key
+slots through a bounded event array; the boot probe covers multi-key reports
+and duplicate-key rejection.
 PS/2 mouse initialization now verifies the controller auxiliary-port test
 before enabling mouse commands, preventing an unavailable second port from
 being published as an active input backend.

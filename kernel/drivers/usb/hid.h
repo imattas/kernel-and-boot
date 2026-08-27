@@ -6,6 +6,9 @@
 
 int usb_hid_keyboard_decode(const uint8_t *report, uint32_t length,
                             input_event_t *event);
+int usb_hid_keyboard_decode_report(const uint8_t *report, uint32_t length,
+                                   input_event_t events[6],
+                                   uint32_t *event_count);
 int usb_hid_mouse_decode(const uint8_t *report, uint32_t length,
                          input_event_t events[3], uint32_t *event_count);
 

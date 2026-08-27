@@ -1605,12 +1605,16 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("USB descriptor layer ready\r\n");
-    static const uint8_t hid_probe_report[8] = {0x02, 0, 0x04, 0, 0, 0, 0, 0};
-    input_event_t hid_probe_event;
-    if (!usb_hid_keyboard_decode(hid_probe_report, sizeof(hid_probe_report),
-                                 &hid_probe_event) ||
-        hid_probe_event.type != INPUT_EVENT_KEY || hid_probe_event.code != 0x04 ||
-        hid_probe_event.value != 0x02) {
+    static const uint8_t hid_probe_report[8] = {0x02, 0, 0x04, 0x05, 0, 0, 0, 0};
+    input_event_t hid_probe_events[6];
+    uint32_t hid_probe_count = 0;
+    if (!usb_hid_keyboard_decode_report(hid_probe_report, sizeof(hid_probe_report),
+                                        hid_probe_events, &hid_probe_count) ||
+        hid_probe_count != 2 || hid_probe_events[0].code != 0x04 ||
+        hid_probe_events[1].code != 0x05 || hid_probe_events[0].value != 1 ||
+        usb_hid_keyboard_decode_report((const uint8_t[]){0, 0, 4, 4, 0, 0, 0, 0},
+                                        sizeof(hid_probe_report), hid_probe_events,
+                                        &hid_probe_count)) {
         serial_write("USB HID keyboard failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
@@ -1638,13 +1642,16 @@ void kernel_main(void *boot_info) {
         int uhci_report_ready = uhci_interrupt_transfer(
             1, uhci_interrupt_endpoint, uhci_report, uhci_interrupt_packet,
             uhci_interrupt_packet, &uhci_toggle);
-        input_event_t uhci_event;
+        input_event_t uhci_events[6];
+        uint32_t uhci_event_count = 0;
         if (uhci_report_ready &&
-            usb_hid_keyboard_decode(uhci_report, uhci_interrupt_packet,
-                                    &uhci_event) &&
-            !input_queue_push(&input_queue, &uhci_event)) {
-            serial_write("UHCI HID input delivery failure\r\n");
-            for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+            usb_hid_keyboard_decode_report(uhci_report, uhci_interrupt_packet,
+                                           uhci_events, &uhci_event_count)) {
+            for (uint32_t event = 0; event < uhci_event_count; ++event)
+                if (!input_queue_push(&input_queue, &uhci_events[event])) {
+                    serial_write("UHCI HID input delivery failure\r\n");
+                    for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+                }
         }
         serial_write(uhci_report_ready ? "UHCI HID input delivery ready\r\n" :
                      "UHCI HID polling ready\r\n");

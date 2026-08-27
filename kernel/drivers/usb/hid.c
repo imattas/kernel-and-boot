@@ -2,14 +2,29 @@
 
 int usb_hid_keyboard_decode(const uint8_t *report, uint32_t length,
                             input_event_t *event) {
-    if (!report || !event || length != 8 || report[2] == 0) return 0;
+    if (!event) return 0;
+    input_event_t events[6];
+    uint32_t event_count = 0;
+    if (!usb_hid_keyboard_decode_report(report, length, events, &event_count) ||
+        event_count == 0) return 0;
+    *event = events[0];
+    return 1;
+}
+
+int usb_hid_keyboard_decode_report(const uint8_t *report, uint32_t length,
+                                   input_event_t events[6],
+                                   uint32_t *event_count) {
+    if (!report || !events || !event_count || length != 8 || report[1] != 0)
+        return 0;
     for (uint32_t i = 2; i < 8; ++i)
         for (uint32_t j = i + 1; j < 8; ++j)
             if (report[i] != 0 && report[i] == report[j]) return 0;
-    event->type = INPUT_EVENT_KEY;
-    event->code = report[2];
-    event->value = report[0];
-    event->timestamp = 0;
+    *event_count = 0;
+    for (uint32_t i = 2; i < 8; ++i) {
+        if (report[i] == 0) continue;
+        events[*event_count] = (input_event_t){INPUT_EVENT_KEY, report[i], 1, 0};
+        ++*event_count;
+    }
     return 1;
 }
 

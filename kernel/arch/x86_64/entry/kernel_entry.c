@@ -1390,6 +1390,19 @@ void kernel_main(void *boot_info) {
         serial_write("VFS hierarchy failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
+    vfs_node_t *vfs_foreign = vfs_node_create("foreign", VFS_NODE_REGULAR,
+                                               0, 0, 0444);
+    int vfs_remove_result = vfs_foreign ?
+        vfs_node_remove(vfs_root, vfs_foreign) : 0;
+    vfs_node_t *vfs_after_remove = vfs_node_lookup(vfs_root, "dev");
+    if (!vfs_foreign || vfs_remove_result || !vfs_after_remove) {
+        if (vfs_foreign) vfs_node_release(vfs_foreign);
+        if (vfs_after_remove) vfs_node_release(vfs_after_remove);
+        serial_write("VFS remove failure-path deadlock\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    vfs_node_release(vfs_after_remove);
+    vfs_node_release(vfs_foreign);
     vfs_node_release(vfs_dev);
     vfs_node_release(vfs_console);
     vfs_node_release(vfs_etc);

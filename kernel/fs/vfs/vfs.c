@@ -262,6 +262,7 @@ int vfs_node_remove(vfs_node_t *parent, vfs_node_t *child) {
     vfs_node_t **link = &parent->first_child;
     while (*link && *link != child) link = &(*link)->next_sibling;
     if (!*link) {
+        spinlock_unlock_irqrestore(&child->lock, child_flags);
         spinlock_unlock_irqrestore(&parent->lock, flags);
         return 0;
     }

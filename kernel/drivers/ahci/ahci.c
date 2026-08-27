@@ -126,7 +126,8 @@ static int ahci_probe(device_t *device) {
     ++controllers;
     ports |= implemented_ports;
     arch_set_interrupt_gate(AHCI_IRQ_VECTOR, arch_ahci_irq_stub);
-    ahci_irq_enabled = pci_enable_msi(device, AHCI_IRQ_VECTOR);
+    ahci_irq_enabled = pci_enable_msix(device, AHCI_IRQ_VECTOR);
+    if (!ahci_irq_enabled) ahci_irq_enabled = pci_enable_msi(device, AHCI_IRQ_VECTOR);
     if (!ahci_irq_enabled)
         ahci_irq_enabled = pci_enable_legacy_irq(device, AHCI_IRQ_VECTOR);
     if (ahci_irq_enabled) abar[AHCI_GHC_OFFSET / 4] |= AHCI_GHC_IE;

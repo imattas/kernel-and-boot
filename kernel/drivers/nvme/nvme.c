@@ -110,7 +110,8 @@ static int nvme_probe(device_t *device) {
     active_io_cq = 0;
     active_io_ready = 0;
     arch_set_interrupt_gate(NVME_IRQ_VECTOR, arch_nvme_irq_stub);
-    nvme_irq_enabled = pci_enable_msi(device, NVME_IRQ_VECTOR);
+    nvme_irq_enabled = pci_enable_msix(device, NVME_IRQ_VECTOR);
+    if (!nvme_irq_enabled) nvme_irq_enabled = pci_enable_msi(device, NVME_IRQ_VECTOR);
     if (!nvme_irq_enabled)
         nvme_irq_enabled = pci_enable_legacy_irq(device, NVME_IRQ_VECTOR);
     if (!nvme_initialize_io()) goto fail;

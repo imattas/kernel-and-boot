@@ -15,6 +15,7 @@ int main(void) {
     put32(&image[2 * 1024 + 8], 5); put32(&image[2 * 1024 + 32 + 8], 13);
     uint8_t *root_inode = &image[5 * 1024 + 128]; put16(root_inode, 0x41ed); put32(&root_inode[4], 1024); put32(&root_inode[40], 7);
     uint8_t *file_inode = &image[5 * 1024 + 256]; put16(file_inode, 0x81a4); put32(&file_inode[4], 5); put32(&file_inode[40], 8);
+    uint8_t *sparse_inode = &image[5 * 1024 + 640]; put16(sparse_inode, 0x81a4); put32(&sparse_inode[4], 1024);
     uint8_t *indirect_inode = &image[5 * 1024 + 384]; put16(indirect_inode, 0x81a4); put32(&indirect_inode[4], 12293); put32(&indirect_inode[88], 9);
     uint8_t *extent_inode = &image[5 * 1024 + 512]; put16(extent_inode, 0x81a4); put32(&extent_inode[4], 1024); put32(&extent_inode[32], 0x00080000); put16(&extent_inode[40], 0xf30a); put16(&extent_inode[42], 1); put16(&extent_inode[44], 4); put16(&extent_inode[46], 1); put32(&extent_inode[52], 0); put32(&extent_inode[56], 11);
     uint8_t *dir = &image[7 * 1024]; put32(dir, 2); put16(&dir[4], 12); dir[6] = 1; dir[7] = 2; dir[8] = '.';
@@ -41,5 +42,7 @@ int main(void) {
                                                group_size == 0x100000005ULL);
     memset(output, 0, sizeof(output)); assert(ext4_read_file(&fs, 9, 0, output, 5) &&
                                             memcmp(output, "group", 5) == 0);
+    memset(output, 0xa5, sizeof(output)); assert(ext4_read_file(&fs, 6, 0, output, 5));
+    assert(output[0] == 0 && output[1] == 0 && output[2] == 0 && output[3] == 0 && output[4] == 0);
     image[2 * 512 + 56] = 0; assert(!ext4_mount(&fs, 0)); return 0;
 }

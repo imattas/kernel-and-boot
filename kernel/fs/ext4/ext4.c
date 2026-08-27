@@ -88,9 +88,9 @@ static int read_inode(const ext4_fs_t *fs, uint32_t number, uint8_t *inode) {
 }
 
 static int extent_data_block(const ext4_fs_t *fs, const uint8_t *header,
-                             uint32_t logical, uint64_t *physical, uint8_t depth,
-                             uint8_t root) {
-    if (!fs || !header || !physical || depth > 5 || load16(header) != EXT4_EXTENT_MAGIC)
+                             uint32_t logical, uint64_t *physical, uint8_t *hole,
+                             uint8_t depth, uint8_t root) {
+    if (!fs || !header || !physical || !hole || depth > 5 || load16(header) != EXT4_EXTENT_MAGIC)
         return 0;
     uint16_t entries = load16(header + 2), maximum = load16(header + 4);
     uint16_t node_depth = load16(header + 6);
@@ -101,12 +101,14 @@ static int extent_data_block(const ext4_fs_t *fs, const uint8_t *header,
         for (uint16_t i = 0; i < entries; ++i) {
             const uint8_t *extent = header + 12U + i * 12U;
             uint32_t first = load32(extent);
-            uint16_t length = load16(extent + 4) & 0x7fffU;
+            uint16_t raw_length = load16(extent + 4);
+            uint16_t length = raw_length & 0x7fffU;
             if (!length || logical < first || logical - first >= length) continue;
             uint64_t start = ((uint64_t)load16(extent + 6) << 32) | load32(extent + 8);
             if (start > UINT64_MAX - (logical - first)) return 0;
             *physical = start + logical - first;
-            return *physical < fs->block_count;
+            *hole = (uint8_t)((raw_length & 0x8000U) != 0);
+            return *hole || *physical < fs->block_count;
         }
         return 0;
     }
@@ -120,20 +122,22 @@ static int extent_data_block(const ext4_fs_t *fs, const uint8_t *header,
     uint64_t child = load32(selected + 4) | ((uint64_t)load16(selected + 8) << 32);
     uint8_t block[4096];
     return read_block(fs, child, block) && extent_data_block(fs, block, logical,
-                                                               physical, (uint8_t)(depth - 1U), 0);
+                                                               physical, hole, (uint8_t)(depth - 1U), 0);
 }
 
 static int inode_data_block(const ext4_fs_t *fs, const uint8_t *inode,
-                            uint32_t logical, uint64_t *physical) {
-    if (!fs || !inode || !physical) return 0;
+                            uint32_t logical, uint64_t *physical, uint8_t *hole) {
+    if (!fs || !inode || !physical || !hole) return 0;
+    *hole = 0;
     if ((load32(&inode[32]) & EXT4_EXTENTS_FL) != 0) {
         const uint8_t *header = &inode[40];
-        return extent_data_block(fs, header, logical, physical, load16(header + 6), 1);
+        return extent_data_block(fs, header, logical, physical, hole, load16(header + 6), 1);
     }
     uint64_t index = logical;
     if (index < 12U) {
         *physical = load32(&inode[40 + (uint32_t)index * 4U]);
-        return *physical != 0 && *physical < fs->block_count;
+        *hole = (uint8_t)(*physical == 0);
+        return *hole || *physical < fs->block_count;
     }
     index -= 12U;
     uint64_t pointers = fs->block_size / 4U;
@@ -142,7 +146,8 @@ static int inode_data_block(const ext4_fs_t *fs, const uint8_t *inode,
     if (index < pointers) {
         if (!read_block(fs, indirect, block)) return 0;
         *physical = load32(&block[index * 4U]);
-        return *physical != 0 && *physical < fs->block_count;
+        *hole = (uint8_t)(*physical == 0);
+        return *hole || *physical < fs->block_count;
     }
     index -= pointers;
     uint64_t double_count = pointers * pointers;
@@ -152,7 +157,8 @@ static int inode_data_block(const ext4_fs_t *fs, const uint8_t *inode,
         uint32_t first = load32(&block[(index / pointers) * 4U]);
         if (!read_block(fs, first, block)) return 0;
         *physical = load32(&block[(index % pointers) * 4U]);
-        return *physical != 0 && *physical < fs->block_count;
+        *hole = (uint8_t)(*physical == 0);
+        return *hole || *physical < fs->block_count;
     }
     index -= double_count;
     uint64_t triple_count = double_count * pointers;
@@ -163,7 +169,8 @@ static int inode_data_block(const ext4_fs_t *fs, const uint8_t *inode,
     uint32_t second = load32(&block[((index / pointers) % pointers) * 4U]);
     if (!read_block(fs, second, block)) return 0;
     *physical = load32(&block[(index % pointers) * 4U]);
-    return *physical != 0 && *physical < fs->block_count;
+    *hole = (uint8_t)(*physical == 0);
+    return *hole || *physical < fs->block_count;
 }
 
 int ext4_lookup(ext4_fs_t *fs, uint32_t directory_inode, const char *name,
@@ -175,7 +182,9 @@ int ext4_lookup(ext4_fs_t *fs, uint32_t directory_inode, const char *name,
     uint32_t block_count = (uint32_t)((directory_size + fs->block_size - 1U) / fs->block_size);
     for (uint32_t logical = 0; logical < block_count; ++logical) {
         uint64_t physical = 0;
-        if (!inode_data_block(fs, inode, logical, &physical) || !read_block(fs, physical, block)) return 0;
+        uint8_t hole = 0;
+        if (!inode_data_block(fs, inode, logical, &physical, &hole) || hole ||
+            !read_block(fs, physical, block)) return 0;
         uint32_t offset = 0;
         while (offset + 8 <= fs->block_size) {
             uint32_t child = load32(&block[offset]); uint16_t record = load16(&block[offset + 4]);
@@ -214,9 +223,15 @@ int ext4_read_file(ext4_fs_t *fs, uint32_t inode_number, uint64_t offset,
     uint32_t remaining = size;
     while (remaining) {
         uint64_t physical = 0;
-        if (!inode_data_block(fs, inode, (uint32_t)logical, &physical) || !read_block(fs, physical, block)) return 0;
+        uint8_t hole = 0;
+        if (!inode_data_block(fs, inode, (uint32_t)logical, &physical, &hole)) return 0;
         uint32_t chunk = fs->block_size - in_block; if (chunk > remaining) chunk = remaining;
-        for (uint32_t i = 0; i < chunk; ++i) destination[i] = block[in_block + i];
+        if (hole) {
+            for (uint32_t i = 0; i < chunk; ++i) destination[i] = 0;
+        } else {
+            if (!read_block(fs, physical, block)) return 0;
+            for (uint32_t i = 0; i < chunk; ++i) destination[i] = block[in_block + i];
+        }
         destination += chunk; remaining -= chunk; ++logical; in_block = 0;
     }
     return 1;

@@ -90,6 +90,10 @@ int user_image_load(address_space_t *space, const void *image, uint64_t image_si
     for (uint16_t index = 0; index < header->phnum; ++index) {
         const elf64_program_header_t *program = &programs[index];
         if (program->type != ELF_PT_LOAD) continue;
+        if ((program->flags & ~(ELF_PF_X | ELF_PF_W | 4U)) != 0) {
+            release_pages(space, loaded);
+            return 0;
+        }
         if (program->memory_size < program->file_size ||
             program->virtual_address < USER_BASE ||
             program->virtual_address + program->memory_size < program->virtual_address ||

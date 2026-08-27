@@ -615,6 +615,8 @@ and user-range validation now share an IRQ-safe address-space lock, protecting
 page-table and owned-frame metadata across SMP callers.
 User address-space mappings now reject flags outside the defined writable,
 user, and executable set, with a boot-time invalid-flag regression probe.
+The ELF user-image loader now rejects program-header permission bits outside
+the defined read/write/execute flags, with a boot-time malformed-image probe.
 Scheduler current-task, idle-task, preemption, counter, and lifecycle state now
 use an IRQ-safe scheduler lock around shared metadata and queue transitions.
 Scheduler block and wake transitions now hold that lock across wait-queue

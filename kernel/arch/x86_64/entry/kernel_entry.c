@@ -343,9 +343,15 @@ void kernel_main(void *boot_info) {
     uint64_t process_page = physical_alloc_frame();
     user_image_t rejected_image;
     user_image_t loaded_image;
+    uint8_t invalid_image[sizeof(user_image_probe)];
     build_user_image_probe();
+    for (uint32_t i = 0; i < sizeof(invalid_image); ++i)
+        invalid_image[i] = user_image_probe[i];
+    probe32(&invalid_image[68], 0x85);
     if (!address_space_create(&process_space) ||
         user_image_load(&process_space, 0, 0, &rejected_image) ||
+        user_image_load(&process_space, invalid_image, sizeof(invalid_image),
+                        &rejected_image) ||
         !user_image_load(&process_space, user_image_probe, sizeof(user_image_probe), &loaded_image) ||
         loaded_image.entry != 0x8000001000ULL || loaded_image.page_count != 1 ||
         address_space_user_range_valid(&process_space, 0x8000001000ULL, 1, 1) ||
@@ -1127,21 +1133,24 @@ void kernel_main(void *boot_info) {
                      "e1000 interrupt path ready\r\n" :
                      "e1000 polling fallback ready\r\n");
     }
-    if (!ahci_initialize()) {
-        serial_write("AHCI initialization failure\r\n");
-        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    int ahci_initialized = ahci_initialize();
+    if (ahci_initialized) {
+        serial_write("AHCI driver ready controllers=");
+        serial_write_hex(ahci_controller_count());
+        serial_write(" ports=");
+        serial_write_hex(ahci_port_mask());
+        serial_write(" ready=");
+        serial_write_hex(ahci_ready_port_count());
+        serial_write(" mask=");
+        serial_write_hex(ahci_ready_port_mask());
+        serial_write("\r\n");
+    } else {
+        serial_write("AHCI driver unavailable\r\n");
     }
-    serial_write("AHCI driver ready controllers=");
-    serial_write_hex(ahci_controller_count());
-    serial_write(" ports=");
-    serial_write_hex(ahci_port_mask());
-    serial_write(" ready=");
-    serial_write_hex(ahci_ready_port_count());
-    serial_write(" mask=");
-    serial_write_hex(ahci_ready_port_mask());
-    serial_write("\r\n");
     serial_write(acpi_reset_available() ? "ACPI reset service ready\r\n" :
                  "ACPI reset service unavailable\r\n");
+    int ahci_storage_available = ahci_initialized && ahci_ready_port_count() != 0;
+    if (ahci_storage_available) {
     static uint16_t ahci_identify_words[256];
     if (!ahci_identify(ahci_identify_words)) {
         serial_write("AHCI identify failure\r\n");
@@ -1186,12 +1195,14 @@ void kernel_main(void *boot_info) {
             for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
         }
     serial_write("AHCI multi-sector I/O ready\r\n");
+    }
     storage_initialize();
-    if (!ahci_register_storage_devices()) {
+    if (ahci_storage_available && !ahci_register_storage_devices()) {
         serial_write("AHCI storage registration failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
-    serial_write("AHCI storage backend ready\r\n");
+    serial_write(ahci_storage_available ? "AHCI storage backend ready\r\n" :
+                 "AHCI storage backend unavailable\r\n");
     if (nvme_controller_count() != 0) {
         storage_device_t nvme_storage = {
             .name = "nvme0", .block_size = 512,

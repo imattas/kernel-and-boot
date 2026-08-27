@@ -285,6 +285,8 @@ device advertises 48-bit addressing, while retaining the bounded LBA28 path.
 ATA PCI probing now rejects published memory BARs and port addresses outside
 the x86 I/O range before resource claim; absent BARs retain validated legacy
 IDE defaults.
+ATA PIO probing now also requires aligned task-file/control BARs with register
+spans large enough for the complete ATA register windows before port access.
 ATA PIO task-file access and shared IDENTIFY metadata are now serialized with
 an IRQ-safe driver lock, preventing concurrent SMP callers from interleaving
 register programming or observing partial geometry state.

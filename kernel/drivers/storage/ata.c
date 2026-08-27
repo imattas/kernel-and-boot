@@ -144,8 +144,12 @@ static int ata_probe(device_t *device) {
     int claimed_io = device->resources[0].size != 0;
     int claimed_control = device->resources[1].size != 0;
     if ((claimed_io && ((device->resources[0].flags & 1U) == 0 ||
+                        device->resources[0].size < 8U ||
+                        (device->resources[0].address & 3U) != 0 ||
                         device->resources[0].address > 0xffffU)) ||
         (claimed_control && ((device->resources[1].flags & 1U) == 0 ||
+                              device->resources[1].size < 4U ||
+                              (device->resources[1].address & 3U) != 0 ||
                               device->resources[1].address > 0xfffdU)))
         return 0;
     if ((claimed_io && !device_claim_resource(device, 0, &ata_driver)) ||

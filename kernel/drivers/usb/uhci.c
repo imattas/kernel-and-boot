@@ -42,6 +42,7 @@ static device_driver_t uhci_driver;
 static int uhci_irq_enabled;
 static volatile uint32_t uhci_interrupts;
 static int uhci_low_speed;
+static int uhci_io_disabled;
 
 typedef struct {
     uint32_t link;
@@ -188,7 +189,7 @@ static int uhci_probe(device_t *device) {
 
 int uhci_control_transfer(uint8_t address, uint8_t endpoint,
                           const uint8_t setup[8], void *data, uint16_t length) {
-    if (!controller_base || !controller_frame_list || !setup || address > 127 ||
+    if (uhci_io_disabled || !controller_base || !controller_frame_list || !setup || address > 127 ||
         endpoint > 15 || length > 4096 || (length != 0 && !data) ||
         length != (uint16_t)(setup[6] | ((uint16_t)setup[7] << 8))) return 0;
     uint64_t qh_frame = physical_alloc_frame();
@@ -255,7 +256,9 @@ int uhci_control_transfer(uint8_t address, uint8_t endpoint,
         __asm__ volatile ("pause");
     }
     if (!uhci_set_running(0)) {
-        uhci_release_transfer_frames(qh_frame, td_frame, setup_frame, data_frame);
+        uhci_io_disabled = 1;
+        __asm__ volatile ("outw %0, %1" :: "a"((uint16_t)0),
+                          "Nd"((uint16_t)(controller_base + UHCI_USBINTR)));
         return 0;
     }
     uint16_t controller_status = uhci_status();
@@ -273,7 +276,7 @@ int uhci_control_transfer(uint8_t address, uint8_t endpoint,
 int uhci_interrupt_transfer(uint8_t address, uint8_t endpoint, void *data,
                             uint16_t length, uint16_t max_packet,
                             uint8_t *toggle) {
-    if (!controller_base || !controller_frame_list || !data || address > 127 ||
+    if (uhci_io_disabled || !controller_base || !controller_frame_list || !data || address > 127 ||
         (endpoint & 0x0fU) > 15 || length == 0 || length > 4096 || max_packet == 0 ||
         max_packet > 64 || !toggle || *toggle > 1) return 0;
     uint32_t packet_count = (length + max_packet - 1U) / max_packet;
@@ -329,7 +332,9 @@ int uhci_interrupt_transfer(uint8_t address, uint8_t endpoint, void *data,
         __asm__ volatile ("pause");
     }
     if (!uhci_set_running(0)) {
-        uhci_release_transfer_frames(qh_frame, td_frame, 0, data_frame);
+        uhci_io_disabled = 1;
+        __asm__ volatile ("outw %0, %1" :: "a"((uint16_t)0),
+                          "Nd"((uint16_t)(controller_base + UHCI_USBINTR)));
         return 0;
     }
     uint16_t controller_status = uhci_status();
@@ -353,6 +358,7 @@ int uhci_initialize(void) {
     controller_base = 0;
     controller_frame_list = 0;
     uhci_low_speed = 0;
+    uhci_io_disabled = 0;
     uhci_irq_enabled = 0;
     uhci_interrupts = 0;
     uhci_driver.name = "uhci";

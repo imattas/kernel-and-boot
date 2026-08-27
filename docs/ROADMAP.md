@@ -297,6 +297,9 @@ UHCI transfers now verify controller HALTED state before releasing transfer
 descriptors or data buffers after a stop/timeout path.
 UHCI control and interrupt transfers also validate controller-level USB error
 status after quiescence instead of trusting TD status alone.
+UHCI transfer DMA is quarantined when a post-submit stop cannot confirm HALTED,
+disabling further I/O rather than freeing descriptors that may still be owned
+by the controller.
 USB HID decoding is now an independently compiled and linked driver component;
 the USB descriptor parser no longer embeds another source file.
 UHCI now programs its PCI legacy IRQ through the shared e1000/UHCI ISR and

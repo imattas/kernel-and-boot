@@ -10,6 +10,7 @@ typedef struct address_space {
     struct {
         uint64_t virtual_address;
         uint64_t physical_address;
+        uint64_t flags;
     } anonymous_frames[128];
     uint32_t anonymous_count;
 } address_space_t;
@@ -29,6 +30,8 @@ int address_space_activate_kernel(void);
 int address_space_destroy(address_space_t *space);
 int address_space_map_page(address_space_t *space, uint64_t virtual_address,
                            uint64_t physical_address, uint64_t flags);
+int address_space_clone_anonymous(address_space_t *destination,
+                                  const address_space_t *source);
 int address_space_unmap_page(address_space_t *space, uint64_t virtual_address);
 int address_space_map_anonymous(address_space_t *space, uint64_t virtual_address,
                                 uint32_t pages, uint64_t flags);

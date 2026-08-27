@@ -187,6 +187,9 @@ map/unmap syscall operations; userland launch remains deferred.
 User memory protection now has a range-level API and syscall that prevalidates
 the complete mapped range, updates W^X page policy under the address-space lock,
 and invalidates active TLB entries; failed ranges remain unchanged.
+Address spaces now provide rollback-safe cloning of bounded anonymous user
+pages into independent physical frames while preserving user and W^X flags;
+the QEMU memory probe verifies copied contents remain isolated after cloning.
 ELF page mappings now carry the segment write policy, with a controlled flag
 update for shared pages; the QEMU image probe verifies a non-writable code
 page while the process stack remains writable.

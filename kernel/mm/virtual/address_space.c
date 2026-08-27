@@ -231,6 +231,42 @@ static int address_space_map_page_locked(address_space_t *space,
     return 1;
 }
 
+int address_space_clone_anonymous(address_space_t *destination,
+                                  const address_space_t *source) {
+    if (!destination || !source || destination == source || destination->root != 0 ||
+        source->root == 0 || source->anonymous_count > ADDRESS_SPACE_MAX_ANONYMOUS_PAGES)
+        return 0;
+    uint64_t lock_flags = spinlock_lock_irqsave(&address_space_lock);
+    if (!address_space_create_locked(destination)) {
+        spinlock_unlock_irqrestore(&address_space_lock, lock_flags);
+        return 0;
+    }
+    for (uint32_t index = 0; index < source->anonymous_count; ++index) {
+        const uint64_t virtual_address = source->anonymous_frames[index].virtual_address;
+        const uint64_t source_frame = source->anonymous_frames[index].physical_address;
+        const uint64_t flags = source->anonymous_frames[index].flags;
+        uint64_t destination_frame = physical_alloc_frame();
+        if (!destination_frame || !address_space_map_page_locked(
+                destination, virtual_address, destination_frame, flags)) {
+            if (destination_frame) physical_free_frame(destination_frame);
+            (void)address_space_destroy_locked(destination);
+            spinlock_unlock_irqrestore(&address_space_lock, lock_flags);
+            return 0;
+        }
+        volatile uint8_t *from = (volatile uint8_t *)(uintptr_t)source_frame;
+        volatile uint8_t *to = (volatile uint8_t *)(uintptr_t)destination_frame;
+        for (uint32_t byte = 0; byte < PAGE_SIZE; ++byte) to[byte] = from[byte];
+        destination->anonymous_frames[destination->anonymous_count].virtual_address =
+            virtual_address;
+        destination->anonymous_frames[destination->anonymous_count].physical_address =
+            destination_frame;
+        destination->anonymous_frames[destination->anonymous_count].flags = flags;
+        ++destination->anonymous_count;
+    }
+    spinlock_unlock_irqrestore(&address_space_lock, lock_flags);
+    return 1;
+}
+
 static int address_space_update_page_flags_locked(address_space_t *space,
                                                    uint64_t virtual_address,
                                                    uint64_t flags) {
@@ -495,6 +531,8 @@ int address_space_map_anonymous(address_space_t *space, uint64_t virtual_address
         }
         space->anonymous_frames[space->anonymous_count].virtual_address = address;
         space->anonymous_frames[space->anonymous_count].physical_address = frame;
+        space->anonymous_frames[space->anonymous_count].flags =
+            flags | ADDRESS_SPACE_USER;
         ++space->anonymous_count;
     }
     spinlock_unlock_irqrestore(&address_space_lock, lock_flags);

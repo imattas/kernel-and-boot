@@ -431,6 +431,32 @@ void kernel_main(void *boot_info) {
         serial_write("address space table reclamation failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
+    address_space_t cloned_space = {0};
+    if (!address_space_map_anonymous(&process_space, 0x8000003000ULL, 1,
+                                     ADDRESS_SPACE_WRITABLE) ||
+        process_space.anonymous_count != 1 ||
+        !address_space_clone_anonymous(&cloned_space, &process_space) ||
+        cloned_space.anonymous_count != 1 ||
+        cloned_space.anonymous_frames[0].virtual_address != 0x8000003000ULL ||
+        cloned_space.anonymous_frames[0].physical_address ==
+            process_space.anonymous_frames[0].physical_address) {
+        serial_write("address space clone failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    volatile uint8_t *source_clone_byte = (volatile uint8_t *)(uintptr_t)
+        process_space.anonymous_frames[0].physical_address;
+    volatile uint8_t *destination_clone_byte = (volatile uint8_t *)(uintptr_t)
+        cloned_space.anonymous_frames[0].physical_address;
+    source_clone_byte[0] = 0x5a;
+    if (destination_clone_byte[0] != 0) {
+        serial_write("address space clone isolation failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    if (!address_space_destroy(&cloned_space) ||
+        !address_space_unmap_anonymous(&process_space, 0x8000003000ULL, 1)) {
+        serial_write("address space clone teardown failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
     if (!address_space_activate(&process_space) ||
         (kernel_space.root = virtual_memory_root(), !address_space_activate(&kernel_space)) ||
         !address_space_destroy(&process_space)) {

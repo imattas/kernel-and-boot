@@ -1227,6 +1227,14 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     vfs_node_release(vfs_mountpoint_root);
+    vfs_node_t *vfs_mount_escape =
+        vfs_lookup_path_mounted(&vfs_mounts, vfs_root, "/dev/../etc");
+    if (!vfs_mount_escape || vfs_mount_escape->name[0] != 'e') {
+        if (vfs_mount_escape) vfs_node_release(vfs_mount_escape);
+        serial_write("VFS mount escape failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    vfs_node_release(vfs_mount_escape);
     if (!vfs_unmount(&vfs_mounts, vfs_dev)) {
         serial_write("VFS mounted path failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");

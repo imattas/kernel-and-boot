@@ -672,6 +672,8 @@ The network service now drains bounded NIC input, learns validated ARP
 senders, and transmits ARP and ICMP echo replies through the adapter boundary.
 The generic block layer now has a storage-backed adapter, with boot-time
 verification reading the FAT32 image through the registered storage device.
+Mounted VFS path traversal now lets `..` escape a mounted filesystem root back
+to its mountpoint hierarchy.
 
 ## Phase 10 — Userland begins after the kernel gate
 

@@ -84,12 +84,31 @@ static vfs_node_t *mounted_root(vfs_mount_table_t *table, vfs_node_t *node) {
     return result;
 }
 
+static vfs_node_t *mounted_mountpoint(vfs_mount_table_t *table,
+                                      vfs_node_t *node) {
+    if (!table || !node) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&table->lock);
+    vfs_node_t *result = 0;
+    for (uint32_t i = 0; i < VFS_MAX_MOUNTS; ++i) {
+        if (table->mounts[i].active && table->mounts[i].root == node) {
+            vfs_node_t *mountpoint = table->mounts[i].mountpoint;
+            /* .. from a mounted root returns to the mountpoint's parent. */
+            result = mountpoint->parent ? mountpoint->parent : mountpoint;
+            vfs_node_retain(result);
+            break;
+        }
+    }
+    spinlock_unlock_irqrestore(&table->lock, flags);
+    return result;
+}
+
 vfs_node_t *vfs_lookup_path_mounted(vfs_mount_table_t *table,
                                     vfs_node_t *root, const char *path) {
     if (!table || !root || !path || path[0] != '/') return 0;
     vfs_node_t *current = root;
     vfs_node_retain(current);
     uint32_t index = 1;
+    int escaped_mount = 0;
     while (path[index] != '\0') {
         while (path[index] == '/') ++index;
         if (path[index] == '\0') break;
@@ -108,24 +127,29 @@ vfs_node_t *vfs_lookup_path_mounted(vfs_mount_table_t *table,
             next = current;
             vfs_node_retain(next);
         } else if (string_equal(component, "..")) {
-            next = current != root && current->parent ? current->parent : current;
-            vfs_node_retain(next);
+            next = mounted_mountpoint(table, current);
+            if (next) escaped_mount = 1;
+            else {
+                next = current != root && current->parent ?
+                    current->parent : current;
+                vfs_node_retain(next);
+            }
         } else {
             next = vfs_node_lookup(current, component);
         }
         vfs_node_release(current);
         if (!next) return 0;
-        vfs_node_t *mounted = mounted_root(table, next);
-        if (mounted) {
-            vfs_node_release(next);
-            next = mounted;
+        if (!escaped_mount) {
+            vfs_node_t *mounted = mounted_root(table, next);
+            if (mounted) {
+                vfs_node_release(next);
+                next = mounted;
+            }
         }
+        escaped_mount = 0;
         current = next;
     }
     vfs_node_t *mounted = mounted_root(table, current);
-    if (mounted) {
-        vfs_node_release(current);
-        return mounted;
-    }
+    if (mounted) { vfs_node_release(current); return mounted; }
     return current;
 }

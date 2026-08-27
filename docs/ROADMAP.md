@@ -974,7 +974,10 @@ Btrfs now have strict read-only superblock and geometry
 mount layers with contract tests. XFS now maps allocation-group inode numbers,
 reads v1/v2 inodes, supports short-form directories, inline files, extent
 records, and a VFS file adapter. XFS extent reads now decode the extent-state
-flag correctly and return zeroes for sparse gaps and unwritten extents. Btrfs
+flag correctly and return zeroes for sparse gaps and unwritten extents. XFS
+regular files now support bounded read-modify-write updates for mapped written
+extents through the VFS adapter; sparse and unwritten extents remain protected.
+Btrfs
 validates its CRC32C superblock checksum
 and supported checksum type, validates tree-node checksums/identity, and reads
 bounded leaf items through single-stripe system-chunk logical-to-physical

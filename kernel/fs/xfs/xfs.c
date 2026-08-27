@@ -58,6 +58,13 @@ static int xfs_read_block(const xfs_fs_t *fs, uint64_t block, void *buffer) {
                         fs->block_size / XFS_SECTOR_SIZE, buffer);
 }
 
+static int xfs_write_block(const xfs_fs_t *fs, uint64_t block, const void *buffer) {
+    uint32_t sectors = fs ? fs->block_size / XFS_SECTOR_SIZE : 0;
+    return fs && buffer && sectors != 0 && block < fs->block_count &&
+           block <= UINT64_MAX / sectors &&
+           storage_write(fs->device, block * sectors, sectors, buffer);
+}
+
 static int xfs_read_inode(const xfs_fs_t *fs, uint64_t inode, uint8_t *data) {
     uint64_t agno, agino_mask, agino;
     uint64_t block;
@@ -153,6 +160,41 @@ int xfs_read_file(xfs_fs_t *fs, uint64_t inode, uint64_t offset,
             for (uint32_t i = 0; i < chunk; ++i) destination[i] = block[in_block + i];
         }
         destination += chunk; remaining -= chunk; ++logical; in_block = 0;
+    }
+    return 1;
+}
+
+int xfs_write_file(xfs_fs_t *fs, uint64_t inode, uint64_t offset,
+                   const void *buffer, uint32_t size) {
+    uint8_t data[4096], block[4096];
+    if (!fs || !fs->mounted || !buffer || size == 0 ||
+        !xfs_read_inode(fs, inode, data)) return 0;
+    uint32_t core = fs->inode_size == 256 ? 100U : 176U;
+    uint64_t file_size = be64(&data[8]);
+    if (offset > file_size || (uint64_t)size > file_size - offset ||
+        core > fs->inode_size || (be16(&data[0]) & 0xf000U) != 0x8000U)
+        return 0;
+    uint32_t extent_count = be32(&data[76]);
+    if (extent_count == 0 || extent_count > (fs->inode_size - core) / 16U)
+        return 0;
+    uint64_t logical = offset / fs->block_size;
+    uint32_t in_block = (uint32_t)(offset % fs->block_size);
+    uint32_t remaining = size;
+    const uint8_t *source = (const uint8_t *)buffer;
+    while (remaining) {
+        uint64_t physical = 0, extent_length = 0;
+        uint8_t unwritten = 0; int found = 0;
+        for (uint32_t i = 0; i < extent_count; ++i)
+            if (xfs_extent(&data[core + i * 16U], logical, &physical,
+                           &extent_length, &unwritten)) { found = 1; break; }
+        uint32_t chunk = fs->block_size - in_block;
+        if (chunk > remaining) chunk = remaining;
+        if (!found || unwritten || physical >= fs->block_count ||
+            !xfs_read_block(fs, physical, block)) return 0;
+        for (uint32_t i = 0; i < chunk; ++i)
+            block[in_block + i] = source[i];
+        if (!xfs_write_block(fs, physical, block)) return 0;
+        source += chunk; remaining -= chunk; ++logical; in_block = 0;
     }
     return 1;
 }

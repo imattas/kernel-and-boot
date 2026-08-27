@@ -22,5 +22,7 @@ int xfs_lookup(xfs_fs_t *fs, uint64_t directory_inode, const char *name,
                uint64_t *inode);
 int xfs_read_file(xfs_fs_t *fs, uint64_t inode, uint64_t offset,
                   void *buffer, uint32_t size);
+int xfs_write_file(xfs_fs_t *fs, uint64_t inode, uint64_t offset,
+                   const void *buffer, uint32_t size);
 
 #endif

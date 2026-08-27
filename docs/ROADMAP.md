@@ -366,6 +366,10 @@ VFS child removal now revalidates parent ownership and child emptiness while
 holding the parent lock, closing a concurrent mutation window.
 Credential access checks now reject permission values outside the supported
 Unix mode mask instead of silently ignoring malformed bits.
+The signal-next syscall now validates its writable user destination before
+dequeueing a pending signal, preventing invalid pointers from losing signals.
+The QEMU kernel probe now verifies that a failed signal dequeue leaves the
+pending signal available for a subsequent valid destination.
 APIC PIT calibration now uses a bounded wait budget and retains a validated
 fallback count, preventing slow firmware emulation from blocking kernel boot.
 UEFI memory-map retries now release rejected candidate pools and validate boot

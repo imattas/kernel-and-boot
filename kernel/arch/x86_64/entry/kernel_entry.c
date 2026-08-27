@@ -1169,7 +1169,11 @@ void kernel_main(void *boot_info) {
     }
     serial_write("syscall ABI ready\r\n");
     uint32_t signal_result = 0;
-    if (syscall_dispatch(OS_SYSCALL_SIGNAL_MASK, 1U << 4, 0, 0) != 0 ||
+    if (syscall_dispatch(OS_SYSCALL_SIGNAL_SEND, 3, 0, 0) != 0 ||
+        syscall_dispatch(OS_SYSCALL_SIGNAL_NEXT, 0x8000002fffULL, 0, 0) !=
+            OS_SYSCALL_ERROR ||
+        syscall_dispatch(OS_SYSCALL_SIGNAL_NEXT, 0x8000002000ULL, 0, 0) != 3 ||
+        syscall_dispatch(OS_SYSCALL_SIGNAL_MASK, 1U << 4, 0, 0) != 0 ||
         syscall_dispatch(OS_SYSCALL_SIGNAL_SEND, 2, 0, 0) != 0 ||
         syscall_dispatch(OS_SYSCALL_SIGNAL_NEXT, 0x8000002000ULL, 0, 0) != 2 ||
         !syscall_copy_from_user(&signal_result, 0x8000002000ULL, sizeof(signal_result)) ||

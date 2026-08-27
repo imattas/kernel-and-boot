@@ -64,7 +64,8 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
         }
         case OS_SYSCALL_SIGNAL_NEXT: {
             uint32_t signal = 0;
-            if (!process_take_signal(process_current(), &signal) ||
+            if (!user_range(arg1, sizeof(signal), 1) ||
+                !process_take_signal(process_current(), &signal) ||
                 !syscall_copy_to_user(arg1, &signal, sizeof(signal))) return OS_SYSCALL_ERROR;
             return signal;
         }

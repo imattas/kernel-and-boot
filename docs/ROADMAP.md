@@ -703,6 +703,9 @@ Physical frame allocation now zero-fills reclaimed pages, with boot-time
 reallocation validation preventing stale frame contents from crossing owners.
 The physical allocator now supports zero-filled contiguous frame runs with
 range-checked release for future DMA allocations.
+Oversized contiguous-frame requests are now rejected before the bitmap scan,
+preventing an unsigned scan-bound underflow from walking outside the allocator
+range.
 UHCI and e1000 now use an explicit shared PCI interrupt dispatcher because
 legacy IRQ lines may be shared; each handler independently filters its device
 status before acknowledging its own controller.

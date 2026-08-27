@@ -272,6 +272,7 @@ void kernel_main(void *boot_info) {
     serial_write("physical frame hygiene ready\r\n");
     uint64_t contiguous_frames = physical_alloc_frames(2);
     if (!contiguous_frames || physical_alloc_frames(0) != 0 ||
+        physical_alloc_frames(UINT32_MAX) != 0 ||
         (contiguous_frames & 0xfffULL) != 0 ||
         ((volatile uint8_t *)(uintptr_t)contiguous_frames)[0] != 0 ||
         ((volatile uint8_t *)(uintptr_t)contiguous_frames)[4096] != 0) {

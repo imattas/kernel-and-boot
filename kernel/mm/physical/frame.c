@@ -84,7 +84,7 @@ uint64_t physical_alloc_frame(void) {
 }
 
 uint64_t physical_alloc_frames(uint32_t count) {
-    if (count == 0) return 0;
+    if (count == 0 || count > MAX_FRAMES - 256) return 0;
     uint64_t flags = spinlock_lock_irqsave(&frame_lock);
     for (uint64_t frame = 256; frame <= MAX_FRAMES - count; ++frame) {
         uint32_t available = 0;

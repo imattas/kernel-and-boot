@@ -13,6 +13,9 @@
 #define UHCI_CMD_HCRESET 0x0002
 #define UHCI_CMD_CONFIGURE 0x0040
 #define UHCI_STATUS_HALTED 0x0020
+#define UHCI_STATUS_ERROR 0x0002
+#define UHCI_STATUS_HOST_SYSTEM_ERROR 0x0008
+#define UHCI_STATUS_PROCESS_ERROR 0x0010
 #define UHCI_TD_ACTIVE (1U << 23)
 #define UHCI_TD_LOW_SPEED (1U << 26)
 #define UHCI_TD_ERROR_MASK (0x3fU << 17)
@@ -73,6 +76,18 @@ static int uhci_set_running(int running) {
         return 0;
     }
     return 1;
+}
+
+static uint16_t uhci_status(void) {
+    uint16_t status;
+    __asm__ volatile ("inw %1, %0" : "=a"(status)
+                      : "Nd"((uint16_t)(controller_base + UHCI_USBSTS)));
+    return status;
+}
+
+static void uhci_acknowledge_status(uint16_t status) {
+    __asm__ volatile ("outw %0, %1" :: "a"(status),
+                      "Nd"((uint16_t)(controller_base + UHCI_USBSTS)));
 }
 
 static int uhci_match(const device_t *device) {
@@ -204,6 +219,7 @@ int uhci_control_transfer(uint8_t address, uint8_t endpoint,
         if (data_frame) physical_free_frame(data_frame);
         return 0;
     }
+    uhci_acknowledge_status(uhci_status() & 0x001fU);
     for (uint32_t i = 0; i < 1024; ++i) frame_list[i] = (uint32_t)qh_frame | 2U;
     __asm__ volatile ("outl %0, %1" :: "a"((uint32_t)controller_frame_list),
                       "Nd"((uint16_t)(controller_base + UHCI_FLBASEADD)));
@@ -219,6 +235,10 @@ int uhci_control_transfer(uint8_t address, uint8_t endpoint,
         __asm__ volatile ("pause");
     }
     if (!uhci_set_running(0)) return 0;
+    uint16_t controller_status = uhci_status();
+    complete = complete && (controller_status & (UHCI_STATUS_ERROR |
+                        UHCI_STATUS_HOST_SYSTEM_ERROR |
+                        UHCI_STATUS_PROCESS_ERROR)) == 0;
     for (uint32_t i = 0; i < 1024; ++i) frame_list[i] = 1U;
     uhci_set_running(1);
     if (complete && length && (setup[0] & 0x80U))
@@ -284,7 +304,11 @@ int uhci_interrupt_transfer(uint8_t address, uint8_t endpoint, void *data,
         }
         __asm__ volatile ("pause");
     }
-    uhci_set_running(0);
+    if (!uhci_set_running(0)) return 0;
+    uint16_t controller_status = uhci_status();
+    complete = complete && (controller_status & (UHCI_STATUS_ERROR |
+                        UHCI_STATUS_HOST_SYSTEM_ERROR |
+                        UHCI_STATUS_PROCESS_ERROR)) == 0;
     for (uint32_t i = 0; i < 1024; ++i) frame_list[i] = 1U;
     uhci_set_running(1);
     if (complete) {

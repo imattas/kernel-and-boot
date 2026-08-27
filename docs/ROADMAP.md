@@ -313,6 +313,9 @@ PCI enumeration now enables memory/I/O space and bus mastering before BAR
 drivers probe, making DMA activation an explicit kernel-owned contract.
 The device model now rejects duplicate PCI bus/slot/function identities and
 duplicate driver names before binding.
+Device resource claim, release, and ownership queries now serialize through an
+IRQ-safe ownership lock, preventing concurrent driver probes from claiming the
+same BAR.
 ACPI IOAPIC discovery now retains bounded multi-IOAPIC GSI ranges and routes
 each legacy PCI IRQ through the controller that owns its GSI.
 PCI now programs a validated single-entry MSI-X table when available, with

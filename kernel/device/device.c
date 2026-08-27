@@ -1,9 +1,11 @@
 #include "device.h"
+#include "../core/sync/spinlock.h"
 
 static device_t registry[DEVICE_REGISTRY_CAPACITY];
 static uint32_t registry_count;
 static const device_driver_t *drivers[DEVICE_DRIVER_CAPACITY];
 static uint32_t driver_count;
+static spinlock_t resource_lock;
 
 static int same_name(const char *left, const char *right) {
     while (*left && *left == *right) { ++left; ++right; }
@@ -17,6 +19,7 @@ static int same_pci_device(const device_t *left, const device_t *right) {
 }
 
 void device_registry_initialize(void) {
+    spinlock_init(&resource_lock);
     registry_count = 0;
     driver_count = 0;
 }
@@ -64,19 +67,32 @@ uint32_t device_driver_count(void) { return driver_count; }
 
 int device_claim_resource(device_t *device, uint32_t index,
                           const device_driver_t *driver) {
-    if (!device || !driver || index >= 6 || device->resources[index].size == 0 ||
-        device->resource_owner[index]) return 0;
+    if (!device || !driver || index >= 6 || device->resources[index].size == 0)
+        return 0;
+    uint64_t flags = spinlock_lock_irqsave(&resource_lock);
+    if (device->resource_owner[index]) {
+        spinlock_unlock_irqrestore(&resource_lock, flags);
+        return 0;
+    }
     device->resource_owner[index] = driver;
+    spinlock_unlock_irqrestore(&resource_lock, flags);
     return 1;
 }
 
 void device_release_resource(device_t *device, uint32_t index,
                              const device_driver_t *driver) {
-    if (device && index < 6 && device->resource_owner[index] == driver)
+    if (!device || index >= 6) return;
+    uint64_t flags = spinlock_lock_irqsave(&resource_lock);
+    if (device->resource_owner[index] == driver)
         device->resource_owner[index] = 0;
+    spinlock_unlock_irqrestore(&resource_lock, flags);
 }
 
 const device_driver_t *device_resource_owner(const device_t *device,
                                              uint32_t index) {
-    return device && index < 6 ? device->resource_owner[index] : 0;
+    if (!device || index >= 6) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&resource_lock);
+    const device_driver_t *owner = device->resource_owner[index];
+    spinlock_unlock_irqrestore(&resource_lock, flags);
+    return owner;
 }

@@ -41,6 +41,8 @@ int main(void) {
     assert(shell_parse("inherit 3 off", 13, argument, sizeof(argument)) == SHELL_INHERIT);
     assert(shell_parse("echo hello", 10, argument, sizeof(argument)) == SHELL_ECHO);
     assert(strcmp(argument, "hello") == 0);
+    assert(shell_parse("echo -n hello", 13, argument, sizeof(argument)) == SHELL_ECHO);
+    assert(strcmp(argument, "-n hello") == 0);
     assert(shell_parse("echo hello > /tmp/out", 21, argument,
                        sizeof(argument)) == SHELL_RUN);
     assert(strcmp(argument, "echo hello > /tmp/out") == 0);

@@ -1838,6 +1838,9 @@ Shell exports now preserve valid empty values (`NAME=`) instead of treating an
 empty value as malformed; the assignment boundary remains validated before the
 environment syscall.
 
+The native shell and standalone `echo.elf` now support `echo -n`, suppressing
+the trailing CRLF while retaining normal handling for other `-n`-prefixed text.
+
 The standalone formatter now supports bounded unsigned decimal, hexadecimal,
 octal, and single-character conversions in addition to its existing string,
 signed-decimal, percent, and escaped-control behavior.

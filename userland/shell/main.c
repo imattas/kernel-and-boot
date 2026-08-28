@@ -1061,8 +1061,15 @@ void shell_main(void) {
             else if (command == SHELL_ECHO) {
                 uint32_t argument_length = 0;
                 while (argument[argument_length]) ++argument_length;
-                print(argument, argument_length);
-                print("\r\n", 2);
+                int no_newline = argument_length >= 2 && argument[0] == '-' &&
+                    argument[1] == 'n' &&
+                    (argument_length == 2 || argument[2] == ' ' ||
+                     argument[2] == '\t');
+                uint32_t start = no_newline ? 2U : 0U;
+                while (start < argument_length &&
+                       (argument[start] == ' ' || argument[start] == '\t')) ++start;
+                print(argument + start, argument_length - start);
+                if (!no_newline) print("\r\n", 2);
             } else if (command == SHELL_PWD) {
                 uint64_t result = os_getcwd(argument, sizeof(argument));
                 if (result != OS_SYSCALL_ERROR) print(argument, result);

@@ -1689,6 +1689,8 @@ Pipeline and redirection scanning now ignores operators inside quoted or
 escaped text, and quoted input/output paths are normalized before VFS access.
 The first standalone status utility, `TRUE.ELF`, is now built, validated, and
 packaged in the FAT32 root for independent ring-3 success-path testing.
+The paired standalone `FALSE.ELF` utility is now built and packaged as an
+independent ring-3 nonzero-exit path for shell and process-status validation.
 
 ## Phase 10 — BIOS boot path
 

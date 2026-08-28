@@ -27,6 +27,15 @@ typedef struct {
     int32_t exit_status;
 } os_process_info_t;
 
+typedef struct {
+    uint16_t year;
+    uint8_t month;
+    uint8_t day;
+    uint8_t hour;
+    uint8_t minute;
+    uint8_t second;
+} os_datetime_t;
+
 enum {
     OS_PROCESS_NEW,
     OS_PROCESS_READY,
@@ -40,6 +49,9 @@ uint64_t os_syscall3(uint64_t number, uint64_t arg1, uint64_t arg2,
 static inline uint64_t os_getpid(void) { return os_syscall3(3, 0, 0, 0); }
 static inline uint64_t os_clock_monotonic(void) {
     return os_syscall3(2, 0, 0, 0);
+}
+static inline uint64_t os_clock_realtime(os_datetime_t *datetime) {
+    return os_syscall3(49, (uint64_t)(uintptr_t)datetime, 0, 0);
 }
 static inline uint64_t os_getppid(void) { return os_syscall3(40, 0, 0, 0); }
 static inline uint64_t os_getuid(void) { return os_syscall3(38, 0, 0, 0); }

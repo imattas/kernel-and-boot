@@ -12,6 +12,7 @@
 #include "../../sched/core/scheduler.h"
 #include "../printk/serial.h"
 #include "../../drivers/input/input.h"
+#include "../../drivers/time/rtc.h"
 #include "../process/thread.h"
 
 #define SYSCALL_SPAWN_MAX_IMAGE (1024U * 1024U)
@@ -134,6 +135,14 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
         }
         case OS_SYSCALL_CLOCK_MONOTONIC:
             return clock_monotonic_ns();
+        case OS_SYSCALL_CLOCK_REALTIME: {
+            rtc_datetime_t datetime;
+            if (arg2 != 0 || arg3 != 0 ||
+                !user_range(arg1, sizeof(datetime), 1) ||
+                !rtc_read_datetime(&datetime)) return OS_SYSCALL_ERROR;
+            return syscall_copy_to_user(arg1, &datetime, sizeof(datetime)) ? 0 :
+                   OS_SYSCALL_ERROR;
+        }
         case OS_SYSCALL_GETPID:
             return process_current() ? process_current()->id : OS_SYSCALL_ERROR;
         case OS_SYSCALL_PROCESS_LIST: {

@@ -52,7 +52,8 @@ enum {
     OS_SYSCALL_GETENV = 45,
     OS_SYSCALL_SETENV = 46,
     OS_SYSCALL_UNSETENV = 47,
-    OS_SYSCALL_PIPE = 48
+    OS_SYSCALL_PIPE = 48,
+    OS_SYSCALL_CLOCK_REALTIME = 49
 };
 
 #define OS_SYSCALL_ERROR UINT64_MAX
@@ -84,6 +85,15 @@ typedef struct {
     uint32_t read_handle;
     uint32_t write_handle;
 } os_syscall_pipe_t;
+
+typedef struct {
+    uint16_t year;
+    uint8_t month;
+    uint8_t day;
+    uint8_t hour;
+    uint8_t minute;
+    uint8_t second;
+} os_syscall_datetime_t;
 
 typedef struct {
     uint64_t magic;

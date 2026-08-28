@@ -1826,6 +1826,9 @@ through PATH resolution and the normal process ABI.
 Standalone `uptime.elf` now reports seconds and milliseconds from the kernel's
 monotonic clock syscall and is packaged in the FAT32 image and live VFS.
 
+Standalone `date.elf` now reports the validated RTC date and time through a
+bounded realtime-clock syscall and is packaged in the FAT32 image and live VFS.
+
 The shell `unsetenv` builtin now removes multiple whitespace-separated variable
 names in one bounded command, matching the standalone utility's multi-operand
 environment behavior.

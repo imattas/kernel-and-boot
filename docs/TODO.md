@@ -107,6 +107,8 @@ the init-owned shell supervisor remains the next kernel/userland boundary.
   parsing.
 - [x] Add packaged `uptime.elf` using the monotonic clock syscall and expose
   it through PATH and the live FAT32 VFS namespace.
+- [x] Add packaged `date.elf` using the validated RTC syscall and expose it
+  through PATH and the live FAT32 VFS namespace.
 - [x] Route redirected `echo` through the external descriptor path.
 - [x] Route redirected `cat`, `pwd`, and `ls` through packaged utilities.
 - [x] Add quote-aware bounded `;` command sequencing.

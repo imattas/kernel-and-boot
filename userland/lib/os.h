@@ -49,6 +49,16 @@ static inline uint64_t os_channel_receive(uint64_t channel, void *data,
     return os_syscall3(18, channel, (uint64_t)(uintptr_t)data, capacity);
 }
 
+static inline uint64_t os_channel_send_wait(uint64_t channel, const void *data,
+                                             uint64_t length) {
+    return os_syscall3(19, channel, (uint64_t)(uintptr_t)data, length);
+}
+
+static inline uint64_t os_channel_receive_wait(uint64_t channel, void *data,
+                                                uint64_t capacity) {
+    return os_syscall3(20, channel, (uint64_t)(uintptr_t)data, capacity);
+}
+
 static inline uint64_t os_process_list(uint64_t *ids, uint64_t capacity) {
     return os_syscall3(42, (uint64_t)(uintptr_t)ids, capacity, 0);
 }

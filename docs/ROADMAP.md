@@ -1605,7 +1605,8 @@ The standalone `SLEEP.ELF` utility is also packaged and uses monotonic time
 with scheduler yielding.
 The standalone `SETENV.ELF` utility is packaged for external environment
 updates through the same bounded process environment ABI.
-Userland now exposes channel create/send/receive wrappers and includes an
+Userland now exposes channel create/send/receive wrappers, including blocking
+variants, and includes an
 `IPC.ELF` round-trip probe, establishing the message-passing seam for future
 pipeline support.
 The process environment now supports bounded multi-entry updates through

@@ -80,6 +80,12 @@ static void job_remove(uint64_t process_id) {
     }
 }
 
+static int job_contains(uint64_t process_id) {
+    for (uint32_t index = 0; index < job_count; ++index)
+        if (jobs[index] == process_id) return 1;
+    return 0;
+}
+
 static uint32_t resolve_command(const char *name, uint32_t name_length,
                                 char *path, uint32_t capacity) {
     if (!name || !path || capacity == 0 || name_length == 0) return 0;
@@ -284,7 +290,7 @@ static int shell_run_input_redirect(char *text, uint32_t length,
 
 void shell_main(void) {
     static const char prompt[] = "os> ";
-    static const char help[] = "help id ps env setenv unsetenv status jobs which inherit echo pwd cd ls cat stat chmod kill sleep mv mkdir rm rmdir touch write run wait exit\r\n";
+    static const char help[] = "help id ps env setenv unsetenv status jobs fg which inherit echo pwd cd ls cat stat chmod kill sleep mv mkdir rm rmdir touch write run wait exit\r\n";
     static const char unknown[] = "unknown command\r\n";
     static char line[128];
     static char argument[128];
@@ -373,6 +379,24 @@ void shell_main(void) {
                     print_number(info.id);
                     print(" state=", 7);
                     print_number(info.state);
+                    print("\r\n", 2);
+                }
+            }
+            else if (command == SHELL_FG) {
+                uint32_t pid_length = 0;
+                while (argument[pid_length]) ++pid_length;
+                uint64_t process_id = 0;
+                int32_t status = -1;
+                if (!parse_number(argument, pid_length, &process_id) ||
+                    !job_contains(process_id) ||
+                    os_wait(process_id, &status) == OS_SYSCALL_ERROR ||
+                    os_reap(process_id) == OS_SYSCALL_ERROR) {
+                    print(unknown, sizeof(unknown) - 1U);
+                } else {
+                    last_status = status;
+                    job_remove(process_id);
+                    print("exit=", 5);
+                    print_status(status);
                     print("\r\n", 2);
                 }
             }

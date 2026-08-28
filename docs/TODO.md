@@ -124,6 +124,7 @@ kernel gate below is explicitly marked complete.
 - [x] Add the first shell pipeline form: `run <producer> | <consumer>`.
 - [x] Add shell output redirection: `run <command> > <path>`.
 - [x] Add shell input redirection: `run <command> < <path>`.
+- [x] Add shell `fg <pid>` foregrounding for tracked background jobs.
 - [x] Add a bounded serial-input bridge into the standard-input queue for
   terminal-backed userland sessions.
 - [ ] Add reliable QEMU live keyboard verification for `run INIT.ELF`.

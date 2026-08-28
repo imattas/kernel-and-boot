@@ -1,15 +1,10 @@
-#include "../../lib/os.h"
+#include "../../lib/runtime.h"
 
-static uint64_t length(const char *text) {
-    uint64_t result = 0;
-    while (text[result]) ++result;
-    return result;
-}
 
 int cat_main(uint64_t argc, char **argv, char **environment) {
     (void)environment;
     if ((argc != 1 && argc != 2) || (argc == 2 && !argv[1])) os_exit(2);
-    uint64_t descriptor = argc == 1 ? 0 : os_open(argv[1], length(argv[1]), 1);
+    uint64_t descriptor = argc == 1 ? 0 : os_open(argv[1], os_userland_length(argv[1]), 1);
     if (descriptor == OS_SYSCALL_ERROR) os_exit(1);
     int close_descriptor = argc == 2;
     char buffer[256];

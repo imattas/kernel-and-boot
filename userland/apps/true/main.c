@@ -1,4 +1,4 @@
-#include "../../lib/os.h"
+#include "../../lib/runtime.h"
 
 int true_main(uint64_t argc, char **argv, char **environment) {
     (void)argc;

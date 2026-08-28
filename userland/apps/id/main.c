@@ -1,4 +1,4 @@
-#include "../../lib/os.h"
+#include "../../lib/runtime.h"
 
 static void number(uint64_t value) {
     char digits[20];

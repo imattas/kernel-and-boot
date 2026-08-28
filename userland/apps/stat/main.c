@@ -1,10 +1,5 @@
-#include "../../lib/os.h"
+#include "../../lib/runtime.h"
 
-static uint64_t length(const char *text) {
-    uint64_t result = 0;
-    while (text[result]) ++result;
-    return result;
-}
 
 static void number(uint64_t value) {
     char digits[20];
@@ -23,7 +18,7 @@ static void number(uint64_t value) {
 int stat_main(uint64_t argc, char **argv, char **environment) {
     (void)environment;
     if (argc != 2 || !argv[1]) os_exit(2);
-    uint64_t descriptor = os_open(argv[1], length(argv[1]), 1);
+    uint64_t descriptor = os_open(argv[1], os_userland_length(argv[1]), 1);
     os_stat_t stat;
     if (descriptor == OS_SYSCALL_ERROR || os_fstat(descriptor, &stat) == OS_SYSCALL_ERROR) {
         if (descriptor != OS_SYSCALL_ERROR) (void)os_close(descriptor);

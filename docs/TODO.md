@@ -64,6 +64,8 @@ the init-owned shell supervisor remains the next kernel/userland boundary.
 
 - [x] Add a small userland runtime layer for shared argument parsing, status
   handling, and diagnostic output across standalone applications.
+- [x] Migrate the remaining standalone applications to the shared runtime
+  helpers without changing their syscall contracts.
 - [ ] Add shell/application integration coverage for filesystem mutation,
   pipelines, redirection, background jobs, and inherited environment state.
 - [ ] Make init supervise `shell.elf` through the normal spawn/wait ABI after

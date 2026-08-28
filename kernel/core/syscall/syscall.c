@@ -115,12 +115,22 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
             serial_write("syscall handled\r\n");
             return 0;
         case OS_SYSCALL_WRITE: {
-            if (arg1 != 1 || arg3 == 0 || arg3 > OS_SYSCALL_MAX_WRITE) return OS_SYSCALL_ERROR;
-            char buffer[257];
-            if (!syscall_copy_from_user(buffer, arg2, arg3)) return OS_SYSCALL_ERROR;
-            buffer[arg3] = '\0';
-            serial_write(buffer);
-            return arg3;
+            process_t *process = process_current();
+            if (!process || arg3 == 0 || arg3 > OS_SYSCALL_MAX_WRITE)
+                return OS_SYSCALL_ERROR;
+            if (arg1 == 1 && process->standard_output_handle == 0) {
+                char buffer[257];
+                if (!syscall_copy_from_user(buffer, arg2, arg3))
+                    return OS_SYSCALL_ERROR;
+                buffer[arg3] = '\0';
+                serial_write(buffer);
+                return arg3;
+            }
+            if (arg1 != 1 || process->standard_output_handle == 0)
+                return OS_SYSCALL_ERROR;
+            arg1 = process->standard_output_handle;
+            number = OS_SYSCALL_WRITE_FILE;
+            goto standard_io_rw;
         }
         case OS_SYSCALL_CLOCK_MONOTONIC:
             return clock_monotonic_ns();
@@ -264,7 +274,28 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
             char path[OS_SYSCALL_MAX_PATH + 1];
             if (!syscall_copy_path(path, arg1, arg2)) return OS_SYSCALL_ERROR;
             char arguments[257] = {0};
-            if (arg3 && !syscall_copy_string(arguments, arg3, sizeof(arguments)))
+            uint32_t redirected_input = 0;
+            uint32_t redirected_output = 0;
+            os_spawn_redirect_t request;
+            int redirected = arg3 &&
+                syscall_copy_from_user(&request, arg3, sizeof(request)) &&
+                request.magic == OS_SPAWN_REDIRECT_MAGIC;
+            if (redirected) {
+                redirected_input = request.input_handle;
+                redirected_output = request.output_handle;
+                if (request.arguments &&
+                    !syscall_copy_string(arguments, request.arguments,
+                                         sizeof(arguments)))
+                    return OS_SYSCALL_ERROR;
+            } else if (arg3 &&
+                       !syscall_copy_string(arguments, arg3, sizeof(arguments)))
+                return OS_SYSCALL_ERROR;
+            if (redirected &&
+                (!redirected_input || !redirected_output ||
+                 !process_handle_get(&parent->handles, redirected_input,
+                                     PROCESS_HANDLE_READ) ||
+                 !process_handle_get(&parent->handles, redirected_output,
+                                     PROCESS_HANDLE_WRITE)))
                 return OS_SYSCALL_ERROR;
             uint64_t flags = spinlock_lock_irqsave(&parent->lock);
             vfs_node_t *root = parent->root_directory;
@@ -305,6 +336,9 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
                         process_inherit_namespace(child, parent) &&
                         process_inherit_handles(child, parent) &&
                         process_inherit_environment(child, parent) &&
+                        process_set_standard_handles(child, redirected ?
+                            redirected_input : 0, redirected ?
+                            redirected_output : 0) &&
                         process_load_image(child, image, image_size) &&
                         process_map_user_stack(child, 0x8000100000ULL +
                             (child->id * 0x10000ULL)) &&
@@ -346,15 +380,19 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
             if (root) vfs_node_release(root);
             return handle ? (uint64_t)(uint32_t)handle : OS_SYSCALL_ERROR;
         }
+standard_io_rw:
         case OS_SYSCALL_READ:
         case OS_SYSCALL_WRITE_FILE: {
             process_t *process = process_current();
             if (!process || arg3 == 0 || arg3 > OS_SYSCALL_MAX_WRITE) return OS_SYSCALL_ERROR;
-            if (number == OS_SYSCALL_READ && arg1 == 0) {
+            if (number == OS_SYSCALL_READ && arg1 == 0 &&
+                process->standard_input_handle == 0) {
                 uint8_t input[OS_SYSCALL_MAX_WRITE];
                 uint32_t count = input_read_standard(input, (uint32_t)arg3);
                 return count != 0 && syscall_copy_to_user(arg2, input, count) ? count : 0;
             }
+            if (number == OS_SYSCALL_READ && arg1 == 0)
+                arg1 = process->standard_input_handle;
             if (number == OS_SYSCALL_READ && !user_range(arg2, arg3, 1))
                 return OS_SYSCALL_ERROR;
             process_handle_ref_t ref = {0};

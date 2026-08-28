@@ -45,6 +45,8 @@ typedef struct process {
     task_wait_queue_t exit_waiters;
     int32_t exit_status;
     process_handle_table_t handles;
+    uint32_t standard_input_handle;
+    uint32_t standard_output_handle;
     vfs_node_t *root_directory;
     vfs_node_t *working_directory;
 } process_t;
@@ -63,6 +65,8 @@ int process_set_namespace(process_t *process, vfs_node_t *root,
                           vfs_node_t *working_directory);
 int process_inherit_namespace(process_t *child, process_t *parent);
 int process_inherit_handles(process_t *child, process_t *parent);
+int process_set_standard_handles(process_t *process, uint32_t input_handle,
+                                 uint32_t output_handle);
 int process_inherit_environment(process_t *child, process_t *parent);
 int process_environment_get(process_t *process, const char *key,
                              uint32_t key_length, char *value,

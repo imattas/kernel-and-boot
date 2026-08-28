@@ -99,6 +99,8 @@ process_t *process_create(uint64_t id) {
     task_wait_queue_initialize(&process->exit_waiters);
     process->exit_status = 0;
     process_handle_table_initialize(&process->handles);
+    process->standard_input_handle = 0;
+    process->standard_output_handle = 0;
     process->root_directory = 0;
     process->working_directory = 0;
     process->threads = 0;
@@ -224,8 +226,32 @@ int process_inherit_handles(process_t *child, process_t *parent) {
     flags = spinlock_lock_irqsave(&child->lock);
     int child_new = child->state == PROCESS_NEW;
     spinlock_unlock_irqrestore(&child->lock, flags);
-    return child_new ? process_handle_table_inherit(&child->handles,
-                                                    &parent->handles) : 0;
+    if (!child_new || !process_handle_table_inherit(&child->handles,
+                                                    &parent->handles)) return 0;
+    flags = spinlock_lock_irqsave(&parent->lock);
+    uint32_t input = parent->standard_input_handle;
+    uint32_t output = parent->standard_output_handle;
+    spinlock_unlock_irqrestore(&parent->lock, flags);
+    flags = spinlock_lock_irqsave(&child->lock);
+    child->standard_input_handle = input;
+    child->standard_output_handle = output;
+    spinlock_unlock_irqrestore(&child->lock, flags);
+    return 1;
+}
+
+int process_set_standard_handles(process_t *process, uint32_t input_handle,
+                                 uint32_t output_handle) {
+    if (!process || (input_handle &&
+        !process_handle_get(&process->handles, input_handle,
+                            PROCESS_HANDLE_READ)) ||
+        (output_handle &&
+         !process_handle_get(&process->handles, output_handle,
+                             PROCESS_HANDLE_WRITE))) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&process->lock);
+    process->standard_input_handle = input_handle;
+    process->standard_output_handle = output_handle;
+    spinlock_unlock_irqrestore(&process->lock, flags);
+    return 1;
 }
 
 int process_inherit_environment(process_t *child, process_t *parent) {

@@ -4,6 +4,14 @@
 #include <stdint.h>
 
 #define OS_SYSCALL_ERROR UINT64_MAX
+#define OS_SPAWN_REDIRECT_MAGIC UINT64_C(0x4f53505245444952)
+
+typedef struct {
+    uint64_t magic;
+    uint64_t arguments;
+    uint32_t input_handle;
+    uint32_t output_handle;
+} os_spawn_redirect_t;
 
 typedef struct {
     uint64_t owner_uid;
@@ -184,6 +192,17 @@ static inline uint64_t os_spawn(const char *path, uint64_t length,
                                 const char *arguments) {
     return os_syscall3(41, (uint64_t)(uintptr_t)path, length,
                        (uint64_t)(uintptr_t)arguments);
+}
+
+static inline uint64_t os_spawn_redirected(const char *path, uint64_t length,
+                                           const char *arguments,
+                                           uint32_t input_handle,
+                                           uint32_t output_handle) {
+    os_spawn_redirect_t request = {OS_SPAWN_REDIRECT_MAGIC,
+                                   (uint64_t)(uintptr_t)arguments,
+                                   input_handle, output_handle};
+    return os_syscall3(41, (uint64_t)(uintptr_t)path, length,
+                       (uint64_t)(uintptr_t)&request);
 }
 
 static inline uint64_t os_wait(uint64_t process_id, int32_t *status) {

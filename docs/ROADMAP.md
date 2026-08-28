@@ -1623,6 +1623,9 @@ The shell also exposes the most recent waited-process result through a bounded
 The kernel now exposes a typed pipe descriptor pair backed by the blocking IPC
 channel implementation; userland can read and write through the pair while
 descriptor inheritance remains available for the next shell pipeline slice.
+Processes now retain optional standard-input and standard-output descriptor
+bindings, and redirected spawn requests can populate those bindings while
+preserving the default console path.
 The FAT32 image builder now chains a second root-directory cluster, removing
 the one-sector root-entry ceiling for continued userland growth.
 The standalone `ECHO.ELF` utility is now stored in the expanded root directory

@@ -21,6 +21,7 @@ typedef enum {
 #define PROCESS_SIGNAL_MAX 32U
 #define PROCESS_MAX 64U
 #define PROCESS_USER_STACK_PAGES 8U
+#define PROCESS_ENVIRONMENT_SIZE 256U
 
 typedef struct process {
     spinlock_t lock;
@@ -31,6 +32,7 @@ typedef struct process {
     address_space_t address_space;
     user_image_t image;
     security_context_t security;
+    char environment[PROCESS_ENVIRONMENT_SIZE];
     process_thread_t *threads;
     uint32_t thread_count;
     uint32_t retained_thread_references;
@@ -61,6 +63,10 @@ int process_set_namespace(process_t *process, vfs_node_t *root,
                           vfs_node_t *working_directory);
 int process_inherit_namespace(process_t *child, process_t *parent);
 int process_inherit_handles(process_t *child, process_t *parent);
+int process_inherit_environment(process_t *child, process_t *parent);
+int process_environment_get(process_t *process, const char *key,
+                             uint32_t key_length, char *value,
+                             uint32_t capacity);
 int process_set_working_directory(process_t *process, vfs_node_t *directory);
 process_t *process_lookup(uint64_t id);
 process_t *process_lookup_retain(uint64_t id);

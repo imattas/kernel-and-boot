@@ -35,7 +35,7 @@ static void print_status(int32_t status) {
 
 void shell_main(void) {
     static const char prompt[] = "os> ";
-    static const char help[] = "help id ps echo pwd cd ls cat mkdir rm rmdir touch write run exit\r\n";
+    static const char help[] = "help id ps env echo pwd cd ls cat mkdir rm rmdir touch write run exit\r\n";
     static const char unknown[] = "unknown command\r\n";
     static char line[128];
     static char argument[128];
@@ -86,6 +86,17 @@ void shell_main(void) {
                         print_number((uint32_t)info.exit_status);
                         print("\r\n", 2);
                     }
+                }
+            }
+            else if (command == SHELL_ENV) {
+                char value[128];
+                uint64_t length = os_getenv("PATH", value, sizeof(value));
+                if (length == OS_SYSCALL_ERROR) {
+                    print(unknown, sizeof(unknown) - 1U);
+                } else {
+                    print("PATH=", 5);
+                    print(value, length);
+                    print("\r\n", 2);
                 }
             }
             else if (command == SHELL_ECHO) {

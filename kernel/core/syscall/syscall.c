@@ -213,6 +213,23 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
             process_release(target);
             return valid ? 0 : OS_SYSCALL_ERROR;
         }
+        case OS_SYSCALL_GETENV: {
+            process_t *process = process_current();
+            if (!process || arg1 == 0 || arg2 == 0 || arg2 > 32 || arg3 == 0 ||
+                arg3 > PROCESS_ENVIRONMENT_SIZE || !user_range(arg2, arg3, 1))
+                return OS_SYSCALL_ERROR;
+            char key[33];
+            char value[PROCESS_ENVIRONMENT_SIZE];
+            if (!syscall_copy_string(key, arg1, sizeof(key)))
+                return OS_SYSCALL_ERROR;
+            uint32_t key_length = 0;
+            while (key[key_length]) ++key_length;
+            int length = process_environment_get(process, key, key_length,
+                                                 value, (uint32_t)arg3);
+            return length >= 0 && syscall_copy_to_user(arg2, value,
+                                                        (uint32_t)length + 1U) ?
+                   (uint64_t)length : OS_SYSCALL_ERROR;
+        }
         case OS_SYSCALL_SPAWN: {
             process_t *parent = process_current();
             if (!parent || arg2 == 0 || arg2 > OS_SYSCALL_MAX_PATH)
@@ -260,6 +277,7 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
             int valid = child && process_set_parent(child, parent) &&
                         process_inherit_namespace(child, parent) &&
                         process_inherit_handles(child, parent) &&
+                        process_inherit_environment(child, parent) &&
                         process_load_image(child, image, image_size) &&
                         process_map_user_stack(child, 0x8000100000ULL +
                             (child->id * 0x10000ULL)) &&

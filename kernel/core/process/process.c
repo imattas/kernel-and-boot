@@ -84,6 +84,11 @@ process_t *process_create(uint64_t id) {
     process->image.entry = 0;
     process->image.page_count = 0;
     security_context_initialize(&process->security, 1000, 1000, 0);
+    for (uint32_t index = 0; index < PROCESS_ENVIRONMENT_SIZE; ++index)
+        process->environment[index] = 0;
+    const char default_environment[] = "PATH=/bin:/usr/bin";
+    for (uint32_t index = 0; index < sizeof(default_environment); ++index)
+        process->environment[index] = default_environment[index];
     for (uint32_t page = 0; page < PROCESS_USER_STACK_PAGES; ++page)
         process->user_stack_pages[page] = 0;
     process->user_stack_page_count = 0;
@@ -221,6 +226,51 @@ int process_inherit_handles(process_t *child, process_t *parent) {
     spinlock_unlock_irqrestore(&child->lock, flags);
     return child_new ? process_handle_table_inherit(&child->handles,
                                                     &parent->handles) : 0;
+}
+
+int process_inherit_environment(process_t *child, process_t *parent) {
+    if (!child || !parent || child == parent) return 0;
+    char environment[PROCESS_ENVIRONMENT_SIZE];
+    uint64_t flags = spinlock_lock_irqsave(&parent->lock);
+    if (parent->state == PROCESS_EXITED) {
+        spinlock_unlock_irqrestore(&parent->lock, flags);
+        return 0;
+    }
+    for (uint32_t index = 0; index < sizeof(environment); ++index)
+        environment[index] = parent->environment[index];
+    spinlock_unlock_irqrestore(&parent->lock, flags);
+    flags = spinlock_lock_irqsave(&child->lock);
+    if (child->state != PROCESS_NEW) {
+        spinlock_unlock_irqrestore(&child->lock, flags);
+        return 0;
+    }
+    for (uint32_t index = 0; index < sizeof(environment); ++index)
+        child->environment[index] = environment[index];
+    spinlock_unlock_irqrestore(&child->lock, flags);
+    return 1;
+}
+
+int process_environment_get(process_t *process, const char *key,
+                            uint32_t key_length, char *value,
+                            uint32_t capacity) {
+    static const char path_key[] = "PATH";
+    if (!process || !key || !value || key_length != sizeof(path_key) - 1U ||
+        capacity == 0) return 0;
+    for (uint32_t index = 0; index < key_length; ++index)
+        if (key[index] != path_key[index]) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&process->lock);
+    uint32_t prefix = sizeof(path_key);
+    uint32_t length = 0;
+    while (prefix + length < sizeof(process->environment) &&
+           process->environment[prefix + length]) ++length;
+    if (length + 1U > capacity) {
+        spinlock_unlock_irqrestore(&process->lock, flags);
+        return 0;
+    }
+    for (uint32_t index = 0; index <= length; ++index)
+        value[index] = process->environment[prefix + index];
+    spinlock_unlock_irqrestore(&process->lock, flags);
+    return (int)length;
 }
 
 int process_set_working_directory(process_t *process, vfs_node_t *directory) {

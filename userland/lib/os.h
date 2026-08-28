@@ -33,6 +33,12 @@ static inline uint64_t os_reap(uint64_t process_id) {
     return os_syscall3(44, process_id, 0, 0);
 }
 
+static inline uint64_t os_getenv(const char *key, void *value,
+                                 uint64_t capacity) {
+    return os_syscall3(45, (uint64_t)(uintptr_t)key,
+                       (uint64_t)(uintptr_t)value, capacity);
+}
+
 static inline uint64_t os_write(uint64_t descriptor, const void *buffer,
                                 uint64_t length) {
     return os_syscall3(1, descriptor, (uint64_t)(uintptr_t)buffer, length);

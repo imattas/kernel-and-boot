@@ -1044,6 +1044,8 @@ The shell `ps` command now obtains a bounded live process-ID snapshot from the
 kernel process table.
 `ps` now resolves each listed process to PID, parent PID, lifecycle state, and
 exit status through the process-status syscall.
+Processes now carry a bounded inherited `PATH` environment value, exposed to
+userland through `getenv` and the shell `env` command.
 Waiting now reaps completed child processes, and `run` reports their exit
 status before returning to the prompt.
 Reaping is exposed as a separate parent-validated syscall, preserving the

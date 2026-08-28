@@ -20,11 +20,11 @@ kernel gate below is explicitly marked complete.
 
 ## Current kernel milestone
 
-- [ ] Finish the current XFS batch: VFS append-growth boundary, 256/512-byte
+- [x] Finish the current XFS batch: VFS append-growth boundary, 256/512-byte
   inode-core handling, and the corresponding contract coverage.
-- [ ] Run one grouped filesystem, kernel, image, and QEMU verification gate.
-- [ ] Fix all failures from that gate, rerun it, update `ROADMAP.md`, commit,
-  and push `main`.
+- [x] Run one grouped filesystem, kernel, image, and QEMU verification gate;
+  update `ROADMAP.md` and commit the milestone.
+- [ ] Push the milestone to `main` when the remote connection responds.
 
 ## Remaining kernel completion work
 

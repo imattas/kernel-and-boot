@@ -1198,7 +1198,9 @@ updating the inode item in its checksum-protected tree node; the VFS adapter
 updates its cached size while extent allocation/freeing remains separate.
 Btrfs VFS file attachment now accepts an explicit on-disk directory inode,
 allowing validated files below the filesystem root to be exposed through the
-same adapter while preserving the inode permission bits.
+same adapter while preserving the inode permission bits. Its truncate adapter
+also forwards valid zero-length truncation instead of rejecting it at the VFS
+boundary.
 XFS VFS file attachment now likewise accepts an explicit directory inode, so
 validated files in nested short-form directories use the same adapter boundary.
 The XFS allocator now explicitly distinguishes its legacy contract AGF layout

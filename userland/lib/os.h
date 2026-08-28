@@ -67,6 +67,14 @@ static inline uint64_t os_file_write(uint64_t descriptor, const void *buffer,
     return os_syscall3(11, descriptor, (uint64_t)(uintptr_t)buffer, length);
 }
 
+static inline uint64_t os_spawn(const char *path, uint64_t length) {
+    return os_syscall3(41, (uint64_t)(uintptr_t)path, length, 0);
+}
+
+static inline uint64_t os_wait(uint64_t process_id, int32_t *status) {
+    return os_syscall3(8, process_id, (uint64_t)(uintptr_t)status, 0);
+}
+
 static inline uint64_t os_yield(void) { return os_syscall3(21, 0, 0, 0); }
 
 __attribute__((noreturn)) static inline void os_exit(int32_t status) {

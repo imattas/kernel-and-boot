@@ -16,6 +16,7 @@ typedef enum {
     SHELL_RMDIR,
     SHELL_TOUCH,
     SHELL_WRITE,
+    SHELL_RUN,
     SHELL_EXIT,
     SHELL_UNKNOWN
 } shell_command_t;

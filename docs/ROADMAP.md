@@ -1036,6 +1036,8 @@ File creation is exposed through the shell `touch` command and the userland
 create/write runtime wrappers.
 The shell `write` command now creates a file and writes bounded command text
 through those wrappers.
+The userland runtime now supports `run <path>` through a kernel spawn/wait
+syscall path for ELF programs in the process VFS namespace.
 
 This gate includes all non-driver kernel core services and VFS abstractions,
 then the complete driver phase, with build integration, focused tests, and QEMU

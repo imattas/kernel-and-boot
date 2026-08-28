@@ -444,7 +444,8 @@ int process_map_user_stack(process_t *process, uint64_t page_address) {
 int process_activate(process_t *process) {
     if (!process) return 0;
     uint64_t flags = spinlock_lock_irqsave(&process->lock);
-    if (process->state != PROCESS_READY || process->user_stack_page_count == 0 ||
+    if ((process->state != PROCESS_READY && process->state != PROCESS_RUNNING) ||
+        process->user_stack_page_count == 0 ||
         !address_space_activate(&process->address_space)) {
         spinlock_unlock_irqrestore(&process->lock, flags);
         return 0;

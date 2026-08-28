@@ -75,6 +75,7 @@ kernel gate below is explicitly marked complete.
 - [x] Add shell `rmdir` backed by the rmdir syscall.
 - [x] Add shell `touch` and userland file create/write wrappers.
 - [x] Add shell `write <path> <text>` file-writing behavior.
+- [x] Add shell `run <path>` process execution through spawn/wait.
 - [ ] Add the command-line shell and terminal/console I/O.
 - [ ] Add process tools and initial utilities (`init`, `echo`, `ls`, `cat`,
   `pwd`, `mkdir`, `rm`, and `sh`).

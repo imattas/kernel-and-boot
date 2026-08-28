@@ -5,11 +5,15 @@
 #include "../../arch/x86_64/cpu/tables.h"
 #include "../../arch/x86_64/time/timer.h"
 #include "../../mm/virtual/address_space.h"
+#include "../../mm/heap/heap.h"
 #include "../../fs/vfs/file.h"
 #include "../../ipc/endpoint.h"
 #include "../../sched/core/scheduler.h"
 #include "../printk/serial.h"
 #include "../../drivers/input/input.h"
+#include "../process/thread.h"
+
+#define SYSCALL_SPAWN_MAX_IMAGE (1024U * 1024U)
 
 extern void arch_syscall_interrupt(void);
 
@@ -152,9 +156,66 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
             int32_t status = 0;
             int valid = caller && target && target != caller &&
                         process_wait_child(caller, target, &status) &&
+                        process_activate(caller) &&
                         syscall_copy_to_user(arg2, &status, sizeof(status));
             process_release(target);
             return valid ? 0 : OS_SYSCALL_ERROR;
+        }
+        case OS_SYSCALL_SPAWN: {
+            process_t *parent = process_current();
+            if (!parent || arg2 == 0 || arg2 > OS_SYSCALL_MAX_PATH)
+                return OS_SYSCALL_ERROR;
+            char path[OS_SYSCALL_MAX_PATH + 1];
+            if (!syscall_copy_path(path, arg1, arg2)) return OS_SYSCALL_ERROR;
+            uint64_t flags = spinlock_lock_irqsave(&parent->lock);
+            vfs_node_t *root = parent->root_directory;
+            vfs_node_t *working = parent->working_directory;
+            security_context_t security = parent->security;
+            if (root) vfs_node_retain(root);
+            if (working) vfs_node_retain(working);
+            spinlock_unlock_irqrestore(&parent->lock, flags);
+            vfs_node_t *node = root && working ?
+                vfs_lookup_path_at_access(root, working, path, &security) : 0;
+            int accessible = node && node->type == VFS_NODE_REGULAR &&
+                              vfs_node_access(node, &security, 4U);
+            vfs_file_t *file = accessible ? vfs_file_open(node, VFS_FILE_READ) : 0;
+            if (node) vfs_node_release(node);
+            if (working) vfs_node_release(working);
+            if (root) vfs_node_release(root);
+            if (!file) return OS_SYSCALL_ERROR;
+            uint8_t *image = (uint8_t *)kmalloc(SYSCALL_SPAWN_MAX_IMAGE);
+            uint32_t image_size = 0;
+            if (image) {
+                while (image_size < SYSCALL_SPAWN_MAX_IMAGE) {
+                    uint32_t capacity = SYSCALL_SPAWN_MAX_IMAGE - image_size;
+                    if (capacity > 4096U) capacity = 4096U;
+                    int count = vfs_file_read(file, image + image_size, capacity);
+                    if (count <= 0) break;
+                    image_size += (uint32_t)count;
+                }
+            }
+            vfs_file_release(file);
+            if (!image || image_size == 0 || image_size == SYSCALL_SPAWN_MAX_IMAGE) {
+                if (image) kfree(image);
+                return OS_SYSCALL_ERROR;
+            }
+            process_t *child = process_create_auto();
+            process_thread_t *thread = 0;
+            int valid = child && process_set_parent(child, parent) &&
+                        process_inherit_namespace(child, parent) &&
+                        process_inherit_handles(child, parent) &&
+                        process_load_image(child, image, image_size) &&
+                        process_map_user_stack(child, 0x8000100000ULL +
+                            (child->id * 0x10000ULL)) &&
+                        (thread = process_thread_create_user(child, (uint32_t)child->id,
+                            child->image.entry, child->user_stack_top, 4096)) != 0 &&
+                        process_thread_start(thread);
+            kfree(image);
+            if (!valid) {
+                if (child) (void)process_destroy(child);
+                return OS_SYSCALL_ERROR;
+            }
+            return child->id;
         }
         case OS_SYSCALL_OPEN: {
             process_t *process = process_current();

@@ -12,7 +12,7 @@ static void print(const char *text, uint64_t length) {
 
 void shell_main(void) {
     static const char prompt[] = "os> ";
-    static const char help[] = "help echo pwd cd ls cat mkdir rm rmdir touch write exit\r\n";
+    static const char help[] = "help echo pwd cd ls cat mkdir rm rmdir touch write run exit\r\n";
     static const char unknown[] = "unknown command\r\n";
     static char line[128];
     static char argument[128];
@@ -123,6 +123,14 @@ void shell_main(void) {
                 } else if (os_close(descriptor) == OS_SYSCALL_ERROR) {
                     print(unknown, sizeof(unknown) - 1U);
                 }
+            } else if (command == SHELL_RUN) {
+                uint32_t argument_length = 0;
+                while (argument[argument_length]) ++argument_length;
+                uint64_t process_id = os_spawn(argument, argument_length);
+                int32_t status = -1;
+                if (process_id == OS_SYSCALL_ERROR ||
+                    os_wait(process_id, &status) == OS_SYSCALL_ERROR)
+                    print(unknown, sizeof(unknown) - 1U);
             } else if (command == SHELL_EXIT) {
                 os_exit(0);
             } else if (command != SHELL_EMPTY) {

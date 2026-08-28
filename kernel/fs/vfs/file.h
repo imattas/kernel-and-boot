@@ -13,13 +13,6 @@ typedef struct {
     char name[32];
     vfs_node_type_t type;
 } vfs_dirent_t;
-typedef struct {
-    uint64_t owner_uid;
-    uint64_t owner_gid;
-    uint32_t mode;
-    vfs_node_type_t type;
-} vfs_stat_t;
-
 vfs_file_t *vfs_file_open(vfs_node_t *node, uint32_t flags);
 int vfs_file_open_handle(process_handle_table_t *table, vfs_node_t *node,
                          uint32_t flags);

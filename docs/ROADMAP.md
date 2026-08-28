@@ -297,6 +297,8 @@ Directory removal now has a separate permission-checked `rmdir` ABI; `unlink`
 rejects directories, and the QEMU probe verifies the type distinction.
 The ABI now provides owner/root-checked `chmod` for VFS nodes, with `fstat` and
 QEMU coverage of the mode update and restoration path.
+Pathname `stat`, `getuid`, and `getgid` now provide validated metadata and
+process-identity queries, with QEMU coverage of the returned values.
 Access-aware VFS path traversal now requires search permission on every
 directory crossed, preventing inaccessible parent directories from being used
 as a path-resolution side channel.

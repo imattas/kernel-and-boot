@@ -12,6 +12,12 @@ typedef enum {
 } vfs_node_type_t;
 
 typedef struct vfs_node vfs_node_t;
+typedef struct {
+    uint64_t owner_uid;
+    uint64_t owner_gid;
+    uint32_t mode;
+    vfs_node_type_t type;
+} vfs_stat_t;
 typedef int (*vfs_read_fn)(vfs_node_t *node, uint64_t offset,
                           void *buffer, uint32_t size);
 typedef int (*vfs_write_fn)(vfs_node_t *node, uint64_t offset,
@@ -55,6 +61,7 @@ int vfs_node_access(const vfs_node_t *node,
                     const security_context_t *context, uint32_t requested);
 int vfs_node_set_mode(vfs_node_t *node, const security_context_t *context,
                       uint32_t mode);
+int vfs_node_stat(const vfs_node_t *node, vfs_stat_t *stat);
 void vfs_node_retain(vfs_node_t *node);
 void vfs_node_release(vfs_node_t *node);
 int vfs_node_remove(vfs_node_t *parent, vfs_node_t *child);

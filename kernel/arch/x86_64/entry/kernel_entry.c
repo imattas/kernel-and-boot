@@ -3224,6 +3224,22 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("chmod syscall ready\r\n");
+    os_syscall_stat_t path_stat = {0};
+    if (syscall_dispatch(OS_SYSCALL_STAT, 0x8000002000ULL,
+                         sizeof(file_syscall_path) - 1, 0x8000005000ULL) != 0 ||
+        !syscall_copy_from_user(&path_stat, 0x8000005000ULL,
+                                sizeof(path_stat)) ||
+        path_stat.owner_uid != 1000 || path_stat.owner_gid != 1000 ||
+        path_stat.mode != 0666 || path_stat.type != VFS_NODE_REGULAR) {
+        serial_write("stat syscall failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    if (syscall_dispatch(OS_SYSCALL_GETUID, 0, 0, 0) != 1000 ||
+        syscall_dispatch(OS_SYSCALL_GETGID, 0, 0, 0) != 1000) {
+        serial_write("identity syscall failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("stat and identity syscalls ready\r\n");
     serial_write("fstat syscall ready\r\n");
     uint64_t duplicate_source = syscall_dispatch(OS_SYSCALL_OPEN,
         0x8000002000ULL, sizeof(file_syscall_path) - 1, VFS_FILE_READ);

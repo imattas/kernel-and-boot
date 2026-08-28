@@ -97,6 +97,16 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
             return clock_monotonic_ns();
         case OS_SYSCALL_GETPID:
             return process_current() ? process_current()->id : OS_SYSCALL_ERROR;
+        case OS_SYSCALL_GETUID:
+        case OS_SYSCALL_GETGID: {
+            process_t *process = process_current();
+            if (!process) return OS_SYSCALL_ERROR;
+            uint64_t flags = spinlock_lock_irqsave(&process->lock);
+            uint64_t value = number == OS_SYSCALL_GETUID ?
+                             process->security.uid : process->security.gid;
+            spinlock_unlock_irqrestore(&process->lock, flags);
+            return value;
+        }
         case OS_SYSCALL_SIGNAL_MASK:
             return arg1 > UINT32_MAX ||
                    !process_set_signal_mask(process_current(), (uint32_t)arg1) ?
@@ -388,6 +398,35 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
             vfs_node_t *node = root && working ?
                 vfs_lookup_path_at_access(root, working, path, &security) : 0;
             int valid = node && vfs_node_set_mode(node, &security, (uint32_t)arg3);
+            if (node) vfs_node_release(node);
+            if (working) vfs_node_release(working);
+            if (root) vfs_node_release(root);
+            return valid ? 0 : OS_SYSCALL_ERROR;
+        }
+        case OS_SYSCALL_STAT: {
+            process_t *process = process_current();
+            if (!process || arg2 == 0 || arg2 > OS_SYSCALL_MAX_PATH ||
+                !user_range(arg3, sizeof(os_syscall_stat_t), 1))
+                return OS_SYSCALL_ERROR;
+            char path[OS_SYSCALL_MAX_PATH + 1];
+            if (!syscall_copy_from_user(path, arg1, arg2)) return OS_SYSCALL_ERROR;
+            path[arg2] = '\0';
+            uint64_t flags = spinlock_lock_irqsave(&process->lock);
+            vfs_node_t *root = process->root_directory;
+            vfs_node_t *working = process->working_directory;
+            security_context_t security = process->security;
+            if (root) vfs_node_retain(root);
+            if (working) vfs_node_retain(working);
+            spinlock_unlock_irqrestore(&process->lock, flags);
+            vfs_node_t *node = root && working ?
+                vfs_lookup_path_at_access(root, working, path, &security) : 0;
+            vfs_stat_t stat = {0};
+            int valid = node && vfs_node_stat(node, &stat);
+            if (valid) {
+                os_syscall_stat_t result = {stat.owner_uid, stat.owner_gid,
+                                            stat.mode, (uint32_t)stat.type};
+                valid = syscall_copy_to_user(arg3, &result, sizeof(result));
+            }
             if (node) vfs_node_release(node);
             if (working) vfs_node_release(working);
             if (root) vfs_node_release(root);

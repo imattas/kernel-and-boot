@@ -24,6 +24,21 @@ int vfs_node_set_mode(vfs_node_t *node, const security_context_t *context,
     return allowed;
 }
 
+int vfs_node_stat(const vfs_node_t *node, vfs_stat_t *stat) {
+    if (!node || !stat) return 0;
+    uint64_t flags = spinlock_lock_irqsave((spinlock_t *)&node->lock);
+    if (node->destroying || node->references == 0) {
+        spinlock_unlock_irqrestore((spinlock_t *)&node->lock, flags);
+        return 0;
+    }
+    stat->owner_uid = node->owner_uid;
+    stat->owner_gid = node->owner_gid;
+    stat->mode = node->mode;
+    stat->type = node->type;
+    spinlock_unlock_irqrestore((spinlock_t *)&node->lock, flags);
+    return 1;
+}
+
 static uint32_t string_length(const char *value) {
     uint32_t length = 0;
     while (value && value[length] != '\0') ++length;

@@ -39,8 +39,8 @@ kernel gate below is explicitly marked complete.
 
 - [ ] Filesystem hardening: complete bounded metadata mutation behavior and
   persistence/rollback coverage for FAT32, exFAT, ext4, and XFS.
-- [ ] Decide and document the intentionally deferred Btrfs disk allocation
-  scope; do not claim it is complete while it remains deferred.
+- [x] Decide and document the intentionally deferred Btrfs disk allocation
+  scope; it remains explicitly deferred and is not claimed complete.
 - [ ] Driver hardening: grouped error paths, reset/timeout behavior, resource
   ownership, and QEMU coverage for all enabled drivers.
 - [x] AHCI failed-probe and failed-IDENTIFY command-list/FIS cleanup is bounded

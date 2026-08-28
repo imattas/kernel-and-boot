@@ -55,5 +55,13 @@ int main(void) {
     assert(g32(&image[4096 + 52]) == 3 && g32(&image[4096 + 56]) == 3);
     assert(g32(&image[2U * 4096U + 16]) == 10 &&
            g32(&image[3U * 4096U + 16]) == 10);
+    assert(!xfs_free_extent(&fs, 11, 2));
+    assert(g32(&image[4096 + 52]) == 3 &&
+           g32(&image[2U * 4096U + 20]) == 3);
+    assert(xfs_allocate_extent(&fs, 0, 3, &start) && start == 10);
+    assert(g32(&image[4096 + 52]) == 0 && g32(&image[4096 + 56]) == 0 &&
+           image[2U * 4096U + 6] == 0 && image[3U * 4096U + 6] == 0);
+    assert(xfs_free_extent(&fs, 10, 3));
+    assert(g32(&image[4096 + 52]) == 3 && g32(&image[4096 + 56]) == 3);
     return 0;
 }

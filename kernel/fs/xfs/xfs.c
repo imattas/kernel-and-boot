@@ -129,7 +129,9 @@ static int xfs_validate_auth_cnt(const xfs_fs_t *fs, uint64_t ag_base,
     uint32_t capacity = (fs->block_size - 16U) /
                         (view->cnt_level == 1U ? 8U : 12U);
     uint32_t records = be16(&root[6]);
-    if (records == 0 || records > capacity) return 0;
+    if (records > capacity) return 0;
+    if (records == 0)
+        return view->free_blocks == 0 && view->longest == 0;
     uint32_t total = 0, longest = 0, previous_count = 0, previous_start = 0;
     uint32_t pointer_offset = 16U + capacity * 8U;
     uint32_t children = view->cnt_level == 1U ? 1U : records;
@@ -175,7 +177,7 @@ static int xfs_auth_bno_mutate(xfs_fs_t *fs, uint32_t agno, uint32_t blocks,
     if (!fs || !fs->mounted || !blocks || agno >= fs->ag_count ||
         fs->block_size < 512U) return 0;
     uint64_t ag_base = (uint64_t)agno * fs->ag_blocks;
-    if (ag_base > fs->block_count - 2U ||
+    if (ag_base > fs->block_count - 2U || blocks > fs->ag_blocks ||
         !xfs_read_block(fs, ag_base + 1U, agf) ||
         !xfs_agf_view(agf, &view) || !view.authentic ||
         view.bno_level != 1U || view.cnt_level != 1U ||
@@ -185,7 +187,7 @@ static int xfs_auth_bno_mutate(xfs_fs_t *fs, uint32_t agno, uint32_t blocks,
         be16(&bno[4]) != 0 || be16(&cnt[4]) != 0) return 0;
     uint32_t capacity = (fs->block_size - 16U) / 8U;
     uint32_t bno_count = be16(&bno[6]), cnt_count = be16(&cnt[6]);
-    if (bno_count == 0 || bno_count > capacity || cnt_count != bno_count)
+    if (bno_count > capacity || cnt_count != bno_count)
         return 0;
     uint32_t total = 0, previous_end = 0;
     for (uint32_t i = 0; i < bno_count; ++i) {
@@ -237,9 +239,14 @@ static int xfs_auth_bno_mutate(xfs_fs_t *fs, uint32_t agno, uint32_t blocks,
         if (view.free_blocks < blocks) return 0;
         store_be32(&agf[52], view.free_blocks - blocks);
     } else {
-        if (target > fs->ag_blocks - blocks) return 0;
+        if (blocks > fs->ag_blocks || target > fs->ag_blocks - blocks) return 0;
         for (uint32_t i = 0; i < bno_count; ++i)
-            if (target < records[i].start) { record = i; break; }
+            if (target < records[i].start) {
+                if (target > UINT32_MAX - blocks ||
+                    target + blocks > records[i].start) return 0;
+                record = i;
+                break;
+            } else if (target < records[i].start + records[i].count) return 0;
         if (record == UINT32_MAX) record = bno_count;
         uint32_t previous = record == 0 ? UINT32_MAX : record - 1U;
         uint32_t next = record < bno_count ? record : UINT32_MAX;

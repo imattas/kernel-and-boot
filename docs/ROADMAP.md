@@ -1980,4 +1980,5 @@ checks, with conventional zero/one/two exit statuses for shell conditionals.
 Numeric comparisons (`-eq`, `-ne`, `-lt`, `-le`, `-gt`, and `-ge`) are also
 bounded through the shared decimal parser.
 The utility also supports bounded unary negation, empty-string (`-z`), and
-string inequality (`!=`) predicates.
+string inequality (`!=`) predicates. Prefix negation now applies uniformly to
+file, type, string, and numeric predicates.

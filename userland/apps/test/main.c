@@ -33,25 +33,20 @@ static int numeric_compare(const char *left, const char *operator,
     return 0;
 }
 
-int test_main(uint64_t argc, char **argv, char **environment) {
-    (void)environment;
-    if (argc == 3 && argv[1][0] == '!' && argv[1][1] == 0) {
-        if (argv[2][0] == 0) os_exit(0);
-        os_exit(1);
-    }
+static int predicate(uint64_t argc, char **argv) {
     if (argc == 2) {
-        if (argv[1][0] == 0) os_exit(1);
-        os_exit(exists(argv[1]) ? 0 : 1);
+        if (argv[1][0] == 0) return 0;
+        return exists(argv[1]);
     }
     if (argc == 3 && argv[1][0] == '-' && argv[1][1] == 'e' &&
-        argv[1][2] == 0) os_exit(exists(argv[2]) ? 0 : 1);
+        argv[1][2] == 0) return exists(argv[2]);
     if (argc == 3 && argv[1][0] == '-' &&
         (argv[1][1] == 'f' || argv[1][1] == 'd') && argv[1][2] == 0)
-        os_exit(type_is(argv[2], argv[1][1] == 'd' ? 0U : 1U) ? 0 : 1);
+        return type_is(argv[2], argv[1][1] == 'd' ? 0U : 1U);
     if (argc == 3 && argv[1][0] == '-' && argv[1][1] == 'n' &&
-        argv[1][2] == 0) os_exit(argv[2][0] != 0 ? 0 : 1);
+        argv[1][2] == 0) return argv[2][0] != 0;
     if (argc == 3 && argv[1][0] == '-' && argv[1][1] == 'z' &&
-        argv[1][2] == 0) os_exit(argv[2][0] == 0 ? 0 : 1);
+        argv[1][2] == 0) return argv[2][0] == 0;
     if (argc == 4 && argv[1][0] != 0 &&
         ((argv[2][0] == '=' && argv[2][1] == 0) ||
          (argv[2][0] == '!' && argv[2][1] == '=' && argv[2][2] == 0))) {
@@ -60,9 +55,23 @@ int test_main(uint64_t argc, char **argv, char **environment) {
         int equal = left == right;
         for (uint64_t index = 0; equal && index < left; ++index)
             equal = argv[1][index] == argv[3][index];
-        os_exit((argv[2][1] == '!' ? !equal : equal) ? 0 : 1);
+        return argv[2][1] == '!' ? !equal : equal;
     }
     if (argc == 4)
-        os_exit(numeric_compare(argv[1], argv[2], argv[3]) ? 0 : 1);
-    os_exit(2);
+        return numeric_compare(argv[1], argv[2], argv[3]);
+    return -1;
+}
+
+int test_main(uint64_t argc, char **argv, char **environment) {
+    (void)environment;
+    int inverted = 0;
+    if (argc > 1 && argv[1][0] == '!' && argv[1][1] == 0) {
+        inverted = 1;
+        ++argv;
+        --argc;
+    }
+    if (argc == 2 && argv[1][0] == 0) os_exit(inverted ? 0 : 1);
+    int result = predicate(argc, argv);
+    if (result < 0) os_exit(2);
+    os_exit((inverted ? !result : result) ? 0 : 1);
 }

@@ -76,6 +76,8 @@ Numeric comparison predicates are also available through `-eq`, `-ne`,
 `-lt`, `-le`, `-gt`, and `-ge`.
 Negation, empty-string (`-z`), and string inequality (`!=`) are also
 available.
+The leading `!` form now negates every supported predicate, including file,
+type, string, and numeric tests.
 
 - [x] Add a small userland runtime layer for shared argument parsing, status
   handling, and diagnostic output across standalone applications.

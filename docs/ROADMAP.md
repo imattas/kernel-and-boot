@@ -1722,8 +1722,9 @@ The native shell `rm` command now supports bounded `rm -r` tree removal using
 directory enumeration and rejects attempts to recursively remove `/`.
 Input and network runtime services now start before the persistent shell, so an
 immediately-blocking shell cannot starve those services. The init-to-shell
-supervisor handoff remains deferred, and complete multi-cluster FAT32
-application exposure in the live VFS namespace is the next userland boundary.
+supervisor handoff remains deferred. `args.elf` is now the first executable
+utility exposed through the live FAT32-backed VFS namespace; the remaining
+application set is the next userland boundary.
 The shell now keeps a bounded eight-entry command history and handles split
 ANSI up/down escape sequences without feeding terminal control bytes into the
 command parser.

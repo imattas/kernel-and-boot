@@ -72,7 +72,7 @@ int fat32_vfs_attach_file_in_directory(fat32_fs_t *fs, vfs_node_t *root,
     file->fs = fs; file->directory_cluster = directory_cluster;
     file->size = size; spinlock_init(&file->lock);
     for (uint32_t i = 0; i < 11; ++i) file->short_name[i] = short_name[i];
-    vfs_node_t *node = vfs_node_create(name, VFS_NODE_REGULAR, 0, 0, 0644);
+    vfs_node_t *node = vfs_node_create(name, VFS_NODE_REGULAR, 0, 0, 0755);
     if (!node || !vfs_node_set_read(node, fat32_vfs_read, file) ||
         !vfs_node_set_write(node, fat32_vfs_write, file) ||
         !vfs_node_set_truncate(node, fat32_vfs_truncate) ||

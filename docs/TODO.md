@@ -160,6 +160,8 @@ kernel gate below is explicitly marked complete.
   terminal-backed userland sessions.
 - [x] Start input and network runtime services before launching the persistent
   shell, so an immediately-blocking shell cannot starve kernel services.
+- [x] Expose `args.elf` through the live FAT32-backed VFS namespace and grant
+  boot-image ELF nodes execute permissions.
 - [ ] Add reliable QEMU live keyboard verification for `run INIT.ELF`.
 - [ ] Expose the complete multi-cluster FAT32 boot-image application set in the
   live VFS namespace for reliable external `run` execution.

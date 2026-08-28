@@ -1691,6 +1691,9 @@ The first standalone status utility, `TRUE.ELF`, is now built, validated, and
 packaged in the FAT32 root for independent ring-3 success-path testing.
 The paired standalone `FALSE.ELF` utility is now built and packaged as an
 independent ring-3 nonzero-exit path for shell and process-status validation.
+Standalone `ID.ELF` and `PS.ELF` utilities now exercise identity,
+credential, process-list, and process-status syscalls from ring 3 and are
+packaged in the FAT32 root.
 
 ## Phase 10 — BIOS boot path
 

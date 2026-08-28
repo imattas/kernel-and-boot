@@ -129,6 +129,8 @@ kernel gate below is explicitly marked complete.
 - [x] Add standalone `TRUE.ELF` status utility to the FAT32 boot image.
 - [x] Add standalone `FALSE.ELF` nonzero-status utility to the FAT32 boot
   image.
+- [x] Add standalone `ID.ELF` and `PS.ELF` process-inspection utilities to
+  the FAT32 boot image.
 - [x] Add typed pipe descriptors and blocking userland read/write wrappers.
 - [x] Add optional per-process standard-input and standard-output bindings for
   redirected child processes.

@@ -68,7 +68,8 @@ shell_command_t shell_parse(const char *line, uint32_t length,
         !same_word(line, command_length, "which") &&
         !same_word(line, command_length, "inherit") &&
         !same_word(line, command_length, "echo") &&
-        !same_word(line, command_length, "cd")) return SHELL_UNKNOWN;
+        !same_word(line, command_length, "cd") &&
+        !same_word(line, command_length, "stat")) return SHELL_UNKNOWN;
     uint32_t start = command_length;
     while (start < length && (line[start] == ' ' || line[start] == '\t')) ++start;
     uint32_t argument_length = length - start;
@@ -78,6 +79,7 @@ shell_command_t shell_parse(const char *line, uint32_t length,
     argument[argument_length] = 0;
     if (same_word(line, command_length, "cd")) return SHELL_CD;
     if (same_word(line, command_length, "cat")) return SHELL_CAT;
+    if (same_word(line, command_length, "stat")) return SHELL_STAT;
     if (same_word(line, command_length, "mkdir")) return SHELL_MKDIR;
     if (same_word(line, command_length, "rm")) return SHELL_RM;
     if (same_word(line, command_length, "rmdir")) return SHELL_RMDIR;

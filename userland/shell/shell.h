@@ -17,6 +17,7 @@ typedef enum {
     SHELL_CD,
     SHELL_LS,
     SHELL_CAT,
+    SHELL_STAT,
     SHELL_MKDIR,
     SHELL_RM,
     SHELL_RMDIR,

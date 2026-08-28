@@ -33,6 +33,14 @@ static void print_status(int32_t status) {
     }
 }
 
+static void print_stat(const os_stat_t *stat) {
+    print("uid=", 4); print_number(stat->owner_uid);
+    print(" gid=", 5); print_number(stat->owner_gid);
+    print(" mode=", 6); print_number(stat->mode);
+    print(" type=", 6); print_number(stat->type);
+    print("\r\n", 2);
+}
+
 static int parse_number(const char *text, uint32_t length, uint64_t *value) {
     if (!text || !value || length == 0) return 0;
     uint64_t result = 0;
@@ -110,7 +118,7 @@ static uint32_t resolve_command(const char *name, uint32_t name_length,
 
 void shell_main(void) {
     static const char prompt[] = "os> ";
-    static const char help[] = "help id ps env jobs which inherit echo pwd cd ls cat mkdir rm rmdir touch write run wait exit\r\n";
+    static const char help[] = "help id ps env jobs which inherit echo pwd cd ls cat stat mkdir rm rmdir touch write run wait exit\r\n";
     static const char unknown[] = "unknown command\r\n";
     static char line[128];
     static char argument[128];
@@ -280,6 +288,18 @@ void shell_main(void) {
                         print(buffer, count);
                     (void)os_close(descriptor);
                 }
+            } else if (command == SHELL_STAT) {
+                uint32_t argument_length = 0;
+                while (argument[argument_length]) ++argument_length;
+                uint64_t descriptor = os_open(argument, argument_length, 1);
+                os_stat_t stat;
+                if (descriptor == OS_SYSCALL_ERROR ||
+                    os_fstat(descriptor, &stat) == OS_SYSCALL_ERROR) {
+                    print(unknown, sizeof(unknown) - 1U);
+                } else {
+                    print_stat(&stat);
+                }
+                if (descriptor != OS_SYSCALL_ERROR) (void)os_close(descriptor);
             } else if (command == SHELL_MKDIR) {
                 uint32_t argument_length = 0;
                 while (argument[argument_length]) ++argument_length;

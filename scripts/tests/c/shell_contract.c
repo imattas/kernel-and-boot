@@ -36,6 +36,8 @@ int main(void) {
     assert(shell_parse("ls", 2, argument, sizeof(argument)) == SHELL_LS);
     assert(shell_parse("cat /hello", 10, argument, sizeof(argument)) == SHELL_CAT);
     assert(strcmp(argument, "/hello") == 0);
+    assert(shell_parse("stat /hello", 11, argument, sizeof(argument)) == SHELL_STAT);
+    assert(strcmp(argument, "/hello") == 0);
     assert(shell_parse("mkdir /tmp", 10, argument, sizeof(argument)) == SHELL_MKDIR);
     assert(strcmp(argument, "/tmp") == 0);
     assert(shell_parse("rm /tmp/file", 12, argument, sizeof(argument)) == SHELL_RM);

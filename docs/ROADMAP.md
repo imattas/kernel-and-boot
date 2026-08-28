@@ -1634,6 +1634,8 @@ consumer.
 The shell also supports bounded output redirection with
 `run <command> > <path>`, binding a writable VFS file as the child process's
 standard output and reporting its exit status.
+Input redirection is also supported with `run <command> < <path>`, binding a
+readable VFS file as standard input for the child.
 The FAT32 image builder now chains a second root-directory cluster, removing
 the one-sector root-entry ceiling for continued userland growth.
 The standalone `ECHO.ELF` utility is now stored in the expanded root directory

@@ -1748,6 +1748,8 @@ The shell now accepts a quote-aware bounded `;` sequence and dispatches each
 command in order before returning to the prompt.
 `grep.elf` now also reads standard input when invoked without a file operand,
 enabling file-to-search pipelines through the shell's pipe descriptors.
+`wc.elf` now has the same standard-input mode, completing the basic
+file-to-filter counting pipeline path.
 PATH-resolved external commands can now also use the shell's background-job
 syntax (`command &`) and enter the existing `jobs`/`fg` tracking table.
 The shell now polls those jobs without blocking, reaps processes after both

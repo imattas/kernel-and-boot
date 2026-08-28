@@ -51,6 +51,9 @@ assert root[416:427] == b'LS      ELF'
 assert int.from_bytes(root[442:444], 'little') >= 5
 assert root[448:459] == b'CHMOD   ELF'
 assert int.from_bytes(root[474:476], 'little') >= 5
+root_extension = data[(32 + 2 * 520 + 3) * 512:(32 + 2 * 520 + 4) * 512]
+assert root_extension[:11] == b'ECHO    ELF'
+assert int.from_bytes(root_extension[26:28], 'little') >= 5
 assert data[(33 + 2 * 520) * 512 + 64:(33 + 2 * 520) * 512 + 75] == b'BOOT       '
 assert data[(34 + 2 * 520) * 512 + 64:(34 + 2 * 520) * 512 + 75] == b'BOOTX64 EFI'
 print('FAT image contract: PASS')

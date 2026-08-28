@@ -1588,6 +1588,8 @@ The shell can launch a process in the background with `run ... &` and collect
 its status later with `wait <pid>`.
 The FAT32 image builder now chains a second root-directory cluster, removing
 the one-sector root-entry ceiling for continued userland growth.
+The standalone `ECHO.ELF` utility is now stored in the expanded root directory
+and exercises the conventional argument vector.
 The terminal input loop now has a bounded line editor with backspace/delete,
 Ctrl-U clear-line, and Ctrl-C cancel-line behavior.
 The first standalone ring-3 `ARGS.ELF` utility is now built and packaged in

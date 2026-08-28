@@ -645,12 +645,23 @@ static int xfs_auth_one_child_mutate(xfs_fs_t *fs, uint32_t agno,
     for (uint32_t i = 0; i < count; ++i)
         if (records[i].count > longest) longest = records[i].count;
     store_be32(&agf[56], longest);
+    uint64_t journal_targets[5] = {ag_base + bno_child, ag_base + cnt_child,
+                                   ag_base + view.bno_root, ag_base + view.cnt_root,
+                                   ag_base + 1U};
+    const uint8_t *journal_images[5] = {bno_leaf, cnt_leaf, bno_root, cnt_root, agf};
+    int journal_active = 0;
+    if (fs->journal_blocks) {
+        if (!xfs_journal_prepare(fs, journal_targets, journal_images, 5U))
+            return xfs_journal_clear(fs);
+        journal_active = 1;
+    }
     if (!xfs_write_block(fs, ag_base + bno_child, bno_leaf) ||
         !xfs_write_block(fs, ag_base + cnt_child, cnt_leaf) ||
         !xfs_write_block(fs, ag_base + view.bno_root, bno_root) ||
         !xfs_write_block(fs, ag_base + view.cnt_root, cnt_root) ||
         !xfs_write_block(fs, ag_base + 1U, agf) ||
         !xfs_flush_metadata(fs)) goto rollback;
+    if (journal_active && !xfs_journal_clear(fs)) return 0;
     return 1;
 rollback:
     (void)xfs_write_block(fs, ag_base + bno_child, original_bno_leaf);
@@ -658,6 +669,7 @@ rollback:
     (void)xfs_write_block(fs, ag_base + view.bno_root, original_bno_root);
     (void)xfs_write_block(fs, ag_base + view.cnt_root, original_cnt_root);
     (void)xfs_write_block(fs, ag_base + 1U, original_agf);
+    if (journal_active) (void)xfs_journal_clear(fs);
     return 0;
 }
 
@@ -794,15 +806,26 @@ static int xfs_auth_bno_mutate(xfs_fs_t *fs, uint32_t agno, uint32_t blocks,
     for (uint32_t i = 0; i < bno_count; ++i)
         if (records[i].count > longest) longest = records[i].count;
     store_be32(&agf[56], longest);
+    uint64_t journal_targets[3] = {ag_base + view.bno_root,
+                                   ag_base + view.cnt_root, ag_base + 1U};
+    const uint8_t *journal_images[3] = {bno, cnt, agf};
+    int journal_active = 0;
+    if (fs->journal_blocks) {
+        if (!xfs_journal_prepare(fs, journal_targets, journal_images, 3U))
+            return xfs_journal_clear(fs);
+        journal_active = 1;
+    }
     if (!xfs_write_block(fs, ag_base + view.bno_root, bno) ||
         !xfs_write_block(fs, ag_base + view.cnt_root, cnt) ||
         !xfs_write_block(fs, ag_base + 1U, agf) ||
         !xfs_flush_metadata(fs)) goto rollback;
+    if (journal_active && !xfs_journal_clear(fs)) return 0;
     return 1;
 rollback:
     (void)xfs_write_block(fs, ag_base + view.bno_root, original_bno);
     (void)xfs_write_block(fs, ag_base + view.cnt_root, original_cnt);
     (void)xfs_write_block(fs, ag_base + 1U, original_agf);
+    if (journal_active) (void)xfs_journal_clear(fs);
     return 0;
 }
 

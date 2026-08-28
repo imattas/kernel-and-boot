@@ -1842,6 +1842,10 @@ The text-pipeline slice now also provides `cut.elf`, selecting one bounded
 delimiter-separated field from standard input or a file and packaging it in
 the FAT32 userland namespace.
 
+The pipeline now also includes `tr.elf`, translating bounded character sets
+from standard input while preserving the existing freestanding, PATH, and
+FAT32 image contracts.
+
 Shell integration contracts now directly cover the quote-aware sequence
 splitter, including semicolons and conditional operators preserved inside
 quoted arguments; this joins

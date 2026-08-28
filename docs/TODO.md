@@ -74,6 +74,8 @@ bounded existence, non-empty-string, and equality predicates.
 It also distinguishes regular files and directories with `-f` and `-d`.
 Numeric comparison predicates are also available through `-eq`, `-ne`,
 `-lt`, `-le`, `-gt`, and `-ge`.
+Negation, empty-string (`-z`), and string inequality (`!=`) are also
+available.
 
 - [x] Add a small userland runtime layer for shared argument parsing, status
   handling, and diagnostic output across standalone applications.

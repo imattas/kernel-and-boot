@@ -1979,3 +1979,5 @@ string equality predicates, plus regular-file (`-f`) and directory (`-d`)
 checks, with conventional zero/one/two exit statuses for shell conditionals.
 Numeric comparisons (`-eq`, `-ne`, `-lt`, `-le`, `-gt`, and `-ge`) are also
 bounded through the shared decimal parser.
+The utility also supports bounded unary negation, empty-string (`-z`), and
+string inequality (`!=`) predicates.

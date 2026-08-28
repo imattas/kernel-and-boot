@@ -47,6 +47,8 @@ int main(void) {
     assert(strcmp(argument, "-d /") == 0);
     assert(shell_parse("test 3 -lt 4", 12, argument, sizeof(argument)) == SHELL_RUN);
     assert(strcmp(argument, "3 -lt 4") == 0);
+    assert(shell_parse("test ! -e /missing", 18, argument, sizeof(argument)) == SHELL_RUN);
+    assert(shell_parse("test foo != bar", 15, argument, sizeof(argument)) == SHELL_RUN);
     assert(shell_parse("inherit 3 off", 13, argument, sizeof(argument)) == SHELL_INHERIT);
     assert(shell_parse("echo hello", 10, argument, sizeof(argument)) == SHELL_ECHO);
     assert(strcmp(argument, "hello") == 0);

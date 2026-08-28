@@ -371,6 +371,28 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
             process_handle_release_ref(&ref);
             return valid ? 0 : OS_SYSCALL_ERROR;
         }
+        case OS_SYSCALL_CHMOD: {
+            process_t *process = process_current();
+            if (!process || arg2 == 0 || arg2 > OS_SYSCALL_MAX_PATH ||
+                (arg3 & ~0777U) != 0) return OS_SYSCALL_ERROR;
+            char path[OS_SYSCALL_MAX_PATH + 1];
+            if (!syscall_copy_from_user(path, arg1, arg2)) return OS_SYSCALL_ERROR;
+            path[arg2] = '\0';
+            uint64_t flags = spinlock_lock_irqsave(&process->lock);
+            vfs_node_t *root = process->root_directory;
+            vfs_node_t *working = process->working_directory;
+            security_context_t security = process->security;
+            if (root) vfs_node_retain(root);
+            if (working) vfs_node_retain(working);
+            spinlock_unlock_irqrestore(&process->lock, flags);
+            vfs_node_t *node = root && working ?
+                vfs_lookup_path_at_access(root, working, path, &security) : 0;
+            int valid = node && vfs_node_set_mode(node, &security, (uint32_t)arg3);
+            if (node) vfs_node_release(node);
+            if (working) vfs_node_release(working);
+            if (root) vfs_node_release(root);
+            return valid ? 0 : OS_SYSCALL_ERROR;
+        }
         case OS_SYSCALL_DUP: {
             process_t *process = process_current();
             if (!process || arg2 > 7U) return OS_SYSCALL_ERROR;

@@ -295,6 +295,8 @@ validation, parent permission checks, and duplicate-name rejection; the QEMU
 probe covers rename before removal.
 Directory removal now has a separate permission-checked `rmdir` ABI; `unlink`
 rejects directories, and the QEMU probe verifies the type distinction.
+The ABI now provides owner/root-checked `chmod` for VFS nodes, with `fstat` and
+QEMU coverage of the mode update and restoration path.
 Access-aware VFS path traversal now requires search permission on every
 directory crossed, preventing inaccessible parent directories from being used
 as a path-resolution side channel.

@@ -53,6 +53,8 @@ vfs_node_t *vfs_lookup_path_at_access(vfs_node_t *root, vfs_node_t *working,
                                       const security_context_t *context);
 int vfs_node_access(const vfs_node_t *node,
                     const security_context_t *context, uint32_t requested);
+int vfs_node_set_mode(vfs_node_t *node, const security_context_t *context,
+                      uint32_t mode);
 void vfs_node_retain(vfs_node_t *node);
 void vfs_node_release(vfs_node_t *node);
 int vfs_node_remove(vfs_node_t *parent, vfs_node_t *child);

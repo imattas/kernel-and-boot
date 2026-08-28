@@ -13,6 +13,17 @@ int vfs_node_access(const vfs_node_t *node,
     return security_can_access(context, owner_uid, owner_gid, mode, requested);
 }
 
+int vfs_node_set_mode(vfs_node_t *node, const security_context_t *context,
+                      uint32_t mode) {
+    if (!node || !context || (mode & ~0777U) != 0) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&node->lock);
+    int allowed = !node->destroying && node->references != 0 &&
+                  (context->uid == 0 || context->uid == node->owner_uid);
+    if (allowed) node->mode = mode;
+    spinlock_unlock_irqrestore(&node->lock, flags);
+    return allowed;
+}
+
 static uint32_t string_length(const char *value) {
     uint32_t length = 0;
     while (value && value[length] != '\0') ++length;

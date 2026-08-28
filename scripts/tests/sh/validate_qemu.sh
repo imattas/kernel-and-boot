@@ -85,6 +85,7 @@ grep -F 'os kernel entry ok' "$log" >/dev/null
 grep -F 'syscall ABI ready' "$log" >/dev/null
 grep -F 'filesystem mutation syscalls ready' "$log" >/dev/null
 grep -F 'filesystem rename syscall ready' "$log" >/dev/null
+grep -F 'chmod syscall ready' "$log" >/dev/null
 grep -F 'filesystem rename syscall ready' "$log" >/dev/null
 grep -F 'signal syscalls ready' "$log" >/dev/null
 grep -F 'process lifecycle ready' "$log" >/dev/null

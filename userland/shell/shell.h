@@ -30,6 +30,7 @@ typedef enum {
     SHELL_MV,
     SHELL_CP,
     SHELL_SETENV,
+    SHELL_EXPORT,
     SHELL_UNSETENV,
     SHELL_STATUS,
     SHELL_TRUE,

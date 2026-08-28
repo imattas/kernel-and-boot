@@ -742,7 +742,7 @@ static int shell_remove_tree(const char *path, uint32_t length,
 
 void shell_main(void) {
     static const char prompt[] = "os> ";
-    static const char help[] = "help clear alias unalias id ps env setenv unsetenv status true false jobs history fg which inherit echo printf basename dirname cut tr cmp pwd cd ls cat head wc grep tee tail sort uniq stat chmod kill sleep mv cp mkdir rm rmdir touch write run wait exit\r\n";
+    static const char help[] = "help clear alias unalias id ps env setenv export unsetenv status true false jobs history fg which inherit echo printf basename dirname cut tr cmp pwd cd ls cat head wc grep tee tail sort uniq stat chmod kill sleep mv cp mkdir rm rmdir touch write run wait exit\r\n";
     static const char *unknown = shell_unknown;
     static char line[128];
     static char input[64];
@@ -1220,18 +1220,29 @@ void shell_main(void) {
                                      argument + destination_start,
                                      destination_length))
                     print(unknown, sizeof(unknown) - 1U);
-            } else if (command == SHELL_SETENV) {
+            } else if (command == SHELL_SETENV || command == SHELL_EXPORT) {
                 uint32_t argument_length = 0;
                 while (argument[argument_length]) ++argument_length;
                 uint32_t separator = 0;
-                while (separator < argument_length && argument[separator] != ' ' &&
-                       argument[separator] != '\t') ++separator;
-                uint32_t value_start = separator;
-                while (value_start < argument_length &&
-                       (argument[value_start] == ' ' || argument[value_start] == '\t'))
-                    ++value_start;
-                if (separator == 0 || value_start == argument_length ||
-                    os_setenv(argument, argument + value_start) == OS_SYSCALL_ERROR)
+                if (command == SHELL_EXPORT) {
+                    while (separator < argument_length && argument[separator] != '=')
+                        ++separator;
+                    if (separator != 0 && separator + 1U < argument_length) {
+                        argument[separator] = 0;
+                        ++separator;
+                    }
+                } else {
+                    while (separator < argument_length && argument[separator] != ' ' &&
+                           argument[separator] != '\t') ++separator;
+                    uint32_t value_start = separator;
+                    while (value_start < argument_length &&
+                           (argument[value_start] == ' ' || argument[value_start] == '\t'))
+                        ++value_start;
+                    if (value_start < argument_length) argument[separator] = 0;
+                    separator = value_start;
+                }
+                if (separator == 0 || separator >= argument_length ||
+                    os_setenv(argument, argument + separator) == OS_SYSCALL_ERROR)
                     print(unknown, sizeof(unknown) - 1U);
             } else if (command == SHELL_UNSETENV) {
                 uint32_t argument_length = 0;

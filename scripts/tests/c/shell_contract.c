@@ -92,6 +92,9 @@ int main(void) {
     assert(strcmp(argument, "/old /new") == 0);
     assert(shell_parse("setenv MODE test", 16, argument, sizeof(argument)) == SHELL_SETENV);
     assert(strcmp(argument, "MODE test") == 0);
+    assert(shell_parse("export MODE=test", 16, argument, sizeof(argument)) == SHELL_EXPORT);
+    assert(strcmp(argument, "MODE=test") == 0);
+    assert(shell_parse("export =test", 12, argument, sizeof(argument)) == SHELL_EXPORT);
     assert(shell_parse("unsetenv MODE", 13, argument, sizeof(argument)) == SHELL_UNSETENV);
     assert(strcmp(argument, "MODE") == 0);
     assert(shell_parse("status", 6, argument, sizeof(argument)) == SHELL_STATUS);

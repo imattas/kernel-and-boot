@@ -1803,6 +1803,10 @@ The shell now keeps a bounded eight-entry command history and handles split
 ANSI up/down escape sequences without feeding terminal control bytes into the
 command parser.
 
+The shell now accepts conventional `export NAME=VALUE` assignments and routes
+them through the existing inherited-environment syscall path; parser and help
+surface contracts remain synchronized.
+
 ## Phase 10 — BIOS boot path
 
 Implement legacy BIOS support as a separate loader path. It should normalize legacy machine startup into the same kernel boot contract used by UEFI rather than creating a BIOS-specific kernel architecture.

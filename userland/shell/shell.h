@@ -14,6 +14,7 @@ typedef enum {
     SHELL_MKDIR,
     SHELL_RM,
     SHELL_RMDIR,
+    SHELL_TOUCH,
     SHELL_EXIT,
     SHELL_UNKNOWN
 } shell_command_t;

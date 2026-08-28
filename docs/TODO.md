@@ -73,6 +73,7 @@ kernel gate below is explicitly marked complete.
 - [x] Add shell `mkdir` backed by the mkdir syscall.
 - [x] Add shell `rm` backed by the unlink syscall.
 - [x] Add shell `rmdir` backed by the rmdir syscall.
+- [x] Add shell `touch` and userland file create/write wrappers.
 - [ ] Add the command-line shell and terminal/console I/O.
 - [ ] Add process tools and initial utilities (`init`, `echo`, `ls`, `cat`,
   `pwd`, `mkdir`, `rm`, and `sh`).

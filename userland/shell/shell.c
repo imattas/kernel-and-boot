@@ -33,6 +33,7 @@ shell_command_t shell_parse(const char *line, uint32_t length,
         !same_word(line, command_length, "mkdir") &&
         !same_word(line, command_length, "rm") &&
         !same_word(line, command_length, "rmdir") &&
+        !same_word(line, command_length, "touch") &&
         !same_word(line, command_length, "echo") &&
         !same_word(line, command_length, "cd")) return SHELL_UNKNOWN;
     uint32_t start = command_length;
@@ -47,5 +48,6 @@ shell_command_t shell_parse(const char *line, uint32_t length,
     if (same_word(line, command_length, "mkdir")) return SHELL_MKDIR;
     if (same_word(line, command_length, "rm")) return SHELL_RM;
     if (same_word(line, command_length, "rmdir")) return SHELL_RMDIR;
+    if (same_word(line, command_length, "touch")) return SHELL_TOUCH;
     return SHELL_ECHO;
 }

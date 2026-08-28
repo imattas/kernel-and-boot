@@ -1032,6 +1032,8 @@ The shell also includes `mkdir`, using the kernel directory-creation syscall.
 It now includes `rm` for regular-file removal through the unlink syscall.
 Directory lifecycle support also includes `rmdir` through the directory-removal
 syscall.
+File creation is exposed through the shell `touch` command and the userland
+create/write runtime wrappers.
 
 This gate includes all non-driver kernel core services and VFS abstractions,
 then the complete driver phase, with build integration, focused tests, and QEMU

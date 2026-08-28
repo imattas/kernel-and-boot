@@ -57,6 +57,16 @@ static inline uint64_t os_rmdir(const char *path, uint64_t length) {
     return os_syscall3(35, (uint64_t)(uintptr_t)path, length, 0);
 }
 
+static inline uint64_t os_create(const char *path, uint64_t length,
+                                 uint64_t flags) {
+    return os_syscall3(31, (uint64_t)(uintptr_t)path, length, flags);
+}
+
+static inline uint64_t os_file_write(uint64_t descriptor, const void *buffer,
+                                     uint64_t length) {
+    return os_syscall3(11, descriptor, (uint64_t)(uintptr_t)buffer, length);
+}
+
 static inline uint64_t os_yield(void) { return os_syscall3(21, 0, 0, 0); }
 
 __attribute__((noreturn)) static inline void os_exit(int32_t status) {

@@ -1834,6 +1834,10 @@ while `>` retains create-and-truncate behavior.
 Standalone `env.elf` now supports `-i` to clear inherited variables and repeated
 `-u NAME` filters before applying assignment prefixes and launching a command.
 
+The standalone formatter now supports bounded unsigned decimal, hexadecimal,
+octal, and single-character conversions in addition to its existing string,
+signed-decimal, percent, and escaped-control behavior.
+
 Shell operator validation now rejects empty pipeline/redirection operands,
 non-terminal background markers, unterminated quoting, and trailing escapes
 before any process-launch path is selected.

@@ -116,6 +116,8 @@ the init-owned shell supervisor remains the next kernel/userland boundary.
 - [x] Add stdin/file `uniq.elf` with streaming adjacent-duplicate filtering and package it in the FAT32 image.
 - [x] Add standalone `printf.elf` with bounded `%s`, `%d`, `%%`, and basic
   escaped-control output through PATH and the FAT32 image.
+- [x] Extend standalone `printf.elf` with bounded `%u`, `%x`, `%X`, `%o`, and
+  `%c` conversions.
 - [x] Add standalone `basename.elf` path-component extraction through PATH and
   the FAT32 image.
 - [x] Add standalone `dirname.elf` parent-path extraction through PATH and the

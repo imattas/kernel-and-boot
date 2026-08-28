@@ -89,6 +89,10 @@ int main(void) {
     assert(strcmp(argument, "/hello") == 0);
     assert(shell_parse("cmp /a /b", 9, argument, sizeof(argument)) == SHELL_RUN);
     assert(strcmp(argument, "/a /b") == 0);
+    assert(shell_parse("find / -type f", 15, argument, sizeof(argument)) == SHELL_RUN);
+    assert(strcmp(argument, "/ -type f") == 0);
+    assert(shell_parse("find / > /tmp/files", 20, argument, sizeof(argument)) == SHELL_RUN);
+    assert(strcmp(argument, "find / > /tmp/files") == 0);
     assert(shell_parse("tail /hello", 11, argument, sizeof(argument)) == SHELL_RUN);
     assert(shell_parse("sort /hello", 11, argument, sizeof(argument)) == SHELL_RUN);
     assert(shell_parse("uniq /hello", 11, argument, sizeof(argument)) == SHELL_RUN);

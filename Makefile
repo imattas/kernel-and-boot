@@ -44,6 +44,8 @@ CACHE_TEST := $(TEST_DIR)/cache_contract
 DEVICE_TEST := $(TEST_DIR)/device_contract
 USERLAND_INIT_ELF := $(BUILD_DIR)/userland/init.elf
 USERLAND_INIT_OBJ := $(BUILD_DIR)/userland/init_start.o
+USERLAND_INIT_MAIN_OBJ := $(BUILD_DIR)/userland/init_main.o
+USERLAND_SYSCALL_OBJ := $(BUILD_DIR)/userland/syscall.o
 USERLAND_LD := userland/init/init.ld
 UEFI_OBJ := $(BUILD_DIR)/uefi/efi_main.obj
 UEFI_ENTRY_OBJ := $(BUILD_DIR)/uefi/entry.obj
@@ -108,8 +110,15 @@ $(BUILD_DIR)/userland:
 $(USERLAND_INIT_OBJ): userland/init/start.asm | $(BUILD_DIR)/userland
 	$(NASM) -f elf64 $< -o $@
 
-$(USERLAND_INIT_ELF): $(USERLAND_INIT_OBJ) $(USERLAND_LD) | $(BUILD_DIR)/userland
-	$(LD) -m elf_x86_64 -T $(USERLAND_LD) --build-id=none -o $@ $(USERLAND_INIT_OBJ)
+$(USERLAND_INIT_MAIN_OBJ): userland/init/main.c userland/lib/os.h | $(BUILD_DIR)/userland
+	$(CC) -target x86_64-pc-none-elf -std=c11 -ffreestanding -fno-builtin \
+		-fno-stack-protector -fPIE -fno-plt -mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@
+
+$(USERLAND_SYSCALL_OBJ): userland/lib/syscall.asm | $(BUILD_DIR)/userland
+	$(NASM) -f elf64 $< -o $@
+
+$(USERLAND_INIT_ELF): $(USERLAND_INIT_OBJ) $(USERLAND_INIT_MAIN_OBJ) $(USERLAND_SYSCALL_OBJ) $(USERLAND_LD) | $(BUILD_DIR)/userland
+	$(LD) -m elf_x86_64 -T $(USERLAND_LD) --build-id=none -o $@ $(USERLAND_INIT_OBJ) $(USERLAND_INIT_MAIN_OBJ) $(USERLAND_SYSCALL_OBJ)
 
 $(TEST_DIR):
 	mkdir -p $@

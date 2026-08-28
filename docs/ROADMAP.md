@@ -1538,9 +1538,10 @@ tried, preventing leaked BAR/PIO ownership from blocking fallback binding.
 
 Only after the kernel completion gate passes populate `userland/`. The first
 userland slice now provides a freestanding ring-3 init ELF that exercises the
-existing `write` and `exit` syscall ABI; loading it from the UEFI boot contract
-and launching it now runs as the first external user process after the kernel
-gate. Next expand toward libraries, shell/tooling, and system services.
+existing `write` and `exit` syscall ABI. A small C-facing runtime wrapper now
+owns those calls, while the UEFI boot contract loads the image and the kernel
+launches it as the first external user process after the kernel gate. Next
+expand toward libraries, shell/tooling, and system services.
 
 ## Phase 10 — BIOS boot path
 

@@ -1044,8 +1044,9 @@ The shell `ps` command now obtains a bounded live process-ID snapshot from the
 kernel process table.
 `ps` now resolves each listed process to PID, parent PID, lifecycle state, and
 exit status through the process-status syscall.
-Processes now carry a bounded inherited `PATH` environment value, exposed to
-userland through `getenv` and the shell `env` command.
+Processes now carry a bounded inherited `PATH` environment value (including
+the boot image root), exposed to userland through `getenv` and the shell `env`
+command.
 The shell also exposes descriptor inheritance policy through `inherit <fd>
 <on|off>`.
 Waiting now reaps completed child processes, and `run` reports their exit
@@ -1581,6 +1582,8 @@ The shell now includes an `ls` builtin backed by the open/readdir/close syscall
 path.
 The shell `run` command now resolves bare executable names through the
 process's inherited `PATH`, while preserving explicit paths.
+The shell also provides `which`, using the same bounded resolver to report the
+actual executable path only when the target exists.
 The first standalone ring-3 `ARGS.ELF` utility is now built and packaged in
 the FAT32 root, providing an executable path for validating argument delivery.
 

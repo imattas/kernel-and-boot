@@ -54,6 +54,9 @@ static uint32_t resolve_command(const char *name, uint32_t name_length,
             for (uint32_t copy = 0; copy < name_length; ++copy)
                 path[copy] = name[copy];
             path[name_length] = 0;
+            uint64_t descriptor = os_open(path, name_length, 1);
+            if (descriptor == OS_SYSCALL_ERROR) return 0;
+            (void)os_close(descriptor);
             return name_length;
         }
     }
@@ -91,7 +94,7 @@ static uint32_t resolve_command(const char *name, uint32_t name_length,
 
 void shell_main(void) {
     static const char prompt[] = "os> ";
-    static const char help[] = "help id ps env inherit echo pwd cd ls cat mkdir rm rmdir touch write run exit\r\n";
+    static const char help[] = "help id ps env which inherit echo pwd cd ls cat mkdir rm rmdir touch write run exit\r\n";
     static const char unknown[] = "unknown command\r\n";
     static char line[128];
     static char argument[128];
@@ -152,6 +155,20 @@ void shell_main(void) {
                 } else {
                     print("PATH=", 5);
                     print(value, length);
+                    print("\r\n", 2);
+                }
+            }
+            else if (command == SHELL_WHICH) {
+                uint32_t name_length = 0;
+                while (argument[name_length]) ++name_length;
+                char resolved_path[128];
+                uint32_t resolved_length = resolve_command(argument, name_length,
+                                                            resolved_path,
+                                                            sizeof(resolved_path));
+                if (resolved_length == 0) {
+                    print(unknown, sizeof(unknown) - 1U);
+                } else {
+                    print(resolved_path, resolved_length);
                     print("\r\n", 2);
                 }
             }

@@ -86,7 +86,7 @@ process_t *process_create(uint64_t id) {
     security_context_initialize(&process->security, 1000, 1000, 0);
     for (uint32_t index = 0; index < PROCESS_ENVIRONMENT_SIZE; ++index)
         process->environment[index] = 0;
-    const char default_environment[] = "PATH=/bin:/usr/bin";
+    const char default_environment[] = "PATH=/:/bin:/usr/bin";
     for (uint32_t index = 0; index < sizeof(default_environment); ++index)
         process->environment[index] = default_environment[index];
     for (uint32_t page = 0; page < PROCESS_USER_STACK_PAGES; ++page)

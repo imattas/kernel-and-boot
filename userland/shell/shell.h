@@ -9,6 +9,7 @@ typedef enum {
     SHELL_ID,
     SHELL_PS,
     SHELL_ENV,
+    SHELL_WHICH,
     SHELL_INHERIT,
     SHELL_ECHO,
     SHELL_PWD,

@@ -616,7 +616,7 @@ static int shell_remove_tree(const char *path, uint32_t length,
 
 void shell_main(void) {
     static const char prompt[] = "os> ";
-    static const char help[] = "help id ps env setenv unsetenv status true false jobs history fg which inherit echo pwd cd ls cat stat chmod kill sleep mv cp mkdir rm rmdir touch write run wait exit\r\n";
+    static const char help[] = "help clear id ps env setenv unsetenv status true false jobs history fg which inherit echo pwd cd ls cat stat chmod kill sleep mv cp mkdir rm rmdir touch write run wait exit\r\n";
     static const char *unknown = shell_unknown;
     static char line[128];
     static char input[64];
@@ -718,6 +718,7 @@ void shell_main(void) {
             if (command != SHELL_EMPTY && command != SHELL_STATUS)
                 last_status = 0;
             if (command == SHELL_HELP) print(help, sizeof(help) - 1U);
+            else if (command == SHELL_CLEAR) print("\x1b[2J\x1b[H", 7);
             else if (command == SHELL_ID) {
                 print("pid=", 4);
                 print_number(os_getpid());

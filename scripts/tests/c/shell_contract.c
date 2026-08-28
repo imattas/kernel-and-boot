@@ -21,6 +21,7 @@ int main(void) {
     assert(shell_edit_line(line, &line_length, sizeof(line) - 1U, '\n') == SHELL_EDIT_SUBMIT);
     assert(line_length == 1 && line[0] == 'z');
     assert(shell_parse("help", 4, argument, sizeof(argument)) == SHELL_HELP);
+    assert(shell_parse("clear", 5, argument, sizeof(argument)) == SHELL_CLEAR);
     assert(shell_parse("id", 2, argument, sizeof(argument)) == SHELL_ID);
     assert(shell_parse("ps", 2, argument, sizeof(argument)) == SHELL_PS);
     assert(shell_parse("env", 3, argument, sizeof(argument)) == SHELL_ENV);

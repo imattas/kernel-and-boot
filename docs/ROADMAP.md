@@ -1731,6 +1731,8 @@ the external process path as the native shell `help` command.
 The complete `make test` gate now passes with the expanded 31-artifact
 userland set, including shell/runtime contracts, filesystem/device contracts,
 image validation, and QEMU UEFI execution.
+The ring-3 shell now includes a `clear` command that emits the standard ANSI
+screen-clear and cursor-home sequence, with parser contract coverage.
 Active address-space and CR3 tracking is now per logical CPU, preventing AP
 activity from overwriting the BSP's userland address-space state during SMP
 transitions. The change passes the grouped QEMU gate and is ready for a

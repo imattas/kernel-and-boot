@@ -89,6 +89,7 @@ shell_command_t shell_parse(const char *line, uint32_t length,
     while (command_length < length && line[command_length] != ' ' &&
            line[command_length] != '\t') ++command_length;
     if (same_word(line, command_length, "help")) return SHELL_HELP;
+    if (same_word(line, command_length, "clear")) return SHELL_CLEAR;
     if (same_word(line, command_length, "id")) return SHELL_ID;
     if (same_word(line, command_length, "ps")) return SHELL_PS;
     if (same_word(line, command_length, "env")) return SHELL_ENV;

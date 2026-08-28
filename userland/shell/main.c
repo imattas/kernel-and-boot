@@ -12,7 +12,7 @@ static void print(const char *text, uint64_t length) {
 
 void shell_main(void) {
     static const char prompt[] = "os> ";
-    static const char help[] = "help echo pwd cd ls cat mkdir rm rmdir touch exit\r\n";
+    static const char help[] = "help echo pwd cd ls cat mkdir rm rmdir touch write exit\r\n";
     static const char unknown[] = "unknown command\r\n";
     static char line[128];
     static char argument[128];
@@ -102,6 +102,27 @@ void shell_main(void) {
                     print(unknown, sizeof(unknown) - 1U);
                 else if (os_close(descriptor) == OS_SYSCALL_ERROR)
                     print(unknown, sizeof(unknown) - 1U);
+            } else if (command == SHELL_WRITE) {
+                uint32_t path_length = 0;
+                while (argument[path_length] && argument[path_length] != ' ' &&
+                       argument[path_length] != '\t') ++path_length;
+                uint32_t content_start = path_length;
+                while (argument[content_start] == ' ' ||
+                       argument[content_start] == '\t') ++content_start;
+                uint32_t content_length = 0;
+                while (argument[content_start + content_length])
+                    ++content_length;
+                uint64_t descriptor = path_length != 0 && content_length != 0 ?
+                    os_create(argument, path_length, 3) : OS_SYSCALL_ERROR;
+                if (descriptor == OS_SYSCALL_ERROR || content_length > 256 ||
+                    os_file_write(descriptor, argument + content_start,
+                                  content_length) != content_length) {
+                    if (descriptor != OS_SYSCALL_ERROR)
+                        (void)os_close(descriptor);
+                    print(unknown, sizeof(unknown) - 1U);
+                } else if (os_close(descriptor) == OS_SYSCALL_ERROR) {
+                    print(unknown, sizeof(unknown) - 1U);
+                }
             } else if (command == SHELL_EXIT) {
                 os_exit(0);
             } else if (command != SHELL_EMPTY) {

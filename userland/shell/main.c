@@ -6,7 +6,12 @@ typedef struct {
     uint32_t type;
 } shell_dirent_t;
 
+static const char shell_unknown[] = "unknown command\r\n";
+static int32_t *shell_active_status;
+
 static void print(const char *text, uint64_t length) {
+    if (shell_active_status && text == shell_unknown)
+        *shell_active_status = 1;
     (void)os_write(1, text, length);
 }
 
@@ -329,11 +334,12 @@ static int shell_run_input_redirect(char *text, uint32_t length,
 void shell_main(void) {
     static const char prompt[] = "os> ";
     static const char help[] = "help id ps env setenv unsetenv status jobs fg which inherit echo pwd cd ls cat stat chmod kill sleep mv mkdir rm rmdir touch write run wait exit\r\n";
-    static const char unknown[] = "unknown command\r\n";
+    static const char *unknown = shell_unknown;
     static char line[128];
     static char argument[128];
     uint32_t length = 0;
     int32_t last_status = 0;
+    shell_active_status = &last_status;
     print(prompt, sizeof(prompt) - 1U);
     for (;;) {
         uint32_t start = length;
@@ -365,6 +371,8 @@ void shell_main(void) {
             if (edit != SHELL_EDIT_SUBMIT) continue;
             shell_command_t command = shell_parse(line, length, argument,
                                                    sizeof(argument));
+            if (command != SHELL_EMPTY && command != SHELL_STATUS)
+                last_status = 0;
             if (command == SHELL_HELP) print(help, sizeof(help) - 1U);
             else if (command == SHELL_ID) {
                 print("pid=", 4);
@@ -483,6 +491,7 @@ void shell_main(void) {
             } else if (command == SHELL_PWD) {
                 uint64_t result = os_getcwd(argument, sizeof(argument));
                 if (result != OS_SYSCALL_ERROR) print(argument, result);
+                else print(unknown, sizeof(unknown) - 1U);
                 print("\r\n", 2);
             } else if (command == SHELL_CD) {
                 uint32_t argument_length = 0;
@@ -496,13 +505,16 @@ void shell_main(void) {
                 if (descriptor == OS_SYSCALL_ERROR) {
                     print(unknown, sizeof(unknown) - 1U);
                 } else {
-                    while (os_readdir(descriptor, &entry) == 1) {
+                    uint64_t read_result;
+                    while ((read_result = os_readdir(descriptor, &entry)) == 1) {
                         uint32_t name_length = 0;
                         while (name_length < sizeof(entry.name) &&
                                entry.name[name_length] != 0) ++name_length;
                         print(entry.name, name_length);
                         print("\r\n", 2);
                     }
+                    if (read_result == OS_SYSCALL_ERROR)
+                        print(unknown, sizeof(unknown) - 1U);
                     (void)os_close(descriptor);
                 }
             } else if (command == SHELL_CAT) {
@@ -518,6 +530,8 @@ void shell_main(void) {
                                                   sizeof(buffer))) !=
                            OS_SYSCALL_ERROR && count != 0)
                         print(buffer, count);
+                    if (count == OS_SYSCALL_ERROR)
+                        print(unknown, sizeof(unknown) - 1U);
                     (void)os_close(descriptor);
                 }
             } else if (command == SHELL_STAT) {

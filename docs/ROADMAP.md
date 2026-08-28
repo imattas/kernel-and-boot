@@ -1672,6 +1672,11 @@ The standalone `RM.ELF` utility now exercises userland file removal and is
 packaged in the boot image.
 The standalone `RMDIR.ELF` utility now exercises userland directory removal
 and is packaged in the boot image.
+Shell command status is now normalized across the command loop: each new
+non-empty command starts at success, command failures publish status 1, and
+`status` reports the retained result without changing it. Foreground process,
+pipeline, redirection, and wait results continue to publish their real exit
+status.
 
 ## Phase 10 — BIOS boot path
 

@@ -1596,6 +1596,8 @@ The standalone `CAT.ELF` utility now exercises the userland open/read/close
 path and is packaged in the boot image.
 The standalone `PWD.ELF` utility now exercises the userland working-directory
 query and is packaged in the boot image.
+The standalone `MKDIR.ELF` utility now exercises userland directory creation
+and is packaged in the boot image.
 
 ## Phase 10 — BIOS boot path
 

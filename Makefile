@@ -49,6 +49,7 @@ USERLAND_ARGS_ELF := $(BUILD_DIR)/userland/args.elf
 USERLAND_ENV_ELF := $(BUILD_DIR)/userland/env.elf
 USERLAND_CAT_ELF := $(BUILD_DIR)/userland/cat.elf
 USERLAND_PWD_ELF := $(BUILD_DIR)/userland/pwd.elf
+USERLAND_MKDIR_ELF := $(BUILD_DIR)/userland/mkdir.elf
 USERLAND_INIT_OBJ := $(BUILD_DIR)/userland/init_start.o
 USERLAND_INIT_MAIN_OBJ := $(BUILD_DIR)/userland/init_main.o
 USERLAND_SYSCALL_OBJ := $(BUILD_DIR)/userland/syscall.o
@@ -67,6 +68,9 @@ USERLAND_CAT_LD := userland/apps/cat/cat.ld
 USERLAND_PWD_START_OBJ := $(BUILD_DIR)/userland/pwd_start.o
 USERLAND_PWD_MAIN_OBJ := $(BUILD_DIR)/userland/pwd_main.o
 USERLAND_PWD_LD := userland/apps/pwd/pwd.ld
+USERLAND_MKDIR_START_OBJ := $(BUILD_DIR)/userland/mkdir_start.o
+USERLAND_MKDIR_MAIN_OBJ := $(BUILD_DIR)/userland/mkdir_main.o
+USERLAND_MKDIR_LD := userland/apps/mkdir/mkdir.ld
 UEFI_OBJ := $(BUILD_DIR)/uefi/efi_main.obj
 UEFI_ENTRY_OBJ := $(BUILD_DIR)/uefi/entry.obj
 UEFI_CONSOLE_OBJ := $(BUILD_DIR)/uefi/console.obj
@@ -117,9 +121,9 @@ OVMF_CODE ?= /usr/share/edk2/x64/OVMF_CODE.4m.fd
 OVMF_VARS ?= /usr/share/edk2/x64/OVMF_VARS.4m.fd
 QEMU_LOG := $(BUILD_DIR)/qemu-serial.log
 
-.PHONY: all test userland-test shell-test args-test env-test cat-test pwd-test image qemu-test fat32-test exfat-test ext4-test xfs-test xfs-rename-test xfs-alloc-test xfs-unwritten-test xfs-auth-test btrfs-test deflate-test lzo-test zstd-test fse-test cache-test device-test run clean distclean
+.PHONY: all test userland-test shell-test args-test env-test cat-test pwd-test mkdir-test image qemu-test fat32-test exfat-test ext4-test xfs-test xfs-rename-test xfs-alloc-test xfs-unwritten-test xfs-auth-test btrfs-test deflate-test lzo-test zstd-test fse-test cache-test device-test run clean distclean
 
-all: $(CONTRACT_ELF) $(UEFI_EFI) $(KERNEL_ELF) $(USERLAND_INIT_ELF) $(USERLAND_SHELL_ELF) $(USERLAND_ARGS_ELF) $(USERLAND_ENV_ELF) $(USERLAND_CAT_ELF) $(USERLAND_PWD_ELF)
+all: $(CONTRACT_ELF) $(UEFI_EFI) $(KERNEL_ELF) $(USERLAND_INIT_ELF) $(USERLAND_SHELL_ELF) $(USERLAND_ARGS_ELF) $(USERLAND_ENV_ELF) $(USERLAND_CAT_ELF) $(USERLAND_PWD_ELF) $(USERLAND_MKDIR_ELF)
 
 userland-test: $(USERLAND_INIT_ELF)
 	sh scripts/tests/sh/validate_userland.sh $(USERLAND_INIT_ELF)
@@ -138,6 +142,9 @@ cat-test: $(USERLAND_CAT_ELF)
 
 pwd-test: $(USERLAND_PWD_ELF)
 	sh scripts/tests/sh/validate_userland.sh $(USERLAND_PWD_ELF)
+
+mkdir-test: $(USERLAND_MKDIR_ELF)
+	sh scripts/tests/sh/validate_userland.sh $(USERLAND_MKDIR_ELF)
 
 $(SHELL_TEST): scripts/tests/c/shell_contract.c userland/shell/shell.c userland/shell/shell.h
 	$(CC) -std=c11 -Wall -Wextra -Werror -I. -o $@ scripts/tests/c/shell_contract.c userland/shell/shell.c
@@ -209,6 +216,16 @@ $(USERLAND_PWD_MAIN_OBJ): userland/apps/pwd/main.c userland/lib/os.h | $(BUILD_D
 
 $(USERLAND_PWD_ELF): $(USERLAND_PWD_START_OBJ) $(USERLAND_PWD_MAIN_OBJ) $(USERLAND_SYSCALL_OBJ) $(USERLAND_PWD_LD) | $(BUILD_DIR)/userland
 	$(LD) -m elf_x86_64 -T $(USERLAND_PWD_LD) --build-id=none -o $@ $(USERLAND_PWD_START_OBJ) $(USERLAND_PWD_MAIN_OBJ) $(USERLAND_SYSCALL_OBJ)
+
+$(USERLAND_MKDIR_START_OBJ): userland/apps/mkdir/start.asm | $(BUILD_DIR)/userland
+	$(NASM) -f elf64 $< -o $@
+
+$(USERLAND_MKDIR_MAIN_OBJ): userland/apps/mkdir/main.c userland/lib/os.h | $(BUILD_DIR)/userland
+	$(CC) -target x86_64-pc-none-elf -std=c11 -ffreestanding -fno-builtin \
+		-fno-stack-protector -fPIE -fno-plt -mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@
+
+$(USERLAND_MKDIR_ELF): $(USERLAND_MKDIR_START_OBJ) $(USERLAND_MKDIR_MAIN_OBJ) $(USERLAND_SYSCALL_OBJ) $(USERLAND_MKDIR_LD) | $(BUILD_DIR)/userland
+	$(LD) -m elf_x86_64 -T $(USERLAND_MKDIR_LD) --build-id=none -o $@ $(USERLAND_MKDIR_START_OBJ) $(USERLAND_MKDIR_MAIN_OBJ) $(USERLAND_SYSCALL_OBJ)
 
 $(TEST_DIR):
 	mkdir -p $@
@@ -718,6 +735,7 @@ test: all image
 	$(MAKE) env-test
 	$(MAKE) cat-test
 	$(MAKE) pwd-test
+	$(MAKE) mkdir-test
 	$(MAKE) shell-test
 	$(MAKE) fat32-test
 	$(MAKE) exfat-test
@@ -834,8 +852,8 @@ $(FAT32_TEST): scripts/tests/c/fat32_contract.c kernel/fs/fat/fat32.c kernel/fs/
 
 image: $(IMAGE)
 
-$(IMAGE): $(UEFI_EFI) $(KERNEL_ELF) $(USERLAND_INIT_ELF) $(USERLAND_SHELL_ELF) $(USERLAND_ARGS_ELF) $(USERLAND_ENV_ELF) $(USERLAND_CAT_ELF) $(USERLAND_PWD_ELF) scripts/image/create_fat_image.py
-	python3 scripts/image/create_fat_image.py $(UEFI_EFI) $(KERNEL_ELF) $(USERLAND_INIT_ELF) $(USERLAND_SHELL_ELF) $(USERLAND_ARGS_ELF) $(USERLAND_ENV_ELF) $(USERLAND_CAT_ELF) $(USERLAND_PWD_ELF) $@
+$(IMAGE): $(UEFI_EFI) $(KERNEL_ELF) $(USERLAND_INIT_ELF) $(USERLAND_SHELL_ELF) $(USERLAND_ARGS_ELF) $(USERLAND_ENV_ELF) $(USERLAND_CAT_ELF) $(USERLAND_PWD_ELF) $(USERLAND_MKDIR_ELF) scripts/image/create_fat_image.py
+	python3 scripts/image/create_fat_image.py $(UEFI_EFI) $(KERNEL_ELF) $(USERLAND_INIT_ELF) $(USERLAND_SHELL_ELF) $(USERLAND_ARGS_ELF) $(USERLAND_ENV_ELF) $(USERLAND_CAT_ELF) $(USERLAND_PWD_ELF) $(USERLAND_MKDIR_ELF) $@
 	sh scripts/tests/sh/validate_image.sh $@
 
 qemu-test: $(IMAGE)

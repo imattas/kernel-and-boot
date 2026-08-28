@@ -52,6 +52,7 @@ USERLAND_PWD_ELF := $(BUILD_DIR)/userland/pwd.elf
 USERLAND_MKDIR_ELF := $(BUILD_DIR)/userland/mkdir.elf
 USERLAND_RM_ELF := $(BUILD_DIR)/userland/rm.elf
 USERLAND_RMDIR_ELF := $(BUILD_DIR)/userland/rmdir.elf
+USERLAND_TOUCH_ELF := $(BUILD_DIR)/userland/touch.elf
 USERLAND_INIT_OBJ := $(BUILD_DIR)/userland/init_start.o
 USERLAND_INIT_MAIN_OBJ := $(BUILD_DIR)/userland/init_main.o
 USERLAND_SYSCALL_OBJ := $(BUILD_DIR)/userland/syscall.o
@@ -79,6 +80,9 @@ USERLAND_RM_LD := userland/apps/rm/rm.ld
 USERLAND_RMDIR_START_OBJ := $(BUILD_DIR)/userland/rmdir_start.o
 USERLAND_RMDIR_MAIN_OBJ := $(BUILD_DIR)/userland/rmdir_main.o
 USERLAND_RMDIR_LD := userland/apps/rmdir/rmdir.ld
+USERLAND_TOUCH_START_OBJ := $(BUILD_DIR)/userland/touch_start.o
+USERLAND_TOUCH_MAIN_OBJ := $(BUILD_DIR)/userland/touch_main.o
+USERLAND_TOUCH_LD := userland/apps/touch/touch.ld
 UEFI_OBJ := $(BUILD_DIR)/uefi/efi_main.obj
 UEFI_ENTRY_OBJ := $(BUILD_DIR)/uefi/entry.obj
 UEFI_CONSOLE_OBJ := $(BUILD_DIR)/uefi/console.obj
@@ -129,9 +133,9 @@ OVMF_CODE ?= /usr/share/edk2/x64/OVMF_CODE.4m.fd
 OVMF_VARS ?= /usr/share/edk2/x64/OVMF_VARS.4m.fd
 QEMU_LOG := $(BUILD_DIR)/qemu-serial.log
 
-.PHONY: all test userland-test shell-test args-test env-test cat-test pwd-test mkdir-test rm-test rmdir-test image qemu-test fat32-test exfat-test ext4-test xfs-test xfs-rename-test xfs-alloc-test xfs-unwritten-test xfs-auth-test btrfs-test deflate-test lzo-test zstd-test fse-test cache-test device-test run clean distclean
+.PHONY: all test userland-test shell-test args-test env-test cat-test pwd-test mkdir-test rm-test rmdir-test touch-test image qemu-test fat32-test exfat-test ext4-test xfs-test xfs-rename-test xfs-alloc-test xfs-unwritten-test xfs-auth-test btrfs-test deflate-test lzo-test zstd-test fse-test cache-test device-test run clean distclean
 
-all: $(CONTRACT_ELF) $(UEFI_EFI) $(KERNEL_ELF) $(USERLAND_INIT_ELF) $(USERLAND_SHELL_ELF) $(USERLAND_ARGS_ELF) $(USERLAND_ENV_ELF) $(USERLAND_CAT_ELF) $(USERLAND_PWD_ELF) $(USERLAND_MKDIR_ELF) $(USERLAND_RM_ELF) $(USERLAND_RMDIR_ELF)
+all: $(CONTRACT_ELF) $(UEFI_EFI) $(KERNEL_ELF) $(USERLAND_INIT_ELF) $(USERLAND_SHELL_ELF) $(USERLAND_ARGS_ELF) $(USERLAND_ENV_ELF) $(USERLAND_CAT_ELF) $(USERLAND_PWD_ELF) $(USERLAND_MKDIR_ELF) $(USERLAND_RM_ELF) $(USERLAND_RMDIR_ELF) $(USERLAND_TOUCH_ELF)
 
 userland-test: $(USERLAND_INIT_ELF)
 	sh scripts/tests/sh/validate_userland.sh $(USERLAND_INIT_ELF)
@@ -159,6 +163,9 @@ rm-test: $(USERLAND_RM_ELF)
 
 rmdir-test: $(USERLAND_RMDIR_ELF)
 	sh scripts/tests/sh/validate_userland.sh $(USERLAND_RMDIR_ELF)
+
+touch-test: $(USERLAND_TOUCH_ELF)
+	sh scripts/tests/sh/validate_userland.sh $(USERLAND_TOUCH_ELF)
 
 $(SHELL_TEST): scripts/tests/c/shell_contract.c userland/shell/shell.c userland/shell/shell.h
 	$(CC) -std=c11 -Wall -Wextra -Werror -I. -o $@ scripts/tests/c/shell_contract.c userland/shell/shell.c
@@ -260,6 +267,16 @@ $(USERLAND_RMDIR_MAIN_OBJ): userland/apps/rmdir/main.c userland/lib/os.h | $(BUI
 
 $(USERLAND_RMDIR_ELF): $(USERLAND_RMDIR_START_OBJ) $(USERLAND_RMDIR_MAIN_OBJ) $(USERLAND_SYSCALL_OBJ) $(USERLAND_RMDIR_LD) | $(BUILD_DIR)/userland
 	$(LD) -m elf_x86_64 -T $(USERLAND_RMDIR_LD) --build-id=none -o $@ $(USERLAND_RMDIR_START_OBJ) $(USERLAND_RMDIR_MAIN_OBJ) $(USERLAND_SYSCALL_OBJ)
+
+$(USERLAND_TOUCH_START_OBJ): userland/apps/touch/start.asm | $(BUILD_DIR)/userland
+	$(NASM) -f elf64 $< -o $@
+
+$(USERLAND_TOUCH_MAIN_OBJ): userland/apps/touch/main.c userland/lib/os.h | $(BUILD_DIR)/userland
+	$(CC) -target x86_64-pc-none-elf -std=c11 -ffreestanding -fno-builtin \
+		-fno-stack-protector -fPIE -fno-plt -mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@
+
+$(USERLAND_TOUCH_ELF): $(USERLAND_TOUCH_START_OBJ) $(USERLAND_TOUCH_MAIN_OBJ) $(USERLAND_SYSCALL_OBJ) $(USERLAND_TOUCH_LD) | $(BUILD_DIR)/userland
+	$(LD) -m elf_x86_64 -T $(USERLAND_TOUCH_LD) --build-id=none -o $@ $(USERLAND_TOUCH_START_OBJ) $(USERLAND_TOUCH_MAIN_OBJ) $(USERLAND_SYSCALL_OBJ)
 
 $(TEST_DIR):
 	mkdir -p $@
@@ -772,6 +789,7 @@ test: all image
 	$(MAKE) mkdir-test
 	$(MAKE) rm-test
 	$(MAKE) rmdir-test
+	$(MAKE) touch-test
 	$(MAKE) shell-test
 	$(MAKE) fat32-test
 	$(MAKE) exfat-test
@@ -888,8 +906,8 @@ $(FAT32_TEST): scripts/tests/c/fat32_contract.c kernel/fs/fat/fat32.c kernel/fs/
 
 image: $(IMAGE)
 
-$(IMAGE): $(UEFI_EFI) $(KERNEL_ELF) $(USERLAND_INIT_ELF) $(USERLAND_SHELL_ELF) $(USERLAND_ARGS_ELF) $(USERLAND_ENV_ELF) $(USERLAND_CAT_ELF) $(USERLAND_PWD_ELF) $(USERLAND_MKDIR_ELF) $(USERLAND_RM_ELF) $(USERLAND_RMDIR_ELF) scripts/image/create_fat_image.py
-	python3 scripts/image/create_fat_image.py $(UEFI_EFI) $(KERNEL_ELF) $(USERLAND_INIT_ELF) $(USERLAND_SHELL_ELF) $(USERLAND_ARGS_ELF) $(USERLAND_ENV_ELF) $(USERLAND_CAT_ELF) $(USERLAND_PWD_ELF) $(USERLAND_MKDIR_ELF) $(USERLAND_RM_ELF) $(USERLAND_RMDIR_ELF) $@
+$(IMAGE): $(UEFI_EFI) $(KERNEL_ELF) $(USERLAND_INIT_ELF) $(USERLAND_SHELL_ELF) $(USERLAND_ARGS_ELF) $(USERLAND_ENV_ELF) $(USERLAND_CAT_ELF) $(USERLAND_PWD_ELF) $(USERLAND_MKDIR_ELF) $(USERLAND_RM_ELF) $(USERLAND_RMDIR_ELF) $(USERLAND_TOUCH_ELF) scripts/image/create_fat_image.py
+	python3 scripts/image/create_fat_image.py $(UEFI_EFI) $(KERNEL_ELF) $(USERLAND_INIT_ELF) $(USERLAND_SHELL_ELF) $(USERLAND_ARGS_ELF) $(USERLAND_ENV_ELF) $(USERLAND_CAT_ELF) $(USERLAND_PWD_ELF) $(USERLAND_MKDIR_ELF) $(USERLAND_RM_ELF) $(USERLAND_RMDIR_ELF) $(USERLAND_TOUCH_ELF) $@
 	sh scripts/tests/sh/validate_image.sh $@
 
 qemu-test: $(IMAGE)

@@ -87,6 +87,7 @@ kernel gate below is explicitly marked complete.
 - [x] Add shell `which` executable discovery through inherited `PATH`.
 - [x] Add shell line editing for backspace/delete and cancel-line controls.
 - [x] Add the first standalone ring-3 argument-printing utility to the image.
+- [x] Pass inherited environment strings through spawned-process `envp`.
 - [ ] Add reliable QEMU live keyboard verification for `run INIT.ELF`.
 - [ ] Add the command-line shell and terminal/console I/O.
 - [ ] Add process tools and initial utilities (`init`, `echo`, `ls`, `cat`,

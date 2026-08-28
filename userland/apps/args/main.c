@@ -6,7 +6,8 @@ static uint64_t length(const char *text) {
     return result;
 }
 
-int args_main(uint64_t argc, char **argv) {
+int args_main(uint64_t argc, char **argv, char **environment) {
+    if (!environment) os_exit(1);
     for (uint64_t index = 1; index < argc; ++index) {
         uint64_t size = length(argv[index]);
         if (os_write(1, argv[index], size) != size) os_exit(1);

@@ -533,6 +533,10 @@ int process_prepare_user_stack(process_t *process, const char *path,
     while (path[path_length] && path_length < 256U) ++path_length;
     while (arguments[argument_length] && argument_length < 256U) ++argument_length;
     if (path[path_length] || arguments[argument_length]) return 0;
+    uint32_t environment_length = 0;
+    while (environment_length < PROCESS_ENVIRONMENT_SIZE &&
+           process->environment[environment_length]) ++environment_length;
+    if (environment_length == PROCESS_ENVIRONMENT_SIZE) return 0;
     uint32_t starts[8] = {0};
     uint32_t lengths[8] = {0};
     uint32_t argument_count = 0;
@@ -564,11 +568,18 @@ int process_prepare_user_stack(process_t *process, const char *path,
     uint64_t path_address = cursor;
     if (!process_user_stack_write(process, cursor, path, path_length + 1U))
         return 0;
-    uint64_t value_count = 3U + argument_count;
+    cursor -= environment_length + 1U;
+    uint64_t environment_address = cursor;
+    if (!process_user_stack_write(process, cursor, process->environment,
+                                   environment_length + 1U)) return 0;
+    uint64_t value_count = 5U + argument_count;
     cursor = (cursor - value_count * sizeof(uint64_t)) & ~0xfULL;
-    uint64_t values[11] = {1U + argument_count, path_address};
+    uint64_t values[16] = {1U + argument_count, path_address};
     for (uint32_t index = 0; index < argument_count; ++index)
         values[2U + index] = argument_addresses[index];
+    values[2U + argument_count] = 0;
+    values[3U + argument_count] = environment_address;
+    values[4U + argument_count] = 0;
     if (!process_user_stack_write(process, cursor, values,
                                   value_count * sizeof(uint64_t)))
         return 0;

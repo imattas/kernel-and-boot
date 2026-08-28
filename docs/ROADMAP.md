@@ -1588,6 +1588,8 @@ The terminal input loop now has a bounded line editor with backspace/delete,
 Ctrl-U clear-line, and Ctrl-C cancel-line behavior.
 The first standalone ring-3 `ARGS.ELF` utility is now built and packaged in
 the FAT32 root, providing an executable path for validating argument delivery.
+Spawned programs now receive the inherited environment block through a
+conventional `envp` pointer after their `argv` vector.
 
 ## Phase 10 — BIOS boot path
 

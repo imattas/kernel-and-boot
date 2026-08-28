@@ -93,6 +93,7 @@ kernel gate below is explicitly marked complete.
 - [x] Add standalone `PWD.ELF` utility using the working-directory ABI.
 - [x] Add standalone `MKDIR.ELF` utility using the directory-creation ABI.
 - [x] Add standalone `RM.ELF` utility using the unlink ABI.
+- [x] Add standalone `RMDIR.ELF` utility using the directory-removal ABI.
 - [ ] Add reliable QEMU live keyboard verification for `run INIT.ELF`.
 - [ ] Add the command-line shell and terminal/console I/O.
 - [ ] Add process tools and initial utilities (`init`, `echo`, `ls`, `cat`,

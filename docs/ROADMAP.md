@@ -1600,6 +1600,8 @@ The standalone `MKDIR.ELF` utility now exercises userland directory creation
 and is packaged in the boot image.
 The standalone `RM.ELF` utility now exercises userland file removal and is
 packaged in the boot image.
+The standalone `RMDIR.ELF` utility now exercises userland directory removal
+and is packaged in the boot image.
 
 ## Phase 10 — BIOS boot path
 

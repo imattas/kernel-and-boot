@@ -91,6 +91,7 @@ the init-owned shell supervisor remains the next kernel/userland boundary.
 - [x] Add shell `export NAME=VALUE` environment assignment syntax.
 - [x] Extend standalone `env` with bounded assignment-and-command execution.
 - [x] Centralize bounded `NAME=VALUE` parsing in the freestanding runtime.
+- [x] Add standalone `unsetenv.elf` and expose it through the FAT32 VFS.
 - [x] Reject malformed shell pipeline, redirection, and background operators
   before process launch.
 - [x] Preserve direct external utility commands through pipeline and

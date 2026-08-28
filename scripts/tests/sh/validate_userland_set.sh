@@ -16,5 +16,5 @@ for elf in "$root"/*.elf; do
     readelf -s "$elf" | grep -E '[[:space:]]_start$' >/dev/null
     count=$((count + 1))
 done
-test "$count" -ge 45
+test "$count" -ge 46
 echo "userland ELF set contract: PASS ($count artifacts)"

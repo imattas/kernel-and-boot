@@ -1815,6 +1815,10 @@ Bounded environment-assignment parsing is now shared by standalone utilities
 through the freestanding runtime, with malformed empty-name assignments rejected
 by the runtime contract.
 
+The environment utility set now includes standalone `unsetenv.elf`, which
+removes one or more inherited variables through the normal syscall ABI and is
+packaged in the FAT32 image and live VFS namespace.
+
 Shell operator validation now rejects empty pipeline/redirection operands,
 non-terminal background markers, unterminated quoting, and trailing escapes
 before any process-launch path is selected.

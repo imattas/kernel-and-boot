@@ -56,7 +56,8 @@ static int xfs_agf_view(const uint8_t *agf, xfs_agf_view_t *view) {
         view->longest = be32(&agf[44]);
         view->authentic = 0;
     }
-    return view->bno_root != 0U && view->bno_level != 0U;
+    return view->bno_root != 0U && view->bno_level != 0U &&
+           (!view->authentic || view->cnt_root != 0U);
 }
 
 static int xfs_bno_layout(const uint8_t *tree, uint32_t block_size,

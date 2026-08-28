@@ -1975,5 +1975,5 @@ working-directory ABI.
 
 The initial predicate utility `test.elf` is now built into the userland image.
 It provides bounded `PATH`-resolvable existence (`-e`), non-empty (`-n`), and
-string equality predicates with conventional zero/one/two exit statuses for
-shell conditionals.
+string equality predicates, plus regular-file (`-f`) and directory (`-d`)
+checks, with conventional zero/one/two exit statuses for shell conditionals.

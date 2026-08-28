@@ -71,6 +71,7 @@ The shell directory-navigation slice now supports `cd` with no operand.
 
 The first shell predicate utility is now packaged as `test.elf`, supporting
 bounded existence, non-empty-string, and equality predicates.
+It also distinguishes regular files and directories with `-f` and `-d`.
 
 - [x] Add a small userland runtime layer for shared argument parsing, status
   handling, and diagnostic output across standalone applications.

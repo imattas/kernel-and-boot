@@ -1,6 +1,7 @@
 #ifndef OS_KERNEL_FS_BTRFS_H
 #define OS_KERNEL_FS_BTRFS_H
 #include <stdint.h>
+#include "../../core/sync/spinlock.h"
 #define BTRFS_MAX_SYSTEM_CHUNKS 64U
 #define BTRFS_MAX_DEVICES 8U
 
@@ -33,6 +34,7 @@ typedef struct {
     uint32_t device_count;
     btrfs_chunk_t chunks[BTRFS_MAX_SYSTEM_CHUNKS];
     uint32_t chunk_count;
+    spinlock_t write_lock;
     uint8_t mounted;
 } btrfs_fs_t;
 

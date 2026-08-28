@@ -274,7 +274,8 @@ int btrfs_mount(btrfs_fs_t *fs, uint32_t device) {
         (root % sector_size) != 0 || (chunk_root % sector_size) != 0) return 0;
     fs->device = device; fs->sector_size = sector_size; fs->node_size = node_size;
     fs->total_bytes = total_bytes; fs->root_bytenr = root; fs->chunk_count = 0;
-    fs->chunk_root_bytenr = chunk_root; fs->mounted = 1; fs->device_count = 0;
+    fs->chunk_root_bytenr = chunk_root; spinlock_init(&fs->write_lock);
+    fs->mounted = 1; fs->device_count = 0;
     for (uint32_t i = 0; i < sizeof(fs->fsid); ++i) fs->fsid[i] = sb[0x20 + i];
     fs->primary_devid = le64(&sb[0x100]);
     if (fs->primary_devid == 0) fs->primary_devid = 1;
@@ -906,7 +907,7 @@ int btrfs_read_file(btrfs_fs_t *fs, uint64_t tree_bytenr, uint64_t inode,
     return 1;
 }
 
-int btrfs_write_file(btrfs_fs_t *fs, uint64_t tree_bytenr, uint64_t inode,
+static int btrfs_write_file_unlocked(btrfs_fs_t *fs, uint64_t tree_bytenr, uint64_t inode,
                      uint64_t offset, const void *buffer, uint32_t size) {
     uint64_t file_size = 0; uint32_t mode = 0;
     uint8_t extent[53], data[4096], original[4096];
@@ -982,7 +983,17 @@ int btrfs_write_file(btrfs_fs_t *fs, uint64_t tree_bytenr, uint64_t inode,
     return 1;
 }
 
-int btrfs_truncate_file(btrfs_fs_t *fs, uint64_t tree_bytenr, uint64_t inode,
+int btrfs_write_file(btrfs_fs_t *fs, uint64_t tree_bytenr, uint64_t inode,
+                     uint64_t offset, const void *buffer, uint32_t size) {
+    if (!fs) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&fs->write_lock);
+    int result = btrfs_write_file_unlocked(fs, tree_bytenr, inode, offset,
+                                           buffer, size);
+    spinlock_unlock_irqrestore(&fs->write_lock, flags);
+    return result;
+}
+
+static int btrfs_truncate_file_unlocked(btrfs_fs_t *fs, uint64_t tree_bytenr, uint64_t inode,
                         uint64_t size) {
     uint64_t old_size = 0; uint32_t mode = 0;
     uint8_t extent[53];
@@ -994,4 +1005,13 @@ int btrfs_truncate_file(btrfs_fs_t *fs, uint64_t tree_bytenr, uint64_t inode,
         extent[17] != 0 || extent[18] != 0 || extent[20] != 0)
         return 0;
     return btrfs_update_inode_size(fs, tree_bytenr, inode, size, 0);
+}
+
+int btrfs_truncate_file(btrfs_fs_t *fs, uint64_t tree_bytenr, uint64_t inode,
+                        uint64_t size) {
+    if (!fs) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&fs->write_lock);
+    int result = btrfs_truncate_file_unlocked(fs, tree_bytenr, inode, size);
+    spinlock_unlock_irqrestore(&fs->write_lock, flags);
+    return result;
 }

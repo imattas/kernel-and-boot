@@ -14,6 +14,9 @@ typedef struct {
     uint8_t inode_per_block_log;
     uint64_t block_count;
     uint64_t root_inode;
+    uint64_t journal_start;
+    uint32_t journal_blocks;
+    uint64_t journal_sequence;
     uint8_t mounted;
 } xfs_fs_t;
 

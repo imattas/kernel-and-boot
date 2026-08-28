@@ -4,8 +4,8 @@
 #include "kernel/fs/xfs/xfs.h"
 #include "kernel/drivers/storage/storage.h"
 
-static uint8_t image[512U * 128U];
-static uint8_t snapshot[512U * 128U];
+static uint8_t image[512U * 256U];
+static uint8_t snapshot[512U * 256U];
 static uint32_t flush_calls;
 static uint32_t write_calls;
 static uint32_t fail_write_call = UINT32_MAX;
@@ -20,11 +20,11 @@ static uint32_t g32(const uint8_t *p) {
            ((uint32_t)p[2] << 8) | p[3];
 }
 static int rd(uint64_t lba, uint32_t n, void *p) {
-    if (lba + n > 128U) return 0;
+    if (lba + n > 256U) return 0;
     memcpy(p, image + lba * 512U, n * 512U); return 1;
 }
 static int wr(uint64_t lba, uint32_t n, const void *p) {
-    if (lba + n > 128U) return 0;
+    if (lba + n > 256U) return 0;
     if (write_calls++ == fail_write_call) {
         fail_write_call = UINT32_MAX;
         return 0;
@@ -41,8 +41,9 @@ static void leaf(uint8_t *p, uint32_t start, uint32_t count) {
 
 int main(void) {
     memset(image, 0, sizeof(image));
-    p32(&image[0], 0x58465342U); p32(&image[4], 4096); p64(&image[8], 16);
-    p16(&image[102], 512); p32(&image[84], 16); p32(&image[88], 1);
+    p32(&image[0], 0x58465342U); p32(&image[4], 4096); p64(&image[8], 32);
+    p64(&image[40], 20); p16(&image[102], 512); p32(&image[84], 16); p32(&image[88], 2);
+    p32(&image[96], 12);
     p16(&image[100], 4); p16(&image[104], 256); p16(&image[106], 16);
     image[108] = 12; image[110] = 8; image[111] = 4; image[112] = 4;
     p64(&image[56], 128);
@@ -53,7 +54,7 @@ int main(void) {
     leaf(&image[2U * 4096U], 10, 3); leaf(&image[3U * 4096U], 10, 3);
     storage_initialize();
     storage_device_t device = {.name = "xfs-auth", .block_size = 512,
-                               .block_count = 128, .read = rd, .write = wr,
+                               .block_count = 256, .read = rd, .write = wr,
                                .flush = flush};
     assert(storage_register(&device));
     xfs_fs_t fs;
@@ -181,8 +182,19 @@ int main(void) {
     assert(((bno_root[6] << 8) | bno_root[7]) == 1 &&
            g32(&bno_root[16]) == 2 && g32(&agf[52]) == 1);
     memcpy(snapshot, image, sizeof(image));
-    fail_write_call = write_calls + 2U;
+    fail_write_call = write_calls + 15U;
     assert(!xfs_allocate_extent(&fs, 0, 1, &start));
     assert(memcmp(snapshot, image, sizeof(image)) == 0);
+    /* Simulate a committed journal surviving a crash: mount replays the
+     * payload before validating the allocation-group indexes. */
+    uint8_t *journal = &image[20U * 4096U];
+    uint8_t *payload = &image[21U * 4096U];
+    memset(journal, 0, 4096); memset(payload, 0, 4096);
+    p32(journal, 0x584A4E4CU); p64(&journal[4], 1); p32(&journal[12], 2);
+    p32(&journal[16], 1); p64(&journal[24], 5);
+    leaf(payload, 2, 1); memset(&image[5U * 4096U], 0, 4096);
+    assert(xfs_mount(&fs, 0));
+    assert(g32(&image[5U * 4096U + 16]) == 2 && g32(&image[5U * 4096U + 20]) == 1);
+    assert(g32(journal) == 0);
     return 0;
 }

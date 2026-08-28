@@ -13,6 +13,10 @@
 #define XFS_BNO_MAGIC 0x58414254U
 #define XFS_BNO_MAGIC_V3 0x58414233U
 #define XFS_BNO_MAGIC_REAL 0x41425442U
+#define XFS_JOURNAL_MAGIC 0x584A4E4CU
+#define XFS_JOURNAL_PREPARE 1U
+#define XFS_JOURNAL_COMMIT 2U
+#define XFS_JOURNAL_MAX_BLOCKS 12U
 
 static uint32_t be32(const uint8_t *p);
 static uint16_t be16(const uint8_t *p);
@@ -88,6 +92,10 @@ static void xfs_bno_store_records(uint8_t *tree,
 
 static int xfs_read_block(const xfs_fs_t *fs, uint64_t block, void *buffer);
 static int xfs_write_block(const xfs_fs_t *fs, uint64_t block, const void *buffer);
+static int xfs_journal_recover(xfs_fs_t *fs);
+static int xfs_journal_clear(xfs_fs_t *fs);
+static int xfs_journal_prepare(xfs_fs_t *fs, const uint64_t *targets,
+                               const uint8_t *const *images, uint32_t records);
 static int xfs_flush_metadata(const xfs_fs_t *fs) {
     const storage_device_t *device = fs ? storage_device_at(fs->device) : 0;
     return device && (!device->flush || storage_flush(fs->device));
@@ -458,6 +466,29 @@ static int xfs_auth_multi_child_mutate(xfs_fs_t *fs, uint32_t agno,
         store_be32(&cnt_root[pointer_offset + i * 4U], cchild);
         bpos += bn; cpos += cn;
     }
+    uint64_t journal_targets[XFS_JOURNAL_MAX_BLOCKS];
+    const uint8_t *journal_images[XFS_JOURNAL_MAX_BLOCKS];
+    uint32_t journal_records = 0;
+    for (uint32_t i = 0; i < children; ++i) {
+        journal_targets[journal_records] = ag_base +
+            be32(&original_bno_root[pointer_offset + i * 4U]);
+        journal_images[journal_records++] = bno_leaf[i];
+        journal_targets[journal_records] = ag_base +
+            be32(&original_cnt_root[pointer_offset + i * 4U]);
+        journal_images[journal_records++] = cnt_leaf[i];
+    }
+    journal_targets[journal_records] = ag_base + view.bno_root;
+    journal_images[journal_records++] = bno_root;
+    journal_targets[journal_records] = ag_base + view.cnt_root;
+    journal_images[journal_records++] = cnt_root;
+    journal_targets[journal_records] = ag_base + 1U;
+    journal_images[journal_records++] = agf;
+    int journal_active = 0;
+    if (fs->journal_blocks) {
+        if (!xfs_journal_prepare(fs, journal_targets, journal_images, journal_records))
+            return xfs_journal_clear(fs);
+        journal_active = 1;
+    }
     int publication_ok = 1;
     for (uint32_t i = 0; i < children; ++i) {
         publication_ok = publication_ok &&
@@ -469,6 +500,7 @@ static int xfs_auth_multi_child_mutate(xfs_fs_t *fs, uint32_t agno,
     if (!publication_ok || !xfs_write_block(fs, ag_base + view.bno_root, bno_root) ||
         !xfs_write_block(fs, ag_base + view.cnt_root, cnt_root) ||
         !xfs_write_block(fs, ag_base + 1U, agf) || !xfs_flush_metadata(fs)) goto rollback;
+    if (journal_active && !xfs_journal_clear(fs)) return 0;
     return 1;
 rollback:
     (void)xfs_write_block(fs, ag_base + view.bno_root, original_bno_root);
@@ -478,6 +510,7 @@ rollback:
         (void)xfs_write_block(fs, ag_base + be32(&original_bno_root[pointer_offset + i * 4U]), original_bno_leaf[i]);
         (void)xfs_write_block(fs, ag_base + be32(&original_cnt_root[pointer_offset + i * 4U]), original_cnt_leaf[i]);
     }
+    if (journal_active) (void)xfs_journal_clear(fs);
     return 0;
 }
 
@@ -1026,6 +1059,8 @@ int xfs_mount(xfs_fs_t *fs, uint32_t device) {
     if (!storage_read(device, 0, 1, sb) || be32(&sb[0]) != XFS_SB_MAGIC) return 0;
     uint32_t block_size = be32(&sb[4]);
     uint64_t blocks = be64(&sb[8]);
+    uint64_t journal_start = be64(&sb[40]);
+    uint32_t journal_blocks = be32(&sb[96]);
     uint32_t ag_blocks = be32(&sb[84]);
     uint32_t ag_count = be32(&sb[88]);
     uint32_t inode_size = be16(&sb[104]);
@@ -1042,12 +1077,17 @@ int xfs_mount(xfs_fs_t *fs, uint32_t device) {
         inopblock_log > 4 || (1U << block_log) != block_size ||
         (1U << inode_log) != inode_size || (1U << inopblock_log) != (block_size / inode_size) ||
         (uint64_t)ag_blocks * ag_count < blocks ||
+        ((journal_start == 0) != (journal_blocks == 0)) ||
+        (journal_start != 0 && (journal_start >= blocks || journal_blocks < 2U ||
+                                journal_blocks > blocks - journal_start)) ||
         blocks > storage_device_at(device)->block_count / (block_size / XFS_SECTOR_SIZE)) return 0;
     spinlock_init(&fs->lock);
     fs->device = device; fs->block_size = block_size; fs->inode_size = inode_size;
     fs->ag_count = ag_count; fs->ag_blocks = ag_blocks; fs->block_count = blocks;
     fs->ag_block_log = sb[112]; fs->inode_per_block_log = inopblock_log;
-    fs->root_inode = be64(&sb[56]); fs->mounted = 1;
+    fs->root_inode = be64(&sb[56]); fs->journal_start = journal_start;
+    fs->journal_blocks = journal_blocks; fs->journal_sequence = 0; fs->mounted = 1;
+    if (!xfs_journal_recover(fs)) { fs->mounted = 0; return 0; }
     for (uint32_t agno = 0; agno < fs->ag_count; ++agno) {
         uint8_t agf[4096];
         xfs_agf_view_t view;
@@ -1080,6 +1120,64 @@ static int xfs_write_block(const xfs_fs_t *fs, uint64_t block, const void *buffe
     return fs && buffer && sectors != 0 && block < fs->block_count &&
            block <= UINT64_MAX / sectors &&
            storage_write(fs->device, block * sectors, sectors, buffer);
+}
+
+static int xfs_journal_configured(const xfs_fs_t *fs, uint32_t records) {
+    return fs && fs->journal_blocks >= records + 1U &&
+           fs->journal_blocks >= 2U && fs->journal_start < fs->block_count &&
+           fs->journal_blocks <= fs->block_count - fs->journal_start &&
+           records <= XFS_JOURNAL_MAX_BLOCKS;
+}
+
+static int xfs_journal_clear(xfs_fs_t *fs) {
+    uint8_t header[4096];
+    memset(header, 0, fs->block_size);
+    for (uint32_t i = 0; i < fs->journal_blocks; ++i)
+        if (!xfs_write_block(fs, fs->journal_start + i, header)) return 0;
+    return xfs_flush_metadata(fs);
+}
+
+static int xfs_journal_prepare(xfs_fs_t *fs, const uint64_t *targets,
+                               const uint8_t *const *images, uint32_t records) {
+    uint8_t header[4096];
+    if (!xfs_journal_configured(fs, records) || !targets || !images) return 0;
+    for (uint32_t i = 0; i < records; ++i)
+        if (targets[i] >= fs->block_count ||
+            (targets[i] >= fs->journal_start &&
+             targets[i] < fs->journal_start + fs->journal_blocks)) return 0;
+    memset(header, 0, fs->block_size);
+    store_be32(header, XFS_JOURNAL_MAGIC);
+    store_be64(&header[4], ++fs->journal_sequence);
+    store_be32(&header[12], XFS_JOURNAL_PREPARE);
+    store_be32(&header[16], records);
+    for (uint32_t i = 0; i < records; ++i) store_be64(&header[24U + i * 8U], targets[i]);
+    if (!xfs_write_block(fs, fs->journal_start, header)) return 0;
+    for (uint32_t i = 0; i < records; ++i)
+        if (!xfs_write_block(fs, fs->journal_start + 1U + i, images[i])) return 0;
+    if (!xfs_flush_metadata(fs)) return 0;
+    store_be32(&header[12], XFS_JOURNAL_COMMIT);
+    return xfs_write_block(fs, fs->journal_start, header) && xfs_flush_metadata(fs);
+}
+
+static int xfs_journal_recover(xfs_fs_t *fs) {
+    uint8_t header[4096], image[4096];
+    if (!fs || !fs->journal_blocks || fs->journal_start >= fs->block_count ||
+        fs->journal_blocks > fs->block_count - fs->journal_start ||
+        !xfs_read_block(fs, fs->journal_start, header) ||
+        be32(header) != XFS_JOURNAL_MAGIC) return 1;
+    uint32_t state = be32(&header[12]), records = be32(&header[16]);
+    if (records == 0 || records > XFS_JOURNAL_MAX_BLOCKS ||
+        !xfs_journal_configured(fs, records)) return 0;
+    if (state == XFS_JOURNAL_COMMIT) {
+        for (uint32_t i = 0; i < records; ++i) {
+            uint64_t target = be64(&header[24U + i * 8U]);
+            if (target >= fs->block_count ||
+                !xfs_read_block(fs, fs->journal_start + 1U + i, image) ||
+                !xfs_write_block(fs, target, image)) return 0;
+        }
+        if (!xfs_flush_metadata(fs)) return 0;
+    } else if (state != XFS_JOURNAL_PREPARE) return 0;
+    return xfs_journal_clear(fs);
 }
 
 /* The existing two-level path handles a root and leaf set.  Keep the deeper

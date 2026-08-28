@@ -1212,7 +1212,9 @@ and release now update both indexes and AGF counters with rollback on failed
 publication. Authenticated level-2 roots now also support a bounded four-child
 transaction: all child leaves, both index roots, and the AGF are redistributed
 and restored together when publication fails, including empty-child collapse
-and later repopulation. Larger fan-out trees and durable crash-recovery
+and later repopulation. The authenticated allocator now has a bounded
+on-disk intent journal with prepare/commit ordering, payload clearing, and
+mount-time committed replay. Larger fan-out trees and full filesystem-wide
 transaction logging remain pending; a device flush is a persistence barrier,
 not a recovery log. Nested empty-child transitions can now be repopulated
 without leaving invalid AGF/CNT metadata. Authentic metadata

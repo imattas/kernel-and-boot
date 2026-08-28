@@ -9,7 +9,8 @@
 typedef enum {
     INPUT_EVENT_KEY,
     INPUT_EVENT_BUTTON,
-    INPUT_EVENT_AXIS
+    INPUT_EVENT_AXIS,
+    INPUT_EVENT_TEXT
 } input_event_type_t;
 
 typedef struct {
@@ -35,5 +36,7 @@ int input_queue_pop(input_queue_t *queue, input_event_t *event);
 uint32_t input_queue_count(const input_queue_t *queue);
 void input_set_standard_queue(input_queue_t *queue);
 uint32_t input_read_standard(void *buffer, uint32_t capacity);
+int input_queue_push_text(input_queue_t *queue, const char *text,
+                          uint32_t length, uint64_t timestamp);
 
 #endif

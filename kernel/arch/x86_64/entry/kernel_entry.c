@@ -132,6 +132,12 @@ static void network_runtime_task(void *argument) {
 static void input_runtime_task(void *argument) {
     (void)argument;
     for (;;) {
+        char serial_input[16];
+        uint32_t serial_count = serial_poll_input(serial_input,
+                                                  sizeof(serial_input));
+        if (serial_count != 0)
+            (void)input_queue_push_text(input_runtime_queue, serial_input,
+                                        serial_count, timer_ticks());
         if (input_runtime_ready && input_runtime_pending) {
             int completed = uhci_interrupt_poll();
             if (completed > 0) {
@@ -318,6 +324,7 @@ void kernel_main(void *boot_info) {
     kernel_init_state_initialize(&init_state);
     serial_init();
     serial_write("serial driver ready\r\n");
+    serial_write("serial input bridge ready\r\n");
     kernel_init_state_t invalid_init;
     kernel_init_state_initialize(&invalid_init);
     if (kernel_init_state_advance(&invalid_init, KERNEL_INIT_MEMORY)) {

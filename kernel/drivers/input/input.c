@@ -93,9 +93,24 @@ uint32_t input_read_standard(void *buffer, uint32_t capacity) {
     uint32_t count = 0;
     input_event_t event;
     while (count < capacity && input_queue_pop(standard_queue, &event)) {
-        if (event.type != INPUT_EVENT_KEY || event.value == 0) continue;
-        char value = key_to_ascii(event.code);
+        if (event.value == 0) continue;
+        char value = event.type == INPUT_EVENT_TEXT ? (char)event.code :
+                     event.type == INPUT_EVENT_KEY ? key_to_ascii(event.code) : 0;
         if (value) output[count++] = (uint8_t)value;
     }
     return count;
+}
+
+int input_queue_push_text(input_queue_t *queue, const char *text,
+                          uint32_t length, uint64_t timestamp) {
+    if (!queue || !text || length == 0 || length > INPUT_EVENT_CAPACITY)
+        return 0;
+    input_event_t events[INPUT_EVENT_CAPACITY];
+    for (uint32_t index = 0; index < length; ++index) {
+        if (text[index] == 0) return 0;
+        events[index] = (input_event_t){INPUT_EVENT_TEXT,
+                                        (uint16_t)(uint8_t)text[index], 1,
+                                        timestamp};
+    }
+    return input_queue_push_batch(queue, events, length);
 }

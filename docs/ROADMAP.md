@@ -1614,6 +1614,10 @@ the packaged kernel image.
 The process environment now supports bounded multi-entry updates through
 `setenv`, and spawned user programs receive each inherited entry in `envp[]`.
 The shell also supports bounded `unsetenv <key>` removal from that environment.
+The kernel now polls the configured COM1 serial console and feeds bounded input
+bytes into the same standard-input queue used by the shell, providing a
+terminal path without changing the userland ABI. A live QEMU typed-command
+probe remains a separate verification item.
 The FAT32 image builder now chains a second root-directory cluster, removing
 the one-sector root-entry ceiling for continued userland growth.
 The standalone `ECHO.ELF` utility is now stored in the expanded root directory

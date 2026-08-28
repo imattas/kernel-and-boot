@@ -5,6 +5,7 @@ log=${1:?usage: validate_qemu.sh <serial-log>}
 test -f "$log"
 grep -F 'os UEFI loader' "$log" >/dev/null
 grep -F 'serial driver ready' "$log" >/dev/null
+grep -F 'serial input bridge ready' "$log" >/dev/null
 grep -F 'firmware boot contract ready' "$log" >/dev/null
 grep -F 'physical frame hygiene ready' "$log" >/dev/null
 grep -F 'physical contiguous frames ready' "$log" >/dev/null

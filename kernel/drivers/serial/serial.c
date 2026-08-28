@@ -7,6 +7,12 @@ static void out8(uint16_t port, uint8_t value) {
     __asm__ volatile ("outb %0, %1" :: "a"(value), "Nd"(port));
 }
 
+static uint8_t in8(uint16_t port) {
+    uint8_t value;
+    __asm__ volatile ("inb %1, %0" : "=a"(value) : "Nd"(port));
+    return value;
+}
+
 static void putc_serial(char value) { out8(SERIAL_COM1, (uint8_t)value); }
 static volatile uint32_t serial_lock;
 
@@ -35,6 +41,14 @@ void serial_init(void) {
     out8(SERIAL_COM1 + 3, 3);
     out8(SERIAL_COM1 + 2, 0xc7);
     out8(SERIAL_COM1 + 4, 0x0b);
+}
+
+uint32_t serial_poll_input(char *buffer, uint32_t capacity) {
+    if (!buffer || capacity == 0) return 0;
+    uint32_t count = 0;
+    while (count < capacity && (in8(SERIAL_COM1 + 5) & 1U) != 0)
+        buffer[count++] = (char)in8(SERIAL_COM1);
+    return count;
 }
 
 void serial_write(const char *message) {

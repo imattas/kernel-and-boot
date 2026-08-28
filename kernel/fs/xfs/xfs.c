@@ -428,7 +428,9 @@ static int xfs_deep_scan(xfs_deep_bno_context_t *context, uint32_t block,
             if (count == 0 || key > context->fs->ag_blocks - count ||
                 child == 0 || child >= context->fs->ag_blocks ||
                 (i != 0 && key < be32(&node[16U + (i - 1U) * 8U]))) return 0;
-            if (!xfs_deep_scan(context, child, level - 1U, depth + 1U)) return 0;
+            if (!xfs_deep_scan(context, child, level - 1U, depth + 1U) ||
+                key != be32(&context->path[depth + 1U][16]) ||
+                count != be32(&context->path[depth + 1U][20])) return 0;
         }
         return 1;
     }

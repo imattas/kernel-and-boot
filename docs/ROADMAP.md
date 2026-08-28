@@ -1823,6 +1823,9 @@ The shell now preserves the zero-argument `env` builtin while dispatching
 assignment-prefixed `env NAME=VALUE COMMAND` invocations to packaged `env.elf`
 through PATH resolution and the normal process ABI.
 
+Standalone `uptime.elf` now reports seconds and milliseconds from the kernel's
+monotonic clock syscall and is packaged in the FAT32 image and live VFS.
+
 The shell `unsetenv` builtin now removes multiple whitespace-separated variable
 names in one bounded command, matching the standalone utility's multi-operand
 environment behavior.

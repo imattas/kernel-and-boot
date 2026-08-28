@@ -122,6 +122,7 @@ assert root_extension_second[480:491] == b'WHICH   ELF'
 assert int.from_bytes(root_extension_second[506:508], 'little') >= 5
 root_extension_third = data[(32 + 2 * 520 + 5) * 512:(32 + 2 * 520 + 6) * 512]
 assert root_extension_third[:11] == b'UNSETENVELF'
+assert root_extension_third[32:43] == b'UPTIME  ELF'
 assert int.from_bytes(root_extension_third[26:28], 'little') >= 5
 assert data[(33 + 2 * 520) * 512 + 64:(33 + 2 * 520) * 512 + 75] == b'BOOT       '
 assert data[(34 + 2 * 520) * 512 + 64:(34 + 2 * 520) * 512 + 75] == b'BOOTX64 EFI'

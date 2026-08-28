@@ -2190,11 +2190,15 @@ void kernel_main(void *boot_info) {
     static const char unsetenv_short_name[11] = {
         'U','N','S','E','T','E','N','V','E','L','F'
     };
+    static const char uptime_short_name[11] = {
+        'U','P','T','I','M','E',' ',' ','E','L','F'
+    };
     if (!fat32_vfs_attach_file(&fat32, vfs_root, mv_short_name, "mv.elf") ||
         !fat32_vfs_attach_file(&fat32, vfs_root, kill_short_name, "kill.elf") ||
         !fat32_vfs_attach_file(&fat32, vfs_root, sleep_short_name, "sleep.elf") ||
         !fat32_vfs_attach_file(&fat32, vfs_root, setenv_short_name, "setenv.elf") ||
-        !fat32_vfs_attach_file(&fat32, vfs_root, unsetenv_short_name, "unsetenv.elf")) {
+        !fat32_vfs_attach_file(&fat32, vfs_root, unsetenv_short_name, "unsetenv.elf") ||
+        !fat32_vfs_attach_file(&fat32, vfs_root, uptime_short_name, "uptime.elf")) {
         serial_write("userland process utility VFS attach failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }

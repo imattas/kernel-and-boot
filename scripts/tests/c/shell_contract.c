@@ -17,6 +17,8 @@ int main(void) {
     assert(strcmp(argument, "/tmp") == 0);
     assert(shell_parse("rm /tmp/file", 12, argument, sizeof(argument)) == SHELL_RM);
     assert(strcmp(argument, "/tmp/file") == 0);
+    assert(shell_parse("rmdir /tmp", 10, argument, sizeof(argument)) == SHELL_RMDIR);
+    assert(strcmp(argument, "/tmp") == 0);
     assert(shell_parse("exit", 4, argument, sizeof(argument)) == SHELL_EXIT);
     assert(shell_parse("wat", 3, argument, sizeof(argument)) == SHELL_UNKNOWN);
     assert(shell_parse("", 0, argument, sizeof(argument)) == SHELL_EMPTY);

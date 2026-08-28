@@ -1716,6 +1716,8 @@ Copy operations now preserve source mode metadata and reject identical source
 and destination paths in both the standalone and native shell implementations.
 The native shell `mkdir` command now supports bounded `mkdir -p` recursive
 creation and accepts already-existing directory parents.
+The native shell `rmdir` command now supports bounded `rmdir -p` cleanup of
+empty directory parents without attempting to remove the filesystem root.
 The shell now keeps a bounded eight-entry command history and handles split
 ANSI up/down escape sequences without feeding terminal control bytes into the
 command parser.

@@ -552,6 +552,18 @@ static int shell_mkdir_parents(char *path, uint32_t length) {
     return existing_directory;
 }
 
+static int shell_rmdir_parents(char *path, uint32_t length) {
+    if (!path || length == 0) return 0;
+    while (length > 1 && path[length - 1U] == '/') --length;
+    for (;;) {
+        if (os_rmdir(path, length) == OS_SYSCALL_ERROR) return 0;
+        uint32_t separator = length;
+        while (separator != 0 && path[separator - 1U] != '/') --separator;
+        if (separator == 0 || (separator == 1 && path[0] == '/')) return 1;
+        length = separator - 1U;
+    }
+}
+
 void shell_main(void) {
     static const char prompt[] = "os> ";
     static const char help[] = "help id ps env setenv unsetenv status true false jobs history fg which inherit echo pwd cd ls cat stat chmod kill sleep mv cp mkdir rm rmdir touch write run wait exit\r\n";
@@ -967,7 +979,19 @@ void shell_main(void) {
             } else if (command == SHELL_RMDIR) {
                 uint32_t argument_length = 0;
                 while (argument[argument_length]) ++argument_length;
-                if (os_rmdir(argument, argument_length) == OS_SYSCALL_ERROR)
+                int recursive = argument_length >= 3 && argument[0] == '-' &&
+                    argument[1] == 'p' &&
+                    (argument[2] == ' ' || argument[2] == '\t');
+                uint32_t path_start = recursive ? 2 : 0;
+                while (path_start < argument_length &&
+                       (argument[path_start] == ' ' || argument[path_start] == '\t'))
+                    ++path_start;
+                uint32_t path_length = argument_length - path_start;
+                int removed = recursive ? shell_rmdir_parents(argument + path_start,
+                                                               path_length) :
+                    path_length != 0 && os_rmdir(argument + path_start,
+                                                  path_length) != OS_SYSCALL_ERROR;
+                if (!removed)
                     print(unknown, sizeof(unknown) - 1U);
             } else if (command == SHELL_TOUCH) {
                 uint32_t argument_length = 0;

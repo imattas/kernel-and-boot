@@ -142,6 +142,7 @@ kernel gate below is explicitly marked complete.
 - [x] Add native shell `history` listing for the bounded command ring.
 - [x] Preserve source mode and reject same-path copies in `cp`.
 - [x] Add native shell `mkdir -p` recursive directory creation.
+- [x] Add native shell `rmdir -p` empty-parent cleanup.
 - [x] Add bounded shell command history with ANSI up/down navigation.
 - [x] Add bounded shell expansion for environment variables, `$?`, and `$$`
   with quote/escape-aware behavior.

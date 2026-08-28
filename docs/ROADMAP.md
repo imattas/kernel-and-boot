@@ -1973,6 +1973,10 @@ The shell `cd` command now accepts an empty operand and resolves it to the
 root directory, matching the normal shell default without changing the VFS
 working-directory ABI.
 
+Process teardown now releases each process lock before removing the process
+from the global process table, preserving the lock ordering used by activation
+and reducing the init-supervisor spawn deadlock surface.
+
 The initial predicate utility `test.elf` is now built into the userland image.
 It provides bounded `PATH`-resolvable existence (`-e`), non-empty (`-n`), and
 string equality predicates, plus regular-file (`-f`) and directory (`-d`)

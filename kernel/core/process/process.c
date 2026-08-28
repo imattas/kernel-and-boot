@@ -812,11 +812,11 @@ int process_destroy(process_t *process) {
     process->parent = 0;
     process->root_directory = 0;
     process->working_directory = 0;
+    spinlock_unlock_irqrestore(&process->lock, process_flags);
     uint64_t flags = spinlock_lock_irqsave(&process_table_lock);
     for (uint32_t i = 0; i < PROCESS_MAX; ++i)
         if (process_table[i] == process) process_table[i] = 0;
     spinlock_unlock_irqrestore(&process_table_lock, flags);
-    spinlock_unlock_irqrestore(&process->lock, process_flags);
     if (working) vfs_node_release(working);
     if (root) vfs_node_release(root);
     if (parent) process_release(parent);

@@ -1739,6 +1739,8 @@ length, complete descriptor writes, decimal parsing, and octal permission
 parsing for standalone utilities without adding a linker or syscall
 dependency. All packaged standalone applications now consume that shared
 runtime seam; their existing syscall contracts remain unchanged.
+Host contract coverage now exercises the shared parser and string-helper
+boundaries, including overflow, malformed input, and bounded octal modes.
 The shell now keeps a bounded eight-entry command history and handles split
 ANSI up/down escape sequences without feeding terminal control bytes into the
 command parser.

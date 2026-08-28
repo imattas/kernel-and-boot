@@ -99,6 +99,9 @@ shell_command_t shell_parse(const char *line, uint32_t length,
     if (same_word(line, command_length, "ls")) return SHELL_LS;
     if (same_word(line, command_length, "exit")) return SHELL_EXIT;
     if (!same_word(line, command_length, "cat") &&
+        !same_word(line, command_length, "head") &&
+        !same_word(line, command_length, "wc") &&
+        !same_word(line, command_length, "grep") &&
         !same_word(line, command_length, "mkdir") &&
         !same_word(line, command_length, "rm") &&
         !same_word(line, command_length, "rmdir") &&
@@ -131,6 +134,9 @@ shell_command_t shell_parse(const char *line, uint32_t length,
     argument[argument_length] = 0;
     if (same_word(line, command_length, "cd")) return SHELL_CD;
     if (same_word(line, command_length, "cat")) return SHELL_CAT;
+    if (same_word(line, command_length, "head")) return SHELL_HEAD;
+    if (same_word(line, command_length, "wc")) return SHELL_WC;
+    if (same_word(line, command_length, "grep")) return SHELL_GREP;
     if (same_word(line, command_length, "stat")) return SHELL_STAT;
     if (same_word(line, command_length, "chmod")) return SHELL_CHMOD;
     if (same_word(line, command_length, "kill")) return SHELL_KILL;

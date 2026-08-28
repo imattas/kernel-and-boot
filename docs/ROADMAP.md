@@ -1731,6 +1731,9 @@ The next utility, `wc.elf`, adds streaming line, word, and byte counting over
 the same descriptor boundary.
 The following `grep.elf` component adds bounded literal substring matching with
 line-oriented output and packaged VFS access.
+The shell now dispatches `head`, `wc`, and `grep` through one direct
+spawn/wait/reap utility path, so these applications are usable without the
+lower-level `run` command.
 The standalone `HELP.ELF` utility now provides the same command inventory through
 the external process path as the native shell `help` command.
 The complete `make test` gate now passes with the expanded 34-artifact

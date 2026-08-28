@@ -292,6 +292,19 @@ static uint32_t resolve_command(const char *name, uint32_t name_length,
     return 0;
 }
 
+static int shell_run_utility(const char *name, uint32_t name_length,
+                             char *arguments, int32_t *status) {
+    char path[128];
+    uint32_t path_length = resolve_command(name, name_length, path,
+                                           sizeof(path));
+    if (path_length == 0) return 0;
+    uint64_t process_id = os_spawn(path, path_length, arguments);
+    if (process_id == OS_SYSCALL_ERROR ||
+        os_wait(process_id, status) == OS_SYSCALL_ERROR ||
+        os_reap(process_id) == OS_SYSCALL_ERROR) return 0;
+    return 1;
+}
+
 static uint32_t shell_count_operator(const char *text, uint32_t length,
                                       char operator, uint32_t *first) {
     uint32_t count = 0;
@@ -871,6 +884,22 @@ void shell_main(void) {
                     if (read_result == OS_SYSCALL_ERROR)
                         print(unknown, sizeof(unknown) - 1U);
                     (void)os_close(descriptor);
+                }
+            } else if (command == SHELL_HEAD || command == SHELL_WC ||
+                       command == SHELL_GREP) {
+                const char *utility = command == SHELL_HEAD ? "head" :
+                    (command == SHELL_WC ? "wc" : "grep");
+                uint32_t utility_length = command == SHELL_WC ? 2U : 4U;
+                int32_t utility_status = 1;
+                if (!shell_run_utility(utility, utility_length, argument,
+                                        &utility_status)) {
+                    last_status = 1;
+                    print(unknown, sizeof(unknown) - 1U);
+                } else {
+                    last_status = utility_status;
+                    print("exit=", 5);
+                    print_status(utility_status);
+                    print("\r\n", 2);
                 }
             } else if (command == SHELL_CAT) {
                 uint32_t argument_length = 0;

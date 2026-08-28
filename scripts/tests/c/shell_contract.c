@@ -40,6 +40,12 @@ int main(void) {
     assert(shell_parse("ls", 2, argument, sizeof(argument)) == SHELL_LS);
     assert(shell_parse("cat /hello", 10, argument, sizeof(argument)) == SHELL_CAT);
     assert(strcmp(argument, "/hello") == 0);
+    assert(shell_parse("head /hello", 11, argument, sizeof(argument)) == SHELL_HEAD);
+    assert(strcmp(argument, "/hello") == 0);
+    assert(shell_parse("wc /hello", 9, argument, sizeof(argument)) == SHELL_WC);
+    assert(strcmp(argument, "/hello") == 0);
+    assert(shell_parse("grep needle /hello", 18, argument, sizeof(argument)) == SHELL_GREP);
+    assert(strcmp(argument, "needle /hello") == 0);
     assert(shell_parse("stat /hello", 11, argument, sizeof(argument)) == SHELL_STAT);
     assert(strcmp(argument, "/hello") == 0);
     assert(shell_parse("chmod 755 /hello", 16, argument, sizeof(argument)) == SHELL_CHMOD);

@@ -23,6 +23,7 @@ typedef enum {
     SHELL_KILL,
     SHELL_SLEEP,
     SHELL_MV,
+    SHELL_CP,
     SHELL_SETENV,
     SHELL_UNSETENV,
     SHELL_STATUS,

@@ -480,9 +480,38 @@ static int shell_run_input_redirect(char *text, uint32_t length,
     return 1;
 }
 
+static int shell_copy_file(const char *source_path, uint32_t source_length,
+                           const char *destination_path,
+                           uint32_t destination_length) {
+    uint64_t source = os_open(source_path, source_length, 1);
+    if (source == OS_SYSCALL_ERROR) return 0;
+    uint64_t destination = os_create(destination_path, destination_length, 3);
+    if (destination == OS_SYSCALL_ERROR) {
+        (void)os_close(source);
+        return 0;
+    }
+    char buffer[256];
+    for (;;) {
+        uint64_t count = os_file_read(source, buffer, sizeof(buffer));
+        if (count == OS_SYSCALL_ERROR) {
+            (void)os_close(source);
+            (void)os_close(destination);
+            return 0;
+        }
+        if (count == 0) break;
+        if (os_file_write(destination, buffer, count) != count) {
+            (void)os_close(source);
+            (void)os_close(destination);
+            return 0;
+        }
+    }
+    return os_close(source) != OS_SYSCALL_ERROR &&
+           os_close(destination) != OS_SYSCALL_ERROR;
+}
+
 void shell_main(void) {
     static const char prompt[] = "os> ";
-    static const char help[] = "help id ps env setenv unsetenv status true false jobs fg which inherit echo pwd cd ls cat stat chmod kill sleep mv mkdir rm rmdir touch write run wait exit\r\n";
+    static const char help[] = "help id ps env setenv unsetenv status true false jobs fg which inherit echo pwd cd ls cat stat chmod kill sleep mv cp mkdir rm rmdir touch write run wait exit\r\n";
     static const char *unknown = shell_unknown;
     static char line[128];
     static char input[64];
@@ -816,6 +845,22 @@ void shell_main(void) {
                 if (separator == 0 || new_length == 0 ||
                     os_rename(argument, separator, argument + new_start,
                               new_length) == OS_SYSCALL_ERROR)
+                    print(unknown, sizeof(unknown) - 1U);
+            } else if (command == SHELL_CP) {
+                uint32_t argument_length = 0;
+                while (argument[argument_length]) ++argument_length;
+                uint32_t separator = 0;
+                while (separator < argument_length && argument[separator] != ' ' &&
+                       argument[separator] != '\t') ++separator;
+                uint32_t destination_start = separator;
+                while (destination_start < argument_length &&
+                       (argument[destination_start] == ' ' ||
+                        argument[destination_start] == '\t')) ++destination_start;
+                uint32_t destination_length = argument_length - destination_start;
+                if (separator == 0 || destination_length == 0 ||
+                    !shell_copy_file(argument, separator,
+                                     argument + destination_start,
+                                     destination_length))
                     print(unknown, sizeof(unknown) - 1U);
             } else if (command == SHELL_SETENV) {
                 uint32_t argument_length = 0;

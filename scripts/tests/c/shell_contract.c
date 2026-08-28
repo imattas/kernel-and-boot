@@ -48,6 +48,8 @@ int main(void) {
     assert(strcmp(argument, "25") == 0);
     assert(shell_parse("mv /old /new", 12, argument, sizeof(argument)) == SHELL_MV);
     assert(strcmp(argument, "/old /new") == 0);
+    assert(shell_parse("cp /old /new", 12, argument, sizeof(argument)) == SHELL_CP);
+    assert(strcmp(argument, "/old /new") == 0);
     assert(shell_parse("setenv MODE test", 16, argument, sizeof(argument)) == SHELL_SETENV);
     assert(strcmp(argument, "MODE test") == 0);
     assert(shell_parse("unsetenv MODE", 13, argument, sizeof(argument)) == SHELL_UNSETENV);

@@ -113,6 +113,7 @@ shell_command_t shell_parse(const char *line, uint32_t length,
         !same_word(line, command_length, "kill") &&
         !same_word(line, command_length, "sleep") &&
         !same_word(line, command_length, "mv") &&
+        !same_word(line, command_length, "cp") &&
         !same_word(line, command_length, "setenv") &&
         !same_word(line, command_length, "unsetenv") &&
         !same_word(line, command_length, "status") &&
@@ -133,6 +134,7 @@ shell_command_t shell_parse(const char *line, uint32_t length,
     if (same_word(line, command_length, "kill")) return SHELL_KILL;
     if (same_word(line, command_length, "sleep")) return SHELL_SLEEP;
     if (same_word(line, command_length, "mv")) return SHELL_MV;
+    if (same_word(line, command_length, "cp")) return SHELL_CP;
     if (same_word(line, command_length, "setenv")) return SHELL_SETENV;
     if (same_word(line, command_length, "unsetenv")) return SHELL_UNSETENV;
     if (same_word(line, command_length, "status")) return SHELL_STATUS;

@@ -1708,6 +1708,8 @@ escaped dollars remain literal.
 ring 3 and is packaged in the FAT32 root.
 `CP.ELF` now copies regular files entirely from ring 3 through the existing
 open/read/create/write/close interfaces and is packaged in the FAT32 root.
+The shell now also provides native `cp <source> <destination>` behavior using
+the same bounded file-copy path.
 The shell now keeps a bounded eight-entry command history and handles split
 ANSI up/down escape sequences without feeding terminal control bytes into the
 command parser.

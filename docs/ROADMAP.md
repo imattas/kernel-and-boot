@@ -2024,3 +2024,9 @@ operator rejection.
 
 Native shell `ls` now opens its supplied directory operand instead of silently
 falling back to the current directory; the no-operand form remains unchanged.
+
+The userland spawn path now snapshots and retains the current process namespace
+outside the process lock before resolving an executable. This removes the
+process-lock/VFS-node lock inversion from PATH-resolved application startup;
+the normal init-owned supervisor remains a separate follow-up because its
+shared-scheduler handoff still needs live QEMU proof.

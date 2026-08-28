@@ -308,13 +308,14 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
             if (redirected && ((!redirected_input && !redirected_output) ||
                                !input_valid || !output_valid))
                 return OS_SYSCALL_ERROR;
-            uint64_t flags = spinlock_lock_irqsave(&parent->lock);
+            /* The current process cannot be destroyed while it is executing
+               this syscall. Retain its namespace nodes without taking the
+               process lock, avoiding the VFS-node/process-lock inversion. */
             vfs_node_t *root = parent->root_directory;
             vfs_node_t *working = parent->working_directory;
             security_context_t security = parent->security;
             if (root) vfs_node_retain(root);
             if (working) vfs_node_retain(working);
-            spinlock_unlock_irqrestore(&parent->lock, flags);
             vfs_node_t *node = root && working ?
                 vfs_lookup_path_at_access(root, working, path, &security) : 0;
             int accessible = node && node->type == VFS_NODE_REGULAR &&

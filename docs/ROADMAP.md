@@ -1734,6 +1734,9 @@ line-oriented output and packaged VFS access.
 The shell now dispatches `head`, `wc`, and `grep` through one direct
 spawn/wait/reap utility path, so these applications are usable without the
 lower-level `run` command.
+Unknown shell commands now receive a PATH-based external-application fallback;
+failed resolution still reports `unknown command`, while successful children
+return their exit status through the shell.
 The standalone `HELP.ELF` utility now provides the same command inventory through
 the external process path as the native shell `help` command.
 The complete `make test` gate now passes with the expanded 34-artifact

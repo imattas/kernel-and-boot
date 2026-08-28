@@ -1253,7 +1253,25 @@ void shell_main(void) {
             } else if (command == SHELL_EXIT) {
                 os_exit(0);
             } else if (command != SHELL_EMPTY) {
-                print(unknown, sizeof(unknown) - 1U);
+                uint32_t name_length = 0;
+                while (name_length < length && line[name_length] != ' ' &&
+                       line[name_length] != '\t') ++name_length;
+                uint32_t argument_start = name_length;
+                while (argument_start < length &&
+                       (line[argument_start] == ' ' ||
+                        line[argument_start] == '\t')) ++argument_start;
+                int32_t external_status = 1;
+                if (name_length == 0 ||
+                    !shell_run_utility(line, name_length,
+                                       line + argument_start,
+                                       &external_status)) {
+                    print(unknown, sizeof(unknown) - 1U);
+                } else {
+                    last_status = external_status;
+                    print("exit=", 5);
+                    print_status(external_status);
+                    print("\r\n", 2);
+                }
             }
             length = 0;
             print(prompt, sizeof(prompt) - 1U);

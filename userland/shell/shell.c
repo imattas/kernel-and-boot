@@ -230,6 +230,7 @@ shell_command_t shell_parse(const char *line, uint32_t length,
         !same_word(line, command_length, "rmdir") &&
         !same_word(line, command_length, "touch") &&
         !same_word(line, command_length, "write") &&
+        !same_word(line, command_length, "uptime") &&
         !same_word(line, command_length, "run") &&
         !same_word(line, command_length, "wait") &&
         !same_word(line, command_length, "which") &&
@@ -282,8 +283,9 @@ shell_command_t shell_parse(const char *line, uint32_t length,
          same_word(line, command_length, "basename") ||
          same_word(line, command_length, "dirname") ||
          same_word(line, command_length, "cut") ||
-         same_word(line, command_length, "tr") ||
-         same_word(line, command_length, "cmp")) &&
+        same_word(line, command_length, "tr") ||
+        same_word(line, command_length, "cmp") ||
+        same_word(line, command_length, "uptime")) &&
         shell_has_operator(line, length)) {
         if (!shell_operator_syntax_valid(line, length) || length >= capacity)
             return SHELL_UNKNOWN;
@@ -308,6 +310,7 @@ shell_command_t shell_parse(const char *line, uint32_t length,
         same_word(line, command_length, "cut") ||
         same_word(line, command_length, "tr") ||
         same_word(line, command_length, "cmp")) return SHELL_RUN;
+    if (same_word(line, command_length, "uptime")) return SHELL_RUN;
     if (same_word(line, command_length, "stat")) return SHELL_STAT;
     if (same_word(line, command_length, "chmod")) return SHELL_CHMOD;
     if (same_word(line, command_length, "kill")) return SHELL_KILL;

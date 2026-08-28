@@ -71,7 +71,7 @@ the init-owned shell supervisor remains the next kernel/userland boundary.
 - [ ] Add shell/application integration coverage for filesystem mutation,
   pipelines, redirection, background jobs, and inherited environment state.
 - [ ] Make init supervise `shell.elf` through the normal spawn/wait ABI after
-  the namespace-retain deadlock is fixed.
+  the namespace-retain and shared-scheduler startup deadlocks are fixed.
 
 - [x] Tell the user before creating ring-3/userland implementation.
 - [x] Build the first freestanding ring-3 init ELF against the existing syscall

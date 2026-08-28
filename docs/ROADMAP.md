@@ -1725,6 +1725,10 @@ immediately-blocking shell cannot starve those services. The init-to-shell
 supervisor handoff remains deferred pending a namespace-retain deadlock fix.
 Userland development is nevertheless active: the next batch is shared
 standalone-utility support and shell/application integration coverage.
+An attempted init-owned supervisor run with services queued before init was
+reverted after QEMU tracing showed the shared scheduler/address-space path
+stalling during the first spawn argument copy; the stable kernel-managed shell
+path remains the validated boot path until scheduler ownership is made SMP-safe.
 `args.elf`, `env.elf`, `cat.elf`,
 `pwd.elf`, `mkdir.elf`, `rm.elf`, `rmdir.elf`, `touch.elf`, `write.elf`,
 `ls.elf`, `chmod.elf`, `echo.elf`, `stat.elf`, `mv.elf`, `kill.elf`,

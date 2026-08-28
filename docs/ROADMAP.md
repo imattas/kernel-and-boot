@@ -1725,10 +1725,11 @@ immediately-blocking shell cannot starve those services. The init-to-shell
 supervisor handoff remains deferred pending a namespace-retain deadlock fix.
 Userland development is nevertheless active: the next batch is shared
 standalone-utility support and shell/application integration coverage.
-standalone-utility support and shell/application integration coverage. The
-standalone `HELP.ELF` utility now provides the same command inventory through
+The first utility in this batch is `head.elf`, which reads a bounded file prefix
+through the userland file-descriptor ABI and is packaged into the FAT32 VFS.
+The standalone `HELP.ELF` utility now provides the same command inventory through
 the external process path as the native shell `help` command.
-The complete `make test` gate now passes with the expanded 31-artifact
+The complete `make test` gate now passes with the expanded 32-artifact
 userland set, including shell/runtime contracts, filesystem/device contracts,
 image validation, and QEMU UEFI execution.
 The ring-3 shell now includes a `clear` command that emits the standard ANSI

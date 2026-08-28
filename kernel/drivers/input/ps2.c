@@ -254,3 +254,7 @@ int ps2_keyboard_poll(input_queue_t *queue) {
     spinlock_unlock_irqrestore(&ps2_lock, flags);
     return input_queue_push(queue, &event);
 }
+
+void ps2_keyboard_poll_standard(void) {
+    if (keyboard_queue) (void)ps2_keyboard_poll(keyboard_queue);
+}

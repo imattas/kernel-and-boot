@@ -12,6 +12,7 @@
 #include "../../sched/core/scheduler.h"
 #include "../printk/serial.h"
 #include "../../drivers/input/input.h"
+#include "../../drivers/input/ps2.h"
 #include "../../drivers/time/rtc.h"
 #include "../process/thread.h"
 
@@ -400,6 +401,7 @@ standard_io_rw:
             if (number == OS_SYSCALL_READ && arg1 == 0 &&
                 process->standard_input_handle == 0) {
                 uint8_t input[OS_SYSCALL_MAX_WRITE];
+                ps2_keyboard_poll_standard();
                 uint32_t count = input_read_standard(input, (uint32_t)arg3);
                 if (count == 0)
                     count = serial_poll_input((char *)input, (uint32_t)arg3);

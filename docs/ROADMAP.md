@@ -1803,4 +1803,10 @@ Implement legacy BIOS support as a separate loader path. It should normalize leg
 
 ## Long-term work
 
+The next userland slice adds the standalone `tee` utility. It consumes stdin,
+mirrors the stream to stdout, and persists it to up to eight destination files,
+using the existing freestanding runtime and file-creation ABI. It is packaged
+in the FAT32 image and remains available through the shell's external-command
+PATH resolution.
+
 Continue hardening SMP, memory reclamation, storage, USB, networking, graphics, security, debugging, crash diagnostics, performance tooling, power management, hardware compatibility, and userland while maintaining explicit subsystem boundaries and automated regression coverage.

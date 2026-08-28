@@ -528,13 +528,17 @@ static int shell_run_pipeline(char *text, uint32_t length, int background,
 
 static int shell_run_redirect(char *text, uint32_t length, int32_t *status) {
     uint32_t separator = length;
-    if (shell_count_operator(text, length, '>', &separator) != 1) return 0;
+    uint32_t redirect_count = shell_count_operator(text, length, '>', &separator);
+    int append = redirect_count == 2 && separator + 1U < length &&
+                 text[separator + 1U] == '>';
+    if ((!append && redirect_count != 1) || (append && redirect_count != 2))
+        return 0;
     if (separator == length) return 0;
     text[separator] = 0;
     uint32_t left_length = separator;
     while (left_length != 0 && (text[left_length - 1U] == ' ' ||
                                 text[left_length - 1U] == '\t')) --left_length;
-    uint32_t path_start = separator + 1U;
+    uint32_t path_start = separator + (append ? 2U : 1U);
     while (path_start < length && (text[path_start] == ' ' ||
                                    text[path_start] == '\t')) ++path_start;
     if (left_length == 0 || path_start == length) return 0;
@@ -549,7 +553,21 @@ static int shell_run_redirect(char *text, uint32_t length, int32_t *status) {
     uint32_t output_length = length - path_start;
     if (!shell_unquote_argument(text + path_start, &output_length) ||
         output_length == 0) return 0;
-    uint64_t output = os_create(text + path_start, output_length, 3);
+    uint64_t output = append ? os_open(text + path_start, output_length, 3) :
+                              os_create(text + path_start, output_length, 3);
+    if (append && output == OS_SYSCALL_ERROR) {
+        output = os_create(text + path_start, output_length, 3);
+    } else if (append && output != OS_SYSCALL_ERROR) {
+        static char discard[256];
+        uint64_t read_count;
+        do {
+            read_count = os_read(output, discard, sizeof(discard));
+        } while (read_count != OS_SYSCALL_ERROR && read_count != 0);
+        if (read_count == OS_SYSCALL_ERROR) {
+            (void)os_close(output);
+            return 0;
+        }
+    }
     if (output == OS_SYSCALL_ERROR) return 0;
     uint32_t arguments_start = name_length;
     while (arguments_start < left_length && (text[arguments_start] == ' ' ||

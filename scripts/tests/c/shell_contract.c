@@ -84,6 +84,11 @@ int main(void) {
     assert(shell_parse("tail /hello > /tmp/out", 22, argument,
                        sizeof(argument)) == SHELL_RUN);
     assert(strcmp(argument, "tail /hello > /tmp/out") == 0);
+    assert(shell_parse("echo hello >> /tmp/out", 23, argument,
+                       sizeof(argument)) == SHELL_RUN);
+    assert(strcmp(argument, "echo hello >> /tmp/out") == 0);
+    assert(shell_parse("echo hello >>", 13, argument,
+                       sizeof(argument)) == SHELL_UNKNOWN);
     assert(shell_parse("stat /hello", 11, argument, sizeof(argument)) == SHELL_STAT);
     assert(strcmp(argument, "/hello") == 0);
     assert(shell_parse("chmod 755 /hello", 16, argument, sizeof(argument)) == SHELL_CHMOD);

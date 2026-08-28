@@ -1747,6 +1747,9 @@ file` uses the packaged external utility and descriptor redirection path.
 `cat`, `pwd`, and `ls` now use the same routing for redirected output.
 The shell now accepts a quote-aware bounded `;` sequence and dispatches each
 command in order before returning to the prompt.
+The sequence parser now also recognizes quote/escape-aware `&&` and `||`
+operators. The shell conditionally runs the next command from the preceding
+exit status while retaining the existing bounded `;` behavior.
 `grep.elf` now also reads standard input when invoked without a file operand,
 enabling file-to-search pipelines through the shell's pipe descriptors.
 `wc.elf` now has the same standard-input mode, completing the basic
@@ -1823,7 +1826,8 @@ The following text-tool slice adds streaming adjacent-duplicate filtering with
 `uniq.elf`, available from either a file operand or standard input.
 
 Shell integration contracts now directly cover the quote-aware sequence
-splitter, including semicolons preserved inside quoted arguments; this joins
+splitter, including semicolons and conditional operators preserved inside
+quoted arguments; this joins
 the existing parser coverage for pipelines, redirection, jobs, and expansion.
 
 Continue hardening SMP, memory reclamation, storage, USB, networking, graphics, security, debugging, crash diagnostics, performance tooling, power management, hardware compatibility, and userland while maintaining explicit subsystem boundaries and automated regression coverage.

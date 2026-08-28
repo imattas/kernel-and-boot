@@ -138,6 +138,23 @@ int main(void) {
                                 sizeof(remainder), &remainder_length));
     assert(sequence_length == 10 && remainder_length == 0 &&
            strcmp(sequence, "echo 'a;b'") == 0);
+    memcpy(sequence, "false && echo no", 17);
+    sequence_length = 16;
+    shell_sequence_operator_t sequence_operator = SHELL_SEQUENCE_NONE;
+    assert(shell_split_next(sequence, &sequence_length, remainder,
+                            sizeof(remainder), &remainder_length,
+                            &sequence_operator));
+    assert(sequence_operator == SHELL_SEQUENCE_AND && sequence_length == 5 &&
+           strcmp(sequence, "false") == 0 && remainder_length == 7 &&
+           strcmp(remainder, "echo no") == 0);
+    memcpy(sequence, "true || echo 'a||b'", 20);
+    sequence_length = 19;
+    assert(shell_split_next(sequence, &sequence_length, remainder,
+                            sizeof(remainder), &remainder_length,
+                            &sequence_operator));
+    assert(sequence_operator == SHELL_SEQUENCE_OR && sequence_length == 4 &&
+           strcmp(sequence, "true") == 0 && remainder_length == 11 &&
+           strcmp(remainder, "echo 'a||b'") == 0);
     assert(shell_parse("external | wc /hello", 20, argument,
                        sizeof(argument)) == SHELL_RUN);
     assert(strcmp(argument, "external | wc /hello") == 0);

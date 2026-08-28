@@ -51,6 +51,13 @@ typedef enum {
     SHELL_EDIT_CANCEL
 } shell_edit_result_t;
 
+typedef enum {
+    SHELL_SEQUENCE_NONE,
+    SHELL_SEQUENCE_SEMICOLON,
+    SHELL_SEQUENCE_AND,
+    SHELL_SEQUENCE_OR
+} shell_sequence_operator_t;
+
 #define SHELL_HISTORY_LINE_CAPACITY 128
 
 uint32_t shell_history_push(char history[][SHELL_HISTORY_LINE_CAPACITY],
@@ -68,6 +75,10 @@ int shell_unquote_argument(char *argument, uint32_t *length);
 int shell_split_sequence(char *line, uint32_t *length,
                          char *remainder, uint32_t capacity,
                          uint32_t *remainder_length);
+int shell_split_next(char *line, uint32_t *length,
+                     char *remainder, uint32_t capacity,
+                     uint32_t *remainder_length,
+                     shell_sequence_operator_t *operator);
 
 shell_edit_result_t shell_edit_line(char *line, uint32_t *length,
                                     uint32_t capacity, char value);

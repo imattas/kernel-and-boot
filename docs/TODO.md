@@ -94,6 +94,8 @@ the init-owned shell supervisor remains the next kernel/userland boundary.
 - [x] Route redirected `echo` through the external descriptor path.
 - [x] Route redirected `cat`, `pwd`, and `ls` through packaged utilities.
 - [x] Add quote-aware bounded `;` command sequencing.
+- [x] Add quote-aware conditional `&&`/`||` command sequencing driven by the
+  preceding command's exit status.
 - [x] Make `grep.elf` consume standard input for pipeline execution.
 - [x] Make `wc.elf` consume standard input for pipeline execution.
 - [x] Make `head.elf` consume standard input for pipeline execution.

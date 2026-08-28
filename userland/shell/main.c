@@ -670,6 +670,10 @@ void shell_main(void) {
     uint32_t escape_state = 0;
     uint32_t length = 0;
     uint32_t pending_length = 0;
+    shell_sequence_operator_t pending_operator = SHELL_SEQUENCE_NONE;
+    shell_sequence_operator_t command_operator = SHELL_SEQUENCE_NONE;
+    shell_sequence_operator_t sequence_operator = SHELL_SEQUENCE_NONE;
+    int run_command = 1;
     int32_t last_status = 0;
     shell_active_status = &last_status;
     print(prompt, sizeof(prompt) - 1U);
@@ -737,10 +741,30 @@ void shell_main(void) {
             }
             if (edit != SHELL_EDIT_SUBMIT) continue;
         command_ready:
-            if (!shell_split_sequence(line, &length, pending_line,
-                                      sizeof(pending_line), &pending_length)) {
+            command_operator = pending_operator;
+            sequence_operator = SHELL_SEQUENCE_NONE;
+            if (!shell_split_next(line, &length, pending_line,
+                                  sizeof(pending_line), &pending_length,
+                                  &sequence_operator)) {
                 length = 0;
                 line[0] = 0;
+            }
+            pending_operator = sequence_operator;
+            run_command = command_operator != SHELL_SEQUENCE_AND ||
+                          last_status == 0;
+            if (command_operator == SHELL_SEQUENCE_OR && last_status == 0)
+                run_command = 0;
+            if (!run_command) {
+                if (pending_length != 0) {
+                    length = pending_length;
+                    for (uint32_t index = 0; index <= length; ++index)
+                        line[index] = pending_line[index];
+                    pending_length = 0;
+                    goto command_ready;
+                }
+                length = 0;
+                print(prompt, sizeof(prompt) - 1U);
+                continue;
             }
             history_count = shell_history_push(history,
                                                sizeof(history) /

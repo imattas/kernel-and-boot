@@ -1,13 +1,17 @@
 #include "shell.h"
 
-int shell_split_sequence(char *line, uint32_t *length,
-                         char *remainder, uint32_t capacity,
-                         uint32_t *remainder_length) {
-    if (!line || !length || !remainder || !remainder_length) return 0;
+int shell_split_next(char *line, uint32_t *length,
+                     char *remainder, uint32_t capacity,
+                     uint32_t *remainder_length,
+                     shell_sequence_operator_t *operator) {
+    if (!line || !length || !remainder || !remainder_length || !operator)
+        return 0;
     *remainder_length = 0;
+    *operator = SHELL_SEQUENCE_NONE;
     char quote = 0;
     int escaped = 0;
     uint32_t separator = *length;
+    uint32_t separator_width = 0;
     for (uint32_t index = 0; index < *length; ++index) {
         char value = line[index];
         if (escaped) escaped = 0;
@@ -15,10 +19,27 @@ int shell_split_sequence(char *line, uint32_t *length,
         else if (quote) {
             if (value == quote) quote = 0;
         } else if (value == '\'' || value == '"') quote = value;
-        else if (value == ';') { separator = index; break; }
+        else if (value == ';') {
+            separator = index;
+            separator_width = 1;
+            *operator = SHELL_SEQUENCE_SEMICOLON;
+            break;
+        } else if (value == '&' && index + 1U < *length &&
+                   line[index + 1U] == '&') {
+            separator = index;
+            separator_width = 2;
+            *operator = SHELL_SEQUENCE_AND;
+            break;
+        } else if (value == '|' && index + 1U < *length &&
+                   line[index + 1U] == '|') {
+            separator = index;
+            separator_width = 2;
+            *operator = SHELL_SEQUENCE_OR;
+            break;
+        }
     }
     if (separator == *length) return 1;
-    uint32_t tail_start = separator + 1U;
+    uint32_t tail_start = separator + separator_width;
     while (tail_start < *length && (line[tail_start] == ' ' ||
                                     line[tail_start] == '\t')) ++tail_start;
     uint32_t tail_length = *length - tail_start;
@@ -36,6 +57,16 @@ int shell_split_sequence(char *line, uint32_t *length,
     *length = first_length;
     *remainder_length = tail_length;
     return 1;
+}
+
+int shell_split_sequence(char *line, uint32_t *length,
+                         char *remainder, uint32_t capacity,
+                         uint32_t *remainder_length) {
+    shell_sequence_operator_t operator;
+    if (!shell_split_next(line, length, remainder, capacity,
+                          remainder_length, &operator)) return 0;
+    return operator == SHELL_SEQUENCE_NONE ||
+           operator == SHELL_SEQUENCE_SEMICOLON;
 }
 
 uint32_t shell_history_push(char history[][SHELL_HISTORY_LINE_CAPACITY],

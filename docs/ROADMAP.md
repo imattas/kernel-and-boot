@@ -1774,6 +1774,9 @@ An attempted init-owned supervisor run with services queued before init was
 reverted after QEMU tracing showed the shared scheduler/address-space path
 stalling during the first spawn argument copy; the stable kernel-managed shell
 path remains the validated boot path until scheduler ownership is made SMP-safe.
+A later retry that moved runtime services ahead of the init scheduler and used
+an absolute shell path still stalled before a valid shell handoff, so the
+supervisor remains deferred rather than weakening the validated boot path.
 `args.elf`, `env.elf`, `cat.elf`,
 `pwd.elf`, `mkdir.elf`, `rm.elf`, `rmdir.elf`, `touch.elf`, `write.elf`,
 `ls.elf`, `chmod.elf`, `echo.elf`, `stat.elf`, `mv.elf`, `kill.elf`,

@@ -71,6 +71,7 @@ kernel gate below is explicitly marked complete.
 - [x] Add the first core utility: shell `ls` backed by open/readdir/close.
 - [x] Add shell `cat` backed by open/read/close.
 - [x] Add shell `mkdir` backed by the mkdir syscall.
+- [x] Add shell `rm` backed by the unlink syscall.
 - [ ] Add the command-line shell and terminal/console I/O.
 - [ ] Add process tools and initial utilities (`init`, `echo`, `ls`, `cat`,
   `pwd`, `mkdir`, `rm`, and `sh`).

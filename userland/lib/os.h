@@ -49,6 +49,10 @@ static inline uint64_t os_mkdir(const char *path, uint64_t length,
     return os_syscall3(32, (uint64_t)(uintptr_t)path, length, mode);
 }
 
+static inline uint64_t os_unlink(const char *path, uint64_t length) {
+    return os_syscall3(33, (uint64_t)(uintptr_t)path, length, 0);
+}
+
 static inline uint64_t os_yield(void) { return os_syscall3(21, 0, 0, 0); }
 
 __attribute__((noreturn)) static inline void os_exit(int32_t status) {

@@ -12,6 +12,7 @@ typedef enum {
     SHELL_LS,
     SHELL_CAT,
     SHELL_MKDIR,
+    SHELL_RM,
     SHELL_EXIT,
     SHELL_UNKNOWN
 } shell_command_t;

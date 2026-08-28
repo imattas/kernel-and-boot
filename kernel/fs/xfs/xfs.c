@@ -143,6 +143,10 @@ static int xfs_validate_auth_cnt(const xfs_fs_t *fs, uint64_t ag_base,
                 !xfs_read_block(fs, ag_base + child, leaf) ||
                 be32(leaf) != XFS_BNO_MAGIC_REAL || be16(&leaf[4]) != 0)
                 return 0;
+            if (be16(&leaf[6]) == 0 ||
+                be32(&root[16U + child_index * 8U]) != be32(&leaf[16]) ||
+                be32(&root[20U + child_index * 8U]) != be32(&leaf[20]))
+                return 0;
             source = leaf;
         }
         uint32_t leaf_records = view->cnt_level == 1U ? records : be16(&source[6]);

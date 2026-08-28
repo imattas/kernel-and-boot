@@ -63,5 +63,15 @@ int main(void) {
            image[2U * 4096U + 6] == 0 && image[3U * 4096U + 6] == 0);
     assert(xfs_free_extent(&fs, 10, 3));
     assert(g32(&image[4096 + 52]) == 3 && g32(&image[4096 + 56]) == 3);
+    uint8_t *cnt_root = &image[3U * 4096U];
+    uint8_t *cnt_leaf = &image[4U * 4096U];
+    memset(cnt_root, 0, 4096); memset(cnt_leaf, 0, 4096);
+    p32(&agf[20], 3); p32(&agf[32], 2);
+    p32(cnt_root, 0x41425442U); p16(&cnt_root[4], 1); p16(&cnt_root[6], 1);
+    p32(&cnt_root[16], 10); p32(&cnt_root[20], 3); p32(&cnt_root[2736], 4);
+    leaf(cnt_leaf, 10, 3);
+    assert(xfs_mount(&fs, 0));
+    p32(&cnt_root[16], 11);
+    assert(!xfs_mount(&fs, 0));
     return 0;
 }

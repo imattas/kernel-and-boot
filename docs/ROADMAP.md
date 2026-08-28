@@ -1687,6 +1687,8 @@ rejecting unterminated escapes/quotes while leaving external `run` argument
 text intact for kernel-side argv construction.
 Pipeline and redirection scanning now ignores operators inside quoted or
 escaped text, and quoted input/output paths are normalized before VFS access.
+The first standalone status utility, `TRUE.ELF`, is now built, validated, and
+packaged in the FAT32 root for independent ring-3 success-path testing.
 
 ## Phase 10 — BIOS boot path
 

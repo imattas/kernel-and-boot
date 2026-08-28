@@ -55,6 +55,14 @@ int main(void) {
     assert(strcmp(argument, "/hello") == 0);
     assert(shell_parse("grep needle /hello", 18, argument, sizeof(argument)) == SHELL_GREP);
     assert(strcmp(argument, "needle /hello") == 0);
+    assert(shell_parse("tee /hello", 10, argument, sizeof(argument)) == SHELL_RUN);
+    assert(strcmp(argument, "/hello") == 0);
+    assert(shell_parse("printf %d 42", 12, argument, sizeof(argument)) == SHELL_RUN);
+    assert(strcmp(argument, "%d 42") == 0);
+    assert(shell_parse("basename /hello", 15, argument, sizeof(argument)) == SHELL_RUN);
+    assert(strcmp(argument, "/hello") == 0);
+    assert(shell_parse("cmp /a /b", 9, argument, sizeof(argument)) == SHELL_RUN);
+    assert(strcmp(argument, "/a /b") == 0);
     assert(shell_parse("stat /hello", 11, argument, sizeof(argument)) == SHELL_STAT);
     assert(strcmp(argument, "/hello") == 0);
     assert(shell_parse("chmod 755 /hello", 16, argument, sizeof(argument)) == SHELL_CHMOD);

@@ -184,6 +184,16 @@ shell_command_t shell_parse(const char *line, uint32_t length,
         !same_word(line, command_length, "head") &&
         !same_word(line, command_length, "wc") &&
         !same_word(line, command_length, "grep") &&
+        !same_word(line, command_length, "tee") &&
+        !same_word(line, command_length, "tail") &&
+        !same_word(line, command_length, "sort") &&
+        !same_word(line, command_length, "uniq") &&
+        !same_word(line, command_length, "printf") &&
+        !same_word(line, command_length, "basename") &&
+        !same_word(line, command_length, "dirname") &&
+        !same_word(line, command_length, "cut") &&
+        !same_word(line, command_length, "tr") &&
+        !same_word(line, command_length, "cmp") &&
         !same_word(line, command_length, "mkdir") &&
         !same_word(line, command_length, "rm") &&
         !same_word(line, command_length, "rmdir") &&
@@ -225,7 +235,20 @@ shell_command_t shell_parse(const char *line, uint32_t length,
     if ((same_word(line, command_length, "echo") ||
          same_word(line, command_length, "cat") ||
          same_word(line, command_length, "pwd") ||
-         same_word(line, command_length, "ls")) &&
+         same_word(line, command_length, "ls") ||
+         same_word(line, command_length, "head") ||
+         same_word(line, command_length, "wc") ||
+         same_word(line, command_length, "grep") ||
+         same_word(line, command_length, "tee") ||
+         same_word(line, command_length, "tail") ||
+         same_word(line, command_length, "sort") ||
+         same_word(line, command_length, "uniq") ||
+         same_word(line, command_length, "printf") ||
+         same_word(line, command_length, "basename") ||
+         same_word(line, command_length, "dirname") ||
+         same_word(line, command_length, "cut") ||
+         same_word(line, command_length, "tr") ||
+         same_word(line, command_length, "cmp")) &&
         shell_has_operator(line, length)) {
         if (length >= capacity) return SHELL_UNKNOWN;
         for (uint32_t index = 0; index <= length; ++index)
@@ -239,6 +262,16 @@ shell_command_t shell_parse(const char *line, uint32_t length,
     if (same_word(line, command_length, "head")) return SHELL_HEAD;
     if (same_word(line, command_length, "wc")) return SHELL_WC;
     if (same_word(line, command_length, "grep")) return SHELL_GREP;
+    if (same_word(line, command_length, "tee") ||
+        same_word(line, command_length, "tail") ||
+        same_word(line, command_length, "sort") ||
+        same_word(line, command_length, "uniq") ||
+        same_word(line, command_length, "printf") ||
+        same_word(line, command_length, "basename") ||
+        same_word(line, command_length, "dirname") ||
+        same_word(line, command_length, "cut") ||
+        same_word(line, command_length, "tr") ||
+        same_word(line, command_length, "cmp")) return SHELL_RUN;
     if (same_word(line, command_length, "stat")) return SHELL_STAT;
     if (same_word(line, command_length, "chmod")) return SHELL_CHMOD;
     if (same_word(line, command_length, "kill")) return SHELL_KILL;

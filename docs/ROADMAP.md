@@ -1859,6 +1859,11 @@ utilities, are now attached to the live FAT32 VFS namespace. External process
 lookup and execution therefore see the same complete application set that is
 present in `dist/os.img`.
 
+The shell now dispatches every packaged text utility by its command name,
+including `tee`, `tail`, `sort`, `uniq`, `printf`, `basename`, `dirname`,
+`cut`, `tr`, and `cmp`, while preserving the existing pipeline, redirection,
+background, and conditional-status paths.
+
 Shell integration contracts now directly cover the quote-aware sequence
 splitter, including semicolons and conditional operators preserved inside
 quoted arguments; this joins

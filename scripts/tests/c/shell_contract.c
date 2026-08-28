@@ -123,6 +123,21 @@ int main(void) {
     assert(strcmp(argument, "4") == 0);
     assert(shell_parse("exit", 4, argument, sizeof(argument)) == SHELL_EXIT);
     assert(shell_parse("wat", 3, argument, sizeof(argument)) == SHELL_UNKNOWN);
+    char sequence[32] = "true; false";
+    char remainder[32] = {0};
+    uint32_t sequence_length = 11;
+    uint32_t remainder_length = 0;
+    assert(shell_split_sequence(sequence, &sequence_length, remainder,
+                                sizeof(remainder), &remainder_length));
+    assert(sequence_length == 4 && strcmp(sequence, "true") == 0);
+    assert(remainder_length == 5 && strcmp(remainder, "false") == 0);
+    memcpy(sequence, "echo 'a;b'", 11);
+    sequence_length = 10;
+    remainder_length = 99;
+    assert(shell_split_sequence(sequence, &sequence_length, remainder,
+                                sizeof(remainder), &remainder_length));
+    assert(sequence_length == 10 && remainder_length == 0 &&
+           strcmp(sequence, "echo 'a;b'") == 0);
     assert(shell_parse("external | wc /hello", 20, argument,
                        sizeof(argument)) == SHELL_RUN);
     assert(strcmp(argument, "external | wc /hello") == 0);

@@ -1,5 +1,43 @@
 #include "shell.h"
 
+int shell_split_sequence(char *line, uint32_t *length,
+                         char *remainder, uint32_t capacity,
+                         uint32_t *remainder_length) {
+    if (!line || !length || !remainder || !remainder_length) return 0;
+    *remainder_length = 0;
+    char quote = 0;
+    int escaped = 0;
+    uint32_t separator = *length;
+    for (uint32_t index = 0; index < *length; ++index) {
+        char value = line[index];
+        if (escaped) escaped = 0;
+        else if (value == '\\') escaped = 1;
+        else if (quote) {
+            if (value == quote) quote = 0;
+        } else if (value == '\'' || value == '"') quote = value;
+        else if (value == ';') { separator = index; break; }
+    }
+    if (separator == *length) return 1;
+    uint32_t tail_start = separator + 1U;
+    while (tail_start < *length && (line[tail_start] == ' ' ||
+                                    line[tail_start] == '\t')) ++tail_start;
+    uint32_t tail_length = *length - tail_start;
+    while (tail_length != 0 && (line[tail_start + tail_length - 1U] == ' ' ||
+                                line[tail_start + tail_length - 1U] == '\t'))
+        --tail_length;
+    if (tail_length >= capacity) return 0;
+    for (uint32_t index = 0; index < tail_length; ++index)
+        remainder[index] = line[tail_start + index];
+    remainder[tail_length] = 0;
+    uint32_t first_length = separator;
+    while (first_length != 0 && (line[first_length - 1U] == ' ' ||
+                                 line[first_length - 1U] == '\t')) --first_length;
+    line[first_length] = 0;
+    *length = first_length;
+    *remainder_length = tail_length;
+    return 1;
+}
+
 uint32_t shell_history_push(char history[][SHELL_HISTORY_LINE_CAPACITY],
                             uint32_t capacity, uint32_t count,
                             const char *line, uint32_t length) {

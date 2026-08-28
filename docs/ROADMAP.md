@@ -1822,4 +1822,8 @@ sorting from either a file or standard input and is packaged in the same image.
 The following text-tool slice adds streaming adjacent-duplicate filtering with
 `uniq.elf`, available from either a file operand or standard input.
 
+Shell integration contracts now directly cover the quote-aware sequence
+splitter, including semicolons preserved inside quoted arguments; this joins
+the existing parser coverage for pipelines, redirection, jobs, and expansion.
+
 Continue hardening SMP, memory reclamation, storage, USB, networking, graphics, security, debugging, crash diagnostics, performance tooling, power management, hardware compatibility, and userland while maintaining explicit subsystem boundaries and automated regression coverage.

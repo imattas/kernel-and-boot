@@ -75,6 +75,7 @@ the init-owned shell supervisor remains the next kernel/userland boundary.
   userland transitions.
 - [ ] Add shell/application integration coverage for filesystem mutation,
   pipelines, redirection, background jobs, and inherited environment state.
+- [x] Add direct contract coverage for quote-aware command sequencing.
 - [x] Add shell `clear` terminal control and parser coverage.
 - [x] Keep standalone `HELP.ELF` command inventory synchronized with shell
   built-ins.

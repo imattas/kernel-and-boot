@@ -65,6 +65,10 @@ shell_command_t shell_parse(const char *line, uint32_t length,
 
 int shell_unquote_argument(char *argument, uint32_t *length);
 
+int shell_split_sequence(char *line, uint32_t *length,
+                         char *remainder, uint32_t capacity,
+                         uint32_t *remainder_length);
+
 shell_edit_result_t shell_edit_line(char *line, uint32_t *length,
                                     uint32_t capacity, char value);
 

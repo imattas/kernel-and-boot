@@ -112,6 +112,13 @@ static inline uint64_t os_rmdir(const char *path, uint64_t length) {
     return os_syscall3(35, (uint64_t)(uintptr_t)path, length, 0);
 }
 
+static inline uint64_t os_rename(const char *old_path, uint64_t old_length,
+                                 const char *new_path, uint64_t new_length) {
+    return os_syscall3(34, (uint64_t)(uintptr_t)old_path,
+                       (uint64_t)(uintptr_t)new_path,
+                       old_length | (new_length << 32));
+}
+
 static inline uint64_t os_chmod(const char *path, uint64_t length,
                                 uint64_t mode) {
     return os_syscall3(36, (uint64_t)(uintptr_t)path, length, mode);

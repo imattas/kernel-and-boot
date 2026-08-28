@@ -1595,6 +1595,8 @@ The process-control surface now includes `kill <pid> <signal>` through the
 targeted signal-send syscall.
 The shell also includes `sleep <milliseconds>`, built on the monotonic clock
 and scheduler-yield interfaces.
+The filesystem command surface now includes `mv <old> <new>` through the
+rename syscall.
 The FAT32 image builder now chains a second root-directory cluster, removing
 the one-sector root-entry ceiling for continued userland growth.
 The standalone `ECHO.ELF` utility is now stored in the expanded root directory

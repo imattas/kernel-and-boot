@@ -1728,6 +1728,9 @@ standalone-utility support and shell/application integration coverage.
 standalone-utility support and shell/application integration coverage. The
 standalone `HELP.ELF` utility now provides the same command inventory through
 the external process path as the native shell `help` command.
+The complete `make test` gate now passes with the expanded 31-artifact
+userland set, including shell/runtime contracts, filesystem/device contracts,
+image validation, and QEMU UEFI execution.
 An attempted init-owned supervisor run with services queued before init was
 reverted after QEMU tracing showed the shared scheduler/address-space path
 stalling during the first spawn argument copy; the stable kernel-managed shell

@@ -2203,7 +2203,7 @@ int xfs_truncate_file(xfs_fs_t *fs, uint64_t inode, uint64_t size) {
                         !xfs_read_block(fs, physical, block)) return 0;
                     for (uint32_t byte = (uint32_t)(size % fs->block_size);
                          byte < fs->block_size; ++byte) block[byte] = 0;
-                    if (!xfs_write_block(fs, physical, block)) return 0;
+                    if (!xfs_write_journaled_block(fs, physical, block)) return 0;
                     break;
                 }
         }

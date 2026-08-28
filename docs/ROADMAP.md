@@ -654,6 +654,9 @@ host-system, or process errors instead of reporting a start success blindly.
 The boot path now attempts a HID interrupt poll, tolerates an idle keyboard’s
 valid no-report response, and feeds any completed decoded report into the
 shared input event queue.
+The same UHCI runtime path now selects bounded USB HID mouse decoding for
+three-byte interrupt reports, allowing mouse reports to reach the shared input
+queue without disturbing the six-key keyboard state tracker.
 USB HID keyboard decoding now validates and exposes all six boot-report key
 slots through a bounded event array; the boot probe covers multi-key reports
 and duplicate-key rejection.

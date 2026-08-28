@@ -113,6 +113,7 @@ static uint8_t input_runtime_interval;
 static uint8_t input_runtime_toggle;
 static uint8_t input_runtime_report[64];
 static usb_hid_keyboard_state_t input_runtime_hid_state;
+static int input_runtime_mouse;
 static int input_runtime_ready;
 static int input_runtime_pending;
 
@@ -136,10 +137,15 @@ static void input_runtime_task(void *argument) {
             if (completed > 0) {
             input_event_t events[20];
             uint32_t event_count = 0;
-            if (usb_hid_keyboard_decode_state(input_runtime_report,
+            int decoded = input_runtime_mouse ?
+                usb_hid_mouse_decode(input_runtime_report,
+                                     input_runtime_packet, events,
+                                     &event_count) :
+                usb_hid_keyboard_decode_state(input_runtime_report,
                                               input_runtime_packet,
                                               &input_runtime_hid_state,
-                                              events, &event_count))
+                                              events, &event_count);
+            if (decoded)
                 (void)input_queue_push_batch(input_runtime_queue, events,
                                              event_count);
             input_runtime_pending = 0;
@@ -2527,6 +2533,7 @@ void kernel_main(void *boot_info) {
         input_runtime_toggle = 0;
         input_runtime_endpoint = uhci_interrupt_endpoint;
         input_runtime_packet = uhci_interrupt_packet;
+        input_runtime_mouse = input_runtime_packet == 3;
         input_runtime_ready = 1;
         input_runtime_pending = uhci_interrupt_submit(
             1, input_runtime_endpoint, input_runtime_report,

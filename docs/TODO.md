@@ -135,6 +135,7 @@ kernel gate below is explicitly marked complete.
   FAT32 boot image.
 - [x] Expose seek/truncate syscalls through userland and add standalone
   `TRUNCATE.ELF` file-size utility.
+- [x] Add standalone `SEEK.ELF` seek/read file-position utility.
 - [x] Add typed pipe descriptors and blocking userland read/write wrappers.
 - [x] Add optional per-process standard-input and standard-output bindings for
   redirected child processes.

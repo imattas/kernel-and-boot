@@ -1699,6 +1699,8 @@ returns the waited process status to its caller.
 Userland now exposes the existing file-position and resize syscalls through
 `os_seek`/`os_truncate`, with `TRUNCATE.ELF` providing an independent ring-3
 file-size mutation utility packaged in the FAT32 root.
+`SEEK.ELF` now completes the file-position probe by seeking to a supplied
+offset, reading one byte, and reporting it from ring 3.
 
 ## Phase 10 — BIOS boot path
 

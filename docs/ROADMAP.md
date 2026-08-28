@@ -1209,7 +1209,7 @@ authentic BNO/CNT ordering, child pointers, child boundary keys, free-block
 totals, and longest extent
 before exposing the filesystem. Bounded authentic leaf-root BNO/CNT allocation
 and release now update both indexes and AGF counters with rollback on failed
-publication. Authenticated level-2 roots now also support a bounded two-child
+publication. Authenticated level-2 roots now also support a bounded four-child
 transaction: all child leaves, both index roots, and the AGF are redistributed
 and restored together when publication fails, including empty-child collapse
 and later repopulation. Larger fan-out trees and durable crash-recovery

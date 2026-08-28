@@ -132,5 +132,38 @@ int main(void) {
            ((bno_root[6] << 8) | bno_root[7]) == 2 &&
            ((cnt_root[6] << 8) | cnt_root[7]) == 2 &&
            g32(&bno_root[16]) == 10 && g32(&bno_root[24]) == 13);
+    /* Four-child fan-out also collapses and restores without losing the
+     * retained child pointers. */
+    memset(bno_root, 0, 4096); memset(cnt_root, 0, 4096);
+    memset(&image[5U * 4096U], 0, 4096); memset(&image[6U * 4096U], 0, 4096);
+    memset(&image[8U * 4096U], 0, 4096); memset(&image[9U * 4096U], 0, 4096);
+    memset(&image[4U * 4096U], 0, 4096); memset(&image[7U * 4096U], 0, 4096);
+    memset(&image[10U * 4096U], 0, 4096); memset(&image[11U * 4096U], 0, 4096);
+    p32(bno_root, 0x41425442U); p16(&bno_root[4], 1); p16(&bno_root[6], 4);
+    p32(cnt_root, 0x41425442U); p16(&cnt_root[4], 1); p16(&cnt_root[6], 4);
+    p32(&bno_root[16], 2); p32(&bno_root[20], 1);
+    p32(&bno_root[24], 5); p32(&bno_root[28], 1);
+    p32(&bno_root[32], 8); p32(&bno_root[36], 1);
+    p32(&bno_root[40], 10); p32(&bno_root[44], 1);
+    p32(&cnt_root[16], 2); p32(&cnt_root[20], 1);
+    p32(&cnt_root[24], 5); p32(&cnt_root[28], 1);
+    p32(&cnt_root[32], 8); p32(&cnt_root[36], 1);
+    p32(&cnt_root[40], 10); p32(&cnt_root[44], 1);
+    p32(&bno_root[2736], 5); p32(&bno_root[2740], 6);
+    p32(&bno_root[2744], 8); p32(&bno_root[2748], 9);
+    p32(&cnt_root[2736], 4); p32(&cnt_root[2740], 7);
+    p32(&cnt_root[2744], 10); p32(&cnt_root[2748], 11);
+    leaf(&image[5U * 4096U], 2, 1); leaf(&image[6U * 4096U], 5, 1);
+    leaf(&image[8U * 4096U], 8, 1); leaf(&image[9U * 4096U], 10, 1);
+    leaf(&image[4U * 4096U], 2, 1); leaf(&image[7U * 4096U], 5, 1);
+    leaf(&image[10U * 4096U], 8, 1); leaf(&image[11U * 4096U], 10, 1);
+    p32(&agf[52], 4); p32(&agf[56], 1);
+    assert(xfs_mount(&fs, 0));
+    assert(xfs_allocate_extent(&fs, 0, 1, &start) && start == 2);
+    assert(((bno_root[6] << 8) | bno_root[7]) == 3 &&
+           g32(&bno_root[2736]) == 5 && g32(&bno_root[2744]) == 8);
+    assert(xfs_free_extent(&fs, 2, 1));
+    assert(((bno_root[6] << 8) | bno_root[7]) == 4 &&
+           g32(&bno_root[16]) == 2 && g32(&bno_root[40]) == 10);
     return 0;
 }

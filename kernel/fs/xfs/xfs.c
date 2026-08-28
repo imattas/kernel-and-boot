@@ -306,7 +306,7 @@ static int xfs_mutate_free_records(xfs_free_record_t *records, uint32_t *count,
 }
 
 /* Authenticated level-2 BNO/CNT roots.  The current transaction layer keeps
- * the fan-out bounded by two children: all affected leaves, both index roots,
+ * the fan-out bounded by four children: all affected leaves, both index roots,
  * and the AGF are published as one rollback-able metadata transaction. */
 static int xfs_auth_multi_child_mutate(xfs_fs_t *fs, uint32_t agno,
                                        uint32_t blocks, uint32_t target,
@@ -314,8 +314,8 @@ static int xfs_auth_multi_child_mutate(xfs_fs_t *fs, uint32_t agno,
     uint8_t agf[4096], original_agf[4096];
     uint8_t bno_root[4096], original_bno_root[4096];
     uint8_t cnt_root[4096], original_cnt_root[4096];
-    uint8_t bno_leaf[2][4096], original_bno_leaf[2][4096];
-    uint8_t cnt_leaf[2][4096], original_cnt_leaf[2][4096];
+    uint8_t bno_leaf[4][4096], original_bno_leaf[4][4096];
+    uint8_t cnt_leaf[4][4096], original_cnt_leaf[4][4096];
     xfs_free_record_t records[512], count_records[512];
     xfs_agf_view_t view;
     if (!fs || !fs->mounted || !blocks || agno >= fs->ag_count ||
@@ -332,12 +332,17 @@ static int xfs_auth_multi_child_mutate(xfs_fs_t *fs, uint32_t agno,
         be32(cnt_root) != XFS_BNO_MAGIC_REAL || be16(&bno_root[4]) != 1U ||
         be16(&cnt_root[4]) != 1U) return 0;
     uint32_t children = be16(&bno_root[6]);
-    if (!children || children > 2U || children != be16(&cnt_root[6])) return 0;
+    if (!children || children > 4U || children != be16(&cnt_root[6])) return 0;
     /* A collapsed transaction retains the second child pointer outside the
      * active root count so a later release can repopulate that child. */
     uint32_t pointer_offset = 16U + index_capacity * 8U;
-    if (children == 1U && be32(&bno_root[pointer_offset + 4U]) != 0U &&
-        be32(&cnt_root[pointer_offset + 4U]) != 0U) children = 2U;
+    if (children < 4U) {
+        for (uint32_t i = children; i < 4U; ++i) {
+            if (be32(&bno_root[pointer_offset + i * 4U]) == 0U ||
+                be32(&cnt_root[pointer_offset + i * 4U]) == 0U) break;
+            children = i + 1U;
+        }
+    }
     uint32_t record_pos = 0;
     for (uint32_t i = 0; i < children; ++i) {
         uint32_t bchild = be32(&bno_root[16U + index_capacity * 8U + i * 4U]);
@@ -406,7 +411,7 @@ static int xfs_auth_multi_child_mutate(xfs_fs_t *fs, uint32_t agno,
     xfs_sort_count_records(count_records, count);
     uint32_t new_children = count < children ? count : children;
     uint32_t bpos = 0, cpos = 0;
-    for (uint32_t i = 0; i < 2U; ++i) {
+    for (uint32_t i = 0; i < 4U; ++i) {
         memset(&bno_leaf[i][16], 0, fs->block_size - 16U);
         memset(&cnt_leaf[i][16], 0, fs->block_size - 16U);
         uint32_t bn = i < new_children ? (count - bpos + (new_children - i) - 1U) /
@@ -452,11 +457,15 @@ static int xfs_auth_multi_child_mutate(xfs_fs_t *fs, uint32_t agno,
         store_be32(&cnt_root[pointer_offset + i * 4U], cchild);
         bpos += bn; cpos += cn;
     }
-    if (!xfs_write_block(fs, ag_base + be32(&original_bno_root[16U + index_capacity * 8U]), bno_leaf[0]) ||
-        (children > 1U && !xfs_write_block(fs, ag_base + be32(&original_bno_root[16U + index_capacity * 8U + 4U]), bno_leaf[1])) ||
-        !xfs_write_block(fs, ag_base + be32(&original_cnt_root[16U + index_capacity * 8U]), cnt_leaf[0]) ||
-        (children > 1U && !xfs_write_block(fs, ag_base + be32(&original_cnt_root[16U + index_capacity * 8U + 4U]), cnt_leaf[1])) ||
-        !xfs_write_block(fs, ag_base + view.bno_root, bno_root) ||
+    int publication_ok = 1;
+    for (uint32_t i = 0; i < children; ++i) {
+        publication_ok = publication_ok &&
+            xfs_write_block(fs, ag_base + be32(&original_bno_root[pointer_offset + i * 4U]),
+                            bno_leaf[i]) &&
+            xfs_write_block(fs, ag_base + be32(&original_cnt_root[pointer_offset + i * 4U]),
+                            cnt_leaf[i]);
+    }
+    if (!publication_ok || !xfs_write_block(fs, ag_base + view.bno_root, bno_root) ||
         !xfs_write_block(fs, ag_base + view.cnt_root, cnt_root) ||
         !xfs_write_block(fs, ag_base + 1U, agf) || !xfs_flush_metadata(fs)) goto rollback;
     return 1;

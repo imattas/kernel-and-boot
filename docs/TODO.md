@@ -101,6 +101,7 @@ kernel gate below is explicitly marked complete.
 - [x] Add shell background `run ... &` and explicit `wait <pid>` handling.
 - [x] Expand the FAT32 boot-image root directory beyond one cluster.
 - [x] Add standalone `ECHO.ELF` in the expanded root directory.
+- [x] Add standalone `STAT.ELF` using descriptor metadata.
 - [ ] Add reliable QEMU live keyboard verification for `run INIT.ELF`.
 - [ ] Add the command-line shell and terminal/console I/O.
 - [ ] Add process tools and initial utilities (`init`, `echo`, `ls`, `cat`,

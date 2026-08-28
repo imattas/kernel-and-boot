@@ -1590,6 +1590,8 @@ The FAT32 image builder now chains a second root-directory cluster, removing
 the one-sector root-entry ceiling for continued userland growth.
 The standalone `ECHO.ELF` utility is now stored in the expanded root directory
 and exercises the conventional argument vector.
+The standalone `STAT.ELF` utility now exercises descriptor metadata queries
+and is stored in the expanded root directory.
 The terminal input loop now has a bounded line editor with backspace/delete,
 Ctrl-U clear-line, and Ctrl-C cancel-line behavior.
 The first standalone ring-3 `ARGS.ELF` utility is now built and packaged in

@@ -6,6 +6,13 @@
 #define OS_SYSCALL_ERROR UINT64_MAX
 
 typedef struct {
+    uint64_t owner_uid;
+    uint64_t owner_gid;
+    uint32_t mode;
+    uint32_t type;
+} os_stat_t;
+
+typedef struct {
     uint64_t id;
     uint64_t parent_id;
     uint32_t state;
@@ -69,6 +76,10 @@ static inline uint64_t os_open(const char *path, uint64_t length,
 
 static inline uint64_t os_close(uint64_t descriptor) {
     return os_syscall3(12, descriptor, 0, 0);
+}
+
+static inline uint64_t os_fstat(uint64_t descriptor, os_stat_t *stat) {
+    return os_syscall3(24, descriptor, (uint64_t)(uintptr_t)stat, 0);
 }
 
 static inline uint64_t os_readdir(uint64_t descriptor, void *entry) {

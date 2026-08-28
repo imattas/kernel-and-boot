@@ -2067,6 +2067,5 @@ input no longer depends on the optional background input task being scheduled.
 The interactive serial path now has a dedicated `qemu-input-test` gate. It
 waits for the UEFI boot to reach `os> `, submits a delayed `echo input-test`
 through QEMU's serial stdin, and verifies the command is received and echoed by
-the live shell. Standard-input reads also perform a bounded PS/2 poll fallback,
-so a shell read does not depend exclusively on the interrupt route; live
-USB/PS2 keyboard injection remains a separate verification follow-up.
+the live shell. Live USB/PS2 keyboard injection remains a separate verification
+follow-up.

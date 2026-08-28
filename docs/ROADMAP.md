@@ -1044,6 +1044,10 @@ The shell `ps` command now obtains a bounded live process-ID snapshot from the
 kernel process table.
 `ps` now resolves each listed process to PID, parent PID, lifecycle state, and
 exit status through the process-status syscall.
+Waiting now reaps completed child processes, and `run` reports their exit
+status before returning to the prompt.
+Reaping is exposed as a separate parent-validated syscall, preserving the
+existing wait ABI used by kernel lifecycle probes.
 
 This gate includes all non-driver kernel core services and VFS abstractions,
 then the complete driver phase, with build integration, focused tests, and QEMU

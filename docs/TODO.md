@@ -79,6 +79,7 @@ kernel gate below is explicitly marked complete.
 - [x] Add shell `id` process and credential identity utility.
 - [x] Add shell `ps` live process-ID listing.
 - [x] Add process status details to shell `ps`.
+- [x] Reap completed spawned processes and report `run` exit status.
 - [ ] Add reliable QEMU live keyboard verification for `run INIT.ELF`.
 - [ ] Add the command-line shell and terminal/console I/O.
 - [ ] Add process tools and initial utilities (`init`, `echo`, `ls`, `cat`,

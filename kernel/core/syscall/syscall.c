@@ -188,6 +188,20 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
             process_release(target);
             return valid ? 0 : OS_SYSCALL_ERROR;
         }
+        case OS_SYSCALL_PROCESS_REAP: {
+            process_t *parent = process_current();
+            process_t *target = process_lookup_retain(arg1);
+            int valid = parent && target && parent != target;
+            if (valid) {
+                uint64_t flags = spinlock_lock_irqsave(&target->lock);
+                valid = target->parent == parent &&
+                        target->state == PROCESS_EXITED;
+                spinlock_unlock_irqrestore(&target->lock, flags);
+            }
+            if (valid) valid = process_destroy(target);
+            process_release(target);
+            return valid ? 0 : OS_SYSCALL_ERROR;
+        }
         case OS_SYSCALL_SPAWN: {
             process_t *parent = process_current();
             if (!parent || arg2 == 0 || arg2 > OS_SYSCALL_MAX_PATH)

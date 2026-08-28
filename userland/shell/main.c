@@ -24,6 +24,15 @@ static void print_number(uint64_t value) {
     while (length != 0) print(&digits[--length], 1);
 }
 
+static void print_status(int32_t status) {
+    if (status < 0) {
+        print("-", 1);
+        print_number((uint64_t)(-(int64_t)status));
+    } else {
+        print_number((uint64_t)status);
+    }
+}
+
 void shell_main(void) {
     static const char prompt[] = "os> ";
     static const char help[] = "help id ps echo pwd cd ls cat mkdir rm rmdir touch write run exit\r\n";
@@ -174,9 +183,16 @@ void shell_main(void) {
                 while (argument[argument_length]) ++argument_length;
                 uint64_t process_id = os_spawn(argument, argument_length);
                 int32_t status = -1;
-                if (process_id == OS_SYSCALL_ERROR ||
-                    os_wait(process_id, &status) == OS_SYSCALL_ERROR)
+                if (process_id == OS_SYSCALL_ERROR) {
                     print(unknown, sizeof(unknown) - 1U);
+                } else if (os_wait(process_id, &status) == OS_SYSCALL_ERROR ||
+                           os_reap(process_id) == OS_SYSCALL_ERROR) {
+                    print(unknown, sizeof(unknown) - 1U);
+                } else {
+                    print("exit=", 5);
+                    print_status(status);
+                    print("\r\n", 2);
+                }
             } else if (command == SHELL_EXIT) {
                 os_exit(0);
             } else if (command != SHELL_EMPTY) {

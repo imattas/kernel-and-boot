@@ -29,6 +29,10 @@ static inline uint64_t os_process_status(uint64_t process_id,
     return os_syscall3(43, process_id, (uint64_t)(uintptr_t)info, 0);
 }
 
+static inline uint64_t os_reap(uint64_t process_id) {
+    return os_syscall3(44, process_id, 0, 0);
+}
+
 static inline uint64_t os_write(uint64_t descriptor, const void *buffer,
                                 uint64_t length) {
     return os_syscall3(1, descriptor, (uint64_t)(uintptr_t)buffer, length);

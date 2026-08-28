@@ -94,6 +94,7 @@ the init-owned shell supervisor remains the next kernel/userland boundary.
 - [x] Add quote-aware bounded `;` command sequencing.
 - [x] Make `grep.elf` consume standard input for pipeline execution.
 - [x] Make `wc.elf` consume standard input for pipeline execution.
+- [x] Make `head.elf` consume standard input for pipeline execution.
 - [x] Add background execution and job-table tracking for PATH-resolved
   external commands.
 - [x] Poll, reap, and remove completed background jobs without blocking the

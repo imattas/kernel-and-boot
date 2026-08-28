@@ -1750,6 +1750,8 @@ command in order before returning to the prompt.
 enabling file-to-search pipelines through the shell's pipe descriptors.
 `wc.elf` now has the same standard-input mode, completing the basic
 file-to-filter counting pipeline path.
+`head.elf` now accepts standard input as well, completing stdin support across
+the initial text pipeline utilities.
 PATH-resolved external commands can now also use the shell's background-job
 syntax (`command &`) and enter the existing `jobs`/`fg` tracking table.
 The shell now polls those jobs without blocking, reaps processes after both

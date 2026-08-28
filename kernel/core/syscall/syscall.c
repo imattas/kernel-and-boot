@@ -245,6 +245,17 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
             return process_environment_set(process, key, key_length, value,
                                            value_length) ? 0 : OS_SYSCALL_ERROR;
         }
+        case OS_SYSCALL_UNSETENV: {
+            process_t *process = process_current();
+            char key[33];
+            if (!process || arg1 == 0 ||
+                !syscall_copy_string(key, arg1, sizeof(key)))
+                return OS_SYSCALL_ERROR;
+            uint32_t key_length = 0;
+            while (key[key_length]) ++key_length;
+            return process_environment_unset(process, key, key_length) ?
+                   0 : OS_SYSCALL_ERROR;
+        }
         case OS_SYSCALL_SPAWN: {
             process_t *parent = process_current();
             if (!parent || arg2 == 0 || arg2 > OS_SYSCALL_MAX_PATH)

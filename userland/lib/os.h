@@ -83,6 +83,10 @@ static inline uint64_t os_setenv(const char *key, const char *value) {
                        (uint64_t)(uintptr_t)value, 0);
 }
 
+static inline uint64_t os_unsetenv(const char *key) {
+    return os_syscall3(47, (uint64_t)(uintptr_t)key, 0, 0);
+}
+
 static inline uint64_t os_set_inheritable(uint64_t descriptor,
                                           uint64_t enabled) {
     return os_syscall3(30, descriptor, enabled, 0);

@@ -336,6 +336,37 @@ int process_environment_set(process_t *process, const char *key,
     return 1;
 }
 
+int process_environment_unset(process_t *process, const char *key,
+                              uint32_t key_length) {
+    if (!process || !key || key_length == 0 || key_length > 32U) return 0;
+    char updated[PROCESS_ENVIRONMENT_SIZE] = {0};
+    uint32_t output = 0;
+    uint64_t flags = spinlock_lock_irqsave(&process->lock);
+    uint32_t offset = 0;
+    while (offset < sizeof(process->environment) &&
+           process->environment[offset]) {
+        uint32_t end = offset;
+        while (end < sizeof(process->environment) &&
+               process->environment[end]) ++end;
+        if (!environment_key_matches(&process->environment[offset],
+                                     end - offset, key, key_length)) {
+            uint32_t length = end - offset;
+            if (output + length + 1U >= sizeof(updated)) {
+                spinlock_unlock_irqrestore(&process->lock, flags);
+                return 0;
+            }
+            for (uint32_t index = 0; index <= length; ++index)
+                updated[output + index] = process->environment[offset + index];
+            output += length + 1U;
+        }
+        offset = end + 1U;
+    }
+    for (uint32_t index = 0; index < sizeof(updated); ++index)
+        process->environment[index] = updated[index];
+    spinlock_unlock_irqrestore(&process->lock, flags);
+    return 1;
+}
+
 int process_set_working_directory(process_t *process, vfs_node_t *directory) {
     if (!process || !directory || directory->type != VFS_NODE_DIRECTORY) return 0;
     vfs_node_retain(directory);

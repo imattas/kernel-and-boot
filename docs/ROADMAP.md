@@ -1613,6 +1613,7 @@ The standalone `DUP.ELF` probe now exercises descriptor duplication against
 the packaged kernel image.
 The process environment now supports bounded multi-entry updates through
 `setenv`, and spawned user programs receive each inherited entry in `envp[]`.
+The shell also supports bounded `unsetenv <key>` removal from that environment.
 The FAT32 image builder now chains a second root-directory cluster, removing
 the one-sector root-entry ceiling for continued userland growth.
 The standalone `ECHO.ELF` utility is now stored in the expanded root directory

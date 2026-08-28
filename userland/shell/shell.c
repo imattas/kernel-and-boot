@@ -74,7 +74,8 @@ shell_command_t shell_parse(const char *line, uint32_t length,
         !same_word(line, command_length, "kill") &&
         !same_word(line, command_length, "sleep") &&
         !same_word(line, command_length, "mv") &&
-        !same_word(line, command_length, "setenv")) return SHELL_UNKNOWN;
+        !same_word(line, command_length, "setenv") &&
+        !same_word(line, command_length, "unsetenv")) return SHELL_UNKNOWN;
     uint32_t start = command_length;
     while (start < length && (line[start] == ' ' || line[start] == '\t')) ++start;
     uint32_t argument_length = length - start;
@@ -90,6 +91,7 @@ shell_command_t shell_parse(const char *line, uint32_t length,
     if (same_word(line, command_length, "sleep")) return SHELL_SLEEP;
     if (same_word(line, command_length, "mv")) return SHELL_MV;
     if (same_word(line, command_length, "setenv")) return SHELL_SETENV;
+    if (same_word(line, command_length, "unsetenv")) return SHELL_UNSETENV;
     if (same_word(line, command_length, "mkdir")) return SHELL_MKDIR;
     if (same_word(line, command_length, "rm")) return SHELL_RM;
     if (same_word(line, command_length, "rmdir")) return SHELL_RMDIR;

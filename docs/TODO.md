@@ -116,6 +116,7 @@ kernel gate below is explicitly marked complete.
   standalone round-trip probe.
 - [x] Add standalone `DUP.ELF` descriptor-duplication probe.
 - [x] Add shell `setenv <key> <value>` and multi-entry environment inheritance.
+- [x] Add shell `unsetenv <key>` environment removal.
 - [ ] Add reliable QEMU live keyboard verification for `run INIT.ELF`.
 - [ ] Add the command-line shell and terminal/console I/O.
 - [ ] Add process tools and initial utilities (`init`, `echo`, `ls`, `cat`,

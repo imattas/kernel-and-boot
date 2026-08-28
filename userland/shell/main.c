@@ -36,6 +36,17 @@ static void print_number(uint64_t value) {
     while (length != 0) print(&digits[--length], 1);
 }
 
+static void print_uptime(void) {
+    uint64_t now = os_clock_monotonic();
+    uint64_t milliseconds = (now / 1000000U) % 1000U;
+    print_number(now / 1000000000U);
+    print(".", 1);
+    if (milliseconds < 100U) print("0", 1);
+    if (milliseconds < 10U) print("0", 1);
+    print_number(milliseconds);
+    print("s\r\n", 3);
+}
+
 static void print_status(int32_t status) {
     if (status < 0) {
         print("-", 1);
@@ -1234,6 +1245,9 @@ void shell_main(void) {
                 if (!shell_print_path_part(argument, argument_length,
                                            command == SHELL_DIRNAME))
                     print(unknown, sizeof(unknown) - 1U);
+            } else if (command == SHELL_UPTIME) {
+                if (argument_length != 0) print(unknown, sizeof(unknown) - 1U);
+                else print_uptime();
             } else if (command == SHELL_CD) {
                 uint32_t argument_length = 0;
                 while (argument[argument_length]) ++argument_length;

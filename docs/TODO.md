@@ -134,6 +134,8 @@ type, string, and numeric tests.
   parsing.
 - [x] Add packaged `uptime.elf` using the monotonic clock syscall and expose
   it through PATH and the live FAT32 VFS namespace.
+- [x] Implement shell `uptime` directly through the clock syscall while
+  retaining external/pipeline dispatch.
 - [x] Add packaged `date.elf` using the validated RTC syscall and expose it
   through PATH and the live FAT32 VFS namespace.
 - [x] Package `clear.elf` with the shell's terminal-clear sequence for PATH

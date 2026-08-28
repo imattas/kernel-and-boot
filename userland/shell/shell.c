@@ -286,6 +286,8 @@ shell_command_t shell_parse(const char *line, uint32_t length,
         !shell_has_operator(line, length)) return SHELL_BASENAME;
     if (same_word(line, command_length, "dirname") &&
         !shell_has_operator(line, length)) return SHELL_DIRNAME;
+    if (same_word(line, command_length, "uptime") &&
+        !shell_has_operator(line, length)) return SHELL_UPTIME;
     if ((same_word(line, command_length, "echo") ||
          same_word(line, command_length, "cat") ||
          same_word(line, command_length, "pwd") ||
@@ -331,8 +333,7 @@ shell_command_t shell_parse(const char *line, uint32_t length,
         same_word(line, command_length, "tr") ||
         same_word(line, command_length, "cmp")) return SHELL_RUN;
     if (same_word(line, command_length, "find")) return SHELL_RUN;
-    if (same_word(line, command_length, "uptime") ||
-        same_word(line, command_length, "date")) return SHELL_RUN;
+    if (same_word(line, command_length, "date")) return SHELL_RUN;
     if (same_word(line, command_length, "test")) return SHELL_RUN;
     if (same_word(line, command_length, "stat")) return SHELL_STAT;
     if (same_word(line, command_length, "chmod")) return SHELL_CHMOD;

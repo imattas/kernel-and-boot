@@ -1826,6 +1826,10 @@ through PATH resolution and the normal process ABI.
 Standalone `uptime.elf` now reports seconds and milliseconds from the kernel's
 monotonic clock syscall and is packaged in the FAT32 image and live VFS.
 
+The interactive shell now handles plain `uptime` natively through the same
+clock syscall, while operator forms continue through the external pipeline
+path.
+
 Standalone `date.elf` now reports the validated RTC date and time through a
 bounded realtime-clock syscall and is packaged in the FAT32 image and live VFS.
 

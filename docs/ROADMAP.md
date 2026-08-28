@@ -1742,6 +1742,8 @@ with the shell's existing pipeline and redirection operators.
 The parser now preserves operator expressions for arbitrary external command
 names as well, allowing the same pipeline/redirection path to resolve them via
 `PATH`.
+The `echo` command follows that same route when redirected, so `echo text >
+file` uses the packaged external utility and descriptor redirection path.
 PATH-resolved external commands can now also use the shell's background-job
 syntax (`command &`) and enter the existing `jobs`/`fg` tracking table.
 The shell now polls those jobs without blocking, reaps processes after both

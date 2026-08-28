@@ -153,6 +153,13 @@ shell_command_t shell_parse(const char *line, uint32_t length,
     for (uint32_t index = 0; index < argument_length; ++index)
         argument[index] = line[start + index];
     argument[argument_length] = 0;
+    if (same_word(line, command_length, "echo") &&
+        shell_has_operator(line, length)) {
+        if (length >= capacity) return SHELL_UNKNOWN;
+        for (uint32_t index = 0; index <= length; ++index)
+            argument[index] = line[index];
+        return SHELL_RUN;
+    }
     if (same_word(line, command_length, "cd")) return SHELL_CD;
     if (same_word(line, command_length, "cat")) return SHELL_CAT;
     if (same_word(line, command_length, "head")) return SHELL_HEAD;

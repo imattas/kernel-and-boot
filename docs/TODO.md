@@ -90,6 +90,7 @@ the init-owned shell supervisor remains the next kernel/userland boundary.
   redirection dispatch.
 - [x] Preserve arbitrary external commands through pipeline and redirection
   parsing.
+- [x] Route redirected `echo` through the external descriptor path.
 - [x] Add background execution and job-table tracking for PATH-resolved
   external commands.
 - [x] Poll, reap, and remove completed background jobs without blocking the

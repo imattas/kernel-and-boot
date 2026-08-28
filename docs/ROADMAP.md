@@ -1609,6 +1609,8 @@ Userland now exposes channel create/send/receive wrappers, including blocking
 variants, and includes an
 `IPC.ELF` round-trip probe, establishing the message-passing seam for future
 pipeline support.
+The standalone `DUP.ELF` probe now exercises descriptor duplication against
+the packaged kernel image.
 The process environment now supports bounded multi-entry updates through
 `setenv`, and spawned user programs receive each inherited entry in `envp[]`.
 The FAT32 image builder now chains a second root-directory cluster, removing

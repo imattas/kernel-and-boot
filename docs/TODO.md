@@ -114,6 +114,7 @@ kernel gate below is explicitly marked complete.
 - [x] Add standalone `SETENV.ELF` utility using the environment-update ABI.
 - [x] Add userland IPC channel wrappers, including blocking variants, and a
   standalone round-trip probe.
+- [x] Add standalone `DUP.ELF` descriptor-duplication probe.
 - [x] Add shell `setenv <key> <value>` and multi-entry environment inheritance.
 - [ ] Add reliable QEMU live keyboard verification for `run INIT.ELF`.
 - [ ] Add the command-line shell and terminal/console I/O.

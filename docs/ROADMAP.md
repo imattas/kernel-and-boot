@@ -1541,7 +1541,9 @@ userland slice now provides a freestanding ring-3 init ELF that exercises the
 existing `write` and `exit` syscall ABI. A small C-facing runtime wrapper now
 owns those calls, while the UEFI boot contract loads the image and the kernel
 launches it as the first external user process after the kernel gate. Next
-expand toward libraries, shell/tooling, and system services.
+The kernel now exposes a nonblocking descriptor-0 read backed by the shared
+keyboard queue, with the runtime exporting `os_read`; the next step is a
+blocking input policy and shell/tooling.
 
 ## Phase 10 — BIOS boot path
 

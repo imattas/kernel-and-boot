@@ -9,6 +9,7 @@
 #include "../../ipc/endpoint.h"
 #include "../../sched/core/scheduler.h"
 #include "../printk/serial.h"
+#include "../../drivers/input/input.h"
 
 extern void arch_syscall_interrupt(void);
 
@@ -185,6 +186,11 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
         case OS_SYSCALL_WRITE_FILE: {
             process_t *process = process_current();
             if (!process || arg3 == 0 || arg3 > OS_SYSCALL_MAX_WRITE) return OS_SYSCALL_ERROR;
+            if (number == OS_SYSCALL_READ && arg1 == 0) {
+                uint8_t input[OS_SYSCALL_MAX_WRITE];
+                uint32_t count = input_read_standard(input, (uint32_t)arg3);
+                return count != 0 && syscall_copy_to_user(arg2, input, count) ? count : 0;
+            }
             if (number == OS_SYSCALL_READ && !user_range(arg2, arg3, 1))
                 return OS_SYSCALL_ERROR;
             process_handle_ref_t ref = {0};

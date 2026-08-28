@@ -2365,6 +2365,7 @@ void kernel_main(void *boot_info) {
     serial_write("slab cache ready\r\n");
     input_queue_t input_queue;
     input_runtime_queue = &input_queue;
+    input_set_standard_queue(&input_queue);
     input_event_t input_event = {
         .type = INPUT_EVENT_KEY, .code = 30, .value = 1, .timestamp = 7
     };
@@ -2402,6 +2403,17 @@ void kernel_main(void *boot_info) {
         serial_write("input batch failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
+    input_event_t standard_input_event = {
+        .type = INPUT_EVENT_KEY, .code = 4, .value = 1, .timestamp = 9
+    };
+    uint8_t standard_input_probe[2] = {0};
+    if (!input_queue_push(&input_queue, &standard_input_event) ||
+        input_read_standard(standard_input_probe, 1) != 1 ||
+        standard_input_probe[0] != 'a') {
+        serial_write("standard input failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("standard input ready\r\n");
     uint32_t framebuffer_storage[50];
     framebuffer_t framebuffer;
     if (!framebuffer_initialize(&framebuffer, framebuffer_storage, 8, 5, 10)) {

@@ -7,7 +7,7 @@ static void print(const char *text, uint64_t length) {
 
 void shell_main(void) {
     static const char prompt[] = "os> ";
-    static const char help[] = "help echo pwd\r\n";
+    static const char help[] = "help echo pwd cd exit\r\n";
     static const char unknown[] = "unknown command\r\n";
     static char line[128];
     static char argument[128];
@@ -37,6 +37,13 @@ void shell_main(void) {
                 uint64_t result = os_getcwd(argument, sizeof(argument));
                 if (result != OS_SYSCALL_ERROR) print(argument, result);
                 print("\r\n", 2);
+            } else if (command == SHELL_CD) {
+                uint32_t argument_length = 0;
+                while (argument[argument_length]) ++argument_length;
+                if (os_chdir(argument, argument_length) == OS_SYSCALL_ERROR)
+                    print(unknown, sizeof(unknown) - 1U);
+            } else if (command == SHELL_EXIT) {
+                os_exit(0);
             } else if (command != SHELL_EMPTY) {
                 print(unknown, sizeof(unknown) - 1U);
             }

@@ -1547,6 +1547,8 @@ blocking input policy and shell/tooling. The first shell parser now handles
 bounded `help`, `echo`, and `pwd` commands independently of I/O scheduling.
 The persistent shell ELF is now loaded by UEFI and enqueued by the kernel after
 init, with a prompt running on the standard input/output boundary.
+The shell command surface now also recognizes bounded `cd` and `exit` commands,
+using the existing working-directory and process-exit syscalls.
 
 ## Phase 10 — BIOS boot path
 

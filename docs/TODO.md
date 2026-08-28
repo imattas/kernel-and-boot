@@ -67,6 +67,7 @@ kernel gate below is explicitly marked complete.
 - [x] Add and contract-test the first shell command parser (`help`, `echo`, and
   `pwd`, with bounded unknown-command handling).
 - [x] Build and launch the persistent ring-3 shell process with standard I/O.
+- [x] Add shell `cd` and `exit` command dispatch through the syscall runtime.
 - [ ] Add the command-line shell and terminal/console I/O.
 - [ ] Add process tools and initial utilities (`init`, `echo`, `ls`, `cat`,
   `pwd`, `mkdir`, `rm`, and `sh`).

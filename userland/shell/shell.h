@@ -8,6 +8,8 @@ typedef enum {
     SHELL_HELP,
     SHELL_ECHO,
     SHELL_PWD,
+    SHELL_CD,
+    SHELL_EXIT,
     SHELL_UNKNOWN
 } shell_command_t;
 

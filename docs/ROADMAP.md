@@ -678,6 +678,10 @@ bounded press/release transitions, preventing repeated held-key reports from
 being misclassified as new presses.
 HID transition emission now timestamps key presses consistently and guards the
 fixed 20-event output capacity before publishing a state update.
+The interactive shell currently exposes its prompt through the QEMU serial
+console (`-serial stdio`); the graphical/VNC display has no terminal surface,
+and live USB/PS2 keyboard-to-shell input remains an unfinished verification
+item.
 The HID state tracker now also emits transitions for all eight boot-report
 modifier bits using stable modifier key codes.
 The shared input queue now supports atomic bounded event batches, so one

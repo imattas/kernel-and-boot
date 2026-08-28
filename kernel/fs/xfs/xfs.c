@@ -1449,7 +1449,8 @@ static int xfs_write_inode(const xfs_fs_t *fs, uint64_t inode,
     uint8_t block_data[4096];
     if (!xfs_read_block(fs, block, block_data)) return 0;
     for (uint32_t i = 0; i < fs->inode_size; ++i) block_data[offset + i] = data[i];
-    return xfs_write_block(fs, block, block_data);
+    if (!xfs_write_block(fs, block, block_data)) return 0;
+    return xfs_flush_metadata(fs);
 }
 
 int xfs_inode_size(xfs_fs_t *fs, uint64_t inode, uint64_t *size) {

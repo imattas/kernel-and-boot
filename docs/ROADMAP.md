@@ -1841,6 +1841,10 @@ environment syscall.
 The native shell and standalone `echo.elf` now support `echo -n`, suppressing
 the trailing CRLF while retaining normal handling for other `-n`-prefixed text.
 
+Foreground pipeline execution now supports up to four stages with one pipe per
+boundary, explicit inheritable-handle control, and ordered wait/reap cleanup;
+the existing two-stage background job limit remains explicit.
+
 The standalone formatter now supports bounded unsigned decimal, hexadecimal,
 octal, and single-character conversions in addition to its existing string,
 signed-decimal, percent, and escaped-control behavior.

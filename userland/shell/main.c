@@ -526,6 +526,103 @@ static int shell_run_pipeline(char *text, uint32_t length, int background,
     return 1;
 }
 
+static int shell_run_multi_pipeline(char *text, uint32_t length,
+                                    uint32_t separator_count, int32_t *status) {
+    if (!text || !status || separator_count < 2U || separator_count > 3U)
+        return 0;
+    uint32_t separators[3] = {0};
+    uint32_t found = 0;
+    char quote = 0;
+    int escaped = 0;
+    for (uint32_t index = 0; index < length; ++index) {
+        char value = text[index];
+        if (escaped) { escaped = 0; continue; }
+        if (value == '\\') { escaped = 1; continue; }
+        if (quote) { if (value == quote) quote = 0; continue; }
+        if (value == '\'' || value == '"') { quote = value; continue; }
+        if (value == '|') {
+            if (found == separator_count) return 0;
+            separators[found++] = index;
+        }
+    }
+    if (found != separator_count || escaped || quote) return 0;
+    uint32_t stages = separator_count + 1U;
+    for (uint32_t separator = 0; separator < separator_count; ++separator)
+        text[separators[separator]] = 0;
+    char paths[4][128];
+    uint32_t path_lengths[4] = {0};
+    uint32_t starts[4] = {0};
+    uint32_t ends[4] = {0};
+    for (uint32_t stage = 0; stage < stages; ++stage) {
+        starts[stage] = stage == 0 ? 0 : separators[stage - 1U] + 1U;
+        ends[stage] = stage == separator_count ? length : separators[stage];
+        while (starts[stage] < ends[stage] && (text[starts[stage]] == ' ' ||
+               text[starts[stage]] == '\t')) ++starts[stage];
+        while (ends[stage] > starts[stage] && (text[ends[stage] - 1U] == ' ' ||
+               text[ends[stage] - 1U] == '\t')) --ends[stage];
+        if (starts[stage] == ends[stage]) return 0;
+        uint32_t name_end = starts[stage];
+        while (name_end < ends[stage] && text[name_end] != ' ' &&
+               text[name_end] != '\t') ++name_end;
+        path_lengths[stage] = resolve_command(text + starts[stage],
+                                               name_end - starts[stage],
+                                               paths[stage], sizeof(paths[stage]));
+        if (path_lengths[stage] == 0) return 0;
+    }
+    uint32_t reads[3] = {0};
+    uint32_t writes[3] = {0};
+    uint64_t processes[4] = {0};
+    uint32_t pipes = stages - 1U;
+    for (uint32_t pipe = 0; pipe < pipes; ++pipe) {
+        if (os_pipe(&reads[pipe], &writes[pipe]) == OS_SYSCALL_ERROR ||
+            os_set_inheritable(reads[pipe], 0) == OS_SYSCALL_ERROR ||
+            os_set_inheritable(writes[pipe], 0) == OS_SYSCALL_ERROR)
+            goto failure;
+    }
+    for (uint32_t stage = 0; stage < stages; ++stage) {
+        uint32_t input = stage == 0 ? 0 : reads[stage - 1U];
+        uint32_t output = stage + 1U == stages ? 0 : writes[stage];
+        if (input && os_set_inheritable(input, 1) == OS_SYSCALL_ERROR) goto failure;
+        if (output && os_set_inheritable(output, 1) == OS_SYSCALL_ERROR) goto failure;
+        uint32_t name_end = starts[stage];
+        while (name_end < ends[stage] && text[name_end] != ' ' &&
+               text[name_end] != '\t') ++name_end;
+        uint32_t arguments = name_end;
+        while (arguments < ends[stage] && (text[arguments] == ' ' ||
+               text[arguments] == '\t')) ++arguments;
+        processes[stage] = os_spawn_redirected(paths[stage], path_lengths[stage],
+                                                text + arguments, input, output);
+        if (input) (void)os_set_inheritable(input, 0);
+        if (output) (void)os_set_inheritable(output, 0);
+        if (processes[stage] == OS_SYSCALL_ERROR) goto failure;
+    }
+    for (uint32_t pipe = 0; pipe < pipes; ++pipe) {
+        (void)os_close(reads[pipe]);
+        (void)os_close(writes[pipe]);
+    }
+    *status = 1;
+    for (uint32_t stage = 0; stage < stages; ++stage) {
+        int32_t child_status = 1;
+        if (os_wait(processes[stage], &child_status) == OS_SYSCALL_ERROR ||
+            os_reap(processes[stage]) == OS_SYSCALL_ERROR) return 0;
+        if (stage + 1U == stages) *status = child_status;
+    }
+    return 1;
+failure:
+    for (uint32_t pipe = 0; pipe < pipes; ++pipe) {
+        if (reads[pipe]) (void)os_close(reads[pipe]);
+        if (writes[pipe]) (void)os_close(writes[pipe]);
+    }
+    for (uint32_t stage = 0; stage < stages; ++stage) {
+        if (processes[stage] != 0 && processes[stage] != OS_SYSCALL_ERROR) {
+            int32_t ignored = 1;
+            (void)os_wait(processes[stage], &ignored);
+            (void)os_reap(processes[stage]);
+        }
+    }
+    return 0;
+}
+
 static int shell_run_redirect(char *text, uint32_t length, int32_t *status) {
     uint32_t separator = length;
     uint32_t redirect_count = shell_count_operator(text, length, '>', &separator);
@@ -1417,10 +1514,17 @@ void shell_main(void) {
                     int32_t pipeline_status = 1;
                     uint64_t pipeline_leader = 0;
                     uint64_t pipeline_consumer = 0;
-                    if (!shell_run_pipeline(argument, argument_length,
-                                             pipeline_background,
-                                             &pipeline_leader, &pipeline_consumer,
-                                             &pipeline_status))
+                    if (pipeline_count > 1U && pipeline_background)
+                        pipeline_status = 1;
+                    int pipeline_ok = pipeline_count > 1U ?
+                        (!pipeline_background && shell_run_multi_pipeline(
+                            argument, argument_length, pipeline_count,
+                            &pipeline_status)) :
+                        shell_run_pipeline(argument, argument_length,
+                                           pipeline_background,
+                                           &pipeline_leader, &pipeline_consumer,
+                                           &pipeline_status);
+                    if (!pipeline_ok)
                         print(unknown, sizeof(unknown) - 1U);
                     else if (pipeline_background) {
                         job_add(pipeline_leader, pipeline_consumer);

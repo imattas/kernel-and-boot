@@ -129,7 +129,7 @@ static uint32_t resolve_command(const char *name, uint32_t name_length,
 
 void shell_main(void) {
     static const char prompt[] = "os> ";
-    static const char help[] = "help id ps env jobs which inherit echo pwd cd ls cat stat chmod kill mkdir rm rmdir touch write run wait exit\r\n";
+    static const char help[] = "help id ps env jobs which inherit echo pwd cd ls cat stat chmod kill sleep mkdir rm rmdir touch write run wait exit\r\n";
     static const char unknown[] = "unknown command\r\n";
     static char line[128];
     static char argument[128];
@@ -344,6 +344,19 @@ void shell_main(void) {
                                   argument_length - signal_start, &signal_number) ||
                     os_signal_send_to(process_id, signal_number) == OS_SYSCALL_ERROR)
                     print(unknown, sizeof(unknown) - 1U);
+            } else if (command == SHELL_SLEEP) {
+                uint32_t argument_length = 0;
+                while (argument[argument_length]) ++argument_length;
+                uint64_t milliseconds;
+                uint64_t now = os_clock_monotonic();
+                if (!parse_number(argument, argument_length, &milliseconds) ||
+                    milliseconds > (UINT64_MAX - now) / 1000000U) {
+                    print(unknown, sizeof(unknown) - 1U);
+                } else {
+                    uint64_t deadline = now + milliseconds * 1000000U;
+                    while ((now = os_clock_monotonic()) < deadline)
+                        (void)os_yield();
+                }
             } else if (command == SHELL_MKDIR) {
                 uint32_t argument_length = 0;
                 while (argument[argument_length]) ++argument_length;

@@ -42,6 +42,8 @@ int main(void) {
     assert(strcmp(argument, "755 /hello") == 0);
     assert(shell_parse("kill 4 9", 8, argument, sizeof(argument)) == SHELL_KILL);
     assert(strcmp(argument, "4 9") == 0);
+    assert(shell_parse("sleep 25", 8, argument, sizeof(argument)) == SHELL_SLEEP);
+    assert(strcmp(argument, "25") == 0);
     assert(shell_parse("mkdir /tmp", 10, argument, sizeof(argument)) == SHELL_MKDIR);
     assert(strcmp(argument, "/tmp") == 0);
     assert(shell_parse("rm /tmp/file", 12, argument, sizeof(argument)) == SHELL_RM);

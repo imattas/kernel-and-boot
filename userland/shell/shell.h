@@ -20,6 +20,7 @@ typedef enum {
     SHELL_STAT,
     SHELL_CHMOD,
     SHELL_KILL,
+    SHELL_SLEEP,
     SHELL_MKDIR,
     SHELL_RM,
     SHELL_RMDIR,

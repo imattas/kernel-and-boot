@@ -47,6 +47,8 @@ int main(void) {
     assert(strcmp(argument, "/tmp/file hello") == 0);
     assert(shell_parse("run INIT.ELF hello", 18, argument, sizeof(argument)) == SHELL_RUN);
     assert(strcmp(argument, "INIT.ELF hello") == 0);
+    assert(shell_parse("wait 4", 6, argument, sizeof(argument)) == SHELL_WAIT);
+    assert(strcmp(argument, "4") == 0);
     assert(shell_parse("exit", 4, argument, sizeof(argument)) == SHELL_EXIT);
     assert(shell_parse("wat", 3, argument, sizeof(argument)) == SHELL_UNKNOWN);
     assert(shell_parse("", 0, argument, sizeof(argument)) == SHELL_EMPTY);

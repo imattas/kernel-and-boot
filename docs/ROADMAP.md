@@ -1584,6 +1584,8 @@ The shell `run` command now resolves bare executable names through the
 process's inherited `PATH`, while preserving explicit paths.
 The shell also provides `which`, using the same bounded resolver to report the
 actual executable path only when the target exists.
+The shell can launch a process in the background with `run ... &` and collect
+its status later with `wait <pid>`.
 The terminal input loop now has a bounded line editor with backspace/delete,
 Ctrl-U clear-line, and Ctrl-C cancel-line behavior.
 The first standalone ring-3 `ARGS.ELF` utility is now built and packaged in

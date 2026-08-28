@@ -22,6 +22,7 @@ typedef enum {
     SHELL_TOUCH,
     SHELL_WRITE,
     SHELL_RUN,
+    SHELL_WAIT,
     SHELL_EXIT,
     SHELL_UNKNOWN
 } shell_command_t;

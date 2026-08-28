@@ -94,7 +94,7 @@ static uint32_t resolve_command(const char *name, uint32_t name_length,
 
 void shell_main(void) {
     static const char prompt[] = "os> ";
-    static const char help[] = "help id ps env which inherit echo pwd cd ls cat mkdir rm rmdir touch write run exit\r\n";
+    static const char help[] = "help id ps env which inherit echo pwd cd ls cat mkdir rm rmdir touch write run wait exit\r\n";
     static const char unknown[] = "unknown command\r\n";
     static char line[128];
     static char argument[128];
@@ -298,9 +298,32 @@ void shell_main(void) {
                 } else if (os_close(descriptor) == OS_SYSCALL_ERROR) {
                     print(unknown, sizeof(unknown) - 1U);
                 }
+            } else if (command == SHELL_WAIT) {
+                uint32_t pid_length = 0;
+                while (argument[pid_length]) ++pid_length;
+                uint64_t process_id = 0;
+                int32_t status = -1;
+                if (!parse_number(argument, pid_length, &process_id) ||
+                    os_wait(process_id, &status) == OS_SYSCALL_ERROR ||
+                    os_reap(process_id) == OS_SYSCALL_ERROR) {
+                    print(unknown, sizeof(unknown) - 1U);
+                } else {
+                    print("exit=", 5);
+                    print_status(status);
+                    print("\r\n", 2);
+                }
             } else if (command == SHELL_RUN) {
                 uint32_t argument_length = 0;
                 while (argument[argument_length]) ++argument_length;
+                int background = 0;
+                if (argument_length != 0 && argument[argument_length - 1U] == '&') {
+                    background = 1;
+                    --argument_length;
+                    while (argument_length != 0 &&
+                           (argument[argument_length - 1U] == ' ' ||
+                            argument[argument_length - 1U] == '\t')) --argument_length;
+                    argument[argument_length] = 0;
+                }
                 uint32_t path_length = 0;
                 while (path_length < argument_length && argument[path_length] != ' ' &&
                        argument[path_length] != '\t') ++path_length;
@@ -318,6 +341,10 @@ void shell_main(void) {
                 int32_t status = -1;
                 if (process_id == OS_SYSCALL_ERROR) {
                     print(unknown, sizeof(unknown) - 1U);
+                } else if (background) {
+                    print("pid=", 4);
+                    print_number(process_id);
+                    print("\r\n", 2);
                 } else if (os_wait(process_id, &status) == OS_SYSCALL_ERROR ||
                            os_reap(process_id) == OS_SYSCALL_ERROR) {
                     print(unknown, sizeof(unknown) - 1U);

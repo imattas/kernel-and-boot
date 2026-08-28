@@ -6,6 +6,8 @@ test -f "$log"
 grep -F 'interactive shell ready' "$log" >/dev/null
 grep -F 'os> ' "$log" >/dev/null
 grep -F 'input-test' "$log" >/dev/null
+prompts=$(grep -o 'os> ' "$log" | wc -l)
+test "$prompts" -ge 2
 if grep -E 'X64 Exception|kernel contract invalid|KERNEL (PANIC|EXCEPTION)' "$log" >/dev/null; then
     echo "QEMU input test reported a failure" >&2
     exit 1

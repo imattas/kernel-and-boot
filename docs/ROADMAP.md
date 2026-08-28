@@ -1105,7 +1105,9 @@ XFS extent-backed truncation now zeroes the retained tail of the final data
 block, and growth validation searches the complete extent list rather than
 only the first record.
 XFS local-format directories now support bounded persistent entry insertion
-and removal while preserving the inline directory record layout; AG free-space
+and removal while preserving the inline directory record layout. They now also
+support validated indexed enumeration and same-directory rename with one-shot
+inode publication and duplicate/name/capacity rejection; AG free-space
 allocation and release are tracked through the metadata milestone below.
 XFS now allocates from a validated single-level AG free-space BNO tree, updating
 AGF free-block and longest-run metadata and rolling back the tree if the AGF

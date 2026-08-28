@@ -1956,6 +1956,41 @@ int xfs_lookup(xfs_fs_t *fs, uint64_t directory_inode, const char *name,
     return 0;
 }
 
+int xfs_directory_entry(xfs_fs_t *fs, uint64_t directory_inode,
+                        uint32_t index, char *name, uint32_t name_size,
+                        uint64_t *inode_number) {
+    uint8_t data[4096];
+    if (!fs || !name || !inode_number || name_size == 0 ||
+        !xfs_read_inode(fs, directory_inode, data) ||
+        (be16(&data[2]) & 0xf000U) != 0x4000U || data[5] != XFS_FORMAT_LOCAL)
+        return 0;
+    uint32_t core = data[4] == 2 ? XFS_CORE_V2_SIZE : 100U;
+    uint64_t directory_size = be64(&data[56]);
+    uint8_t wide = data[core + 1] != 0;
+    uint32_t inode_bytes = wide ? 8U : 4U;
+    uint32_t position = 2U + inode_bytes;
+    if (directory_size < position || directory_size > fs->inode_size - core)
+        return 0;
+    for (uint32_t current = 0; current < data[core]; ++current) {
+        if (position + 3U > directory_size) return 0;
+        uint32_t length = data[core + position];
+        uint32_t record = 3U + inode_bytes + length;
+        if (position + record > directory_size || length + 1U > name_size)
+            return 0;
+        uint64_t child = wide ? be64(&data[core + position + 3U]) :
+                                be32(&data[core + position + 3U]);
+        if (current == index) {
+            const uint8_t *entry_name = &data[core + position + 3U + inode_bytes];
+            for (uint32_t i = 0; i < length; ++i) name[i] = (char)entry_name[i];
+            name[length] = 0;
+            *inode_number = child;
+            return child != 0;
+        }
+        position += record;
+    }
+    return 0;
+}
+
 int xfs_add_local_entry(xfs_fs_t *fs, uint64_t directory_inode,
                         const char *name, uint64_t child_inode) {
     uint8_t data[4096];
@@ -2022,6 +2057,88 @@ int xfs_remove_local_entry(xfs_fs_t *fs, uint64_t directory_inode,
         position += record;
     }
     return 0;
+}
+
+int xfs_rename_local_entry(xfs_fs_t *fs, uint64_t directory_inode,
+                           const char *old_name, const char *new_name) {
+    uint8_t data[4096], rebuilt[4096];
+    if (!fs || !old_name || !new_name || !old_name[0] || !new_name[0] ||
+        !xfs_read_inode(fs, directory_inode, data) ||
+        (be16(&data[2]) & 0xf000U) != 0x4000U || data[5] != XFS_FORMAT_LOCAL)
+        return 0;
+    uint32_t old_length = 0, new_length = 0;
+    for (const char *p = old_name; *p; ++p) {
+        if ((uint8_t)*p < 0x20U || (uint8_t)*p > 0x7eU || old_length == 255U)
+            return 0;
+        ++old_length;
+    }
+    for (const char *p = new_name; *p; ++p) {
+        if ((uint8_t)*p < 0x20U || (uint8_t)*p > 0x7eU || new_length == 255U)
+            return 0;
+        ++new_length;
+    }
+    uint32_t core = data[4] == 2 ? XFS_CORE_V2_SIZE : 100U;
+    uint64_t directory_size = be64(&data[56]);
+    uint8_t wide = data[core + 1] != 0;
+    uint32_t inode_bytes = wide ? 8U : 4U;
+    uint32_t position = 2U + inode_bytes, old_child = 0;
+    uint64_t old_child_wide = 0;
+    uint32_t old_record_position = 0, old_record_size = 0;
+    if (directory_size < position || directory_size > fs->inode_size - core)
+        return 0;
+    for (uint32_t current = 0; current < data[core]; ++current) {
+        if (position + 3U > directory_size) return 0;
+        uint32_t length = data[core + position];
+        uint32_t record = 3U + inode_bytes + length;
+        if (position + record > directory_size) return 0;
+        const uint8_t *entry_name = &data[core + position + 3U + inode_bytes];
+        int is_old = length == old_length;
+        for (uint32_t i = 0; is_old && i < length; ++i)
+            if (entry_name[i] != (uint8_t)old_name[i]) is_old = 0;
+        int is_new = length == new_length;
+        for (uint32_t i = 0; is_new && i < length; ++i)
+            if (entry_name[i] != (uint8_t)new_name[i]) is_new = 0;
+        if (is_new && !is_old) return 0;
+        if (is_old) {
+            if (old_record_size != 0) return 0;
+            old_record_position = position; old_record_size = record;
+            old_child_wide = wide ? be64(&data[core + position + 3U]) :
+                                    be32(&data[core + position + 3U]);
+            old_child = 1;
+        }
+        position += record;
+    }
+    if (!old_child) return 0;
+    uint64_t new_record_size = 3U + inode_bytes + new_length;
+    if (new_record_size > UINT32_MAX ||
+        directory_size - old_record_size + new_record_size > fs->inode_size - core)
+        return 0;
+    for (uint32_t i = 0; i < fs->inode_size; ++i) rebuilt[i] = 0;
+    for (uint32_t i = 0; i < core + 2U + inode_bytes; ++i) rebuilt[i] = data[i];
+    uint32_t output = 2U + inode_bytes;
+    position = 2U + inode_bytes;
+    for (uint32_t current = 0; current < data[core]; ++current) {
+        uint32_t length = data[core + position];
+        uint32_t record = 3U + inode_bytes + length;
+        const uint8_t *source = &data[core + position];
+        if (position == old_record_position) {
+            rebuilt[core + output] = (uint8_t)new_length;
+            rebuilt[core + output + 1U] = 0;
+            rebuilt[core + output + 2U] = 0;
+            if (wide) store_be64(&rebuilt[core + output + 3U], old_child_wide);
+            else store_be32(&rebuilt[core + output + 3U], (uint32_t)old_child_wide);
+            for (uint32_t i = 0; i < new_length; ++i)
+                rebuilt[core + output + 3U + inode_bytes + i] = (uint8_t)new_name[i];
+            output += (uint32_t)new_record_size;
+        } else {
+            for (uint32_t i = 0; i < record; ++i) rebuilt[core + output + i] = source[i];
+            output += record;
+        }
+        position += record;
+    }
+    rebuilt[core] = data[core];
+    store_be64(&rebuilt[56], output);
+    return xfs_write_inode(fs, directory_inode, rebuilt);
 }
 
 int xfs_read_file(xfs_fs_t *fs, uint64_t inode, uint64_t offset,

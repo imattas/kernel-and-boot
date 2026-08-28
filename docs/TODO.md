@@ -162,6 +162,8 @@ type, string, and numeric tests.
   PATH and the FAT32 image.
 - [x] Add standalone `cmp.elf` status-based file comparison for shell
   conditional sequencing through PATH and the FAT32 image.
+- [x] Add standalone `seq.elf` bounded decimal sequence generation through
+  PATH and the FAT32 image.
 - [x] Add standalone `which.elf` PATH executable discovery through the shared
   runtime and FAT32 image namespace.
 - [x] Add background execution and job-table tracking for PATH-resolved

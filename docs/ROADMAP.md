@@ -1998,6 +1998,10 @@ The shell directory-navigation slice now tracks a bounded previous directory
 and implements `cd -`, printing the destination after a successful switch;
 the normal empty-operand `cd` behavior remains unchanged.
 
+The userland application set now includes `seq.elf`, a bounded decimal
+sequence generator supporting one, two, or three numeric operands with
+overflow-safe iteration and FAT32/PATH packaging.
+
 A headless QEMU input probe reaches the live `os> ` prompt but monitor-injected
 USB keyboard events do not yet arrive at the shell input queue. The probe was
 discarded rather than promoted to a passing test; reliable interactive QEMU

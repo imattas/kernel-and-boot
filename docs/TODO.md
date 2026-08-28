@@ -110,6 +110,7 @@ kernel gate below is explicitly marked complete.
 - [x] Add native shell `mv <old> <new>` rename operation.
 - [x] Add standalone `MV.ELF` utility using the rename ABI.
 - [x] Add standalone `KILL.ELF` utility using the targeted signal ABI.
+- [x] Add standalone `SLEEP.ELF` utility using the clock and yield ABI.
 - [ ] Add reliable QEMU live keyboard verification for `run INIT.ELF`.
 - [ ] Add the command-line shell and terminal/console I/O.
 - [ ] Add process tools and initial utilities (`init`, `echo`, `ls`, `cat`,

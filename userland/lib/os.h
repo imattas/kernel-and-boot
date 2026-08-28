@@ -13,6 +13,10 @@ static inline uint64_t os_getppid(void) { return os_syscall3(40, 0, 0, 0); }
 static inline uint64_t os_getuid(void) { return os_syscall3(38, 0, 0, 0); }
 static inline uint64_t os_getgid(void) { return os_syscall3(39, 0, 0, 0); }
 
+static inline uint64_t os_process_list(uint64_t *ids, uint64_t capacity) {
+    return os_syscall3(42, (uint64_t)(uintptr_t)ids, capacity, 0);
+}
+
 static inline uint64_t os_write(uint64_t descriptor, const void *buffer,
                                 uint64_t length) {
     return os_syscall3(1, descriptor, (uint64_t)(uintptr_t)buffer, length);

@@ -49,6 +49,7 @@ typedef struct process {
 
 process_t *process_create(uint64_t id);
 process_t *process_create_auto(void);
+uint32_t process_snapshot(uint64_t *ids, uint32_t capacity);
 int process_set_parent(process_t *child, process_t *parent);
 process_t *process_create_user(uint64_t id, const void *image, uint64_t image_size,
                                uint64_t stack_base, uint32_t thread_id,

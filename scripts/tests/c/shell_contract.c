@@ -6,6 +6,7 @@ int main(void) {
     char argument[32] = {0};
     assert(shell_parse("help", 4, argument, sizeof(argument)) == SHELL_HELP);
     assert(shell_parse("id", 2, argument, sizeof(argument)) == SHELL_ID);
+    assert(shell_parse("ps", 2, argument, sizeof(argument)) == SHELL_PS);
     assert(shell_parse("echo hello", 10, argument, sizeof(argument)) == SHELL_ECHO);
     assert(strcmp(argument, "hello") == 0);
     assert(shell_parse("pwd", 3, argument, sizeof(argument)) == SHELL_PWD);

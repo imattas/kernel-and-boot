@@ -114,6 +114,17 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
             return clock_monotonic_ns();
         case OS_SYSCALL_GETPID:
             return process_current() ? process_current()->id : OS_SYSCALL_ERROR;
+        case OS_SYSCALL_PROCESS_LIST: {
+            if (arg2 == 0 || arg2 > PROCESS_MAX || arg3 != 0 ||
+                arg2 > UINT64_MAX / sizeof(uint64_t) ||
+                !user_range(arg1, arg2 * sizeof(uint64_t), 1))
+                return OS_SYSCALL_ERROR;
+            uint64_t ids[PROCESS_MAX];
+            uint32_t count = process_snapshot(ids, (uint32_t)arg2);
+            return syscall_copy_to_user(arg1, ids,
+                                        count * sizeof(uint64_t)) ? count :
+                   OS_SYSCALL_ERROR;
+        }
         case OS_SYSCALL_GETUID:
         case OS_SYSCALL_GETGID: {
             process_t *process = process_current();

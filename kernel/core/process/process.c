@@ -147,6 +147,16 @@ process_t *process_create_auto(void) {
     return 0;
 }
 
+uint32_t process_snapshot(uint64_t *ids, uint32_t capacity) {
+    if (!ids || capacity == 0) return 0;
+    uint32_t count = 0;
+    uint64_t flags = spinlock_lock_irqsave(&process_table_lock);
+    for (uint32_t index = 0; index < PROCESS_MAX && count < capacity; ++index)
+        if (process_table[index]) ids[count++] = process_table[index]->id;
+    spinlock_unlock_irqrestore(&process_table_lock, flags);
+    return count;
+}
+
 int process_set_namespace(process_t *process, vfs_node_t *root,
                           vfs_node_t *working_directory) {
     if (!process || !root || !working_directory ||

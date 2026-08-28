@@ -27,6 +27,7 @@ shell_command_t shell_parse(const char *line, uint32_t length,
            line[command_length] != '\t') ++command_length;
     if (same_word(line, command_length, "help")) return SHELL_HELP;
     if (same_word(line, command_length, "id")) return SHELL_ID;
+    if (same_word(line, command_length, "ps")) return SHELL_PS;
     if (same_word(line, command_length, "pwd")) return SHELL_PWD;
     if (same_word(line, command_length, "ls")) return SHELL_LS;
     if (same_word(line, command_length, "exit")) return SHELL_EXIT;

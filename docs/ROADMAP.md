@@ -1040,6 +1040,8 @@ The userland runtime now supports `run <path>` through a kernel spawn/wait
 syscall path for ELF programs in the process VFS namespace.
 The shell also provides `id`, exposing the current process and credential
 identity through the existing identity syscalls.
+The shell `ps` command now obtains a bounded live process-ID snapshot from the
+kernel process table.
 
 This gate includes all non-driver kernel core services and VFS abstractions,
 then the complete driver phase, with build integration, focused tests, and QEMU

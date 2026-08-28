@@ -26,7 +26,7 @@ static void print_number(uint64_t value) {
 
 void shell_main(void) {
     static const char prompt[] = "os> ";
-    static const char help[] = "help id echo pwd cd ls cat mkdir rm rmdir touch write run exit\r\n";
+    static const char help[] = "help id ps echo pwd cd ls cat mkdir rm rmdir touch write run exit\r\n";
     static const char unknown[] = "unknown command\r\n";
     static char line[128];
     static char argument[128];
@@ -57,6 +57,18 @@ void shell_main(void) {
                 print(" gid=", 5);
                 print_number(os_getgid());
                 print("\r\n", 2);
+            }
+            else if (command == SHELL_PS) {
+                uint64_t ids[64];
+                uint64_t count = os_process_list(ids, 64);
+                if (count == OS_SYSCALL_ERROR) {
+                    print(unknown, sizeof(unknown) - 1U);
+                } else {
+                    for (uint64_t index = 0; index < count; ++index) {
+                        print_number(ids[index]);
+                        print("\r\n", 2);
+                    }
+                }
             }
             else if (command == SHELL_ECHO) {
                 uint32_t argument_length = 0;

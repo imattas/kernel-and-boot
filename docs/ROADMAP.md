@@ -1876,6 +1876,9 @@ The first PATH-inspection application, `which.elf`, now searches inherited
 PATH entries, validates executable candidates through the VFS, and reports the
 resolved path using the normal freestanding userland runtime.
 
+`which.elf` now accepts multiple command operands, emits one resolved path per
+operand, and returns a failure status when any operand cannot be resolved.
+
 The image contract now explicitly validates the complete 45-entry userland
 set, including every second extension-cluster entry through `WHICH.ELF`, so
 packaging regressions cannot silently omit a late application.

@@ -1133,7 +1133,12 @@ void shell_main(void) {
                 }
             }
             else if (command == SHELL_HISTORY) {
-                for (uint32_t index = 0; index < history_count; ++index) {
+                if (argument_length == 2 && argument[0] == '-' && argument[1] == 'c') {
+                    history_count = 0;
+                    history_offset = 0;
+                } else if (argument_length != 0) {
+                    print(unknown, sizeof(unknown) - 1U);
+                } else for (uint32_t index = 0; index < history_count; ++index) {
                     print_number(index + 1U);
                     print(" ", 1);
                     uint32_t history_length = 0;

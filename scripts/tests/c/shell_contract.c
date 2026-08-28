@@ -35,6 +35,8 @@ int main(void) {
     assert(strcmp(argument, "env MODE=test ECHO.ELF hello") == 0);
     assert(shell_parse("jobs", 4, argument, sizeof(argument)) == SHELL_JOBS);
     assert(shell_parse("history", 7, argument, sizeof(argument)) == SHELL_HISTORY);
+    assert(shell_parse("history -c", 10, argument, sizeof(argument)) == SHELL_HISTORY);
+    assert(strcmp(argument, "-c") == 0);
     assert(shell_parse("fg 4", 4, argument, sizeof(argument)) == SHELL_FG);
     assert(strcmp(argument, "4") == 0);
     assert(shell_parse("which ARGS.ELF", 14, argument, sizeof(argument)) == SHELL_WHICH);

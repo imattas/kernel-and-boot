@@ -210,7 +210,15 @@ shell_command_t shell_parse(const char *line, uint32_t length,
         return SHELL_RUN;
     }
     if (same_word(line, command_length, "jobs")) return SHELL_JOBS;
-    if (same_word(line, command_length, "history")) return SHELL_HISTORY;
+    if (same_word(line, command_length, "history")) {
+        if (command_length == length) return SHELL_HISTORY;
+        uint32_t start = command_length;
+        while (start < length && (line[start] == ' ' || line[start] == '\t')) ++start;
+        if (start == length || length - start >= capacity) return SHELL_UNKNOWN;
+        for (uint32_t index = start; index <= length; ++index)
+            argument[index - start] = line[index];
+        return SHELL_HISTORY;
+    }
     if (same_word(line, command_length, "exit")) return SHELL_EXIT;
     if (!same_word(line, command_length, "cat") &&
         !same_word(line, command_length, "head") &&

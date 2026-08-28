@@ -256,6 +256,7 @@ type, string, and numeric tests.
 - [x] Add standalone `CP.ELF` file-copy utility using read/create/write.
 - [x] Add native shell `cp <source> <destination>` file-copy behavior.
 - [x] Add native shell `history` listing for the bounded command ring.
+- [x] Add bounded shell `history -c` clearing for the command ring.
 - [x] Preserve source mode and reject same-path copies in `cp`.
 - [x] Add native shell `mkdir -p` recursive directory creation.
 - [x] Add native shell `rmdir -p` empty-parent cleanup.

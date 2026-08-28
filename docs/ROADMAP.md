@@ -1850,6 +1850,10 @@ FAT32 image contracts.
 files byte-for-byte and returns distinct equal, different, and error statuses,
 making it directly usable with shell `&&` and `||` sequencing.
 
+The packaged `printf` utility now handles escaped control characters, string
+arguments, signed `%d`/`%i` decimal arguments, unsigned `%u` arguments, and
+explicit malformed-number status handling.
+
 Shell integration contracts now directly cover the quote-aware sequence
 splitter, including semicolons and conditional operators preserved inside
 quoted arguments; this joins

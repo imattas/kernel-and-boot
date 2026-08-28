@@ -14,7 +14,9 @@ static void fat32_vfs_destroy(void *private_data) { kfree(private_data); }
 static int fat32_vfs_read(vfs_node_t *node, uint64_t offset,
                           void *buffer, uint32_t size) {
     fat32_vfs_file_t *file = node ? (fat32_vfs_file_t *)node->private_data : 0;
-    if (!file || offset > file->size || size > file->size - offset) return 0;
+    if (!file || offset >= file->size || size == 0) return 0;
+    uint32_t available = file->size - (uint32_t)offset;
+    if (available < size) size = available;
     uint64_t flags = spinlock_lock_irqsave(&file->lock);
     int result = fat32_read_file_in_directory(file->fs, file->directory_cluster,
                                                file->short_name, (uint32_t)offset,

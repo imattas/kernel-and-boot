@@ -177,6 +177,8 @@ kernel gate below is explicitly marked complete.
   VFS namespace.
 - [x] Expose `truncate.elf`, `seek.elf`, `chdir.elf`, and `cp.elf` through the
   live FAT32-backed VFS namespace.
+- [x] Expose `shell.elf` through the live FAT32-backed VFS namespace and allow
+  partial final reads for unaligned ELF loading.
 - [ ] Add reliable QEMU live keyboard verification for `run INIT.ELF`.
 - [ ] Expose the complete multi-cluster FAT32 boot-image application set in the
   live VFS namespace for reliable external `run` execution.

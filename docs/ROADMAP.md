@@ -1727,8 +1727,10 @@ supervisor handoff remains deferred. `args.elf`, `env.elf`, `cat.elf`,
 `ls.elf`, `chmod.elf`, `echo.elf`, `stat.elf`, `mv.elf`, `kill.elf`,
 `sleep.elf`, `setenv.elf`, `ipc.elf`, `dup.elf`, `true.elf`, `false.elf`,
 `id.elf`, `ps.elf`, `wait.elf`, `truncate.elf`, `seek.elf`, `chdir.elf`, and
-`cp.elf` are now exposed as executable utilities through the live FAT32-backed
-VFS namespace; the remaining application set is the next userland boundary.
+`cp.elf` and `shell.elf` are now exposed as executable utilities through the
+live FAT32-backed VFS namespace, and FAT-backed reads now return valid partial
+final chunks for ELF loading. The remaining application/supervision work is
+the next userland boundary.
 The shell now keeps a bounded eight-entry command history and handles split
 ANSI up/down escape sequences without feeding terminal control bytes into the
 command parser.

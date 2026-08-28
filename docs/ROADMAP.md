@@ -1581,6 +1581,8 @@ The shell now includes an `ls` builtin backed by the open/readdir/close syscall
 path.
 The shell `run` command now resolves bare executable names through the
 process's inherited `PATH`, while preserving explicit paths.
+The first standalone ring-3 `ARGS.ELF` utility is now built and packaged in
+the FAT32 root, providing an executable path for validating argument delivery.
 
 ## Phase 10 — BIOS boot path
 

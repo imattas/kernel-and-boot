@@ -59,6 +59,7 @@ enum {
 #define OS_SYSCALL_MAX_WRITE 256U
 #define OS_SYSCALL_MAX_PATH 256U
 #define OS_SYSCALL_MAX_MESSAGE 64U
+#define OS_SPAWN_REDIRECT_MAGIC UINT64_C(0x4f53505245444952)
 
 typedef struct {
     char name[32];
@@ -83,5 +84,12 @@ typedef struct {
     uint32_t read_handle;
     uint32_t write_handle;
 } os_syscall_pipe_t;
+
+typedef struct {
+    uint64_t magic;
+    uint64_t arguments;
+    uint32_t input_handle;
+    uint32_t output_handle;
+} os_spawn_redirect_t;
 
 #endif

@@ -64,6 +64,8 @@ kernel gate below is explicitly marked complete.
   external user process.
 - [x] Add the first C-facing userland syscall runtime and use it from init.
 - [x] Add nonblocking standard-input reads backed by the kernel keyboard queue.
+- [x] Add and contract-test the first shell command parser (`help`, `echo`, and
+  `pwd`, with bounded unknown-command handling).
 - [ ] Add the command-line shell and terminal/console I/O.
 - [ ] Add process tools and initial utilities (`init`, `echo`, `ls`, `cat`,
   `pwd`, `mkdir`, `rm`, and `sh`).

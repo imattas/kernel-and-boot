@@ -1543,7 +1543,8 @@ owns those calls, while the UEFI boot contract loads the image and the kernel
 launches it as the first external user process after the kernel gate. Next
 The kernel now exposes a nonblocking descriptor-0 read backed by the shared
 keyboard queue, with the runtime exporting `os_read`; the next step is a
-blocking input policy and shell/tooling.
+blocking input policy and shell/tooling. The first shell parser now handles
+bounded `help`, `echo`, and `pwd` commands independently of I/O scheduling.
 
 ## Phase 10 — BIOS boot path
 

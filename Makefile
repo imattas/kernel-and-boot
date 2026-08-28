@@ -42,6 +42,7 @@ ZSTD_FIXTURE := $(TEST_DIR)/zstd_real.zst
 FSE_TEST := $(TEST_DIR)/fse_contract
 CACHE_TEST := $(TEST_DIR)/cache_contract
 DEVICE_TEST := $(TEST_DIR)/device_contract
+SHELL_TEST := $(TEST_DIR)/shell_contract
 USERLAND_INIT_ELF := $(BUILD_DIR)/userland/init.elf
 USERLAND_INIT_OBJ := $(BUILD_DIR)/userland/init_start.o
 USERLAND_INIT_MAIN_OBJ := $(BUILD_DIR)/userland/init_main.o
@@ -97,12 +98,18 @@ OVMF_CODE ?= /usr/share/edk2/x64/OVMF_CODE.4m.fd
 OVMF_VARS ?= /usr/share/edk2/x64/OVMF_VARS.4m.fd
 QEMU_LOG := $(BUILD_DIR)/qemu-serial.log
 
-.PHONY: all test userland-test image qemu-test fat32-test exfat-test ext4-test xfs-test xfs-rename-test xfs-alloc-test xfs-unwritten-test xfs-auth-test btrfs-test deflate-test lzo-test zstd-test fse-test cache-test device-test run clean distclean
+.PHONY: all test userland-test shell-test image qemu-test fat32-test exfat-test ext4-test xfs-test xfs-rename-test xfs-alloc-test xfs-unwritten-test xfs-auth-test btrfs-test deflate-test lzo-test zstd-test fse-test cache-test device-test run clean distclean
 
 all: $(CONTRACT_ELF) $(UEFI_EFI) $(KERNEL_ELF) $(USERLAND_INIT_ELF)
 
 userland-test: $(USERLAND_INIT_ELF)
 	sh scripts/tests/sh/validate_userland.sh $(USERLAND_INIT_ELF)
+
+shell-test: $(SHELL_TEST)
+	$(SHELL_TEST)
+
+$(SHELL_TEST): scripts/tests/c/shell_contract.c userland/shell/shell.c userland/shell/shell.h
+	$(CC) -std=c11 -Wall -Wextra -Werror -I. -o $@ scripts/tests/c/shell_contract.c userland/shell/shell.c
 
 $(BUILD_DIR)/userland:
 	mkdir -p $@
@@ -623,6 +630,8 @@ $(KERNEL_ELF): $(KERNEL_OBJ) $(KERNEL_ENTRY_ASM_OBJ) $(KERNEL_TABLES_OBJ) $(KERN
 	$(LD) -m elf_x86_64 -pie -T kernel/arch/x86_64/entry/kernel.ld --build-id=none -o $@ $(KERNEL_ENTRY_ASM_OBJ) $(KERNEL_OBJ) $(KERNEL_TABLES_OBJ) $(KERNEL_TABLES_ASM_OBJ) $(KERNEL_SERIAL_OBJ) $(KERNEL_CPU_OBJ) $(KERNEL_EXCEPTIONS_OBJ) $(KERNEL_PANIC_OBJ) $(KERNEL_PHYSICAL_OBJ) $(KERNEL_VIRTUAL_OBJ) $(KERNEL_HEAP_OBJ) $(KERNEL_IRQ_OBJ) $(KERNEL_APIC_OBJ) $(KERNEL_ACPI_OBJ) $(KERNEL_PERCPU_OBJ) $(KERNEL_TRAMPOLINE_OBJ) $(KERNEL_TIMER_OBJ) $(KERNEL_TIMER_ASM_OBJ) $(KERNEL_KEYBOARD_ASM_OBJ) $(KERNEL_SYNC_OBJ) $(KERNEL_TASK_OBJ) $(KERNEL_TASK_ASM_OBJ) $(KERNEL_WAIT_OBJ) $(KERNEL_TASK_DESC_OBJ) $(KERNEL_SCHED_OBJ) $(KERNEL_SCHED_POLICY_OBJ) $(KERNEL_PROCESS_OBJ) $(KERNEL_PROCESS_LIFECYCLE_OBJ) $(KERNEL_PROCESS_HANDLE_OBJ) $(KERNEL_PROCESS_THREAD_OBJ) $(KERNEL_EXEC_OBJ) $(KERNEL_SYSCALL_OBJ) $(KERNEL_SYSCALL_ASM_OBJ) $(KERNEL_DEVICE_OBJ) $(KERNEL_PCI_OBJ) $(KERNEL_MEMORY_OBJ) $(KERNEL_STORAGE_OBJ) $(KERNEL_ATA_OBJ) $(KERNEL_IPC_OBJ) $(KERNEL_SECURITY_OBJ) $(KERNEL_VFS_OBJ) $(KERNEL_DEBUG_OBJ) $(KERNEL_VFS_MOUNT_OBJ) $(KERNEL_BLOCK_OBJ) $(KERNEL_CACHE_OBJ) $(KERNEL_CLOCK_OBJ) $(KERNEL_DEVFS_OBJ) $(KERNEL_PROCFS_OBJ) $(KERNEL_SLAB_OBJ) $(KERNEL_FAT12_OBJ) $(KERNEL_FAT12_VFS_OBJ) $(KERNEL_FAT32_OBJ) $(KERNEL_EXFAT_OBJ) $(KERNEL_INPUT_OBJ) $(KERNEL_PS2_OBJ) $(KERNEL_FRAMEBUFFER_OBJ) $(KERNEL_USB_OBJ) $(KERNEL_AHCI_OBJ) $(KERNEL_UHCI_OBJ) $(KERNEL_NVME_OBJ)
 
 test: all image
+	$(MAKE) userland-test
+	$(MAKE) shell-test
 	$(MAKE) fat32-test
 	$(MAKE) exfat-test
 	$(MAKE) ext4-test

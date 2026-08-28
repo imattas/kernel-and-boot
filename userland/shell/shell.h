@@ -1,0 +1,17 @@
+#ifndef OS_USERLAND_SHELL_H
+#define OS_USERLAND_SHELL_H
+
+#include <stdint.h>
+
+typedef enum {
+    SHELL_EMPTY,
+    SHELL_HELP,
+    SHELL_ECHO,
+    SHELL_PWD,
+    SHELL_UNKNOWN
+} shell_command_t;
+
+shell_command_t shell_parse(const char *line, uint32_t length,
+                            char *argument, uint32_t capacity);
+
+#endif

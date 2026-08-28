@@ -1986,3 +1986,6 @@ file, type, string, and numeric predicates.
 The shell now includes a bounded `read NAME` built-in that consumes one line
 from standard input and publishes it through the shell environment; the
 standalone help inventory is synchronized with the new command.
+
+The shell also provides bounded `uname` and `uname -a` identification output
+for the x86_64 system personality.

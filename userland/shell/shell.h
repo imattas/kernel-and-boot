@@ -34,6 +34,7 @@ typedef enum {
     SHELL_EXPORT,
     SHELL_UNSETENV,
     SHELL_READ,
+    SHELL_UNAME,
     SHELL_STATUS,
     SHELL_TRUE,
     SHELL_FALSE,

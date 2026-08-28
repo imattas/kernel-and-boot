@@ -857,7 +857,7 @@ static int shell_remove_tree(const char *path, uint32_t length,
 
 void shell_main(void) {
     static const char prompt[] = "os> ";
-    static const char help[] = "help version clear alias unalias id ps env setenv export unsetenv read status true false jobs history fg which inherit echo printf basename dirname cut tr cmp test pwd cd ls cat head wc grep tee tail sort uniq stat chmod kill sleep mv cp mkdir rm rmdir touch uptime date write run wait exit\r\n";
+    static const char help[] = "help version uname clear alias unalias id ps env setenv export unsetenv read status true false jobs history fg which inherit echo printf basename dirname cut tr cmp test pwd cd ls cat head wc grep tee tail sort uniq stat chmod kill sleep mv cp mkdir rm rmdir touch uptime date write run wait exit\r\n";
     static const char *unknown = shell_unknown;
     static char line[128];
     static char input[64];
@@ -1009,6 +1009,14 @@ void shell_main(void) {
             else if (command == SHELL_VERSION)
                 print("os kernel-and-boot x86_64\r\n",
                       sizeof("os kernel-and-boot x86_64\r\n") - 1U);
+            else if (command == SHELL_UNAME) {
+                if (argument_length != 0 &&
+                    !(argument_length == 2 && argument[0] == '-' &&
+                      argument[1] == 'a'))
+                    print(unknown, sizeof(unknown) - 1U);
+                else
+                    print("os x86_64\r\n", sizeof("os x86_64\r\n") - 1U);
+            }
             else if (command == SHELL_CLEAR) print("\x1b[2J\x1b[H", 7);
             else if (command == SHELL_ALIAS) {
                 if (argument_length == 0) {

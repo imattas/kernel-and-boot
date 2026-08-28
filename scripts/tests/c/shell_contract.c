@@ -127,6 +127,8 @@ int main(void) {
     assert(shell_parse("export =test", 12, argument, sizeof(argument)) == SHELL_EXPORT);
     assert(shell_parse("read ANSWER", 12, argument, sizeof(argument)) == SHELL_READ);
     assert(strcmp(argument, "ANSWER") == 0);
+    assert(shell_parse("uname", 5, argument, sizeof(argument)) == SHELL_UNAME);
+    assert(shell_parse("uname -a", 8, argument, sizeof(argument)) == SHELL_UNAME);
     assert(shell_parse("unsetenv MODE", 13, argument, sizeof(argument)) == SHELL_UNSETENV);
     assert(strcmp(argument, "MODE") == 0);
     assert(shell_parse("unsetenv MODE OTHER", 19, argument,

@@ -107,6 +107,7 @@ type, string, and numeric tests.
 - [x] Add PATH-based fallback execution for packaged external applications.
 - [x] Add shell `export NAME=VALUE` environment assignment syntax.
 - [x] Add shell `read NAME` line input and environment assignment.
+- [x] Add shell `uname` and `uname -a` system-identification output.
 - [x] Extend standalone `env` with bounded assignment-and-command execution.
 - [x] Centralize bounded `NAME=VALUE` parsing in the freestanding runtime.
 - [x] Add standalone `unsetenv.elf` and expose it through the FAT32 VFS.

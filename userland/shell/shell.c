@@ -251,6 +251,7 @@ shell_command_t shell_parse(const char *line, uint32_t length,
         !same_word(line, command_length, "export") &&
         !same_word(line, command_length, "unsetenv") &&
         !same_word(line, command_length, "read") &&
+        !same_word(line, command_length, "uname") &&
         !same_word(line, command_length, "status") &&
         !same_word(line, command_length, "true") &&
         !same_word(line, command_length, "false") &&
@@ -328,6 +329,7 @@ shell_command_t shell_parse(const char *line, uint32_t length,
     if (same_word(line, command_length, "export")) return SHELL_EXPORT;
     if (same_word(line, command_length, "unsetenv")) return SHELL_UNSETENV;
     if (same_word(line, command_length, "read")) return SHELL_READ;
+    if (same_word(line, command_length, "uname")) return SHELL_UNAME;
     if (same_word(line, command_length, "status")) return SHELL_STATUS;
     if (same_word(line, command_length, "true")) return SHELL_TRUE;
     if (same_word(line, command_length, "false")) return SHELL_FALSE;

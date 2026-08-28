@@ -17,6 +17,8 @@ kernel gate below is explicitly marked complete.
 - [x] Core storage, AHCI/ATA, NVMe, PCI, UHCI/USB HID, PS/2, framebuffer,
   serial, and e1000 networking paths.
 - [x] Root build/image contracts and QEMU UEFI handoff gate.
+- [x] Filesystem VFS append-growth boundaries for FAT32, exFAT, ext4, and XFS
+  now update cached sizes after successful writes.
 
 ## Current kernel milestone
 

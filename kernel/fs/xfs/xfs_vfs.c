@@ -26,7 +26,7 @@ static int xfs_vfs_write(vfs_node_t *node, uint64_t offset,
 }
 static int xfs_vfs_truncate(vfs_node_t *node, uint32_t size) {
     xfs_vfs_file_t *file = node ? (xfs_vfs_file_t *)node->private_data : 0;
-    if (!file || size == 0 || (uint64_t)size >= file->size) return 0;
+    if (!file || (uint64_t)size >= file->size) return 0;
     uint64_t flags = spinlock_lock_irqsave(&file->lock);
     int result = xfs_truncate_file(file->fs, file->inode, size);
     if (result) file->size = size;

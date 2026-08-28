@@ -82,6 +82,7 @@ the init-owned shell supervisor remains the next kernel/userland boundary.
   userland set and FAT32 VFS namespace.
 - [x] Add streaming `wc.elf` line, word, and byte counting to the packaged
   userland set and FAT32 VFS namespace.
+- [x] Add bounded literal line matching through standalone `grep.elf`.
 - [ ] Make init supervise `shell.elf` through the normal spawn/wait ABI after
   the namespace-retain and shared-scheduler startup deadlocks are fixed.
 

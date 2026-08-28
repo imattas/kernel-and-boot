@@ -2073,3 +2073,7 @@ waits for the UEFI boot to reach `os> `, submits a delayed `echo input-test`
 through QEMU's serial stdin, and verifies the command is received and echoed by
 the live shell. Live USB/PS2 keyboard injection remains a separate verification
 follow-up.
+
+The normal `make run` target now explicitly selects `-display none` so its
+`os> ` prompt is visibly and reliably attached to the launching terminal;
+the graphical/VNC surface is not a terminal and does not accept shell input.

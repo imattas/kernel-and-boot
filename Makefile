@@ -1800,7 +1800,7 @@ run: $(IMAGE)
 		-device ide-hd,drive=ahcidisk2,bus=ahci.2 \
 		-device nvme,drive=nvmedisk,serial=OSNVME01 \
 		-drive if=none,id=nvmedisk,format=raw,file=$(BUILD_DIR)/nvme-test.img \
-		-no-reboot -no-shutdown
+		-display none -no-reboot -no-shutdown
 
 clean:
 	rm -rf $(BUILD_DIR)

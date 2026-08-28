@@ -35,6 +35,20 @@ static inline uint64_t os_signal_send_to(uint64_t process_id,
     return os_syscall3(7, process_id, signal_number, 0);
 }
 
+static inline uint64_t os_channel_create(void) {
+    return os_syscall3(16, 0, 0, 0);
+}
+
+static inline uint64_t os_channel_send(uint64_t channel, const void *data,
+                                       uint64_t length) {
+    return os_syscall3(17, channel, (uint64_t)(uintptr_t)data, length);
+}
+
+static inline uint64_t os_channel_receive(uint64_t channel, void *data,
+                                           uint64_t capacity) {
+    return os_syscall3(18, channel, (uint64_t)(uintptr_t)data, capacity);
+}
+
 static inline uint64_t os_process_list(uint64_t *ids, uint64_t capacity) {
     return os_syscall3(42, (uint64_t)(uintptr_t)ids, capacity, 0);
 }

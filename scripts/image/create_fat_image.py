@@ -20,8 +20,8 @@ def short_entry(name, attributes, cluster, size):
         "<HI", cluster & 0xffff, size)
 
 def main():
-    if len(sys.argv) != 23:
-        raise SystemExit("usage: create_fat_image.py <BOOTX64.EFI> <KERNEL.ELF> <INIT.ELF> <SHELL.ELF> <ARGS.ELF> <ENV.ELF> <CAT.ELF> <PWD.ELF> <MKDIR.ELF> <RM.ELF> <RMDIR.ELF> <TOUCH.ELF> <WRITE.ELF> <LS.ELF> <CHMOD.ELF> <ECHO.ELF> <STAT.ELF> <MV.ELF> <KILL.ELF> <SLEEP.ELF> <SETENV.ELF> <os.img>")
+    if len(sys.argv) != 24:
+        raise SystemExit("usage: create_fat_image.py <BOOTX64.EFI> <KERNEL.ELF> <INIT.ELF> <SHELL.ELF> <ARGS.ELF> <ENV.ELF> <CAT.ELF> <PWD.ELF> <MKDIR.ELF> <RM.ELF> <RMDIR.ELF> <TOUCH.ELF> <WRITE.ELF> <LS.ELF> <CHMOD.ELF> <ECHO.ELF> <STAT.ELF> <MV.ELF> <KILL.ELF> <SLEEP.ELF> <SETENV.ELF> <IPC.ELF> <os.img>")
     efi_source = Path(sys.argv[1]).read_bytes()
     kernel_source = Path(sys.argv[2]).read_bytes()
     init_source = Path(sys.argv[3]).read_bytes()
@@ -43,7 +43,8 @@ def main():
     kill_source = Path(sys.argv[19]).read_bytes()
     sleep_source = Path(sys.argv[20]).read_bytes()
     setenv_source = Path(sys.argv[21]).read_bytes()
-    output = Path(sys.argv[22])
+    ipc_source = Path(sys.argv[22]).read_bytes()
+    output = Path(sys.argv[23])
     efi_clusters = max(1, math.ceil(len(efi_source) / SECTOR))
     kernel_clusters = max(1, math.ceil(len(kernel_source) / SECTOR))
     init_clusters = max(1, math.ceil(len(init_source) / SECTOR))
@@ -65,6 +66,7 @@ def main():
     kill_clusters = max(1, math.ceil(len(kill_source) / SECTOR))
     sleep_clusters = max(1, math.ceil(len(sleep_source) / SECTOR))
     setenv_clusters = max(1, math.ceil(len(setenv_source) / SECTOR))
+    ipc_clusters = max(1, math.ceil(len(ipc_source) / SECTOR))
     efi_chain = list(range(6, 6 + efi_clusters))
     kernel_chain = list(range(6 + efi_clusters, 6 + efi_clusters + kernel_clusters))
     init_chain = list(range(6 + efi_clusters + kernel_clusters,
@@ -88,7 +90,8 @@ def main():
     kill_chain = list(range(mv_chain[-1] + 1, mv_chain[-1] + 1 + kill_clusters))
     sleep_chain = list(range(kill_chain[-1] + 1, kill_chain[-1] + 1 + sleep_clusters))
     setenv_chain = list(range(sleep_chain[-1] + 1, sleep_chain[-1] + 1 + setenv_clusters))
-    if setenv_chain[-1] >= TOTAL_SECTORS - DATA_START + 2:
+    ipc_chain = list(range(setenv_chain[-1] + 1, setenv_chain[-1] + 1 + ipc_clusters))
+    if ipc_chain[-1] >= TOTAL_SECTORS - DATA_START + 2:
         raise SystemExit("boot files are too large for the FAT32 image")
     image = bytearray(TOTAL_SECTORS * SECTOR)
     boot = bytearray(SECTOR)
@@ -110,7 +113,7 @@ def main():
     fsinfo = bytearray(SECTOR)
     struct.pack_into("<I", fsinfo, 0, 0x41615252)
     struct.pack_into("<I", fsinfo, 484, 0x61417272)
-    struct.pack_into("<I", fsinfo, 488, TOTAL_SECTORS - DATA_START - len(efi_chain) - len(kernel_chain) - len(init_chain) - len(shell_chain) - len(args_chain) - len(env_chain) - len(cat_chain) - len(pwd_chain) - len(mkdir_chain) - len(rm_chain) - len(rmdir_chain) - len(touch_chain) - len(write_chain) - len(ls_chain) - len(chmod_chain) - len(echo_chain) - len(stat_chain) - len(mv_chain) - len(kill_chain) - len(sleep_chain) - len(setenv_chain) - 4)
+    struct.pack_into("<I", fsinfo, 488, TOTAL_SECTORS - DATA_START - len(efi_chain) - len(kernel_chain) - len(init_chain) - len(shell_chain) - len(args_chain) - len(env_chain) - len(cat_chain) - len(pwd_chain) - len(mkdir_chain) - len(rm_chain) - len(rmdir_chain) - len(touch_chain) - len(write_chain) - len(ls_chain) - len(chmod_chain) - len(echo_chain) - len(stat_chain) - len(mv_chain) - len(kill_chain) - len(sleep_chain) - len(setenv_chain) - len(ipc_chain) - 4)
     struct.pack_into("<I", fsinfo, 492, 6 + efi_clusters + kernel_clusters + init_clusters + shell_clusters)
     struct.pack_into("<I", fsinfo, 508, 0xaa550000)
     image[SECTOR:2 * SECTOR] = fsinfo
@@ -123,7 +126,7 @@ def main():
                            (2, 5), (3, 0x0fffffff), (4, 0x0fffffff),
                            (5, 0x0fffffff)):
         set_fat(cluster, value)
-    for chain in (efi_chain, kernel_chain, init_chain, shell_chain, args_chain, env_chain, cat_chain, pwd_chain, mkdir_chain, rm_chain, rmdir_chain, touch_chain, write_chain, ls_chain, chmod_chain, echo_chain, stat_chain, mv_chain, kill_chain, sleep_chain, setenv_chain):
+    for chain in (efi_chain, kernel_chain, init_chain, shell_chain, args_chain, env_chain, cat_chain, pwd_chain, mkdir_chain, rm_chain, rmdir_chain, touch_chain, write_chain, ls_chain, chmod_chain, echo_chain, stat_chain, mv_chain, kill_chain, sleep_chain, setenv_chain, ipc_chain):
         for index, cluster in enumerate(chain):
             set_fat(cluster, chain[index + 1] if index + 1 < len(chain) else 0x0fffffff)
     for fat_index in range(FAT_COUNT):
@@ -156,6 +159,7 @@ def main():
     root_extension[96:128] = short_entry("KILL    ELF", 0x20, kill_chain[0], len(kill_source))
     root_extension[128:160] = short_entry("SLEEP   ELF", 0x20, sleep_chain[0], len(sleep_source))
     root_extension[160:192] = short_entry("SETENV  ELF", 0x20, setenv_chain[0], len(setenv_source))
+    root_extension[192:224] = short_entry("IPC     ELF", 0x20, ipc_chain[0], len(ipc_source))
     image[cluster_offset(5):cluster_offset(5) + SECTOR] = root_extension
     efi_dir = bytearray(SECTOR)
     efi_dir[0:32] = short_entry(".          ", 0x10, 3, 0)
@@ -209,6 +213,8 @@ def main():
         image[cluster_offset(cluster):cluster_offset(cluster) + len(sleep_source[index * SECTOR:(index + 1) * SECTOR])] = sleep_source[index * SECTOR:(index + 1) * SECTOR]
     for index, cluster in enumerate(setenv_chain):
         image[cluster_offset(cluster):cluster_offset(cluster) + len(setenv_source[index * SECTOR:(index + 1) * SECTOR])] = setenv_source[index * SECTOR:(index + 1) * SECTOR]
+    for index, cluster in enumerate(ipc_chain):
+        image[cluster_offset(cluster):cluster_offset(cluster) + len(ipc_source[index * SECTOR:(index + 1) * SECTOR])] = ipc_source[index * SECTOR:(index + 1) * SECTOR]
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_bytes(image)
 

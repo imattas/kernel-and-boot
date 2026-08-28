@@ -112,6 +112,7 @@ kernel gate below is explicitly marked complete.
 - [x] Add standalone `KILL.ELF` utility using the targeted signal ABI.
 - [x] Add standalone `SLEEP.ELF` utility using the clock and yield ABI.
 - [x] Add standalone `SETENV.ELF` utility using the environment-update ABI.
+- [x] Add userland IPC channel wrappers and standalone round-trip probe.
 - [x] Add shell `setenv <key> <value>` and multi-entry environment inheritance.
 - [ ] Add reliable QEMU live keyboard verification for `run INIT.ELF`.
 - [ ] Add the command-line shell and terminal/console I/O.

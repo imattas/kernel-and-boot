@@ -95,6 +95,9 @@ int main(void) {
     assert(strcmp(argument, "/a /b") == 0);
     assert(shell_parse("find / -type f", 15, argument, sizeof(argument)) == SHELL_RUN);
     assert(strcmp(argument, "/ -type f") == 0);
+    assert(shell_parse("expr 2 + 3", 10, argument, sizeof(argument)) == SHELL_RUN);
+    assert(strcmp(argument, "2 + 3") == 0);
+    assert(shell_parse("expr 2 + 3 | cat", 16, argument, sizeof(argument)) == SHELL_RUN);
     assert(shell_parse("find / > /tmp/files", 20, argument, sizeof(argument)) == SHELL_RUN);
     assert(strcmp(argument, "find / > /tmp/files") == 0);
     assert(shell_parse("tail /hello", 11, argument, sizeof(argument)) == SHELL_RUN);

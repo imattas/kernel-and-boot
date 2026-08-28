@@ -235,6 +235,7 @@ shell_command_t shell_parse(const char *line, uint32_t length,
         !same_word(line, command_length, "tr") &&
         !same_word(line, command_length, "cmp") &&
         !same_word(line, command_length, "find") &&
+        !same_word(line, command_length, "expr") &&
         !same_word(line, command_length, "mkdir") &&
         !same_word(line, command_length, "rm") &&
         !same_word(line, command_length, "rmdir") &&
@@ -308,6 +309,7 @@ shell_command_t shell_parse(const char *line, uint32_t length,
         same_word(line, command_length, "tr") ||
         same_word(line, command_length, "cmp") ||
         same_word(line, command_length, "find") ||
+        same_word(line, command_length, "expr") ||
         same_word(line, command_length, "uptime") ||
         same_word(line, command_length, "date")) &&
         shell_has_operator(line, length)) {
@@ -334,7 +336,8 @@ shell_command_t shell_parse(const char *line, uint32_t length,
         same_word(line, command_length, "cut") ||
         same_word(line, command_length, "tr") ||
         same_word(line, command_length, "cmp")) return SHELL_RUN;
-    if (same_word(line, command_length, "find")) return SHELL_RUN;
+    if (same_word(line, command_length, "find") ||
+        same_word(line, command_length, "expr")) return SHELL_RUN;
     if (same_word(line, command_length, "test")) return SHELL_RUN;
     if (same_word(line, command_length, "stat")) return SHELL_STAT;
     if (same_word(line, command_length, "chmod")) return SHELL_CHMOD;

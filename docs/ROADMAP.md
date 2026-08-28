@@ -1987,6 +1987,8 @@ working-directory ABI.
 
 The userland utility set now includes `expr.elf`, a bounded freestanding
 signed-integer arithmetic utility with overflow and division-error checks.
+The shell command inventory now recognizes bare `expr` invocations through
+PATH while preserving external pipeline and redirection dispatch.
 
 Process teardown now releases each process lock before removing the process
 from the global process table, preserving the lock ordering used by activation

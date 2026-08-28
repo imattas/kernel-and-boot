@@ -175,6 +175,8 @@ type, string, and numeric tests.
   it in the FAT32 image.
 - [x] Add standalone `expr.elf` with checked signed integer arithmetic for
   `+`, `-`, `*`, `/`, and `%`, packaged in the FAT32 image and VFS namespace.
+- [x] Expose `expr.elf` through bare shell PATH resolution and synchronized
+  help/parser coverage.
 - [x] Add native shell `basename` and `dirname` path inspection commands while
   preserving their external pipeline/redirection forms.
 - [x] Add standalone `which.elf` PATH executable discovery through the shared

@@ -1590,6 +1590,8 @@ The first standalone ring-3 `ARGS.ELF` utility is now built and packaged in
 the FAT32 root, providing an executable path for validating argument delivery.
 Spawned programs now receive the inherited environment block through a
 conventional `envp` pointer after their `argv` vector.
+The standalone `ENV.ELF` utility now consumes that vector and is packaged in
+the boot image alongside `ARGS.ELF`.
 
 ## Phase 10 — BIOS boot path
 

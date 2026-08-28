@@ -357,8 +357,9 @@ submission with bounded completion/error polling. The AHCI READ/WRITE DMA paths 
 uses the required 128-byte command-table header layout, validates the SATA
 device signature, and are gated by real LBA0 FAT32 read and sector write/read-back
 signature checks. Controller I/O coverage now includes the exercised USB,
-NVMe, AHCI, ATA, and network interrupt/error paths; the remaining work is the
-final cross-driver completion audit before the kernel gate.
+NVMe, AHCI, ATA, and network interrupt/error paths. The driver completion audit
+is covered by the grouped QEMU gate and the device-claim rollback contract;
+remaining kernel work is filesystem hardening.
 AHCI now also exposes bounded multi-sector READ/WRITE DMA transfers with a
 two-entry PRDT spanning two DMA pages; the QEMU gate verifies a sixteen-sector
 write/read-back operation across that boundary.

@@ -290,12 +290,14 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
             } else if (arg3 &&
                        !syscall_copy_string(arguments, arg3, sizeof(arguments)))
                 return OS_SYSCALL_ERROR;
-            if (redirected &&
-                (!redirected_input || !redirected_output ||
-                 !process_handle_get(&parent->handles, redirected_input,
-                                     PROCESS_HANDLE_READ) ||
-                 !process_handle_get(&parent->handles, redirected_output,
-                                     PROCESS_HANDLE_WRITE)))
+            int input_valid = !redirected_input ||
+                process_handle_get(&parent->handles, redirected_input,
+                                   PROCESS_HANDLE_READ) != 0;
+            int output_valid = !redirected_output ||
+                process_handle_get(&parent->handles, redirected_output,
+                                   PROCESS_HANDLE_WRITE) != 0;
+            if (redirected && ((!redirected_input && !redirected_output) ||
+                               !input_valid || !output_valid))
                 return OS_SYSCALL_ERROR;
             uint64_t flags = spinlock_lock_irqsave(&parent->lock);
             vfs_node_t *root = parent->root_directory;

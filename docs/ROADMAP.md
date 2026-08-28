@@ -1631,6 +1631,9 @@ The shell now executes a bounded two-process pipeline with
 child and reporting the consumer's exit status. `CAT.ELF` consumes standard
 input when invoked without a path, providing the first packaged pipeline
 consumer.
+The shell also supports bounded output redirection with
+`run <command> > <path>`, binding a writable VFS file as the child process's
+standard output and reporting its exit status.
 The FAT32 image builder now chains a second root-directory cluster, removing
 the one-sector root-entry ceiling for continued userland growth.
 The standalone `ECHO.ELF` utility is now stored in the expanded root directory

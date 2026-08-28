@@ -197,6 +197,48 @@ static int shell_run_pipeline(char *text, uint32_t length, int32_t *status) {
     return 1;
 }
 
+static int shell_run_redirect(char *text, uint32_t length, int32_t *status) {
+    uint32_t separator = length;
+    for (uint32_t index = 0; index < length; ++index) {
+        if (text[index] != '>') continue;
+        if (separator != length) return 0;
+        separator = index;
+    }
+    if (separator == length) return 0;
+    text[separator] = 0;
+    uint32_t left_length = separator;
+    while (left_length != 0 && (text[left_length - 1U] == ' ' ||
+                                text[left_length - 1U] == '\t')) --left_length;
+    uint32_t path_start = separator + 1U;
+    while (path_start < length && (text[path_start] == ' ' ||
+                                   text[path_start] == '\t')) ++path_start;
+    if (left_length == 0 || path_start == length) return 0;
+    uint32_t name_length = 0;
+    while (name_length < left_length && text[name_length] != ' ' &&
+           text[name_length] != '\t') ++name_length;
+    char resolved_path[128];
+    uint32_t resolved_length = resolve_command(text, name_length,
+                                                resolved_path,
+                                                sizeof(resolved_path));
+    if (resolved_length == 0) return 0;
+    uint32_t output_length = length - path_start;
+    uint64_t output = os_create(text + path_start, output_length, 3);
+    if (output == OS_SYSCALL_ERROR) return 0;
+    uint32_t arguments_start = name_length;
+    while (arguments_start < left_length && (text[arguments_start] == ' ' ||
+                                              text[arguments_start] == '\t')) ++arguments_start;
+    uint64_t process_id = os_spawn_redirected(resolved_path, resolved_length,
+                                              text + arguments_start, 0,
+                                              (uint32_t)output);
+    (void)os_close(output);
+    if (process_id == OS_SYSCALL_ERROR) return 0;
+    int32_t child_status = -1;
+    if (os_wait(process_id, &child_status) == OS_SYSCALL_ERROR ||
+        os_reap(process_id) == OS_SYSCALL_ERROR) return 0;
+    *status = child_status;
+    return 1;
+}
+
 void shell_main(void) {
     static const char prompt[] = "os> ";
     static const char help[] = "help id ps env setenv unsetenv status jobs which inherit echo pwd cd ls cat stat chmod kill sleep mv mkdir rm rmdir touch write run wait exit\r\n";
@@ -545,6 +587,21 @@ void shell_main(void) {
                         print("\r\n", 2);
                     }
                 } else {
+                uint32_t redirect_count = 0;
+                for (uint32_t index = 0; index < argument_length; ++index)
+                    if (argument[index] == '>') ++redirect_count;
+                if (redirect_count != 0) {
+                    int32_t redirect_status = 1;
+                    if (!shell_run_redirect(argument, argument_length,
+                                             &redirect_status))
+                        print(unknown, sizeof(unknown) - 1U);
+                    else {
+                        last_status = redirect_status;
+                        print("exit=", 5);
+                        print_status(redirect_status);
+                        print("\r\n", 2);
+                    }
+                } else {
                 int background = 0;
                 if (argument_length != 0 && argument[argument_length - 1U] == '&') {
                     background = 1;
@@ -587,6 +644,7 @@ void shell_main(void) {
                     print("exit=", 5);
                     print_status(status);
                     print("\r\n", 2);
+                }
                 }
                 }
             } else if (command == SHELL_EXIT) {

@@ -122,6 +122,7 @@ kernel gate below is explicitly marked complete.
 - [x] Add optional per-process standard-input and standard-output bindings for
   redirected child processes.
 - [x] Add the first shell pipeline form: `run <producer> | <consumer>`.
+- [x] Add shell output redirection: `run <command> > <path>`.
 - [x] Add a bounded serial-input bridge into the standard-input queue for
   terminal-backed userland sessions.
 - [ ] Add reliable QEMU live keyboard verification for `run INIT.ELF`.

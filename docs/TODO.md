@@ -71,6 +71,8 @@ the init-owned shell supervisor remains the next kernel/userland boundary.
 - [x] Add standalone `HELP.ELF` and expose it through the live FAT32 VFS.
 - [x] Run the full userland/kernel/image/QEMU regression gate after the
   standalone application expansion.
+- [x] Give active address-space and CR3 ownership per logical CPU for SMP
+  userland transitions.
 - [ ] Add shell/application integration coverage for filesystem mutation,
   pipelines, redirection, background jobs, and inherited environment state.
 - [ ] Make init supervise `shell.elf` through the normal spawn/wait ABI after

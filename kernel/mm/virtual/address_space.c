@@ -2,6 +2,7 @@
 #include "address_space.h"
 #include "../physical/frame.h"
 #include "../../arch/x86_64/memory/paging.h"
+#include "../../arch/x86_64/smp/percpu.h"
 #include "../../core/sync/spinlock.h"
 
 #define PAGE_SIZE 0x1000ULL
@@ -19,9 +20,14 @@ static uint64_t page_directories[4][512] __attribute__((aligned(PAGE_SIZE)));
 static uint64_t heap_page_table[512] __attribute__((aligned(PAGE_SIZE)));
 static int heap_page_table_active;
 static uint64_t root;
-static uint64_t active_root;
-static const address_space_t *active_space;
+static uint64_t active_roots[64];
+static const address_space_t *active_spaces[64];
 static spinlock_t address_space_lock;
+
+static uint32_t address_space_cpu_index(void) {
+    const arch_percpu_t *cpu = arch_percpu_current();
+    return cpu && cpu->logical_id < 64 ? cpu->logical_id : 0;
+}
 
 static int address_space_unmap_page_locked(address_space_t *space,
                                            uint64_t virtual_address);
@@ -31,7 +37,7 @@ static void clear_table(uint64_t *table) {
 }
 
 static void invalidate_active_page(const address_space_t *space, uint64_t address) {
-    if (active_space == space)
+    if (active_spaces[address_space_cpu_index()] == space)
         __asm__ volatile ("invlpg (%0)" :: "r"((void *)(uintptr_t)address) : "memory");
 }
 
@@ -53,8 +59,10 @@ int virtual_memory_initialize(void) {
     pml4[0] = (uint64_t)(uintptr_t)pdpt | PAGE_PRESENT | PAGE_WRITABLE;
     root = (uint64_t)(uintptr_t)pml4;
     x86_64_load_page_root(root);
-    active_root = root;
-    active_space = 0;
+    for (uint32_t cpu = 0; cpu < 64; ++cpu) {
+        active_roots[cpu] = root;
+        active_spaces[cpu] = 0;
+    }
     return 1;
 }
 
@@ -148,13 +156,15 @@ static int address_space_create_locked(address_space_t *space) {
 static int address_space_activate_locked(const address_space_t *space) {
     if (!space || (space->root & (PAGE_SIZE - 1)) != 0 || space->root == 0) return 0;
     x86_64_load_page_root(space->root);
-    active_root = space->root;
-    active_space = space;
+    uint32_t cpu = address_space_cpu_index();
+    active_roots[cpu] = space->root;
+    active_spaces[cpu] = space;
     return 1;
 }
 
 static int address_space_destroy_locked(address_space_t *space) {
-    if (!space || space->root == 0 || space->root == root || space->root == active_root)
+    if (!space || space->root == 0 || space->root == root ||
+        space->root == active_roots[address_space_cpu_index()])
         return 0;
     for (uint32_t i = space->anonymous_count; i != 0; --i)
         physical_free_frame(space->anonymous_frames[i - 1].physical_address);
@@ -377,7 +387,9 @@ static int address_space_page_executable_locked(const address_space_t *space,
            (pte & PAGE_NX) == 0;
 }
 
-const address_space_t *address_space_active(void) { return active_space; }
+const address_space_t *address_space_active(void) {
+    return active_spaces[address_space_cpu_index()];
+}
 
 static int address_space_user_range_valid_locked(const address_space_t *space,
                                                  uint64_t address, uint64_t size,
@@ -426,8 +438,9 @@ int address_space_activate(const address_space_t *space) {
 int address_space_activate_kernel(void) {
     uint64_t flags = spinlock_lock_irqsave(&address_space_lock);
     x86_64_load_page_root(root);
-    active_root = root;
-    active_space = 0;
+    uint32_t cpu = address_space_cpu_index();
+    active_roots[cpu] = root;
+    active_spaces[cpu] = 0;
     spinlock_unlock_irqrestore(&address_space_lock, flags);
     return root != 0;
 }
@@ -608,7 +621,8 @@ int address_space_copy_from_user(void *destination, uint64_t source, uint64_t si
     if (size == 0) return 1;
     if (!destination) return 0;
     uint64_t flags = spinlock_lock_irqsave(&address_space_lock);
-    int valid = address_space_user_range_valid_locked(active_space, source, size, 0);
+    int valid = address_space_user_range_valid_locked(
+        active_spaces[address_space_cpu_index()], source, size, 0);
     if (valid) {
         uint8_t *out = (uint8_t *)destination;
         const uint8_t *in = (const uint8_t *)(uintptr_t)source;
@@ -622,7 +636,8 @@ int address_space_copy_to_user(uint64_t destination, const void *source, uint64_
     if (size == 0) return 1;
     if (!source) return 0;
     uint64_t flags = spinlock_lock_irqsave(&address_space_lock);
-    int valid = address_space_user_range_valid_locked(active_space, destination, size, 1);
+    int valid = address_space_user_range_valid_locked(
+        active_spaces[address_space_cpu_index()], destination, size, 1);
     if (valid) {
         uint8_t *out = (uint8_t *)(uintptr_t)destination;
         const uint8_t *in = (const uint8_t *)source;

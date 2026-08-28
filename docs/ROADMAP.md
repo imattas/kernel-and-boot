@@ -1731,6 +1731,10 @@ the external process path as the native shell `help` command.
 The complete `make test` gate now passes with the expanded 31-artifact
 userland set, including shell/runtime contracts, filesystem/device contracts,
 image validation, and QEMU UEFI execution.
+Active address-space and CR3 tracking is now per logical CPU, preventing AP
+activity from overwriting the BSP's userland address-space state during SMP
+transitions. The change passes the grouped QEMU gate and is ready for a
+separate init-supervisor retry.
 An attempted init-owned supervisor run with services queued before init was
 reverted after QEMU tracing showed the shared scheduler/address-space path
 stalling during the first spawn argument copy; the stable kernel-managed shell

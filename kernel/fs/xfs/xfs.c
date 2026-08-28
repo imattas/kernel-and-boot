@@ -86,6 +86,8 @@ static void xfs_bno_store_records(uint8_t *tree,
 
 static int xfs_read_block(const xfs_fs_t *fs, uint64_t block, void *buffer);
 static int xfs_write_block(const xfs_fs_t *fs, uint64_t block, const void *buffer);
+static int xfs_validate_auth_cnt(const xfs_fs_t *fs, uint64_t ag_base,
+                                 const xfs_agf_view_t *view);
 static int xfs_allocate_real_bno(xfs_fs_t *fs, uint32_t allocation_group,
                                  uint32_t blocks, uint64_t *start);
 static int xfs_free_real_bno(xfs_fs_t *fs, uint64_t start, uint32_t blocks);
@@ -113,6 +115,50 @@ static void store_be32(uint8_t *p, uint32_t value) {
 
 static void store_be16(uint8_t *p, uint16_t value) {
     p[0] = (uint8_t)(value >> 8); p[1] = (uint8_t)value;
+}
+
+static int xfs_validate_auth_cnt(const xfs_fs_t *fs, uint64_t ag_base,
+                                 const xfs_agf_view_t *view) {
+    uint8_t root[4096], leaf[4096];
+    if (!fs || !view || !view->authentic || view->cnt_root == 0 ||
+        view->cnt_level == 0 || view->cnt_level > 2 ||
+        view->cnt_root >= fs->ag_blocks ||
+        !xfs_read_block(fs, ag_base + view->cnt_root, root) ||
+        be32(root) != XFS_BNO_MAGIC_REAL ||
+        be16(&root[4]) != view->cnt_level - 1U) return 0;
+    uint32_t capacity = (fs->block_size - 16U) /
+                        (view->cnt_level == 1U ? 8U : 12U);
+    uint32_t records = be16(&root[6]);
+    if (records == 0 || records > capacity) return 0;
+    uint32_t total = 0, longest = 0, previous_count = 0, previous_start = 0;
+    uint32_t pointer_offset = 16U + capacity * 8U;
+    uint32_t children = view->cnt_level == 1U ? 1U : records;
+    for (uint32_t child_index = 0; child_index < children; ++child_index) {
+        const uint8_t *source = root;
+        if (view->cnt_level == 2U) {
+            uint32_t child = be32(&root[pointer_offset + child_index * 4U]);
+            if (child == 0 || child >= fs->ag_blocks ||
+                !xfs_read_block(fs, ag_base + child, leaf) ||
+                be32(leaf) != XFS_BNO_MAGIC_REAL || be16(&leaf[4]) != 0)
+                return 0;
+            source = leaf;
+        }
+        uint32_t leaf_records = view->cnt_level == 1U ? records : be16(&source[6]);
+        if (leaf_records == 0 || leaf_records > (fs->block_size - 16U) / 8U)
+            return 0;
+        for (uint32_t i = 0; i < leaf_records; ++i) {
+            uint32_t start = be32(&source[16U + i * 8U]);
+            uint32_t count = be32(&source[20U + i * 8U]);
+            if (count == 0 || start > fs->ag_blocks - count ||
+                total > UINT32_MAX - count ||
+                (total != 0 && (count < previous_count ||
+                 (count == previous_count && start <= previous_start))))
+                return 0;
+            total += count; previous_count = count; previous_start = start;
+            if (count > longest) longest = count;
+        }
+    }
+    return total == view->free_blocks && longest == view->longest;
 }
 
 static int xfs_allocate_extent_locked(xfs_fs_t *fs, uint32_t allocation_group,
@@ -386,6 +432,22 @@ int xfs_mount(xfs_fs_t *fs, uint32_t device) {
     fs->ag_count = ag_count; fs->ag_blocks = ag_blocks; fs->block_count = blocks;
     fs->ag_block_log = sb[112]; fs->inode_per_block_log = inopblock_log;
     fs->root_inode = be64(&sb[56]); fs->mounted = 1;
+    for (uint32_t agno = 0; agno < fs->ag_count; ++agno) {
+        uint8_t agf[4096];
+        xfs_agf_view_t view;
+        uint64_t ag_base = (uint64_t)agno * fs->ag_blocks;
+        if (ag_base > fs->block_count - 2U ||
+            !xfs_read_block(fs, ag_base + 1U, agf)) {
+            fs->mounted = 0;
+            return 0;
+        }
+        if (be32(&agf[20]) != 0U &&
+            (!xfs_agf_view(agf, &view) ||
+             !xfs_validate_auth_cnt(fs, ag_base, &view))) {
+            fs->mounted = 0;
+            return 0;
+        }
+    }
     return fs->root_inode != 0;
 }
 

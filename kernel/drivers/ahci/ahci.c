@@ -133,6 +133,33 @@ static void ahci_release_command_buffers(void) {
     active_data_pages = 0;
 }
 
+static int ahci_quiesce_port_locked(volatile uint32_t *port) {
+    if (!port) return 0;
+    port[AHCI_PORT_CMD / 4] &= ~(AHCI_CMD_ST | AHCI_CMD_FRE);
+    for (uint32_t wait = 0; wait < 1000000; ++wait)
+        if ((port[AHCI_PORT_CMD / 4] & (AHCI_CMD_CR | AHCI_CMD_FR)) == 0) {
+            port[AHCI_PORT_IE / 4] = 0;
+            port[AHCI_PORT_IS / 4] = UINT32_MAX;
+            port[AHCI_PORT_SERR / 4] = UINT32_MAX;
+            return 1;
+        }
+    return 0;
+}
+
+static int ahci_release_port_resources_locked(uint32_t port) {
+    ahci_port_state_t *state = &port_state[port];
+    if (!state->regs) return 1;
+    if (!ahci_quiesce_port_locked(state->regs)) return 0;
+    state->regs[AHCI_PORT_CLB / 4] = 0;
+    state->regs[(AHCI_PORT_CLB / 4) + 1] = 0;
+    state->regs[AHCI_PORT_FB / 4] = 0;
+    state->regs[(AHCI_PORT_FB / 4) + 1] = 0;
+    if (state->command_list) physical_free_frame(state->command_list);
+    if (state->fis) physical_free_frame(state->fis);
+    state[0] = (ahci_port_state_t){0};
+    return 1;
+}
+
 static int ahci_finish_command(int completed) {
     if (!completed && !ahci_stop_engine()) {
         /* A wedged HBA may still fetch these buffers; retain them safely. */
@@ -252,6 +279,8 @@ static int ahci_probe(device_t *device) {
         active_command_list = command_list;
     }
     if (ready_ports == 0) {
+        for (uint32_t port = 0; port < 32; ++port)
+            (void)ahci_release_port_resources_locked(port);
         active_port = 0;
         active_command_list = 0;
         device_release_resource(device, AHCI_BAR_INDEX, &ahci_driver);
@@ -409,6 +438,7 @@ static int ahci_identify_ready_ports_locked(void) {
         ahci_select_port_locked(port);
         if (!ahci_identify_locked(words)) {
             port_state[port].identified = 0;
+            if (!ahci_release_port_resources_locked(port)) ahci_io_disabled = 1;
             continue;
         }
         port_state[port].lba48 = active_lba48;

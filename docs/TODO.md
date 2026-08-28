@@ -43,6 +43,8 @@ kernel gate below is explicitly marked complete.
   scope; do not claim it is complete while it remains deferred.
 - [ ] Driver hardening: grouped error paths, reset/timeout behavior, resource
   ownership, and QEMU coverage for all enabled drivers.
+- [x] AHCI failed-probe and failed-IDENTIFY command-list/FIS cleanup is bounded
+  by port-idle confirmation.
 - [ ] Final kernel audit: no required kernel directory is empty or only a
   placeholder; every retained component has build integration and evidence.
 - [ ] Final completion gate: clean build, image validation/mountability checks,

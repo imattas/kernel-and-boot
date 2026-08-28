@@ -522,6 +522,36 @@ static int shell_copy_file(const char *source_path, uint32_t source_length,
                OS_SYSCALL_ERROR;
 }
 
+static int shell_mkdir_parents(char *path, uint32_t length) {
+    if (!path || length == 0) return 0;
+    for (uint32_t index = 1; index < length; ++index) {
+        if (path[index] != '/') continue;
+        if (index == 1 && path[0] == '/') continue;
+        char saved = path[index];
+        path[index] = 0;
+        uint64_t result = os_mkdir(path, index, 0755);
+        if (result == OS_SYSCALL_ERROR) {
+            uint64_t descriptor = os_open(path, index, 1);
+            os_stat_t stat;
+            int existing_directory = descriptor != OS_SYSCALL_ERROR &&
+                os_fstat(descriptor, &stat) != OS_SYSCALL_ERROR && stat.type == 0;
+            if (descriptor != OS_SYSCALL_ERROR) (void)os_close(descriptor);
+            if (!existing_directory) {
+                path[index] = saved;
+                return 0;
+            }
+        }
+        path[index] = saved;
+    }
+    if (os_mkdir(path, length, 0755) != OS_SYSCALL_ERROR) return 1;
+    uint64_t descriptor = os_open(path, length, 1);
+    os_stat_t stat;
+    int existing_directory = descriptor != OS_SYSCALL_ERROR &&
+        os_fstat(descriptor, &stat) != OS_SYSCALL_ERROR && stat.type == 0;
+    if (descriptor != OS_SYSCALL_ERROR) (void)os_close(descriptor);
+    return existing_directory;
+}
+
 void shell_main(void) {
     static const char prompt[] = "os> ";
     static const char help[] = "help id ps env setenv unsetenv status true false jobs history fg which inherit echo pwd cd ls cat stat chmod kill sleep mv cp mkdir rm rmdir touch write run wait exit\r\n";
@@ -914,8 +944,20 @@ void shell_main(void) {
             } else if (command == SHELL_MKDIR) {
                 uint32_t argument_length = 0;
                 while (argument[argument_length]) ++argument_length;
-                if (os_mkdir(argument, argument_length, 0755) ==
-                    OS_SYSCALL_ERROR)
+                int recursive = argument_length >= 3 && argument[0] == '-' &&
+                    argument[1] == 'p' &&
+                    (argument[2] == ' ' || argument[2] == '\t');
+                uint32_t path_start = recursive ? 2 : 0;
+                while (path_start < argument_length &&
+                       (argument[path_start] == ' ' || argument[path_start] == '\t'))
+                    ++path_start;
+                uint32_t path_length = argument_length - path_start;
+                int created = recursive ? shell_mkdir_parents(argument + path_start,
+                                                               path_length) :
+                    path_length != 0 && os_mkdir(argument + path_start,
+                                                  path_length, 0755) !=
+                        OS_SYSCALL_ERROR;
+                if (!created)
                     print(unknown, sizeof(unknown) - 1U);
             } else if (command == SHELL_RM) {
                 uint32_t argument_length = 0;

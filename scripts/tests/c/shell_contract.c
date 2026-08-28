@@ -85,6 +85,9 @@ int main(void) {
     assert(history_length == 6 && strcmp(argument, "second") == 0);
     assert(shell_parse("mkdir /tmp", 10, argument, sizeof(argument)) == SHELL_MKDIR);
     assert(strcmp(argument, "/tmp") == 0);
+    assert(shell_parse("mkdir -p /tmp/a/b", 17, argument,
+                       sizeof(argument)) == SHELL_MKDIR);
+    assert(strcmp(argument, "-p /tmp/a/b") == 0);
     assert(shell_parse("rm /tmp/file", 12, argument, sizeof(argument)) == SHELL_RM);
     assert(strcmp(argument, "/tmp/file") == 0);
     assert(shell_parse("rmdir /tmp", 10, argument, sizeof(argument)) == SHELL_RMDIR);

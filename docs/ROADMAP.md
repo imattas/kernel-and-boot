@@ -1950,9 +1950,9 @@ the existing parser coverage for pipelines, redirection, jobs, and expansion.
 Continue hardening SMP, memory reclamation, storage, USB, networking, graphics, security, debugging, crash diagnostics, performance tooling, power management, hardware compatibility, and userland while maintaining explicit subsystem boundaries and automated regression coverage.
 
 The init-owned shell supervisor remains deferred: the first spawn attempt
-stalled before shell startup. The stable kernel-managed shell handoff remains
-active until process-lock ownership is made SMP-safe and live QEMU verifies
-the normal spawn/wait path.
+stalled during process namespace setup. The stable kernel-managed shell handoff
+remains active until process-lock ownership is made SMP-safe and live QEMU
+verifies the normal spawn/wait path.
 
 Userland development is active while XFS expansion remains paused. The shell
 now includes a `version` built-in, synchronized with its help inventory, as

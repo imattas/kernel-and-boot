@@ -1295,7 +1295,8 @@ PS/2 keyboard and mouse initialization now waits for controller input-buffer
 availability before issuing channel-enable commands, closing the setup race
 that could drop commands on a busy controller.
 USB HID boot-mouse reports now decode into validated button, X-axis, and
-Y-axis input events.
+Y-axis input events; standard four-byte reports additionally publish the
+signed wheel axis and are selected by the UHCI runtime path.
 The network service now drains bounded NIC input, learns validated ARP
 senders, and transmits ARP and ICMP echo replies through the adapter boundary.
 The generic block layer now has a storage-backed adapter, with boot-time

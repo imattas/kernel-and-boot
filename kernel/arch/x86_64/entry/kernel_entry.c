@@ -2526,6 +2526,18 @@ void kernel_main(void *boot_info) {
         serial_write("USB HID mouse failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
+    static const uint8_t hid_mouse_wheel_report[4] = {0x01, 0xff, 0x02, 0xfe};
+    input_event_t hid_mouse_wheel_events[4];
+    uint32_t hid_mouse_wheel_count = 0;
+    if (!usb_hid_mouse_decode(hid_mouse_wheel_report,
+                              sizeof(hid_mouse_wheel_report),
+                              hid_mouse_wheel_events,
+                              &hid_mouse_wheel_count) ||
+        hid_mouse_wheel_count != 4 || hid_mouse_wheel_events[3].code != 2 ||
+        hid_mouse_wheel_events[3].value != -2) {
+        serial_write("USB HID mouse wheel failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
     serial_write("USB HID mouse ready\r\n");
     if (uhci_root_port_count() != 0 && uhci_interrupt_endpoint != 0) {
         for (uint32_t i = 0; i < sizeof(input_runtime_report); ++i)
@@ -2533,7 +2545,8 @@ void kernel_main(void *boot_info) {
         input_runtime_toggle = 0;
         input_runtime_endpoint = uhci_interrupt_endpoint;
         input_runtime_packet = uhci_interrupt_packet;
-        input_runtime_mouse = input_runtime_packet == 3;
+        input_runtime_mouse = input_runtime_packet == 3 ||
+                              input_runtime_packet == 4;
         input_runtime_ready = 1;
         input_runtime_pending = uhci_interrupt_submit(
             1, input_runtime_endpoint, input_runtime_report,

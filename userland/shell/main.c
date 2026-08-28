@@ -855,6 +855,32 @@ static int shell_remove_tree(const char *path, uint32_t length,
     return complete && os_rmdir(path, length) != OS_SYSCALL_ERROR;
 }
 
+static int shell_read_line(char *output, uint32_t capacity, char *buffer,
+                           uint64_t received, uint64_t *input_index) {
+    if (!output || capacity == 0 || !buffer || !input_index) return 0;
+    uint32_t length = 0;
+    while (length + 1U < capacity) {
+        char input;
+        if (*input_index < received) {
+            input = buffer[(*input_index)++];
+        } else {
+            uint64_t result = os_read(0, &input, 1);
+            if (result == OS_SYSCALL_ERROR) return 0;
+            if (result == 0) {
+                os_yield();
+                continue;
+            }
+        }
+        if (input == '\r' || input == '\n') {
+            output[length] = 0;
+            return 1;
+        }
+        output[length++] = input;
+    }
+    output[length] = 0;
+    return 0;
+}
+
 void shell_main(void) {
     static const char prompt[] = "os> ";
     static const char help[] = "help version uname clear alias unalias id ps env setenv export unsetenv read status true false jobs history fg which inherit echo printf basename dirname cut tr cmp test pwd cd ls cat head wc grep tee tail sort uniq stat chmod kill sleep mv cp mkdir rm rmdir touch uptime date write run wait exit\r\n";
@@ -1411,21 +1437,12 @@ void shell_main(void) {
                 }
                 char value[128];
                 uint32_t value_length = 0;
-                while (valid && value_length + 1U < sizeof(value)) {
-                    char input;
-                    uint64_t received = os_read(0, &input, 1);
-                    if (received == OS_SYSCALL_ERROR) {
-                        valid = 0;
-                        break;
-                    }
-                    if (received == 0) {
-                        os_yield();
-                        continue;
-                    }
-                    if (input == '\r' || input == '\n') break;
-                    value[value_length++] = input;
-                }
-                value[value_length] = 0;
+                uint64_t input_index = index + 1U;
+                if (valid && !shell_read_line(value, sizeof(value), input,
+                                              received, &input_index)) valid = 0;
+                value_length = 0;
+                while (value[value_length]) ++value_length;
+                if (input_index > index + 1U) index = input_index - 1U;
                 if (!valid || os_setenv(argument, value) == OS_SYSCALL_ERROR)
                     print(unknown, sizeof(unknown) - 1U);
             } else if (command == SHELL_STATUS) {

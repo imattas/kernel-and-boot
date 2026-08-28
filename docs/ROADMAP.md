@@ -1563,10 +1563,10 @@ Device binding now treats each probe as a resource-ownership transaction and
 releases all claims from a failed probe before the next matching driver is
 tried, preventing leaked BAR/PIO ownership from blocking fallback binding.
 
-## Phase 10 — Userland begins after the kernel gate
+## Phase 10 — Userland active alongside final kernel hardening
 
-Only after the kernel completion gate passes populate `userland/`. The first
-userland slice now provides a freestanding ring-3 init ELF that exercises the
+Userland development is now active while the kernel completion gate is being
+hardened. The first userland slice provides a freestanding ring-3 init ELF that exercises the
 existing `write` and `exit` syscall ABI. A small C-facing runtime wrapper now
 owns those calls, while the UEFI boot contract loads the image and the kernel
 launches it as the first external user process after the kernel gate. Next
@@ -1722,7 +1722,10 @@ The native shell `rm` command now supports bounded `rm -r` tree removal using
 directory enumeration and rejects attempts to recursively remove `/`.
 Input and network runtime services now start before the persistent shell, so an
 immediately-blocking shell cannot starve those services. The init-to-shell
-supervisor handoff remains deferred. `args.elf`, `env.elf`, `cat.elf`,
+supervisor handoff remains deferred pending a namespace-retain deadlock fix.
+Userland development is nevertheless active: the next batch is shared
+standalone-utility support and shell/application integration coverage.
+`args.elf`, `env.elf`, `cat.elf`,
 `pwd.elf`, `mkdir.elf`, `rm.elf`, `rmdir.elf`, `touch.elf`, `write.elf`,
 `ls.elf`, `chmod.elf`, `echo.elf`, `stat.elf`, `mv.elf`, `kill.elf`,
 `sleep.elf`, `setenv.elf`, `ipc.elf`, `dup.elf`, `true.elf`, `false.elf`,

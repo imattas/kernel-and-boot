@@ -1,8 +1,9 @@
 # OS TODO and Completion Ledger
 
 This file is the short execution checklist. `docs/ROADMAP.md` remains the
-authoritative design and phase document. Userland must not begin until the
-kernel gate below is explicitly marked complete.
+authoritative design and phase document. Userland development is now active in
+parallel with final kernel hardening; the kernel gate still controls when the
+kernel may be declared complete.
 
 ## Completed kernel areas
 
@@ -55,7 +56,18 @@ kernel gate below is explicitly marked complete.
   focused contracts, full `make test`, and QEMU boot with `os kernel entry ok`.
 - [ ] Notify the user that the kernel is complete and mark the goal complete.
 
-## Userland — starts only after the kernel gate
+## Userland — active development
+
+Current focus: continue userland contracts and shell/application behavior;
+XFS feature expansion is paused. Kernel hardening continues separately, and
+the init-owned shell supervisor remains the next kernel/userland boundary.
+
+- [ ] Add a small userland runtime layer for shared argument parsing, status
+  handling, and diagnostic output across standalone applications.
+- [ ] Add shell/application integration coverage for filesystem mutation,
+  pipelines, redirection, background jobs, and inherited environment state.
+- [ ] Make init supervise `shell.elf` through the normal spawn/wait ABI after
+  the namespace-retain deadlock is fixed.
 
 - [x] Tell the user before creating ring-3/userland implementation.
 - [x] Build the first freestanding ring-3 init ELF against the existing syscall

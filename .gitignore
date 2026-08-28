@@ -1,6 +1,8 @@
 # Generated build and test output
 /build/
 /dist/
+__pycache__/
+*.pyc
 
 # Local editor and host files
 .vscode/

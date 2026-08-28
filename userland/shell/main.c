@@ -1767,7 +1767,13 @@ void shell_main(void) {
                 }
                 }
             } else if (command == SHELL_EXIT) {
-                os_exit(0);
+                uint64_t status = 0;
+                if (argument_length != 0 &&
+                    (!parse_number(argument, argument_length, &status) ||
+                     status > 255U)) {
+                    print(unknown, sizeof(unknown) - 1U);
+                    last_status = 2;
+                } else os_exit((int32_t)status);
             } else if (command != SHELL_EMPTY) {
                 uint32_t name_length = 0;
                 while (name_length < length && line[name_length] != ' ' &&

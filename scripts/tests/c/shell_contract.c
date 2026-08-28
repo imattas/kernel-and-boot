@@ -202,6 +202,8 @@ int main(void) {
     assert(shell_parse("wait 4", 6, argument, sizeof(argument)) == SHELL_WAIT);
     assert(strcmp(argument, "4") == 0);
     assert(shell_parse("exit", 4, argument, sizeof(argument)) == SHELL_EXIT);
+    assert(shell_parse("exit 7", 6, argument, sizeof(argument)) == SHELL_EXIT);
+    assert(strcmp(argument, "7") == 0);
     assert(shell_parse("wat", 3, argument, sizeof(argument)) == SHELL_UNKNOWN);
     char sequence[32] = "true; false";
     char remainder[32] = {0};

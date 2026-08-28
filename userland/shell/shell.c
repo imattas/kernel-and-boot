@@ -219,7 +219,14 @@ shell_command_t shell_parse(const char *line, uint32_t length,
             argument[index - start] = line[index];
         return SHELL_HISTORY;
     }
-    if (same_word(line, command_length, "exit")) return SHELL_EXIT;
+    if (same_word(line, command_length, "exit")) {
+        uint32_t start = command_length;
+        while (start < length && (line[start] == ' ' || line[start] == '\t')) ++start;
+        if (length - start >= capacity) return SHELL_UNKNOWN;
+        for (uint32_t index = start; index <= length; ++index)
+            argument[index - start] = line[index];
+        return SHELL_EXIT;
+    }
     if (!same_word(line, command_length, "cat") &&
         !same_word(line, command_length, "head") &&
         !same_word(line, command_length, "wc") &&

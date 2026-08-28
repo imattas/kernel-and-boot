@@ -96,6 +96,7 @@ kernel gate below is explicitly marked complete.
 - [x] Add standalone `RMDIR.ELF` utility using the directory-removal ABI.
 - [x] Add standalone `TOUCH.ELF` utility using the create/close ABI.
 - [x] Add standalone `WRITE.ELF` utility using the create/write ABI.
+- [x] Add standalone `LS.ELF` utility using directory enumeration.
 - [ ] Add reliable QEMU live keyboard verification for `run INIT.ELF`.
 - [ ] Add the command-line shell and terminal/console I/O.
 - [ ] Add process tools and initial utilities (`init`, `echo`, `ls`, `cat`,

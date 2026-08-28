@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <stdint.h>
+#include <string.h>
 #include "../../../userland/lib/runtime.h"
 
 int main(void) {

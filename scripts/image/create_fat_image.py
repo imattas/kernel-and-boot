@@ -53,12 +53,12 @@ def main():
     write_clusters = max(1, math.ceil(len(write_source) / SECTOR))
     ls_clusters = max(1, math.ceil(len(ls_source) / SECTOR))
     chmod_clusters = max(1, math.ceil(len(chmod_source) / SECTOR))
-    efi_chain = list(range(5, 5 + efi_clusters))
-    kernel_chain = list(range(5 + efi_clusters, 5 + efi_clusters + kernel_clusters))
-    init_chain = list(range(5 + efi_clusters + kernel_clusters,
-                            5 + efi_clusters + kernel_clusters + init_clusters))
-    shell_chain = list(range(5 + efi_clusters + kernel_clusters + init_clusters,
-                             5 + efi_clusters + kernel_clusters + init_clusters + shell_clusters))
+    efi_chain = list(range(6, 6 + efi_clusters))
+    kernel_chain = list(range(6 + efi_clusters, 6 + efi_clusters + kernel_clusters))
+    init_chain = list(range(6 + efi_clusters + kernel_clusters,
+                            6 + efi_clusters + kernel_clusters + init_clusters))
+    shell_chain = list(range(6 + efi_clusters + kernel_clusters + init_clusters,
+                             6 + efi_clusters + kernel_clusters + init_clusters + shell_clusters))
     args_chain = list(range(shell_chain[-1] + 1, shell_chain[-1] + 1 + args_clusters))
     env_chain = list(range(args_chain[-1] + 1, args_chain[-1] + 1 + env_clusters))
     cat_chain = list(range(env_chain[-1] + 1, env_chain[-1] + 1 + cat_clusters))
@@ -77,7 +77,7 @@ def main():
     boot[0:3] = b"\xeb\x58\x90"
     boot[3:11] = b"OSUEFI  "
     struct.pack_into("<HBHBHHBHHHII", boot, 11, SECTOR, 1, RESERVED, FAT_COUNT, 0,
-                     0, 0xF8, 0, 63, 255, 0, TOTAL_SECTORS)
+                           0, 0xF8, 0, 63, 255, 0, TOTAL_SECTORS)
     struct.pack_into("<IIIHH", boot, 36, FAT_SECTORS, 0, 0, 0, 0)
     struct.pack_into("<I", boot, 44, 2)
     struct.pack_into("<H", boot, 48, 1)
@@ -92,8 +92,8 @@ def main():
     fsinfo = bytearray(SECTOR)
     struct.pack_into("<I", fsinfo, 0, 0x41615252)
     struct.pack_into("<I", fsinfo, 484, 0x61417272)
-    struct.pack_into("<I", fsinfo, 488, TOTAL_SECTORS - DATA_START - len(efi_chain) - len(kernel_chain) - len(init_chain) - len(shell_chain) - len(args_chain) - len(env_chain) - len(cat_chain) - len(pwd_chain) - len(mkdir_chain) - len(rm_chain) - len(rmdir_chain) - len(touch_chain) - len(write_chain) - len(ls_chain) - len(chmod_chain) - 3)
-    struct.pack_into("<I", fsinfo, 492, 5 + efi_clusters + kernel_clusters + init_clusters + shell_clusters)
+    struct.pack_into("<I", fsinfo, 488, TOTAL_SECTORS - DATA_START - len(efi_chain) - len(kernel_chain) - len(init_chain) - len(shell_chain) - len(args_chain) - len(env_chain) - len(cat_chain) - len(pwd_chain) - len(mkdir_chain) - len(rm_chain) - len(rmdir_chain) - len(touch_chain) - len(write_chain) - len(ls_chain) - len(chmod_chain) - 4)
+    struct.pack_into("<I", fsinfo, 492, 6 + efi_clusters + kernel_clusters + init_clusters + shell_clusters)
     struct.pack_into("<I", fsinfo, 508, 0xaa550000)
     image[SECTOR:2 * SECTOR] = fsinfo
     image[6 * SECTOR:7 * SECTOR] = boot
@@ -102,7 +102,8 @@ def main():
     def set_fat(cluster, next_cluster):
         struct.pack_into("<I", fat, cluster * 4, next_cluster)
     for cluster, value in ((0, 0x0ffffff8), (1, 0x0fffffff),
-                           (2, 0x0fffffff), (3, 0x0fffffff), (4, 0x0fffffff)):
+                           (2, 5), (3, 0x0fffffff), (4, 0x0fffffff),
+                           (5, 0x0fffffff)):
         set_fat(cluster, value)
     for chain in (efi_chain, kernel_chain, init_chain, shell_chain, args_chain, env_chain, cat_chain, pwd_chain, mkdir_chain, rm_chain, rmdir_chain, touch_chain, write_chain, ls_chain, chmod_chain):
         for index, cluster in enumerate(chain):
@@ -130,6 +131,7 @@ def main():
     root[448:480] = short_entry("CHMOD   ELF", 0x20, chmod_chain[0], len(chmod_source))
     root[480:512] = short_entry("OS FAT32   ", 0x08, 0, 0)
     image[cluster_offset(2):cluster_offset(2) + SECTOR] = root
+    image[cluster_offset(5):cluster_offset(5) + SECTOR] = bytearray(SECTOR)
     efi_dir = bytearray(SECTOR)
     efi_dir[0:32] = short_entry(".          ", 0x10, 3, 0)
     efi_dir[32:64] = short_entry("..         ", 0x10, 0, 0)

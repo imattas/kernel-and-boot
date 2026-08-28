@@ -17,6 +17,9 @@ assert int.from_bytes(data[44:48], 'little') == 2
 assert data[82:90] == b'FAT32   '
 assert data[6 * 512:7 * 512] == data[:512]
 assert data[7 * 512:8 * 512] == data[512:2 * 512]
+fat = data[32 * 512:(32 + 520) * 512]
+assert int.from_bytes(fat[8:12], 'little') == 5
+assert int.from_bytes(fat[20:24], 'little') >= 0x0fffffff
 root = data[(32 + 2 * 520) * 512:(33 + 2 * 520) * 512]
 assert root[:11] == b'EFI        '
 assert root[26:28] == b'\x03\x00'

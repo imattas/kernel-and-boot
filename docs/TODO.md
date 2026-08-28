@@ -99,6 +99,7 @@ kernel gate below is explicitly marked complete.
 - [x] Add standalone `LS.ELF` utility using directory enumeration.
 - [x] Add standalone `CHMOD.ELF` utility using the permission-update ABI.
 - [x] Add shell background `run ... &` and explicit `wait <pid>` handling.
+- [x] Expand the FAT32 boot-image root directory beyond one cluster.
 - [ ] Add reliable QEMU live keyboard verification for `run INIT.ELF`.
 - [ ] Add the command-line shell and terminal/console I/O.
 - [ ] Add process tools and initial utilities (`init`, `echo`, `ls`, `cat`,

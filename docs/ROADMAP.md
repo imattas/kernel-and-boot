@@ -1720,6 +1720,10 @@ The native shell `rmdir` command now supports bounded `rmdir -p` cleanup of
 empty directory parents without attempting to remove the filesystem root.
 The native shell `rm` command now supports bounded `rm -r` tree removal using
 directory enumeration and rejects attempts to recursively remove `/`.
+The init-to-shell supervisor handoff remains deferred: the current scheduler
+must start input/runtime services before an immediately-blocking shell child,
+so the kernel retains the working shell launch order until that service-start
+contract is implemented.
 The shell now keeps a bounded eight-entry command history and handles split
 ANSI up/down escape sequences without feeding terminal control bytes into the
 command parser.

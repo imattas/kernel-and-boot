@@ -159,6 +159,8 @@ kernel gate below is explicitly marked complete.
 - [x] Add a bounded serial-input bridge into the standard-input queue for
   terminal-backed userland sessions.
 - [ ] Add reliable QEMU live keyboard verification for `run INIT.ELF`.
+- [ ] Make userland init spawn the shell through the normal process ABI after
+  scheduler/runtime service startup can support an immediately-blocking child.
 - [ ] Add the command-line shell and terminal/console I/O.
 - [ ] Add process tools and initial utilities (`init`, `echo`, `ls`, `cat`,
   `pwd`, `mkdir`, `rm`, and `sh`).

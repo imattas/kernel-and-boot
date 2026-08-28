@@ -857,7 +857,7 @@ static int shell_remove_tree(const char *path, uint32_t length,
 
 void shell_main(void) {
     static const char prompt[] = "os> ";
-    static const char help[] = "help version clear alias unalias id ps env setenv export unsetenv status true false jobs history fg which inherit echo printf basename dirname cut tr cmp test pwd cd ls cat head wc grep tee tail sort uniq stat chmod kill sleep mv cp mkdir rm rmdir touch uptime date write run wait exit\r\n";
+    static const char help[] = "help version clear alias unalias id ps env setenv export unsetenv read status true false jobs history fg which inherit echo printf basename dirname cut tr cmp test pwd cd ls cat head wc grep tee tail sort uniq stat chmod kill sleep mv cp mkdir rm rmdir touch uptime date write run wait exit\r\n";
     static const char *unknown = shell_unknown;
     static char line[128];
     static char input[64];
@@ -1391,6 +1391,34 @@ void shell_main(void) {
                     start = end + 1U;
                 }
                 if (failed)
+                    print(unknown, sizeof(unknown) - 1U);
+            } else if (command == SHELL_READ) {
+                int valid = argument_length != 0;
+                for (uint32_t index = 0; valid && index < argument_length; ++index) {
+                    char value = argument[index];
+                    if ((value < 'a' || value > 'z') &&
+                        (value < 'A' || value > 'Z') &&
+                        (value < '0' || value > '9') && value != '_') valid = 0;
+                    if (index == 0 && value >= '0' && value <= '9') valid = 0;
+                }
+                char value[128];
+                uint32_t value_length = 0;
+                while (valid && value_length + 1U < sizeof(value)) {
+                    char input;
+                    uint64_t received = os_read(0, &input, 1);
+                    if (received == OS_SYSCALL_ERROR) {
+                        valid = 0;
+                        break;
+                    }
+                    if (received == 0) {
+                        os_yield();
+                        continue;
+                    }
+                    if (input == '\r' || input == '\n') break;
+                    value[value_length++] = input;
+                }
+                value[value_length] = 0;
+                if (!valid || os_setenv(argument, value) == OS_SYSCALL_ERROR)
                     print(unknown, sizeof(unknown) - 1U);
             } else if (command == SHELL_STATUS) {
                 print_status(last_status);

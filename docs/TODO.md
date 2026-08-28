@@ -106,6 +106,7 @@ type, string, and numeric tests.
   spawn/wait/reap integration.
 - [x] Add PATH-based fallback execution for packaged external applications.
 - [x] Add shell `export NAME=VALUE` environment assignment syntax.
+- [x] Add shell `read NAME` line input and environment assignment.
 - [x] Extend standalone `env` with bounded assignment-and-command execution.
 - [x] Centralize bounded `NAME=VALUE` parsing in the freestanding runtime.
 - [x] Add standalone `unsetenv.elf` and expose it through the FAT32 VFS.

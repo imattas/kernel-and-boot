@@ -1982,3 +1982,7 @@ bounded through the shared decimal parser.
 The utility also supports bounded unary negation, empty-string (`-z`), and
 string inequality (`!=`) predicates. Prefix negation now applies uniformly to
 file, type, string, and numeric predicates.
+
+The shell now includes a bounded `read NAME` built-in that consumes one line
+from standard input and publishes it through the shell environment; the
+standalone help inventory is synchronized with the new command.

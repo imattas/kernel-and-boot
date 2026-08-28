@@ -88,6 +88,8 @@ the init-owned shell supervisor remains the next kernel/userland boundary.
 - [x] Add PATH-based fallback execution for packaged external applications.
 - [x] Preserve direct external utility commands through pipeline and
   redirection dispatch.
+- [x] Preserve arbitrary external commands through pipeline and redirection
+  parsing.
 - [x] Add background execution and job-table tracking for PATH-resolved
   external commands.
 - [x] Poll, reap, and remove completed background jobs without blocking the

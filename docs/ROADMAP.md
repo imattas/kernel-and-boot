@@ -1739,6 +1739,9 @@ failed resolution still reports `unknown command`, while successful children
 return their exit status through the shell.
 External text utilities now preserve their full command expression when paired
 with the shell's existing pipeline and redirection operators.
+The parser now preserves operator expressions for arbitrary external command
+names as well, allowing the same pipeline/redirection path to resolve them via
+`PATH`.
 PATH-resolved external commands can now also use the shell's background-job
 syntax (`command &`) and enter the existing `jobs`/`fg` tracking table.
 The shell now polls those jobs without blocking, reaps processes after both

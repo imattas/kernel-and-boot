@@ -114,6 +114,9 @@ int main(void) {
     assert(strcmp(argument, "4") == 0);
     assert(shell_parse("exit", 4, argument, sizeof(argument)) == SHELL_EXIT);
     assert(shell_parse("wat", 3, argument, sizeof(argument)) == SHELL_UNKNOWN);
+    assert(shell_parse("external | wc /hello", 20, argument,
+                       sizeof(argument)) == SHELL_RUN);
+    assert(strcmp(argument, "external | wc /hello") == 0);
     assert(shell_parse("", 0, argument, sizeof(argument)) == SHELL_EMPTY);
     return 0;
 }

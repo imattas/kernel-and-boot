@@ -27,6 +27,13 @@ typedef struct {
     int32_t exit_status;
 } os_process_info_t;
 
+enum {
+    OS_PROCESS_NEW,
+    OS_PROCESS_READY,
+    OS_PROCESS_RUNNING,
+    OS_PROCESS_EXITED
+};
+
 uint64_t os_syscall3(uint64_t number, uint64_t arg1, uint64_t arg2,
                      uint64_t arg3);
 

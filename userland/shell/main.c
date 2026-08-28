@@ -109,6 +109,38 @@ static int job_contains(uint64_t process_id) {
     return job_find(process_id, 0);
 }
 
+static void job_collect_finished(void) {
+    uint32_t index = 0;
+    while (index < job_count) {
+        shell_job_t job = jobs[index];
+        os_process_info_t leader_info;
+        if (os_process_status(job.process_id, &leader_info) == OS_SYSCALL_ERROR) {
+            job_remove(job.process_id);
+            continue;
+        }
+        int finished = leader_info.state == OS_PROCESS_EXITED;
+        if (job.peer_id != 0) {
+            os_process_info_t peer_info;
+            finished = finished &&
+                os_process_status(job.peer_id, &peer_info) != OS_SYSCALL_ERROR &&
+                peer_info.state == OS_PROCESS_EXITED;
+        }
+        if (!finished) {
+            ++index;
+            continue;
+        }
+        if (os_reap(job.process_id) == OS_SYSCALL_ERROR ||
+            (job.peer_id != 0 && os_reap(job.peer_id) == OS_SYSCALL_ERROR)) {
+            ++index;
+            continue;
+        }
+        print("done pid=", 9);
+        print_number(job.process_id);
+        print("\r\n", 2);
+        job_remove(job.process_id);
+    }
+}
+
 static int shell_wait_job(uint64_t process_id, int32_t *status) {
     uint64_t leader = 0;
     uint64_t peer = 0;
@@ -709,6 +741,7 @@ void shell_main(void) {
             history_offset = 0;
             shell_command_t command = shell_parse(line, length, argument,
                                                    sizeof(argument));
+            job_collect_finished();
             if ((command == SHELL_HEAD || command == SHELL_WC ||
                  command == SHELL_GREP) &&
                 (shell_count_operator(line, length, '|', 0) != 0 ||

@@ -90,6 +90,8 @@ the init-owned shell supervisor remains the next kernel/userland boundary.
   redirection dispatch.
 - [x] Add background execution and job-table tracking for PATH-resolved
   external commands.
+- [x] Poll, reap, and remove completed background jobs without blocking the
+  shell prompt.
 - [ ] Make init supervise `shell.elf` through the normal spawn/wait ABI after
   the namespace-retain and shared-scheduler startup deadlocks are fixed.
 

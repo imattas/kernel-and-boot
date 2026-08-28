@@ -1230,6 +1230,8 @@ writes still request the storage device's flush operation when available.
 Successful XFS extent-file data-block writes now cross the journal boundary
 when configured, with the existing optional flush fallback when no journal is
 present; inode metadata is published through the same journal protocol.
+XFS journal prepare and replay now reject null payloads, duplicate targets, and
+targets inside the journal region before publishing or recovering metadata.
 Legacy and deeper XFS BNO publication paths now use that same optional flush
 boundary after successful metadata commits.
 Ext4 VFS file attachment now accepts an explicit directory inode and validates

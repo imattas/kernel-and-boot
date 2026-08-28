@@ -1164,10 +1164,13 @@ static int xfs_journal_prepare(xfs_fs_t *fs, const uint64_t *targets,
                                const uint8_t *const *images, uint32_t records) {
     uint8_t header[4096];
     if (!xfs_journal_configured(fs, records) || !targets || !images) return 0;
-    for (uint32_t i = 0; i < records; ++i)
-        if (targets[i] >= fs->block_count ||
+    for (uint32_t i = 0; i < records; ++i) {
+        if (!images[i] || targets[i] >= fs->block_count ||
             (targets[i] >= fs->journal_start &&
              targets[i] < fs->journal_start + fs->journal_blocks)) return 0;
+        for (uint32_t j = 0; j < i; ++j)
+            if (targets[j] == targets[i]) return 0;
+    }
     memset(header, 0, fs->block_size);
     store_be32(header, XFS_JOURNAL_MAGIC);
     store_be64(&header[4], ++fs->journal_sequence);
@@ -1195,8 +1198,12 @@ static int xfs_journal_recover(xfs_fs_t *fs) {
         for (uint32_t i = 0; i < records; ++i) {
             uint64_t target = be64(&header[24U + i * 8U]);
             if (target >= fs->block_count ||
-                !xfs_read_block(fs, fs->journal_start + 1U + i, image) ||
-                !xfs_write_block(fs, target, image)) return 0;
+                (target >= fs->journal_start &&
+                 target < fs->journal_start + fs->journal_blocks) ||
+                !xfs_read_block(fs, fs->journal_start + 1U + i, image)) return 0;
+            for (uint32_t j = 0; j < i; ++j)
+                if (target == be64(&header[24U + j * 8U])) return 0;
+            if (!xfs_write_block(fs, target, image)) return 0;
         }
         if (!xfs_flush_metadata(fs)) return 0;
     } else if (state != XFS_JOURNAL_PREPARE) return 0;

@@ -63,6 +63,17 @@ int main(void) {
     assert(strcmp(argument, "/hello") == 0);
     assert(shell_parse("cmp /a /b", 9, argument, sizeof(argument)) == SHELL_RUN);
     assert(strcmp(argument, "/a /b") == 0);
+    assert(shell_parse("tail /hello", 11, argument, sizeof(argument)) == SHELL_RUN);
+    assert(shell_parse("sort /hello", 11, argument, sizeof(argument)) == SHELL_RUN);
+    assert(shell_parse("uniq /hello", 11, argument, sizeof(argument)) == SHELL_RUN);
+    assert(shell_parse("dirname /hello", 14, argument, sizeof(argument)) == SHELL_RUN);
+    assert(shell_parse("cut -d , -f 1", 13, argument, sizeof(argument)) == SHELL_RUN);
+    assert(shell_parse("tr a b", 6, argument, sizeof(argument)) == SHELL_RUN);
+    assert(shell_parse("printf x | wc", 13, argument, sizeof(argument)) == SHELL_RUN);
+    assert(strcmp(argument, "printf x | wc") == 0);
+    assert(shell_parse("tail /hello > /tmp/out", 22, argument,
+                       sizeof(argument)) == SHELL_RUN);
+    assert(strcmp(argument, "tail /hello > /tmp/out") == 0);
     assert(shell_parse("stat /hello", 11, argument, sizeof(argument)) == SHELL_STAT);
     assert(strcmp(argument, "/hello") == 0);
     assert(shell_parse("chmod 755 /hello", 16, argument, sizeof(argument)) == SHELL_CHMOD);

@@ -1864,6 +1864,10 @@ including `tee`, `tail`, `sort`, `uniq`, `printf`, `basename`, `dirname`,
 `cut`, `tr`, and `cmp`, while preserving the existing pipeline, redirection,
 background, and conditional-status paths.
 
+The shell contract now covers the complete text-command set and verifies that
+direct utility invocations retain their full command line for pipeline and
+redirection execution.
+
 Shell integration contracts now directly cover the quote-aware sequence
 splitter, including semicolons and conditional operators preserved inside
 quoted arguments; this joins

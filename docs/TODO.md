@@ -211,7 +211,9 @@ type, string, and numeric tests.
 - [x] Add shell `rmdir` backed by the rmdir syscall.
 - [x] Add shell `touch` and userland file create/write wrappers.
 - [x] Add shell `write <path> <text>` file-writing behavior.
-- [x] Add shell `run <path>` process execution through spawn/wait.
+- [ ] Fix and verify shell `run <path>` process execution through spawn/wait;
+  current live QEMU reproduction hangs during namespace VFS lookup before the
+  child is created.
 - [x] Add shell `id` process and credential identity utility.
 - [x] Add shell `ps` live process-ID listing.
 - [x] Add process status details to shell `ps`.

@@ -173,6 +173,8 @@ kernel gate below is explicitly marked complete.
   live FAT32-backed VFS namespace.
 - [x] Expose `ipc.elf`, `dup.elf`, `true.elf`, and `false.elf` through the live
   FAT32-backed VFS namespace.
+- [x] Expose `id.elf`, `ps.elf`, and `wait.elf` through the live FAT32-backed
+  VFS namespace.
 - [ ] Add reliable QEMU live keyboard verification for `run INIT.ELF`.
 - [ ] Expose the complete multi-cluster FAT32 boot-image application set in the
   live VFS namespace for reliable external `run` execution.

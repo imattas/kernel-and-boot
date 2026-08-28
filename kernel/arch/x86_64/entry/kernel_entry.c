@@ -2211,6 +2211,22 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("userland IPC status namespace ready\r\n");
+    static const char id_short_name[11] = {
+        'I','D',' ',' ',' ',' ',' ',' ','E','L','F'
+    };
+    static const char ps_short_name[11] = {
+        'P','S',' ',' ',' ',' ',' ',' ','E','L','F'
+    };
+    static const char wait_short_name[11] = {
+        'W','A','I','T',' ',' ',' ',' ','E','L','F'
+    };
+    if (!fat32_vfs_attach_file(&fat32, vfs_root, id_short_name, "id.elf") ||
+        !fat32_vfs_attach_file(&fat32, vfs_root, ps_short_name, "ps.elf") ||
+        !fat32_vfs_attach_file(&fat32, vfs_root, wait_short_name, "wait.elf")) {
+        serial_write("userland process inspection VFS attach failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("userland process inspection namespace ready\r\n");
     vfs_node_t *vfs_foreign = vfs_node_create("foreign", VFS_NODE_REGULAR,
                                                0, 0, 0444);
     int vfs_remove_result = vfs_foreign ?

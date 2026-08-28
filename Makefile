@@ -32,6 +32,7 @@ EXT4_TEST := $(TEST_DIR)/ext4_contract
 XFS_TEST := $(TEST_DIR)/xfs_contract
 XFS_ALLOC_TEST := $(TEST_DIR)/xfs_alloc_contract
 XFS_UNWRITTEN_TEST := $(TEST_DIR)/xfs_unwritten_contract
+XFS_AUTH_TEST := $(TEST_DIR)/xfs_auth_contract
 BTRFS_TEST := $(TEST_DIR)/btrfs_contract
 DEFLATE_TEST := $(TEST_DIR)/deflate_contract
 LZO_TEST := $(TEST_DIR)/lzo_contract
@@ -90,7 +91,7 @@ OVMF_CODE ?= /usr/share/edk2/x64/OVMF_CODE.4m.fd
 OVMF_VARS ?= /usr/share/edk2/x64/OVMF_VARS.4m.fd
 QEMU_LOG := $(BUILD_DIR)/qemu-serial.log
 
-.PHONY: all test image qemu-test fat32-test exfat-test ext4-test xfs-test xfs-alloc-test xfs-unwritten-test btrfs-test deflate-test lzo-test zstd-test fse-test cache-test device-test run clean distclean
+.PHONY: all test image qemu-test fat32-test exfat-test ext4-test xfs-test xfs-alloc-test xfs-unwritten-test xfs-auth-test btrfs-test deflate-test lzo-test zstd-test fse-test cache-test device-test run clean distclean
 
 all: $(CONTRACT_ELF) $(UEFI_EFI) $(KERNEL_ELF)
 
@@ -603,6 +604,7 @@ test: all image
 	$(MAKE) xfs-test
 	$(MAKE) xfs-alloc-test
 	$(MAKE) xfs-unwritten-test
+	$(MAKE) xfs-auth-test
 	$(MAKE) btrfs-test
 	$(MAKE) deflate-test
 	$(MAKE) lzo-test
@@ -632,6 +634,9 @@ xfs-alloc-test: $(XFS_ALLOC_TEST)
 
 xfs-unwritten-test: $(XFS_UNWRITTEN_TEST)
 	$(XFS_UNWRITTEN_TEST)
+
+xfs-auth-test: $(XFS_AUTH_TEST)
+	$(XFS_AUTH_TEST)
 
 btrfs-test: $(BTRFS_TEST)
 	$(BTRFS_TEST)
@@ -668,6 +673,9 @@ $(XFS_ALLOC_TEST): scripts/tests/c/xfs_alloc_contract.c kernel/fs/xfs/xfs.c kern
 
 $(XFS_UNWRITTEN_TEST): scripts/tests/c/xfs_unwritten_contract.c kernel/fs/xfs/xfs.c kernel/fs/xfs/xfs.h kernel/drivers/storage/storage.c kernel/drivers/storage/storage.h kernel/core/sync/spinlock.c kernel/core/sync/spinlock.h | $(TEST_DIR)
 	$(CC) -std=c11 -Wall -Wextra -Werror -I. -o $@ scripts/tests/c/xfs_unwritten_contract.c kernel/fs/xfs/xfs.c kernel/drivers/storage/storage.c kernel/core/sync/spinlock.c
+
+$(XFS_AUTH_TEST): scripts/tests/c/xfs_auth_contract.c kernel/fs/xfs/xfs.c kernel/fs/xfs/xfs.h kernel/drivers/storage/storage.c kernel/drivers/storage/storage.h kernel/core/sync/spinlock.c kernel/core/sync/spinlock.h | $(TEST_DIR)
+	$(CC) -std=c11 -Wall -Wextra -Werror -I. -o $@ scripts/tests/c/xfs_auth_contract.c kernel/fs/xfs/xfs.c kernel/drivers/storage/storage.c kernel/core/sync/spinlock.c
 
 $(BTRFS_TEST): scripts/tests/c/btrfs_contract.c kernel/fs/btrfs/btrfs.c kernel/fs/btrfs/btrfs.h kernel/fs/btrfs/deflate.c kernel/fs/btrfs/deflate.h kernel/fs/btrfs/lzo.c kernel/fs/btrfs/lzo.h kernel/fs/btrfs/zstd.c kernel/fs/btrfs/zstd.h kernel/fs/btrfs/fse.c kernel/fs/btrfs/fse.h kernel/drivers/storage/storage.c kernel/drivers/storage/storage.h kernel/core/sync/spinlock.c kernel/core/sync/spinlock.h | $(TEST_DIR)
 	$(CC) -std=c11 -Wall -Wextra -Werror -I. -o $@ scripts/tests/c/btrfs_contract.c kernel/fs/btrfs/btrfs.c kernel/fs/btrfs/deflate.c kernel/fs/btrfs/lzo.c kernel/fs/btrfs/zstd.c kernel/fs/btrfs/fse.c kernel/drivers/storage/storage.c kernel/core/sync/spinlock.c

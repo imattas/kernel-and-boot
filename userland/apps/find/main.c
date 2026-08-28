@@ -10,13 +10,16 @@ static int write_path(const char *path, uint64_t length) {
            os_userland_write_all(1, "\r\n", 2);
 }
 
-static int find_path(const char *path, uint64_t length, uint32_t depth) {
-    if (!path || length == 0 || length >= 256 || depth > 16 ||
-        !write_path(path, length)) return 0;
+static int find_path(const char *path, uint64_t length, uint32_t depth,
+                     uint32_t filter) {
+    if (!path || length == 0 || length >= 256 || depth > 16) return 0;
     uint64_t descriptor = os_open(path, length, 1);
     if (descriptor == OS_SYSCALL_ERROR) return 0;
     os_stat_t stat;
     int success = os_fstat(descriptor, &stat) != OS_SYSCALL_ERROR;
+    if (success && (filter == 0 || (filter == 1 && stat.type == 1) ||
+                    (filter == 2 && stat.type == 0)))
+        success = write_path(path, length);
     if (success && stat.type == 0) {
         find_dirent_t entry;
         uint64_t result;
@@ -36,7 +39,7 @@ static int find_path(const char *path, uint64_t length, uint32_t depth) {
             for (uint64_t index = 0; index < name_length; ++index)
                 child[child_length++] = entry.name[index];
             child[child_length] = 0;
-            if (!find_path(child, child_length, depth + 1U)) {
+            if (!find_path(child, child_length, depth + 1U, filter)) {
                 success = 0;
                 break;
             }
@@ -49,7 +52,17 @@ static int find_path(const char *path, uint64_t length, uint32_t depth) {
 
 int find_main(uint64_t argc, char **argv, char **environment) {
     (void)environment;
-    if (argc > 2) os_exit(2);
+    if (argc != 1 && argc != 2 && argc != 4) os_exit(2);
     const char *path = argc == 2 && argv[1] ? argv[1] : ".";
-    os_exit(find_path(path, os_userland_length(path), 0) ? 0 : 1);
+    uint32_t filter = 0;
+    if (argc == 4) {
+        if (!argv[1] || !argv[2] || !argv[3] ||
+            os_userland_length(argv[2]) != 5 || argv[2][0] != '-' ||
+            argv[2][1] != 't' || argv[2][2] != 'y' || argv[2][3] != 'p' ||
+            argv[2][4] != 'e' || os_userland_length(argv[3]) != 1 ||
+            (argv[3][0] != 'f' && argv[3][0] != 'd')) os_exit(2);
+        path = argv[1];
+        filter = argv[3][0] == 'f' ? 1 : 2;
+    }
+    os_exit(find_path(path, os_userland_length(path), 0, filter) ? 0 : 1);
 }

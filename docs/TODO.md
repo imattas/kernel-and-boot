@@ -164,8 +164,9 @@ type, string, and numeric tests.
   conditional sequencing through PATH and the FAT32 image.
 - [x] Add standalone `seq.elf` bounded signed ascending/descending sequence generation through
   PATH and the FAT32 image.
-- [x] Add standalone `find.elf` bounded recursive directory traversal through
-  the existing readdir/stat ABI and package it in the FAT32 image.
+- [x] Add standalone `find.elf` bounded recursive directory traversal and
+  `-type f`/`-type d` filtering through the existing readdir/stat ABI; package
+  it in the FAT32 image.
 - [x] Add standalone `which.elf` PATH executable discovery through the shared
   runtime and FAT32 image namespace.
 - [x] Add background execution and job-table tracking for PATH-resolved

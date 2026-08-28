@@ -20,6 +20,7 @@ kernel gate below is explicitly marked complete.
 - [x] Filesystem VFS append-growth boundaries for FAT32, exFAT, ext4, and XFS
   now update cached sizes after successful writes.
 - [x] Serialize exFAT data-write and resize mutations across file handles.
+- [x] Serialize exFAT attribute, create, directory-create, and unlink mutations.
 
 ## Current kernel milestone
 

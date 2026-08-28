@@ -1199,6 +1199,9 @@ truncation is idempotent.
 ExFAT file data writes and resize/truncate metadata updates now share an
 IRQ-safe filesystem write lock, preventing concurrent handles from interleaving
 cluster-chain mutations.
+All remaining exFAT mutating entry operations—attributes, file/directory
+creation, and unlink—now use that same lock, giving the filesystem one
+serialization boundary for supported metadata changes.
 Ext4 now supports bounded nonzero shrink/truncation by persistently updating
 the inode low/high size fields, with the VFS adapter synchronizing its cached
 file size and the contract verifying the on-disk result.

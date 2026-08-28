@@ -1220,8 +1220,9 @@ not a recovery log. Nested empty-child transitions can now be repopulated
 without leaving invalid AGF/CNT metadata. Authentic metadata and inode
 publications use the journal when configured, while XFS directory metadata
 writes still request the storage device's flush operation when available.
-Successful XFS extent-file data writes that do not change inode metadata now
-also cross the same optional flush boundary.
+Successful XFS extent-file data-block writes now cross the journal boundary
+when configured, with the existing optional flush fallback when no journal is
+present; inode metadata is published through the same journal protocol.
 Legacy and deeper XFS BNO publication paths now use that same optional flush
 boundary after successful metadata commits.
 Ext4 VFS file attachment now accepts an explicit directory inode and validates

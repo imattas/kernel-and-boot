@@ -1203,6 +1203,23 @@ static int xfs_journal_recover(xfs_fs_t *fs) {
     return xfs_journal_clear(fs);
 }
 
+static int xfs_write_journaled_block(xfs_fs_t *fs, uint64_t block,
+                                     const uint8_t *data) {
+    uint64_t target = block;
+    const uint8_t *image = data;
+    int journal_active = 0;
+    if (fs->journal_blocks) {
+        if (!xfs_journal_prepare(fs, &target, &image, 1U))
+            return xfs_journal_clear(fs);
+        journal_active = 1;
+    }
+    if (!xfs_write_block(fs, block, data) || !xfs_flush_metadata(fs)) {
+        if (journal_active) (void)xfs_journal_clear(fs);
+        return 0;
+    }
+    return !journal_active || xfs_journal_clear(fs);
+}
+
 /* The existing two-level path handles a root and leaf set.  Keep the deeper
  * path deliberately bounded: it supports one additional authenticated index
  * level without silently treating an arbitrary on-disk tree as flat. */
@@ -2095,7 +2112,7 @@ int xfs_write_file(xfs_fs_t *fs, uint64_t inode, uint64_t offset,
         } else if (!xfs_read_block(fs, physical, block)) return 0;
         for (uint32_t i = 0; i < chunk; ++i)
             block[in_block + i] = source[i];
-        if (!xfs_write_block(fs, physical, block)) return 0;
+        if (!xfs_write_journaled_block(fs, physical, block)) return 0;
         if (unwritten) {
             uint32_t record_index = 0;
             int record_found = 0;

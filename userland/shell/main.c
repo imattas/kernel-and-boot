@@ -883,7 +883,7 @@ static int shell_read_line(char *output, uint32_t capacity, char *buffer,
 
 void shell_main(void) {
     static const char prompt[] = "os> ";
-    static const char help[] = "help version uname clear alias unalias id ps env setenv export unsetenv read status true false jobs history fg which inherit echo printf basename dirname cut tr cmp test pwd cd ls cat head wc grep tee tail sort uniq stat chmod kill sleep mv cp mkdir rm rmdir touch uptime date write run wait exit\r\n";
+    static const char help[] = "help version uname clear alias unalias id ps env setenv export unsetenv read status true false jobs history fg which inherit echo printf basename dirname cut tr cmp seq test pwd cd ls cat head wc grep tee tail sort uniq stat chmod kill sleep mv cp mkdir rm rmdir touch uptime date write run wait exit\r\n";
     static const char *unknown = shell_unknown;
     static char line[128];
     static char input[64];

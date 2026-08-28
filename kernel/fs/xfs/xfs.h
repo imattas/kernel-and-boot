@@ -38,6 +38,9 @@ int xfs_remove_local_entry(xfs_fs_t *fs, uint64_t directory_inode,
                            const char *name);
 int xfs_rename_local_entry(xfs_fs_t *fs, uint64_t directory_inode,
                            const char *old_name, const char *new_name);
+int xfs_rename_local_entry_between(xfs_fs_t *fs, uint64_t source_directory,
+                                   const char *old_name, uint64_t target_directory,
+                                   const char *new_name);
 int xfs_read_file(xfs_fs_t *fs, uint64_t inode, uint64_t offset,
                   void *buffer, uint32_t size);
 int xfs_write_file(xfs_fs_t *fs, uint64_t inode, uint64_t offset,

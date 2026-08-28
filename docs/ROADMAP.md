@@ -299,6 +299,8 @@ The ABI now provides owner/root-checked `chmod` for VFS nodes, with `fstat` and
 QEMU coverage of the mode update and restoration path.
 Pathname `stat`, `getuid`, and `getgid` now provide validated metadata and
 process-identity queries, with QEMU coverage of the returned values.
+The identity ABI also exposes a race-safe `getppid` query backed by retained
+parent ownership and covered by the kernel process probe.
 Access-aware VFS path traversal now requires search permission on every
 directory crossed, preventing inaccessible parent directories from being used
 as a path-resolution side channel.

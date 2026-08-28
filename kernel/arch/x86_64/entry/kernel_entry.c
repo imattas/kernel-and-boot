@@ -3254,7 +3254,8 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     if (syscall_dispatch(OS_SYSCALL_GETUID, 0, 0, 0) != 1000 ||
-        syscall_dispatch(OS_SYSCALL_GETGID, 0, 0, 0) != 1000) {
+        syscall_dispatch(OS_SYSCALL_GETGID, 0, 0, 0) != 1000 ||
+        syscall_dispatch(OS_SYSCALL_GETPPID, 0, 0, 0) != 0) {
         serial_write("identity syscall failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }

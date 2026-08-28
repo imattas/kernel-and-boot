@@ -107,6 +107,14 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
             spinlock_unlock_irqrestore(&process->lock, flags);
             return value;
         }
+        case OS_SYSCALL_GETPPID: {
+            process_t *process = process_current();
+            if (!process) return OS_SYSCALL_ERROR;
+            uint64_t flags = spinlock_lock_irqsave(&process->lock);
+            uint64_t value = process->parent ? process->parent->id : 0;
+            spinlock_unlock_irqrestore(&process->lock, flags);
+            return value;
+        }
         case OS_SYSCALL_SIGNAL_MASK:
             return arg1 > UINT32_MAX ||
                    !process_set_signal_mask(process_current(), (uint32_t)arg1) ?

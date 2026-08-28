@@ -1217,9 +1217,9 @@ on-disk intent journal with prepare/commit ordering, payload clearing, and
 mount-time committed replay. Larger fan-out trees and full filesystem-wide
 transaction logging remain pending; a device flush is a persistence barrier,
 not a recovery log. Nested empty-child transitions can now be repopulated
-without leaving invalid AGF/CNT metadata. Authentic metadata
-publication and XFS inode/directory metadata writes now request the storage
-device's flush operation when available.
+without leaving invalid AGF/CNT metadata. Authentic metadata and inode
+publications use the journal when configured, while XFS directory metadata
+writes still request the storage device's flush operation when available.
 Successful XFS extent-file data writes that do not change inode metadata now
 also cross the same optional flush boundary.
 Legacy and deeper XFS BNO publication paths now use that same optional flush

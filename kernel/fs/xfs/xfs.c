@@ -1821,7 +1821,7 @@ static int xfs_extent(const uint8_t *record, uint64_t logical,
     return 1;
 }
 
-static int xfs_write_inode(const xfs_fs_t *fs, uint64_t inode,
+static int xfs_write_inode(xfs_fs_t *fs, uint64_t inode,
                            const uint8_t *data) {
     if (!fs || !data) return 0;
     uint64_t agno = inode >> (fs->ag_block_log + fs->inode_per_block_log);
@@ -1835,8 +1835,19 @@ static int xfs_write_inode(const xfs_fs_t *fs, uint64_t inode,
     uint8_t block_data[4096];
     if (!xfs_read_block(fs, block, block_data)) return 0;
     for (uint32_t i = 0; i < fs->inode_size; ++i) block_data[offset + i] = data[i];
-    if (!xfs_write_block(fs, block, block_data)) return 0;
-    return xfs_flush_metadata(fs);
+    uint64_t journal_target = block;
+    const uint8_t *journal_image = block_data;
+    int journal_active = 0;
+    if (fs->journal_blocks) {
+        if (!xfs_journal_prepare(fs, &journal_target, &journal_image, 1U))
+            return xfs_journal_clear(fs);
+        journal_active = 1;
+    }
+    if (!xfs_write_block(fs, block, block_data) || !xfs_flush_metadata(fs)) {
+        if (journal_active) (void)xfs_journal_clear(fs);
+        return 0;
+    }
+    return !journal_active || xfs_journal_clear(fs);
 }
 
 int xfs_inode_size(xfs_fs_t *fs, uint64_t inode, uint64_t *size) {

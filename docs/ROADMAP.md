@@ -1423,6 +1423,9 @@ bounded series of freshly captured memory-map keys, covering transient map-key
 invalidation without looping indefinitely.
 Timer waits now clamp intervals to the signed wrap-safe range, preventing an
 overflowed deadline from being interpreted as an already-completed wait.
+Device binding now treats each probe as a resource-ownership transaction and
+releases all claims from a failed probe before the next matching driver is
+tried, preventing leaked BAR/PIO ownership from blocking fallback binding.
 
 ## Phase 10 — Userland begins after the kernel gate
 

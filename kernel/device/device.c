@@ -121,6 +121,11 @@ int device_bind_drivers(void) {
                 spinlock_unlock_irqrestore(&registry_lock, flags);
                 break;
             }
+            /* A failed probe must not strand a BAR or PIO range.  Drivers
+               normally release their own partial claims, but the framework
+               owns the binding transaction and closes that failure window. */
+            for (uint32_t resource = 0; resource < 6; ++resource)
+                device_release_resource(&registry[i], resource, driver);
         }
     }
     spinlock_unlock_irqrestore(&binding_lock, binding_flags);

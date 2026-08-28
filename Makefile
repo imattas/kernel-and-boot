@@ -45,6 +45,7 @@ DEVICE_TEST := $(TEST_DIR)/device_contract
 SHELL_TEST := $(TEST_DIR)/shell_contract
 USERLAND_RUNTIME_TEST := $(TEST_DIR)/userland_runtime_contract
 TEST_PREDICATE_TEST := $(TEST_DIR)/test_predicate_contract
+SEQ_TEST := $(TEST_DIR)/seq_contract
 USERLAND_INIT_ELF := $(BUILD_DIR)/userland/init.elf
 USERLAND_SHELL_ELF := $(BUILD_DIR)/userland/shell.elf
 USERLAND_ARGS_ELF := $(BUILD_DIR)/userland/args.elf
@@ -402,8 +403,9 @@ dup-test: $(USERLAND_DUP_ELF)
 true-test: $(USERLAND_TRUE_ELF)
 	sh scripts/tests/sh/validate_userland.sh $(USERLAND_TRUE_ELF)
 
-seq-test: $(USERLAND_SEQ_ELF)
+seq-test: $(USERLAND_SEQ_ELF) $(SEQ_TEST)
 	sh scripts/tests/sh/validate_userland.sh $(USERLAND_SEQ_ELF)
+	$(SEQ_TEST)
 
 false-test: $(USERLAND_FALSE_ELF)
 	sh scripts/tests/sh/validate_userland.sh $(USERLAND_FALSE_ELF)
@@ -437,6 +439,9 @@ $(USERLAND_RUNTIME_TEST): scripts/tests/c/userland_runtime_contract.c userland/l
 
 $(TEST_PREDICATE_TEST): scripts/tests/c/test_predicate_contract.c userland/apps/test/main.c userland/lib/runtime.h userland/lib/os.h
 	$(CC) -std=c11 -Wall -Wextra -Werror -I. -o $@ scripts/tests/c/test_predicate_contract.c
+
+$(SEQ_TEST): scripts/tests/c/seq_contract.c userland/apps/seq/seq_logic.h
+	$(CC) -std=c11 -Wall -Wextra -Werror -I. -o $@ scripts/tests/c/seq_contract.c
 
 $(BUILD_DIR)/userland:
 	mkdir -p $@
@@ -719,7 +724,7 @@ $(USERLAND_TRUE_ELF): $(USERLAND_TRUE_START_OBJ) $(USERLAND_TRUE_MAIN_OBJ) $(USE
 $(USERLAND_SEQ_START_OBJ): userland/apps/seq/start.asm | $(BUILD_DIR)/userland
 	$(NASM) -f elf64 $< -o $@
 
-$(USERLAND_SEQ_MAIN_OBJ): userland/apps/seq/main.c userland/lib/runtime.h userland/lib/os.h | $(BUILD_DIR)/userland
+$(USERLAND_SEQ_MAIN_OBJ): userland/apps/seq/main.c userland/apps/seq/seq_logic.h userland/lib/runtime.h userland/lib/os.h | $(BUILD_DIR)/userland
 	$(CC) -target x86_64-pc-none-elf -std=c11 -ffreestanding -fno-builtin \
 		-fno-stack-protector -fPIE -fno-plt -mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@
 

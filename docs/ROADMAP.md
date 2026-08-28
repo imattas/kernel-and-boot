@@ -1997,3 +1997,8 @@ for the x86_64 system personality.
 The shell directory-navigation slice now tracks a bounded previous directory
 and implements `cd -`, printing the destination after a successful switch;
 the normal empty-operand `cd` behavior remains unchanged.
+
+A headless QEMU input probe reaches the live `os> ` prompt but monitor-injected
+USB keyboard events do not yet arrive at the shell input queue. The probe was
+discarded rather than promoted to a passing test; reliable interactive QEMU
+input remains an explicit follow-up item.

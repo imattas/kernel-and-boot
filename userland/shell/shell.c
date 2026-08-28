@@ -77,6 +77,8 @@ shell_command_t shell_parse(const char *line, uint32_t length,
         !same_word(line, command_length, "setenv") &&
         !same_word(line, command_length, "unsetenv") &&
         !same_word(line, command_length, "status") &&
+        !same_word(line, command_length, "true") &&
+        !same_word(line, command_length, "false") &&
         !same_word(line, command_length, "fg")) return SHELL_UNKNOWN;
     uint32_t start = command_length;
     while (start < length && (line[start] == ' ' || line[start] == '\t')) ++start;
@@ -95,6 +97,8 @@ shell_command_t shell_parse(const char *line, uint32_t length,
     if (same_word(line, command_length, "setenv")) return SHELL_SETENV;
     if (same_word(line, command_length, "unsetenv")) return SHELL_UNSETENV;
     if (same_word(line, command_length, "status")) return SHELL_STATUS;
+    if (same_word(line, command_length, "true")) return SHELL_TRUE;
+    if (same_word(line, command_length, "false")) return SHELL_FALSE;
     if (same_word(line, command_length, "fg")) return SHELL_FG;
     if (same_word(line, command_length, "mkdir")) return SHELL_MKDIR;
     if (same_word(line, command_length, "rm")) return SHELL_RM;

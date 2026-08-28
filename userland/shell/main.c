@@ -333,7 +333,7 @@ static int shell_run_input_redirect(char *text, uint32_t length,
 
 void shell_main(void) {
     static const char prompt[] = "os> ";
-    static const char help[] = "help id ps env setenv unsetenv status jobs fg which inherit echo pwd cd ls cat stat chmod kill sleep mv mkdir rm rmdir touch write run wait exit\r\n";
+    static const char help[] = "help id ps env setenv unsetenv status true false jobs fg which inherit echo pwd cd ls cat stat chmod kill sleep mv mkdir rm rmdir touch write run wait exit\r\n";
     static const char *unknown = shell_unknown;
     static char line[128];
     static char argument[128];
@@ -629,6 +629,10 @@ void shell_main(void) {
             } else if (command == SHELL_STATUS) {
                 print_status(last_status);
                 print("\r\n", 2);
+            } else if (command == SHELL_TRUE) {
+                /* The command-loop reset already published success. */
+            } else if (command == SHELL_FALSE) {
+                last_status = 1;
             } else if (command == SHELL_MKDIR) {
                 uint32_t argument_length = 0;
                 while (argument[argument_length]) ++argument_length;

@@ -1677,6 +1677,8 @@ non-empty command starts at success, command failures publish status 1, and
 `status` reports the retained result without changing it. Foreground process,
 pipeline, redirection, and wait results continue to publish their real exit
 status.
+The shell now also provides `true` and `false` built-ins, giving command
+scripts an explicit success/failure source for exercising status propagation.
 
 ## Phase 10 — BIOS boot path
 

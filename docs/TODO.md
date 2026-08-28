@@ -118,6 +118,8 @@ kernel gate below is explicitly marked complete.
 - [x] Add shell `setenv <key> <value>` and multi-entry environment inheritance.
 - [x] Add shell `unsetenv <key>` environment removal.
 - [x] Add shell `status` reporting for the most recent waited process.
+- [x] Add shell `true` and `false` built-ins for explicit success/failure
+  status control.
 - [x] Add typed pipe descriptors and blocking userland read/write wrappers.
 - [x] Add optional per-process standard-input and standard-output bindings for
   redirected child processes.

@@ -53,6 +53,8 @@ int main(void) {
     assert(shell_parse("unsetenv MODE", 13, argument, sizeof(argument)) == SHELL_UNSETENV);
     assert(strcmp(argument, "MODE") == 0);
     assert(shell_parse("status", 6, argument, sizeof(argument)) == SHELL_STATUS);
+    assert(shell_parse("true", 4, argument, sizeof(argument)) == SHELL_TRUE);
+    assert(shell_parse("false", 5, argument, sizeof(argument)) == SHELL_FALSE);
     assert(shell_parse("mkdir /tmp", 10, argument, sizeof(argument)) == SHELL_MKDIR);
     assert(strcmp(argument, "/tmp") == 0);
     assert(shell_parse("rm /tmp/file", 12, argument, sizeof(argument)) == SHELL_RM);

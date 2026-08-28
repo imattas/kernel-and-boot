@@ -2191,6 +2191,26 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("userland process utility namespace ready\r\n");
+    static const char ipc_short_name[11] = {
+        'I','P','C',' ',' ',' ',' ',' ','E','L','F'
+    };
+    static const char dup_short_name[11] = {
+        'D','U','P',' ',' ',' ',' ',' ','E','L','F'
+    };
+    static const char true_short_name[11] = {
+        'T','R','U','E',' ',' ',' ',' ','E','L','F'
+    };
+    static const char false_short_name[11] = {
+        'F','A','L','S','E',' ',' ',' ','E','L','F'
+    };
+    if (!fat32_vfs_attach_file(&fat32, vfs_root, ipc_short_name, "ipc.elf") ||
+        !fat32_vfs_attach_file(&fat32, vfs_root, dup_short_name, "dup.elf") ||
+        !fat32_vfs_attach_file(&fat32, vfs_root, true_short_name, "true.elf") ||
+        !fat32_vfs_attach_file(&fat32, vfs_root, false_short_name, "false.elf")) {
+        serial_write("userland IPC status VFS attach failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("userland IPC status namespace ready\r\n");
     vfs_node_t *vfs_foreign = vfs_node_create("foreign", VFS_NODE_REGULAR,
                                                0, 0, 0444);
     int vfs_remove_result = vfs_foreign ?

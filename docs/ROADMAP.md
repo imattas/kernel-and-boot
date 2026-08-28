@@ -2059,3 +2059,7 @@ outside the process lock before resolving an executable. This removes the
 process-lock/VFS-node lock inversion from PATH-resolved application startup;
 the normal init-owned supervisor remains a separate follow-up because its
 shared-scheduler handoff still needs live QEMU proof.
+
+The shell console path now echoes printable input and coalesces CRLF into one
+submission. Serial reads are serviced directly by `read(0, ...)`, so shell
+input no longer depends on the optional background input task being scheduled.

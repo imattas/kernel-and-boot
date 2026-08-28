@@ -321,12 +321,14 @@ type, string, and numeric tests.
   live VFS namespace for reliable external `run` execution.
 - [ ] Make userland init spawn the shell through the normal process ABI after
   scheduler/runtime service startup can support an immediately-blocking child.
-- [ ] Add the command-line shell and terminal/console I/O.
-- [ ] Add process tools and initial utilities (`init`, `echo`, `ls`, `cat`,
+- [x] Add the command-line shell and terminal/console I/O.
+- [x] Add process tools and initial utilities (`init`, `echo`, `ls`, `cat`,
   `pwd`, `mkdir`, `rm`, and `sh`).
-- [ ] Add executable loading, environment/arguments, file descriptors,
+- [x] Add executable loading, environment/arguments, file descriptors,
   pipes, job control, and shell error/status handling.
-- [ ] Add applications incrementally with contracts and QEMU integration tests.
+- [x] Add applications incrementally with contracts and QEMU integration tests;
+  the packaged userland set now includes the initial filesystem, process,
+  environment, and text utilities.
 
 ## Working rules
 

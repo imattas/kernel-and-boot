@@ -240,6 +240,7 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
             return valid ? 0 : OS_SYSCALL_ERROR;
         }
         case OS_SYSCALL_PROCESS_REAP: {
+            serial_write("reap-enter\r\n");
             process_t *parent = process_current();
             process_t *target = process_lookup_retain(arg1);
             int valid = parent && target && parent != target;

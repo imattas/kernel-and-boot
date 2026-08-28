@@ -82,6 +82,7 @@ int ext4_mount(ext4_fs_t *fs, uint32_t device) {
     fs->inodes_per_group = inodes_per_group; fs->descriptor_size = descriptor_size;
     fs->descriptor_block = descriptor_block; fs->groups_count = groups_count;
     fs->block_count = block_count; fs->has_64bit = (uint8_t)((incompat & EXT4_INCOMPAT_64BIT) != 0);
+    spinlock_init(&fs->write_lock);
     fs->mounted = 1;
     return 1;
 }
@@ -924,11 +925,19 @@ int ext4_inode_mode(ext4_fs_t *fs, uint32_t inode_number, uint32_t *mode) {
     return 1;
 }
 
-int ext4_set_mode(ext4_fs_t *fs, uint32_t inode_number, uint16_t mode) {
+static int ext4_set_mode_unlocked(ext4_fs_t *fs, uint32_t inode_number, uint16_t mode) {
     uint8_t inode[4096];
     if (!fs || !read_inode(fs, inode_number, inode)) return 0;
     store16(inode, (uint16_t)((load16(inode) & 0xf000U) | (mode & 0x0fffU)));
     return write_inode(fs, inode_number, inode);
+}
+
+int ext4_set_mode(ext4_fs_t *fs, uint32_t inode_number, uint16_t mode) {
+    if (!fs) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&fs->write_lock);
+    int result = ext4_set_mode_unlocked(fs, inode_number, mode);
+    spinlock_unlock_irqrestore(&fs->write_lock, flags);
+    return result;
 }
 
 int ext4_read_file(ext4_fs_t *fs, uint32_t inode_number, uint64_t offset,
@@ -957,7 +966,7 @@ int ext4_read_file(ext4_fs_t *fs, uint32_t inode_number, uint64_t offset,
     return 1;
 }
 
-int ext4_write_file(ext4_fs_t *fs, uint32_t inode_number, uint64_t offset,
+static int ext4_write_file_unlocked(ext4_fs_t *fs, uint32_t inode_number, uint64_t offset,
                     const void *buffer, uint32_t size) {
     if (!fs || !fs->mounted || !buffer || size == 0) return 0;
     uint8_t inode[4096];
@@ -993,7 +1002,16 @@ int ext4_write_file(ext4_fs_t *fs, uint32_t inode_number, uint64_t offset,
     return 1;
 }
 
-int ext4_truncate_file(ext4_fs_t *fs, uint32_t inode_number, uint64_t size) {
+int ext4_write_file(ext4_fs_t *fs, uint32_t inode_number, uint64_t offset,
+                    const void *buffer, uint32_t size) {
+    if (!fs) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&fs->write_lock);
+    int result = ext4_write_file_unlocked(fs, inode_number, offset, buffer, size);
+    spinlock_unlock_irqrestore(&fs->write_lock, flags);
+    return result;
+}
+
+static int ext4_truncate_file_unlocked(ext4_fs_t *fs, uint32_t inode_number, uint64_t size) {
     if (!fs || !fs->mounted) return 0;
     uint8_t inode[4096];
     if (!read_inode(fs, inode_number, inode) ||
@@ -1006,4 +1024,12 @@ int ext4_truncate_file(ext4_fs_t *fs, uint32_t inode_number, uint64_t size) {
         return write_inode_size(fs, inode_number, size);
     }
     return ext4_resize_blocks(fs, inode_number, inode, size);
+}
+
+int ext4_truncate_file(ext4_fs_t *fs, uint32_t inode_number, uint64_t size) {
+    if (!fs) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&fs->write_lock);
+    int result = ext4_truncate_file_unlocked(fs, inode_number, size);
+    spinlock_unlock_irqrestore(&fs->write_lock, flags);
+    return result;
 }

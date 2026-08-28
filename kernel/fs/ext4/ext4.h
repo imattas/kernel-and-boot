@@ -1,6 +1,7 @@
 #ifndef OS_KERNEL_FS_EXT4_H
 #define OS_KERNEL_FS_EXT4_H
 #include <stdint.h>
+#include "../../core/sync/spinlock.h"
 
 typedef struct {
     uint32_t device;
@@ -11,6 +12,7 @@ typedef struct {
     uint64_t descriptor_block;
     uint64_t groups_count;
     uint64_t block_count;
+    spinlock_t write_lock;
     uint8_t has_64bit;
     uint8_t mounted;
 } ext4_fs_t;

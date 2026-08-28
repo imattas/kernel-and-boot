@@ -21,6 +21,7 @@ kernel gate below is explicitly marked complete.
   now update cached sizes after successful writes.
 - [x] Serialize exFAT data-write and resize mutations across file handles.
 - [x] Serialize exFAT attribute, create, directory-create, and unlink mutations.
+- [x] Serialize ext4 mode, data-write, growth, and truncation mutations.
 
 ## Current kernel milestone
 

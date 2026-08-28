@@ -1834,6 +1834,10 @@ while `>` retains create-and-truncate behavior.
 Standalone `env.elf` now supports `-i` to clear inherited variables and repeated
 `-u NAME` filters before applying assignment prefixes and launching a command.
 
+Shell exports now preserve valid empty values (`NAME=`) instead of treating an
+empty value as malformed; the assignment boundary remains validated before the
+environment syscall.
+
 The standalone formatter now supports bounded unsigned decimal, hexadecimal,
 octal, and single-character conversions in addition to its existing string,
 signed-decimal, percent, and escaped-control behavior.

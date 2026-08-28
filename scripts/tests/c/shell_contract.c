@@ -105,6 +105,8 @@ int main(void) {
     assert(strcmp(argument, "MODE test") == 0);
     assert(shell_parse("export MODE=test", 16, argument, sizeof(argument)) == SHELL_EXPORT);
     assert(strcmp(argument, "MODE=test") == 0);
+    assert(shell_parse("export MODE=", 12, argument, sizeof(argument)) == SHELL_EXPORT);
+    assert(strcmp(argument, "MODE=") == 0);
     assert(shell_parse("export =test", 12, argument, sizeof(argument)) == SHELL_EXPORT);
     assert(shell_parse("unsetenv MODE", 13, argument, sizeof(argument)) == SHELL_UNSETENV);
     assert(strcmp(argument, "MODE") == 0);

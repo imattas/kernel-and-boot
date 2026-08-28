@@ -1245,7 +1245,7 @@ void shell_main(void) {
                 if (command == SHELL_EXPORT) {
                     while (separator < argument_length && argument[separator] != '=')
                         ++separator;
-                    if (separator != 0 && separator + 1U < argument_length) {
+                    if (separator != 0 && separator < argument_length) {
                         argument[separator] = 0;
                         ++separator;
                     }
@@ -1259,7 +1259,7 @@ void shell_main(void) {
                     if (value_start < argument_length) argument[separator] = 0;
                     separator = value_start;
                 }
-                if (separator == 0 || separator >= argument_length ||
+                if (separator == 0 || separator > argument_length ||
                     os_setenv(argument, argument + separator) == OS_SYSCALL_ERROR)
                     print(unknown, sizeof(unknown) - 1U);
             } else if (command == SHELL_UNSETENV) {

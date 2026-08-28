@@ -95,6 +95,7 @@ the init-owned shell supervisor remains the next kernel/userland boundary.
 - [x] Dispatch `env NAME=VALUE COMMAND` through the shell's external PATH path.
 - [x] Allow shell `unsetenv` to remove multiple variable names per command.
 - [x] Add standalone `env -i` and repeated `env -u NAME` filtering.
+- [x] Preserve empty values in shell `export NAME=` assignments.
 - [x] Add shell append redirection (`>>`) while preserving truncating `>`.
 - [x] Reject malformed shell pipeline, redirection, and background operators
   before process launch.

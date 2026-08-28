@@ -1216,6 +1216,8 @@ bounded recursion depth and child-count guard.
 The explicit XFS directory-attachment API now resolves its on-disk directory
 entry relative to the supplied parent, matching the file-attachment contract;
 the recursive tree walker remains inode-based after that validated lookup.
+XFS VFS tree materialization now fails closed on unsupported inode types instead
+of silently exposing an incomplete directory view.
 XFS directory validation now requires the encoded record count to consume the
 entire inline payload and rejects zero-inode records before VFS materialization;
 the adapter no longer treats malformed trailing entries as end-of-directory.

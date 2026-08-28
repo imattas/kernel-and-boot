@@ -108,6 +108,8 @@ static int xfs_vfs_attach_directory_tree(xfs_fs_t *fs, vfs_node_t *parent,
                                                    entry_name, entry_name)) {
                 vfs_node_release(node); return 0;
             }
+        } else {
+            vfs_node_release(node); return 0;
         }
     }
     if (!vfs_node_add_child(parent, node)) {

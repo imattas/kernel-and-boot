@@ -47,6 +47,32 @@ static void print_uptime(void) {
     print("s\r\n", 3);
 }
 
+static void print_two_digits(uint8_t value) {
+    char digits[2] = {(char)('0' + value / 10U),
+                      (char)('0' + value % 10U)};
+    print(digits, sizeof(digits));
+}
+
+static void print_four_digits(uint16_t value) {
+    char digits[4] = {(char)('0' + value / 1000U),
+                      (char)('0' + (value / 100U) % 10U),
+                      (char)('0' + (value / 10U) % 10U),
+                      (char)('0' + value % 10U)};
+    print(digits, sizeof(digits));
+}
+
+static int print_date(void) {
+    os_datetime_t datetime;
+    if (os_clock_realtime(&datetime) == OS_SYSCALL_ERROR) return 0;
+    print_four_digits(datetime.year); print("-", 1);
+    print_two_digits(datetime.month); print("-", 1);
+    print_two_digits(datetime.day); print(" ", 1);
+    print_two_digits(datetime.hour); print(":", 1);
+    print_two_digits(datetime.minute); print(":", 1);
+    print_two_digits(datetime.second); print("\r\n", 2);
+    return 1;
+}
+
 static void print_status(int32_t status) {
     if (status < 0) {
         print("-", 1);
@@ -1248,6 +1274,9 @@ void shell_main(void) {
             } else if (command == SHELL_UPTIME) {
                 if (argument_length != 0) print(unknown, sizeof(unknown) - 1U);
                 else print_uptime();
+            } else if (command == SHELL_DATE) {
+                if (argument_length != 0 || !print_date())
+                    print(unknown, sizeof(unknown) - 1U);
             } else if (command == SHELL_CD) {
                 uint32_t argument_length = 0;
                 while (argument[argument_length]) ++argument_length;

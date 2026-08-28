@@ -1830,6 +1830,9 @@ The interactive shell now handles plain `uptime` natively through the same
 clock syscall, while operator forms continue through the external pipeline
 path.
 
+Plain `date` is likewise handled natively through the validated realtime clock
+syscall; operator forms remain external pipeline commands.
+
 Standalone `date.elf` now reports the validated RTC date and time through a
 bounded realtime-clock syscall and is packaged in the FAT32 image and live VFS.
 

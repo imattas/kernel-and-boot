@@ -14,6 +14,7 @@ typedef enum {
     SHELL_BASENAME,
     SHELL_DIRNAME,
     SHELL_UPTIME,
+    SHELL_DATE,
     SHELL_JOBS,
     SHELL_HISTORY,
     SHELL_FG,

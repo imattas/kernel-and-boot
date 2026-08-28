@@ -43,7 +43,8 @@ int main(void) {
     assert(strcmp(argument, "ARGS.ELF") == 0);
     assert(shell_parse("uptime", 6, argument, sizeof(argument)) == SHELL_UPTIME);
     assert(shell_parse("uptime | cat", 12, argument, sizeof(argument)) == SHELL_RUN);
-    assert(shell_parse("date", 4, argument, sizeof(argument)) == SHELL_RUN);
+    assert(shell_parse("date", 4, argument, sizeof(argument)) == SHELL_DATE);
+    assert(shell_parse("date | cat", 10, argument, sizeof(argument)) == SHELL_RUN);
     assert(shell_parse("test -e /hello", 14, argument, sizeof(argument)) == SHELL_RUN);
     assert(strcmp(argument, "-e /hello") == 0);
     assert(shell_parse("test -d /", 9, argument, sizeof(argument)) == SHELL_RUN);

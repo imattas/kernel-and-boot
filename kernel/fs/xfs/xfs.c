@@ -1137,7 +1137,8 @@ int xfs_mount(xfs_fs_t *fs, uint32_t device) {
     fs->ag_count = ag_count; fs->ag_blocks = ag_blocks; fs->block_count = blocks;
     fs->ag_block_log = sb[112]; fs->inode_per_block_log = inopblock_log;
     fs->root_inode = be64(&sb[56]); fs->journal_start = journal_start;
-    fs->journal_blocks = journal_blocks; fs->journal_sequence = 0; fs->mounted = 1;
+    fs->journal_blocks = journal_blocks; fs->journal_sequence = 0;
+    spinlock_init(&fs->journal_lock); fs->mounted = 1;
     if (!xfs_journal_recover(fs)) { fs->mounted = 0; return 0; }
     for (uint32_t agno = 0; agno < fs->ag_count; ++agno) {
         uint8_t agf[4096];
@@ -1257,16 +1258,25 @@ static int xfs_write_journaled_block(xfs_fs_t *fs, uint64_t block,
     uint64_t target = block;
     const uint8_t *image = data;
     int journal_active = 0;
+    uint64_t journal_flags = 0;
     if (fs->journal_blocks) {
+        journal_flags = spinlock_lock_irqsave(&fs->journal_lock);
         if (!xfs_journal_prepare(fs, &target, &image, 1U))
-            return xfs_journal_clear(fs);
+        {
+            int result = xfs_journal_clear(fs);
+            spinlock_unlock_irqrestore(&fs->journal_lock, journal_flags);
+            return result;
+        }
         journal_active = 1;
     }
+    int result = 0;
     if (!xfs_write_block(fs, block, data) || !xfs_flush_metadata(fs)) {
         if (journal_active) (void)xfs_journal_clear(fs);
-        return 0;
+    } else {
+        result = !journal_active || xfs_journal_clear(fs);
     }
-    return !journal_active || xfs_journal_clear(fs);
+    if (fs->journal_blocks) spinlock_unlock_irqrestore(&fs->journal_lock, journal_flags);
+    return result;
 }
 
 /* The existing two-level path handles a root and leaf set.  Keep the deeper
@@ -1953,16 +1963,25 @@ static int xfs_write_inode(xfs_fs_t *fs, uint64_t inode,
     uint64_t journal_target = block;
     const uint8_t *journal_image = block_data;
     int journal_active = 0;
+    uint64_t journal_flags = 0;
     if (fs->journal_blocks) {
+        journal_flags = spinlock_lock_irqsave(&fs->journal_lock);
         if (!xfs_journal_prepare(fs, &journal_target, &journal_image, 1U))
-            return xfs_journal_clear(fs);
+        {
+            int result = xfs_journal_clear(fs);
+            spinlock_unlock_irqrestore(&fs->journal_lock, journal_flags);
+            return result;
+        }
         journal_active = 1;
     }
+    int result = 0;
     if (!xfs_write_block(fs, block, block_data) || !xfs_flush_metadata(fs)) {
         if (journal_active) (void)xfs_journal_clear(fs);
-        return 0;
+    } else {
+        result = !journal_active || xfs_journal_clear(fs);
     }
-    return !journal_active || xfs_journal_clear(fs);
+    if (fs->journal_blocks) spinlock_unlock_irqrestore(&fs->journal_lock, journal_flags);
+    return result;
 }
 
 int xfs_inode_size(xfs_fs_t *fs, uint64_t inode, uint64_t *size) {
@@ -2352,20 +2371,29 @@ static int xfs_write_inode_pair(xfs_fs_t *fs, uint64_t first_inode,
     const uint8_t *images[2] = {first_data, second_data};
     uint32_t target_count = same_block ? 1U : 2U;
     int journal_active = 0;
+    uint64_t journal_flags = 0;
     if (fs->journal_blocks) {
+        journal_flags = spinlock_lock_irqsave(&fs->journal_lock);
         if (!xfs_journal_prepare(fs, targets, images, target_count))
-            return xfs_journal_clear(fs);
+        {
+            int result = xfs_journal_clear(fs);
+            spinlock_unlock_irqrestore(&fs->journal_lock, journal_flags);
+            return result;
+        }
         journal_active = 1;
     }
+    int result = 0;
     if (!xfs_write_block(fs, first_block, first_data) ||
         (!same_block && !xfs_write_block(fs, second_block, second_data)) ||
         !xfs_flush_metadata(fs)) {
         (void)xfs_write_block(fs, first_block, original_first);
         if (!same_block) (void)xfs_write_block(fs, second_block, original_second);
         if (journal_active) (void)xfs_journal_clear(fs);
-        return 0;
+    } else {
+        result = !journal_active || xfs_journal_clear(fs);
     }
-    return !journal_active || xfs_journal_clear(fs);
+    if (fs->journal_blocks) spinlock_unlock_irqrestore(&fs->journal_lock, journal_flags);
+    return result;
 }
 
 int xfs_rename_local_entry_between(xfs_fs_t *fs, uint64_t source_directory,

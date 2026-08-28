@@ -17,6 +17,7 @@ typedef struct {
     uint64_t journal_start;
     uint32_t journal_blocks;
     uint64_t journal_sequence;
+    spinlock_t journal_lock;
     uint8_t mounted;
 } xfs_fs_t;
 

@@ -1151,6 +1151,10 @@ The two-level v4 BNO release path now coalesces an extent across adjacent
 leaf boundaries and removes an emptied child from the root index.
 XFS allocation and release now share an IRQ-safe per-filesystem lock, keeping
 multi-CPU BNO/AGF mutations and rollback publication serialized.
+XFS single-block data writes, single-inode publication, and paired-inode
+publication now hold a dedicated journal lock from journal preparation through
+target write, metadata flush, and journal clear, preventing concurrent journal
+transactions from reusing the same log space.
 Unbounded multi-level BNO/CNT fan-out and full filesystem-wide transaction
 logging remain later hardening work. The BNO allocator now also traverses and mutates a bounded three-level
 root/index/index/leaf tree, propagating changed leaf keys through each index

@@ -2063,3 +2063,8 @@ shared-scheduler handoff still needs live QEMU proof.
 The shell console path now echoes printable input and coalesces CRLF into one
 submission. Serial reads are serviced directly by `read(0, ...)`, so shell
 input no longer depends on the optional background input task being scheduled.
+
+The interactive serial path now has a dedicated `qemu-input-test` gate. It
+waits for the UEFI boot to reach `os> `, submits a delayed `echo input-test`
+through QEMU's serial stdin, and verifies the command is received and echoed by
+the live shell. USB/PS2 keyboard injection remains a separate follow-up.

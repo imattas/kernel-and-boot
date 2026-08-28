@@ -23,6 +23,18 @@ static uint16_t be16(const uint8_t *p);
 static void store_be16(uint8_t *p, uint16_t value);
 static void store_be32(uint8_t *p, uint32_t value);
 
+static uint32_t xfs_journal_checksum(const uint8_t *data, uint32_t length) {
+    uint32_t crc = 0xffffffffU;
+    if (!data) return 0;
+    for (uint32_t i = 0; i < length; ++i) {
+        uint8_t byte = (i >= 20U && i < 24U) ? 0 : data[i];
+        crc ^= byte;
+        for (uint32_t bit = 0; bit < 8U; ++bit)
+            crc = (crc >> 1) ^ (0x82f63b78U & (uint32_t)-(int32_t)(crc & 1U));
+    }
+    return ~crc;
+}
+
 typedef struct {
     uint32_t records;
     uint32_t count_offset;
@@ -1177,11 +1189,13 @@ static int xfs_journal_prepare(xfs_fs_t *fs, const uint64_t *targets,
     store_be32(&header[12], XFS_JOURNAL_PREPARE);
     store_be32(&header[16], records);
     for (uint32_t i = 0; i < records; ++i) store_be64(&header[24U + i * 8U], targets[i]);
+    store_be32(&header[20], xfs_journal_checksum(header, fs->block_size));
     if (!xfs_write_block(fs, fs->journal_start, header)) return 0;
     for (uint32_t i = 0; i < records; ++i)
         if (!xfs_write_block(fs, fs->journal_start + 1U + i, images[i])) return 0;
     if (!xfs_flush_metadata(fs)) return 0;
     store_be32(&header[12], XFS_JOURNAL_COMMIT);
+    store_be32(&header[20], xfs_journal_checksum(header, fs->block_size));
     return xfs_write_block(fs, fs->journal_start, header) && xfs_flush_metadata(fs);
 }
 
@@ -1192,6 +1206,9 @@ static int xfs_journal_recover(xfs_fs_t *fs) {
         !xfs_read_block(fs, fs->journal_start, header) ||
         be32(header) != XFS_JOURNAL_MAGIC) return 1;
     uint32_t state = be32(&header[12]), records = be32(&header[16]);
+    uint32_t checksum = be32(&header[20]);
+    if (checksum != 0 && checksum != xfs_journal_checksum(header, fs->block_size))
+        return 0;
     if (records == 0 || records > XFS_JOURNAL_MAX_BLOCKS ||
         !xfs_journal_configured(fs, records)) return 0;
     if (state == XFS_JOURNAL_COMMIT) {

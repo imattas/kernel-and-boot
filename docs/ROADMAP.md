@@ -1234,6 +1234,9 @@ XFS journal prepare and replay now reject null payloads, duplicate targets, and
 targets inside the journal region before publishing or recovering metadata.
 XFS directory rename now rejects zero-inode records instead of preserving
 malformed directory metadata.
+New XFS journal headers now carry CRC32C integrity coverage; recovery rejects
+corrupted checksummed headers while retaining compatibility with legacy
+zero-checksum records.
 Legacy and deeper XFS BNO publication paths now use that same optional flush
 boundary after successful metadata commits.
 Ext4 VFS file attachment now accepts an explicit directory inode and validates

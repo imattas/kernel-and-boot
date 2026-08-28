@@ -511,7 +511,7 @@ static int shell_copy_file(const char *source_path, uint32_t source_length,
 
 void shell_main(void) {
     static const char prompt[] = "os> ";
-    static const char help[] = "help id ps env setenv unsetenv status true false jobs fg which inherit echo pwd cd ls cat stat chmod kill sleep mv cp mkdir rm rmdir touch write run wait exit\r\n";
+    static const char help[] = "help id ps env setenv unsetenv status true false jobs history fg which inherit echo pwd cd ls cat stat chmod kill sleep mv cp mkdir rm rmdir touch write run wait exit\r\n";
     static const char *unknown = shell_unknown;
     static char line[128];
     static char input[64];
@@ -668,6 +668,16 @@ void shell_main(void) {
                     }
                     print(" state=", 7);
                     print_number(info.state);
+                    print("\r\n", 2);
+                }
+            }
+            else if (command == SHELL_HISTORY) {
+                for (uint32_t index = 0; index < history_count; ++index) {
+                    print_number(index + 1U);
+                    print(" ", 1);
+                    uint32_t history_length = 0;
+                    while (history[index][history_length]) ++history_length;
+                    print(history[index], history_length);
                     print("\r\n", 2);
                 }
             }

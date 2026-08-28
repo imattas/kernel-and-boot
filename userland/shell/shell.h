@@ -10,6 +10,7 @@ typedef enum {
     SHELL_PS,
     SHELL_ENV,
     SHELL_JOBS,
+    SHELL_HISTORY,
     SHELL_FG,
     SHELL_WHICH,
     SHELL_INHERIT,

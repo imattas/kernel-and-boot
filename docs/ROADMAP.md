@@ -1710,6 +1710,8 @@ ring 3 and is packaged in the FAT32 root.
 open/read/create/write/close interfaces and is packaged in the FAT32 root.
 The shell now also provides native `cp <source> <destination>` behavior using
 the same bounded file-copy path.
+The shell now exposes its bounded command ring through `history`, listing
+stored commands in insertion order with stable one-based numbers.
 The shell now keeps a bounded eight-entry command history and handles split
 ANSI up/down escape sequences without feeding terminal control bytes into the
 command parser.

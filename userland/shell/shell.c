@@ -93,6 +93,7 @@ shell_command_t shell_parse(const char *line, uint32_t length,
     if (same_word(line, command_length, "ps")) return SHELL_PS;
     if (same_word(line, command_length, "env")) return SHELL_ENV;
     if (same_word(line, command_length, "jobs")) return SHELL_JOBS;
+    if (same_word(line, command_length, "history")) return SHELL_HISTORY;
     if (same_word(line, command_length, "pwd")) return SHELL_PWD;
     if (same_word(line, command_length, "ls")) return SHELL_LS;
     if (same_word(line, command_length, "exit")) return SHELL_EXIT;

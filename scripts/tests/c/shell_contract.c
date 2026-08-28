@@ -25,6 +25,7 @@ int main(void) {
     assert(shell_parse("ps", 2, argument, sizeof(argument)) == SHELL_PS);
     assert(shell_parse("env", 3, argument, sizeof(argument)) == SHELL_ENV);
     assert(shell_parse("jobs", 4, argument, sizeof(argument)) == SHELL_JOBS);
+    assert(shell_parse("history", 7, argument, sizeof(argument)) == SHELL_HISTORY);
     assert(shell_parse("fg 4", 4, argument, sizeof(argument)) == SHELL_FG);
     assert(strcmp(argument, "4") == 0);
     assert(shell_parse("which ARGS.ELF", 14, argument, sizeof(argument)) == SHELL_WHICH);

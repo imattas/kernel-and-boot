@@ -1338,6 +1338,7 @@ void shell_main(void) {
                     shell_start_utility(line, name_length,
                                         line + argument_start);
                 if (process_id == OS_SYSCALL_ERROR) {
+                    last_status = 1;
                     print(unknown, sizeof(unknown) - 1U);
                 } else if (background) {
                     job_add(process_id, 0);
@@ -1347,6 +1348,7 @@ void shell_main(void) {
                 } else {
                     if (os_wait(process_id, &external_status) == OS_SYSCALL_ERROR ||
                         os_reap(process_id) == OS_SYSCALL_ERROR) {
+                        last_status = 1;
                         print(unknown, sizeof(unknown) - 1U);
                     } else {
                         last_status = external_status;

@@ -65,6 +65,8 @@ the init-owned shell supervisor remains the next kernel/userland boundary.
 The current userland slice adds the `version` shell built-in. XFS expansion
 and init-owned supervision remain paused while the stable boot path is kept.
 
+The identity utility slice now includes bounded `id -u` and `id -g` output.
+
 - [x] Add a small userland runtime layer for shared argument parsing, status
   handling, and diagnostic output across standalone applications.
 - [x] Migrate the remaining standalone applications to the shared runtime

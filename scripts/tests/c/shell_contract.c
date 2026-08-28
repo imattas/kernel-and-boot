@@ -21,6 +21,7 @@ int main(void) {
     assert(shell_edit_line(line, &line_length, sizeof(line) - 1U, '\n') == SHELL_EDIT_SUBMIT);
     assert(line_length == 1 && line[0] == 'z');
     assert(shell_parse("help", 4, argument, sizeof(argument)) == SHELL_HELP);
+    assert(shell_parse("version", 7, argument, sizeof(argument)) == SHELL_VERSION);
     assert(shell_parse("clear", 5, argument, sizeof(argument)) == SHELL_CLEAR);
     assert(shell_parse("alias ll ls", 11, argument, sizeof(argument)) == SHELL_ALIAS);
     assert(strcmp(argument, "ll ls") == 0);

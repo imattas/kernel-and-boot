@@ -15,9 +15,18 @@ static void number(uint64_t value) {
 }
 
 int id_main(uint64_t argc, char **argv, char **environment) {
-    (void)argc;
-    (void)argv;
     (void)environment;
+    if (argc > 2 || (argc == 2 &&
+                     (argv[1][0] != '-' ||
+                      (argv[1][1] != 'u' && argv[1][1] != 'g') ||
+                      argv[1][2] != 0)))
+        os_exit(2);
+    if (argc == 2) {
+        uint64_t value = argv[1][1] == 'u' ? os_getuid() : os_getgid();
+        number(value);
+        if (os_write(1, "\r\n", 2) != 2) os_exit(1);
+        os_exit(0);
+    }
     (void)os_write(1, "pid=", 4); number(os_getpid());
     (void)os_write(1, " ppid=", 6); number(os_getppid());
     (void)os_write(1, " uid=", 5); number(os_getuid());

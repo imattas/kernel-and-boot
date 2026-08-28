@@ -1965,3 +1965,6 @@ A follow-up attempt to synchronize `PWD` and `OLDPWD` from the shell stalled
 before the prompt during QEMU startup and was reverted. The interaction
 between shell startup, `getcwd`, and the VFS/process locks remains an open
 userland boundary issue.
+
+The identity utility slice now adds bounded `id -u` and `id -g` selectors for
+machine-readable UID/GID output while preserving the full identity report.

@@ -23,6 +23,18 @@ static uint16_t be16(const uint8_t *p);
 static void store_be16(uint8_t *p, uint16_t value);
 static void store_be32(uint8_t *p, uint32_t value);
 
+static uint32_t xfs_crc32c(const uint8_t *data, uint32_t length) {
+    uint32_t crc = 0xffffffffU;
+    if (!data) return 0;
+    for (uint32_t i = 0; i < length; ++i) {
+        uint8_t byte = data[i];
+        crc ^= byte;
+        for (uint32_t bit = 0; bit < 8U; ++bit)
+            crc = (crc >> 1) ^ (0x82f63b78U & (uint32_t)-(int32_t)(crc & 1U));
+    }
+    return ~crc;
+}
+
 static uint32_t xfs_journal_checksum(const uint8_t *data, uint32_t length) {
     uint32_t crc = 0xffffffffU;
     if (!data) return 0;
@@ -1175,7 +1187,8 @@ static int xfs_journal_clear(xfs_fs_t *fs) {
 static int xfs_journal_prepare(xfs_fs_t *fs, const uint64_t *targets,
                                const uint8_t *const *images, uint32_t records) {
     uint8_t header[4096];
-    if (!xfs_journal_configured(fs, records) || !targets || !images) return 0;
+    if (!xfs_journal_configured(fs, records) || !targets || !images ||
+        24U + records * 12U > fs->block_size) return 0;
     for (uint32_t i = 0; i < records; ++i) {
         if (!images[i] || targets[i] >= fs->block_count ||
             (targets[i] >= fs->journal_start &&
@@ -1188,7 +1201,11 @@ static int xfs_journal_prepare(xfs_fs_t *fs, const uint64_t *targets,
     store_be64(&header[4], ++fs->journal_sequence);
     store_be32(&header[12], XFS_JOURNAL_PREPARE);
     store_be32(&header[16], records);
-    for (uint32_t i = 0; i < records; ++i) store_be64(&header[24U + i * 8U], targets[i]);
+    for (uint32_t i = 0; i < records; ++i) {
+        store_be64(&header[24U + i * 8U], targets[i]);
+        store_be32(&header[24U + records * 8U + i * 4U],
+                   xfs_crc32c(images[i], fs->block_size));
+    }
     store_be32(&header[20], xfs_journal_checksum(header, fs->block_size));
     if (!xfs_write_block(fs, fs->journal_start, header)) return 0;
     for (uint32_t i = 0; i < records; ++i)
@@ -1220,6 +1237,10 @@ static int xfs_journal_recover(xfs_fs_t *fs) {
                 !xfs_read_block(fs, fs->journal_start + 1U + i, image)) return 0;
             for (uint32_t j = 0; j < i; ++j)
                 if (target == be64(&header[24U + j * 8U])) return 0;
+            uint32_t payload_checksum =
+                be32(&header[24U + records * 8U + i * 4U]);
+            if (payload_checksum != 0 &&
+                payload_checksum != xfs_crc32c(image, fs->block_size)) return 0;
             if (!xfs_write_block(fs, target, image)) return 0;
         }
         if (!xfs_flush_metadata(fs)) return 0;

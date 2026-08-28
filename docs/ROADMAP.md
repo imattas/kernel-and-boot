@@ -1246,6 +1246,8 @@ inode block; the dedicated contract covers the move.
 New XFS journal headers now carry CRC32C integrity coverage; recovery rejects
 corrupted checksummed headers while retaining compatibility with legacy
 zero-checksum records.
+XFS journal records now also carry per-payload CRC32C values, so committed
+recovery validates each metadata image before writing its target block.
 Legacy and deeper XFS BNO publication paths now use that same optional flush
 boundary after successful metadata commits.
 Ext4 VFS file attachment now accepts an explicit directory inode and validates

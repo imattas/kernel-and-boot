@@ -483,8 +483,19 @@ static int shell_run_input_redirect(char *text, uint32_t length,
 static int shell_copy_file(const char *source_path, uint32_t source_length,
                            const char *destination_path,
                            uint32_t destination_length) {
+    if (source_length == destination_length) {
+        uint32_t index = 0;
+        while (index < source_length && source_path[index] == destination_path[index])
+            ++index;
+        if (index == source_length) return 0;
+    }
     uint64_t source = os_open(source_path, source_length, 1);
     if (source == OS_SYSCALL_ERROR) return 0;
+    os_stat_t metadata;
+    if (os_fstat(source, &metadata) == OS_SYSCALL_ERROR) {
+        (void)os_close(source);
+        return 0;
+    }
     uint64_t destination = os_create(destination_path, destination_length, 3);
     if (destination == OS_SYSCALL_ERROR) {
         (void)os_close(source);
@@ -506,7 +517,9 @@ static int shell_copy_file(const char *source_path, uint32_t source_length,
         }
     }
     return os_close(source) != OS_SYSCALL_ERROR &&
-           os_close(destination) != OS_SYSCALL_ERROR;
+           os_close(destination) != OS_SYSCALL_ERROR &&
+           os_chmod(destination_path, destination_length, metadata.mode) !=
+               OS_SYSCALL_ERROR;
 }
 
 void shell_main(void) {

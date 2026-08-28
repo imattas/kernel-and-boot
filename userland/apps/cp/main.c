@@ -18,6 +18,11 @@ int cp_main(uint64_t argc, char **argv, char **environment) {
         os_exit(2);
     uint64_t source = os_open(argv[1], length(argv[1]), 1);
     if (source == OS_SYSCALL_ERROR) os_exit(1);
+    os_stat_t metadata;
+    if (os_fstat(source, &metadata) == OS_SYSCALL_ERROR) {
+        (void)os_close(source);
+        os_exit(1);
+    }
     uint64_t destination = os_create(argv[2], length(argv[2]), 3);
     if (destination == OS_SYSCALL_ERROR) {
         (void)os_close(source);
@@ -39,6 +44,8 @@ int cp_main(uint64_t argc, char **argv, char **environment) {
         }
     }
     if (os_close(source) == OS_SYSCALL_ERROR ||
-        os_close(destination) == OS_SYSCALL_ERROR) os_exit(1);
+        os_close(destination) == OS_SYSCALL_ERROR ||
+        os_chmod(argv[2], length(argv[2]), metadata.mode) == OS_SYSCALL_ERROR)
+        os_exit(1);
     os_exit(0);
 }

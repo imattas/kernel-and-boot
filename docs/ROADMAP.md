@@ -1059,6 +1059,9 @@ Reaping is exposed as a separate parent-validated syscall, preserving the
 existing wait ABI used by kernel lifecycle probes.
 Spawned programs now receive an initial `argc`/`argv` stack, including the
 path and up to eight bounded whitespace-separated command arguments.
+External ELF execution remains an active completion item: shell input and
+filesystem lookup are functional, but the current QEMU gate still hangs
+while resolving an external executable before the spawn syscall returns.
 
 This gate includes all non-driver kernel core services and VFS abstractions,
 then the complete driver phase, with build integration, focused tests, and QEMU

@@ -68,6 +68,7 @@ the init-owned shell supervisor remains the next kernel/userland boundary.
   helpers without changing their syscall contracts.
 - [x] Add host contract coverage for shared runtime parsing and string helpers.
 - [x] Add a complete built-userland ELF-set contract before image packaging.
+- [x] Add standalone `HELP.ELF` and expose it through the live FAT32 VFS.
 - [ ] Add shell/application integration coverage for filesystem mutation,
   pipelines, redirection, background jobs, and inherited environment state.
 - [ ] Make init supervise `shell.elf` through the normal spawn/wait ABI after

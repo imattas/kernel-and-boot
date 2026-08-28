@@ -87,8 +87,10 @@ assert root_extension[480:491] == b'CHDIR   ELF'
 assert int.from_bytes(root_extension[506:508], 'little') >= 5
 assert root[480:491] == b'OS FAT32   '
 root_extension_second = data[(32 + 2 * 520 + 4) * 512:(32 + 2 * 520 + 5) * 512]
-assert root_extension_second[:11] == b'CP      ELF'
+assert root_extension_second[:11] == b'HELP    ELF'
 assert int.from_bytes(root_extension_second[26:28], 'little') >= 5
+assert root_extension_second[32:43] == b'CP      ELF'
+assert int.from_bytes(root_extension_second[58:60], 'little') >= 5
 assert data[(33 + 2 * 520) * 512 + 64:(33 + 2 * 520) * 512 + 75] == b'BOOT       '
 assert data[(34 + 2 * 520) * 512 + 64:(34 + 2 * 520) * 512 + 75] == b'BOOTX64 EFI'
 print('FAT image contract: PASS')

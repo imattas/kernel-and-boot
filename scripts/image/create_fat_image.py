@@ -20,8 +20,8 @@ def short_entry(name, attributes, cluster, size):
         "<HI", cluster & 0xffff, size)
 
 def main():
-    if len(sys.argv) != 34:
-        raise SystemExit("usage: create_fat_image.py <BOOTX64.EFI> <KERNEL.ELF> <INIT.ELF> <SHELL.ELF> <ARGS.ELF> <ENV.ELF> <CAT.ELF> <PWD.ELF> <MKDIR.ELF> <RM.ELF> <RMDIR.ELF> <TOUCH.ELF> <WRITE.ELF> <LS.ELF> <CHMOD.ELF> <ECHO.ELF> <STAT.ELF> <MV.ELF> <KILL.ELF> <SLEEP.ELF> <SETENV.ELF> <IPC.ELF> <DUP.ELF> <TRUE.ELF> <FALSE.ELF> <ID.ELF> <PS.ELF> <WAIT.ELF> <TRUNCATE.ELF> <SEEK.ELF> <CHDIR.ELF> <CP.ELF> <os.img>")
+    if len(sys.argv) != 35:
+        raise SystemExit("usage: create_fat_image.py <BOOTX64.EFI> <KERNEL.ELF> <INIT.ELF> <SHELL.ELF> <ARGS.ELF> <ENV.ELF> <CAT.ELF> <PWD.ELF> <MKDIR.ELF> <RM.ELF> <RMDIR.ELF> <TOUCH.ELF> <WRITE.ELF> <LS.ELF> <CHMOD.ELF> <ECHO.ELF> <HELP.ELF> <STAT.ELF> <MV.ELF> <KILL.ELF> <SLEEP.ELF> <SETENV.ELF> <IPC.ELF> <DUP.ELF> <TRUE.ELF> <FALSE.ELF> <ID.ELF> <PS.ELF> <WAIT.ELF> <TRUNCATE.ELF> <SEEK.ELF> <CHDIR.ELF> <CP.ELF> <os.img>")
     efi_source = Path(sys.argv[1]).read_bytes()
     kernel_source = Path(sys.argv[2]).read_bytes()
     init_source = Path(sys.argv[3]).read_bytes()
@@ -38,23 +38,24 @@ def main():
     ls_source = Path(sys.argv[14]).read_bytes()
     chmod_source = Path(sys.argv[15]).read_bytes()
     echo_source = Path(sys.argv[16]).read_bytes()
-    stat_source = Path(sys.argv[17]).read_bytes()
-    mv_source = Path(sys.argv[18]).read_bytes()
-    kill_source = Path(sys.argv[19]).read_bytes()
-    sleep_source = Path(sys.argv[20]).read_bytes()
-    setenv_source = Path(sys.argv[21]).read_bytes()
-    ipc_source = Path(sys.argv[22]).read_bytes()
-    dup_source = Path(sys.argv[23]).read_bytes()
-    true_source = Path(sys.argv[24]).read_bytes()
-    false_source = Path(sys.argv[25]).read_bytes()
-    id_source = Path(sys.argv[26]).read_bytes()
-    ps_source = Path(sys.argv[27]).read_bytes()
-    wait_source = Path(sys.argv[28]).read_bytes()
-    truncate_source = Path(sys.argv[29]).read_bytes()
-    seek_source = Path(sys.argv[30]).read_bytes()
-    chdir_source = Path(sys.argv[31]).read_bytes()
-    cp_source = Path(sys.argv[32]).read_bytes()
-    output = Path(sys.argv[33])
+    help_source = Path(sys.argv[17]).read_bytes()
+    stat_source = Path(sys.argv[18]).read_bytes()
+    mv_source = Path(sys.argv[19]).read_bytes()
+    kill_source = Path(sys.argv[20]).read_bytes()
+    sleep_source = Path(sys.argv[21]).read_bytes()
+    setenv_source = Path(sys.argv[22]).read_bytes()
+    ipc_source = Path(sys.argv[23]).read_bytes()
+    dup_source = Path(sys.argv[24]).read_bytes()
+    true_source = Path(sys.argv[25]).read_bytes()
+    false_source = Path(sys.argv[26]).read_bytes()
+    id_source = Path(sys.argv[27]).read_bytes()
+    ps_source = Path(sys.argv[28]).read_bytes()
+    wait_source = Path(sys.argv[29]).read_bytes()
+    truncate_source = Path(sys.argv[30]).read_bytes()
+    seek_source = Path(sys.argv[31]).read_bytes()
+    chdir_source = Path(sys.argv[32]).read_bytes()
+    cp_source = Path(sys.argv[33]).read_bytes()
+    output = Path(sys.argv[34])
     efi_clusters = max(1, math.ceil(len(efi_source) / SECTOR))
     kernel_clusters = max(1, math.ceil(len(kernel_source) / SECTOR))
     init_clusters = max(1, math.ceil(len(init_source) / SECTOR))
@@ -71,6 +72,7 @@ def main():
     ls_clusters = max(1, math.ceil(len(ls_source) / SECTOR))
     chmod_clusters = max(1, math.ceil(len(chmod_source) / SECTOR))
     echo_clusters = max(1, math.ceil(len(echo_source) / SECTOR))
+    help_clusters = max(1, math.ceil(len(help_source) / SECTOR))
     stat_clusters = max(1, math.ceil(len(stat_source) / SECTOR))
     mv_clusters = max(1, math.ceil(len(mv_source) / SECTOR))
     kill_clusters = max(1, math.ceil(len(kill_source) / SECTOR))
@@ -105,7 +107,8 @@ def main():
     ls_chain = list(range(write_chain[-1] + 1, write_chain[-1] + 1 + ls_clusters))
     chmod_chain = list(range(ls_chain[-1] + 1, ls_chain[-1] + 1 + chmod_clusters))
     echo_chain = list(range(chmod_chain[-1] + 1, chmod_chain[-1] + 1 + echo_clusters))
-    stat_chain = list(range(echo_chain[-1] + 1, echo_chain[-1] + 1 + stat_clusters))
+    help_chain = list(range(echo_chain[-1] + 1, echo_chain[-1] + 1 + help_clusters))
+    stat_chain = list(range(help_chain[-1] + 1, help_chain[-1] + 1 + stat_clusters))
     mv_chain = list(range(stat_chain[-1] + 1, stat_chain[-1] + 1 + mv_clusters))
     kill_chain = list(range(mv_chain[-1] + 1, mv_chain[-1] + 1 + kill_clusters))
     sleep_chain = list(range(kill_chain[-1] + 1, kill_chain[-1] + 1 + sleep_clusters))
@@ -143,7 +146,7 @@ def main():
     fsinfo = bytearray(SECTOR)
     struct.pack_into("<I", fsinfo, 0, 0x41615252)
     struct.pack_into("<I", fsinfo, 484, 0x61417272)
-    struct.pack_into("<I", fsinfo, 488, TOTAL_SECTORS - DATA_START - len(efi_chain) - len(kernel_chain) - len(init_chain) - len(shell_chain) - len(args_chain) - len(env_chain) - len(cat_chain) - len(pwd_chain) - len(mkdir_chain) - len(rm_chain) - len(rmdir_chain) - len(touch_chain) - len(write_chain) - len(ls_chain) - len(chmod_chain) - len(echo_chain) - len(stat_chain) - len(mv_chain) - len(kill_chain) - len(sleep_chain) - len(setenv_chain) - len(ipc_chain) - len(dup_chain) - len(true_chain) - len(false_chain) - len(id_chain) - len(ps_chain) - len(wait_chain) - len(truncate_chain) - len(seek_chain) - len(chdir_chain) - len(cp_chain) - 5)
+    struct.pack_into("<I", fsinfo, 488, TOTAL_SECTORS - DATA_START - len(efi_chain) - len(kernel_chain) - len(init_chain) - len(shell_chain) - len(args_chain) - len(env_chain) - len(cat_chain) - len(pwd_chain) - len(mkdir_chain) - len(rm_chain) - len(rmdir_chain) - len(touch_chain) - len(write_chain) - len(ls_chain) - len(chmod_chain) - len(echo_chain) - len(help_chain) - len(stat_chain) - len(mv_chain) - len(kill_chain) - len(sleep_chain) - len(setenv_chain) - len(ipc_chain) - len(dup_chain) - len(true_chain) - len(false_chain) - len(id_chain) - len(ps_chain) - len(wait_chain) - len(truncate_chain) - len(seek_chain) - len(chdir_chain) - len(cp_chain) - 5)
     struct.pack_into("<I", fsinfo, 492, 7 + efi_clusters + kernel_clusters + init_clusters + shell_clusters)
     struct.pack_into("<I", fsinfo, 508, 0xaa550000)
     image[SECTOR:2 * SECTOR] = fsinfo
@@ -156,7 +159,7 @@ def main():
                            (2, 5), (3, 0x0fffffff), (4, 0x0fffffff),
                            (5, 6), (6, 0x0fffffff)):
         set_fat(cluster, value)
-    for chain in (efi_chain, kernel_chain, init_chain, shell_chain, args_chain, env_chain, cat_chain, pwd_chain, mkdir_chain, rm_chain, rmdir_chain, touch_chain, write_chain, ls_chain, chmod_chain, echo_chain, stat_chain, mv_chain, kill_chain, sleep_chain, setenv_chain, ipc_chain, dup_chain, true_chain, false_chain, id_chain, ps_chain, wait_chain, truncate_chain, seek_chain, chdir_chain, cp_chain):
+    for chain in (efi_chain, kernel_chain, init_chain, shell_chain, args_chain, env_chain, cat_chain, pwd_chain, mkdir_chain, rm_chain, rmdir_chain, touch_chain, write_chain, ls_chain, chmod_chain, echo_chain, help_chain, stat_chain, mv_chain, kill_chain, sleep_chain, setenv_chain, ipc_chain, dup_chain, true_chain, false_chain, id_chain, ps_chain, wait_chain, truncate_chain, seek_chain, chdir_chain, cp_chain):
         for index, cluster in enumerate(chain):
             set_fat(cluster, chain[index + 1] if index + 1 < len(chain) else 0x0fffffff)
     for fat_index in range(FAT_COUNT):
@@ -201,7 +204,8 @@ def main():
     root_extension[480:512] = short_entry("CHDIR   ELF", 0x20, chdir_chain[0], len(chdir_source))
     image[cluster_offset(5):cluster_offset(5) + SECTOR] = root_extension
     root_extension_second = bytearray(SECTOR)
-    root_extension_second[0:32] = short_entry("CP      ELF", 0x20, cp_chain[0], len(cp_source))
+    root_extension_second[0:32] = short_entry("HELP    ELF", 0x20, help_chain[0], len(help_source))
+    root_extension_second[32:64] = short_entry("CP      ELF", 0x20, cp_chain[0], len(cp_source))
     image[cluster_offset(6):cluster_offset(6) + SECTOR] = root_extension_second
     efi_dir = bytearray(SECTOR)
     efi_dir[0:32] = short_entry(".          ", 0x10, 3, 0)
@@ -245,6 +249,8 @@ def main():
         image[cluster_offset(cluster):cluster_offset(cluster) + len(chmod_source[index * SECTOR:(index + 1) * SECTOR])] = chmod_source[index * SECTOR:(index + 1) * SECTOR]
     for index, cluster in enumerate(echo_chain):
         image[cluster_offset(cluster):cluster_offset(cluster) + len(echo_source[index * SECTOR:(index + 1) * SECTOR])] = echo_source[index * SECTOR:(index + 1) * SECTOR]
+    for index, cluster in enumerate(help_chain):
+        image[cluster_offset(cluster):cluster_offset(cluster) + len(help_source[index * SECTOR:(index + 1) * SECTOR])] = help_source[index * SECTOR:(index + 1) * SECTOR]
     for index, cluster in enumerate(stat_chain):
         image[cluster_offset(cluster):cluster_offset(cluster) + len(stat_source[index * SECTOR:(index + 1) * SECTOR])] = stat_source[index * SECTOR:(index + 1) * SECTOR]
     for index, cluster in enumerate(mv_chain):

@@ -1725,6 +1725,9 @@ immediately-blocking shell cannot starve those services. The init-to-shell
 supervisor handoff remains deferred pending a namespace-retain deadlock fix.
 Userland development is nevertheless active: the next batch is shared
 standalone-utility support and shell/application integration coverage.
+standalone-utility support and shell/application integration coverage. The
+standalone `HELP.ELF` utility now provides the same command inventory through
+the external process path as the native shell `help` command.
 An attempted init-owned supervisor run with services queued before init was
 reverted after QEMU tracing showed the shared scheduler/address-space path
 stalling during the first spawn argument copy; the stable kernel-managed shell

@@ -2074,6 +2074,11 @@ through QEMU's serial stdin, and verifies the command is received and echoed by
 the live shell. Live USB/PS2 keyboard injection remains a separate verification
 follow-up.
 
+The external shell `run` open path now follows the same lock-order rule as
+spawn: it snapshots the current process namespace before retaining VFS nodes.
+This removes the process-lock acquisition deadlock; final live verification is
+still pending because the subsequent VFS path walk has a separate blocker.
+
 The normal `make run` target now explicitly selects `-display none` so its
 `os> ` prompt is visibly and reliably attached to the launching terminal;
 the graphical/VNC surface is not a terminal and does not accept shell input.

@@ -373,13 +373,15 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
                 return OS_SYSCALL_ERROR;
             char path[OS_SYSCALL_MAX_PATH + 1];
             if (!syscall_copy_path(path, arg1, arg2)) return OS_SYSCALL_ERROR;
-            uint64_t flags = spinlock_lock_irqsave(&process->lock);
+            /* A running current process cannot be destroyed during its
+               syscall. Snapshot its namespace without taking the process
+               lock; VFS reference acquisition may take node locks and must
+               not be nested under the process lock. */
             vfs_node_t *root = process->root_directory;
             vfs_node_t *working = process->working_directory;
             security_context_t security = process->security;
             if (root) vfs_node_retain(root);
             if (working) vfs_node_retain(working);
-            spinlock_unlock_irqrestore(&process->lock, flags);
             vfs_node_t *node = root && working ?
                 vfs_lookup_path_at_access(root, working, path, &security) : 0;
             uint32_t requested = (arg3 & VFS_FILE_READ ? 4U : 0U) |

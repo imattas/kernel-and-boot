@@ -5,7 +5,10 @@
 #include "kernel/drivers/storage/storage.h"
 
 static uint8_t image[512U * 128U];
+static uint8_t snapshot[512U * 128U];
 static uint32_t flush_calls;
+static uint32_t write_calls;
+static uint32_t fail_write_call = UINT32_MAX;
 static void p16(uint8_t *p, uint16_t v) { p[0] = (uint8_t)(v >> 8); p[1] = (uint8_t)v; }
 static void p32(uint8_t *p, uint32_t v) {
     p[0] = (uint8_t)(v >> 24); p[1] = (uint8_t)(v >> 16);
@@ -22,6 +25,10 @@ static int rd(uint64_t lba, uint32_t n, void *p) {
 }
 static int wr(uint64_t lba, uint32_t n, const void *p) {
     if (lba + n > 128U) return 0;
+    if (write_calls++ == fail_write_call) {
+        fail_write_call = UINT32_MAX;
+        return 0;
+    }
     memcpy(image + lba * 512U, p, n * 512U); return 1;
 }
 static int flush(void *context) {
@@ -173,5 +180,9 @@ int main(void) {
     assert(xfs_free_extent(&fs, 2, 1));
     assert(((bno_root[6] << 8) | bno_root[7]) == 1 &&
            g32(&bno_root[16]) == 2 && g32(&agf[52]) == 1);
+    memcpy(snapshot, image, sizeof(image));
+    fail_write_call = write_calls + 2U;
+    assert(!xfs_allocate_extent(&fs, 0, 1, &start));
+    assert(memcmp(snapshot, image, sizeof(image)) == 0);
     return 0;
 }

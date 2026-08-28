@@ -1876,6 +1876,10 @@ The first PATH-inspection application, `which.elf`, now searches inherited
 PATH entries, validates executable candidates through the VFS, and reports the
 resolved path using the normal freestanding userland runtime.
 
+The image contract now explicitly validates the complete 45-entry userland
+set, including every second extension-cluster entry through `WHICH.ELF`, so
+packaging regressions cannot silently omit a late application.
+
 Shell integration contracts now directly cover the quote-aware sequence
 splitter, including semicolons and conditional operators preserved inside
 quoted arguments; this joins

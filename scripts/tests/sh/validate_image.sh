@@ -105,6 +105,20 @@ assert root_extension_second[224:235] == b'SORT    ELF'
 assert int.from_bytes(root_extension_second[250:252], 'little') >= 5
 assert root_extension_second[256:267] == b'UNIQ    ELF'
 assert int.from_bytes(root_extension_second[282:284], 'little') >= 5
+assert root_extension_second[288:299] == b'PRINTF  ELF'
+assert int.from_bytes(root_extension_second[314:316], 'little') >= 5
+assert root_extension_second[320:331] == b'BASENAMEELF'
+assert int.from_bytes(root_extension_second[346:348], 'little') >= 5
+assert root_extension_second[352:363] == b'DIRNAME ELF'
+assert int.from_bytes(root_extension_second[378:380], 'little') >= 5
+assert root_extension_second[384:395] == b'CUT     ELF'
+assert int.from_bytes(root_extension_second[410:412], 'little') >= 5
+assert root_extension_second[416:427] == b'TR      ELF'
+assert int.from_bytes(root_extension_second[442:444], 'little') >= 5
+assert root_extension_second[448:459] == b'CMP     ELF'
+assert int.from_bytes(root_extension_second[474:476], 'little') >= 5
+assert root_extension_second[480:491] == b'WHICH   ELF'
+assert int.from_bytes(root_extension_second[506:508], 'little') >= 5
 assert data[(33 + 2 * 520) * 512 + 64:(33 + 2 * 520) * 512 + 75] == b'BOOT       '
 assert data[(34 + 2 * 520) * 512 + 64:(34 + 2 * 520) * 512 + 75] == b'BOOTX64 EFI'
 print('FAT image contract: PASS')

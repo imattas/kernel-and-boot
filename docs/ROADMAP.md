@@ -1599,6 +1599,8 @@ The filesystem command surface now includes `mv <old> <new>` through the
 rename syscall.
 The standalone `MV.ELF` utility is also packaged in the FAT32 boot image for
 the same rename path.
+The standalone `KILL.ELF` utility is packaged as the first process-control
+tool using targeted signal delivery.
 The FAT32 image builder now chains a second root-directory cluster, removing
 the one-sector root-entry ceiling for continued userland growth.
 The standalone `ECHO.ELF` utility is now stored in the expanded root directory

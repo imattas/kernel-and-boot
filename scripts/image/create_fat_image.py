@@ -226,7 +226,6 @@ def main():
     root_extension_second[128:160] = short_entry("GREP    ELF", 0x20, grep_chain[0], len(grep_source))
     root_extension_second[160:192] = short_entry("TEE     ELF", 0x20, tee_chain[0], len(tee_source))
     root_extension_second[192:224] = short_entry("TAIL    ELF", 0x20, tail_chain[0], len(tail_source))
-    root_extension_second[160:192] = short_entry("TEE     ELF", 0x20, tee_chain[0], len(tee_source))
     image[cluster_offset(6):cluster_offset(6) + SECTOR] = root_extension_second
     efi_dir = bytearray(SECTOR)
     efi_dir[0:32] = short_entry(".          ", 0x10, 3, 0)

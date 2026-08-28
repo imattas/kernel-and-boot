@@ -564,6 +564,56 @@ static int shell_rmdir_parents(char *path, uint32_t length) {
     }
 }
 
+static int shell_remove_tree(const char *path, uint32_t length,
+                             uint32_t depth) {
+    if (!path || length == 0 || depth > 16) return 0;
+    uint64_t descriptor = os_open(path, length, 1);
+    if (descriptor == OS_SYSCALL_ERROR) return 0;
+    os_stat_t stat;
+    if (os_fstat(descriptor, &stat) == OS_SYSCALL_ERROR) {
+        (void)os_close(descriptor);
+        return 0;
+    }
+    if (stat.type != 0) {
+        int closed = os_close(descriptor) != OS_SYSCALL_ERROR;
+        return closed && os_unlink(path, length) != OS_SYSCALL_ERROR;
+    }
+    shell_dirent_t entry;
+    uint64_t result;
+    while ((result = os_readdir(descriptor, &entry)) == 1) {
+        uint32_t name_length = 0;
+        while (name_length < sizeof(entry.name) && entry.name[name_length])
+            ++name_length;
+        if (name_length == 0 ||
+            (name_length == 1 && entry.name[0] == '.') ||
+            (name_length == 2 && entry.name[0] == '.' && entry.name[1] == '.'))
+            continue;
+        char child[256];
+        uint32_t child_length = length;
+        if (length != 1 || path[0] != '/') {
+            if (child_length + 1U >= sizeof(child)) {
+                (void)os_close(descriptor);
+                return 0;
+            }
+            child[child_length++] = '/';
+        }
+        if (child_length + name_length >= sizeof(child)) {
+            (void)os_close(descriptor);
+            return 0;
+        }
+        for (uint32_t index = 0; index < length; ++index) child[index] = path[index];
+        for (uint32_t index = 0; index < name_length; ++index)
+            child[child_length + index] = entry.name[index];
+        child[child_length + name_length] = 0;
+        if (!shell_remove_tree(child, child_length + name_length, depth + 1U)) {
+            (void)os_close(descriptor);
+            return 0;
+        }
+    }
+    int complete = result == 0 && os_close(descriptor) != OS_SYSCALL_ERROR;
+    return complete && os_rmdir(path, length) != OS_SYSCALL_ERROR;
+}
+
 void shell_main(void) {
     static const char prompt[] = "os> ";
     static const char help[] = "help id ps env setenv unsetenv status true false jobs history fg which inherit echo pwd cd ls cat stat chmod kill sleep mv cp mkdir rm rmdir touch write run wait exit\r\n";
@@ -974,7 +1024,20 @@ void shell_main(void) {
             } else if (command == SHELL_RM) {
                 uint32_t argument_length = 0;
                 while (argument[argument_length]) ++argument_length;
-                if (os_unlink(argument, argument_length) == OS_SYSCALL_ERROR)
+                int recursive = argument_length >= 3 && argument[0] == '-' &&
+                    argument[1] == 'r' &&
+                    (argument[2] == ' ' || argument[2] == '\t');
+                uint32_t path_start = recursive ? 2 : 0;
+                while (path_start < argument_length &&
+                       (argument[path_start] == ' ' || argument[path_start] == '\t'))
+                    ++path_start;
+                uint32_t path_length = argument_length - path_start;
+                int root = path_length == 1 && argument[path_start] == '/';
+                int removed = recursive ? (!root && shell_remove_tree(
+                    argument + path_start, path_length, 0)) :
+                    path_length != 0 && os_unlink(argument + path_start,
+                                                   path_length) != OS_SYSCALL_ERROR;
+                if (!removed)
                     print(unknown, sizeof(unknown) - 1U);
             } else if (command == SHELL_RMDIR) {
                 uint32_t argument_length = 0;

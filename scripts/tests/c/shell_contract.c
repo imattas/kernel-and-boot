@@ -90,6 +90,8 @@ int main(void) {
     assert(strcmp(argument, "-p /tmp/a/b") == 0);
     assert(shell_parse("rm /tmp/file", 12, argument, sizeof(argument)) == SHELL_RM);
     assert(strcmp(argument, "/tmp/file") == 0);
+    assert(shell_parse("rm -r /tmp/tree", 15, argument, sizeof(argument)) == SHELL_RM);
+    assert(strcmp(argument, "-r /tmp/tree") == 0);
     assert(shell_parse("rmdir /tmp", 10, argument, sizeof(argument)) == SHELL_RMDIR);
     assert(strcmp(argument, "/tmp") == 0);
     assert(shell_parse("rmdir -p /tmp/a/b", 17, argument,

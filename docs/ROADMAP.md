@@ -1811,6 +1811,10 @@ The standalone `env.elf` utility now accepts bounded `NAME=VALUE` prefixes,
 launches a command through the spawn/wait/reap ABI, and returns the child status;
 with no command it retains its inherited-environment listing behavior.
 
+Bounded environment-assignment parsing is now shared by standalone utilities
+through the freestanding runtime, with malformed empty-name assignments rejected
+by the runtime contract.
+
 Shell operator validation now rejects empty pipeline/redirection operands,
 non-terminal background markers, unterminated quoting, and trailing escapes
 before any process-launch path is selected.

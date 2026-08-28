@@ -10,6 +10,18 @@ static inline uint64_t os_userland_length(const char *text) {
     return length;
 }
 
+static inline int os_userland_split_assignment(char *text,
+                                                uint64_t *value_offset) {
+    if (!text || !value_offset || !text[0]) return 0;
+    uint64_t index = 0;
+    while (text[index] && text[index] != '=') ++index;
+    if (index == 0 || text[index] != '=' || index + 1U >
+        os_userland_length(text)) return 0;
+    text[index] = 0;
+    *value_offset = index + 1U;
+    return 1;
+}
+
 static inline int os_userland_write_all(uint64_t descriptor,
                                         const void *buffer, uint64_t length) {
     return os_write(descriptor, buffer, length) == length;

@@ -7,12 +7,9 @@ int env_main(uint64_t argc, char **argv, char **environment) {
     uint64_t command = 1;
     while (command < argc) {
         char *assignment = argv[command];
-        uint64_t length = os_userland_length(assignment);
-        uint64_t equals = 0;
-        while (equals < length && assignment[equals] != '=') ++equals;
-        if (equals == 0 || equals == length) break;
-        assignment[equals] = 0;
-        if (os_setenv(assignment, assignment + equals + 1U) == OS_SYSCALL_ERROR)
+        uint64_t value_offset = 0;
+        if (!os_userland_split_assignment(assignment, &value_offset)) break;
+        if (os_setenv(assignment, assignment + value_offset) == OS_SYSCALL_ERROR)
             os_exit(2);
         ++command;
     }

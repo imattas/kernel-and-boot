@@ -20,5 +20,12 @@ int main(void) {
     assert(!os_userland_parse_octal("7555", &value, 3));
     assert(!os_userland_parse_octal("758", &value, 4));
     assert(!os_userland_parse_octal(0, &value, 4));
+    char assignment[32] = "MODE=test";
+    uint64_t value_offset = 0;
+    assert(os_userland_split_assignment(assignment, &value_offset));
+    assert(strcmp(assignment, "MODE") == 0 && value_offset == 5 &&
+           strcmp(assignment + value_offset, "test") == 0);
+    strcpy(assignment, "=missing");
+    assert(!os_userland_split_assignment(assignment, &value_offset));
     return 0;
 }

@@ -93,6 +93,11 @@ static inline uint64_t os_rmdir(const char *path, uint64_t length) {
     return os_syscall3(35, (uint64_t)(uintptr_t)path, length, 0);
 }
 
+static inline uint64_t os_chmod(const char *path, uint64_t length,
+                                uint64_t mode) {
+    return os_syscall3(36, (uint64_t)(uintptr_t)path, length, mode);
+}
+
 static inline uint64_t os_create(const char *path, uint64_t length,
                                  uint64_t flags) {
     return os_syscall3(31, (uint64_t)(uintptr_t)path, length, flags);

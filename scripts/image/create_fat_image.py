@@ -20,8 +20,8 @@ def short_entry(name, attributes, cluster, size):
         "<HI", cluster & 0xffff, size)
 
 def main():
-    if len(sys.argv) != 16:
-        raise SystemExit("usage: create_fat_image.py <BOOTX64.EFI> <KERNEL.ELF> <INIT.ELF> <SHELL.ELF> <ARGS.ELF> <ENV.ELF> <CAT.ELF> <PWD.ELF> <MKDIR.ELF> <RM.ELF> <RMDIR.ELF> <TOUCH.ELF> <WRITE.ELF> <LS.ELF> <os.img>")
+    if len(sys.argv) != 17:
+        raise SystemExit("usage: create_fat_image.py <BOOTX64.EFI> <KERNEL.ELF> <INIT.ELF> <SHELL.ELF> <ARGS.ELF> <ENV.ELF> <CAT.ELF> <PWD.ELF> <MKDIR.ELF> <RM.ELF> <RMDIR.ELF> <TOUCH.ELF> <WRITE.ELF> <LS.ELF> <CHMOD.ELF> <os.img>")
     efi_source = Path(sys.argv[1]).read_bytes()
     kernel_source = Path(sys.argv[2]).read_bytes()
     init_source = Path(sys.argv[3]).read_bytes()
@@ -36,7 +36,8 @@ def main():
     touch_source = Path(sys.argv[12]).read_bytes()
     write_source = Path(sys.argv[13]).read_bytes()
     ls_source = Path(sys.argv[14]).read_bytes()
-    output = Path(sys.argv[15])
+    chmod_source = Path(sys.argv[15]).read_bytes()
+    output = Path(sys.argv[16])
     efi_clusters = max(1, math.ceil(len(efi_source) / SECTOR))
     kernel_clusters = max(1, math.ceil(len(kernel_source) / SECTOR))
     init_clusters = max(1, math.ceil(len(init_source) / SECTOR))
@@ -51,6 +52,7 @@ def main():
     touch_clusters = max(1, math.ceil(len(touch_source) / SECTOR))
     write_clusters = max(1, math.ceil(len(write_source) / SECTOR))
     ls_clusters = max(1, math.ceil(len(ls_source) / SECTOR))
+    chmod_clusters = max(1, math.ceil(len(chmod_source) / SECTOR))
     efi_chain = list(range(5, 5 + efi_clusters))
     kernel_chain = list(range(5 + efi_clusters, 5 + efi_clusters + kernel_clusters))
     init_chain = list(range(5 + efi_clusters + kernel_clusters,
@@ -67,7 +69,8 @@ def main():
     touch_chain = list(range(rmdir_chain[-1] + 1, rmdir_chain[-1] + 1 + touch_clusters))
     write_chain = list(range(touch_chain[-1] + 1, touch_chain[-1] + 1 + write_clusters))
     ls_chain = list(range(write_chain[-1] + 1, write_chain[-1] + 1 + ls_clusters))
-    if ls_chain[-1] >= TOTAL_SECTORS - DATA_START + 2:
+    chmod_chain = list(range(ls_chain[-1] + 1, ls_chain[-1] + 1 + chmod_clusters))
+    if chmod_chain[-1] >= TOTAL_SECTORS - DATA_START + 2:
         raise SystemExit("boot files are too large for the FAT32 image")
     image = bytearray(TOTAL_SECTORS * SECTOR)
     boot = bytearray(SECTOR)
@@ -89,7 +92,7 @@ def main():
     fsinfo = bytearray(SECTOR)
     struct.pack_into("<I", fsinfo, 0, 0x41615252)
     struct.pack_into("<I", fsinfo, 484, 0x61417272)
-    struct.pack_into("<I", fsinfo, 488, TOTAL_SECTORS - DATA_START - len(efi_chain) - len(kernel_chain) - len(init_chain) - len(shell_chain) - len(args_chain) - len(env_chain) - len(cat_chain) - len(pwd_chain) - len(mkdir_chain) - len(rm_chain) - len(rmdir_chain) - len(touch_chain) - len(write_chain) - len(ls_chain) - 3)
+    struct.pack_into("<I", fsinfo, 488, TOTAL_SECTORS - DATA_START - len(efi_chain) - len(kernel_chain) - len(init_chain) - len(shell_chain) - len(args_chain) - len(env_chain) - len(cat_chain) - len(pwd_chain) - len(mkdir_chain) - len(rm_chain) - len(rmdir_chain) - len(touch_chain) - len(write_chain) - len(ls_chain) - len(chmod_chain) - 3)
     struct.pack_into("<I", fsinfo, 492, 5 + efi_clusters + kernel_clusters + init_clusters + shell_clusters)
     struct.pack_into("<I", fsinfo, 508, 0xaa550000)
     image[SECTOR:2 * SECTOR] = fsinfo
@@ -101,7 +104,7 @@ def main():
     for cluster, value in ((0, 0x0ffffff8), (1, 0x0fffffff),
                            (2, 0x0fffffff), (3, 0x0fffffff), (4, 0x0fffffff)):
         set_fat(cluster, value)
-    for chain in (efi_chain, kernel_chain, init_chain, shell_chain, args_chain, env_chain, cat_chain, pwd_chain, mkdir_chain, rm_chain, rmdir_chain, touch_chain, write_chain, ls_chain):
+    for chain in (efi_chain, kernel_chain, init_chain, shell_chain, args_chain, env_chain, cat_chain, pwd_chain, mkdir_chain, rm_chain, rmdir_chain, touch_chain, write_chain, ls_chain, chmod_chain):
         for index, cluster in enumerate(chain):
             set_fat(cluster, chain[index + 1] if index + 1 < len(chain) else 0x0fffffff)
     for fat_index in range(FAT_COUNT):
@@ -124,7 +127,8 @@ def main():
     root[352:384] = short_entry("TOUCH   ELF", 0x20, touch_chain[0], len(touch_source))
     root[384:416] = short_entry("WRITE   ELF", 0x20, write_chain[0], len(write_source))
     root[416:448] = short_entry("LS      ELF", 0x20, ls_chain[0], len(ls_source))
-    root[448:480] = short_entry("OS FAT32   ", 0x08, 0, 0)
+    root[448:480] = short_entry("CHMOD   ELF", 0x20, chmod_chain[0], len(chmod_source))
+    root[480:512] = short_entry("OS FAT32   ", 0x08, 0, 0)
     image[cluster_offset(2):cluster_offset(2) + SECTOR] = root
     efi_dir = bytearray(SECTOR)
     efi_dir[0:32] = short_entry(".          ", 0x10, 3, 0)
@@ -164,6 +168,8 @@ def main():
         image[cluster_offset(cluster):cluster_offset(cluster) + len(write_source[index * SECTOR:(index + 1) * SECTOR])] = write_source[index * SECTOR:(index + 1) * SECTOR]
     for index, cluster in enumerate(ls_chain):
         image[cluster_offset(cluster):cluster_offset(cluster) + len(ls_source[index * SECTOR:(index + 1) * SECTOR])] = ls_source[index * SECTOR:(index + 1) * SECTOR]
+    for index, cluster in enumerate(chmod_chain):
+        image[cluster_offset(cluster):cluster_offset(cluster) + len(chmod_source[index * SECTOR:(index + 1) * SECTOR])] = chmod_source[index * SECTOR:(index + 1) * SECTOR]
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_bytes(image)
 

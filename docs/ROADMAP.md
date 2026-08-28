@@ -1598,6 +1598,8 @@ The standalone `PWD.ELF` utility now exercises the userland working-directory
 query and is packaged in the boot image.
 The standalone `MKDIR.ELF` utility now exercises userland directory creation
 and is packaged in the boot image.
+The standalone `CHMOD.ELF` utility now exercises userland permission updates
+and is packaged in the boot image.
 The standalone `TOUCH.ELF` utility now exercises userland file creation and
 is packaged in the boot image.
 The standalone `WRITE.ELF` utility now exercises userland file creation and

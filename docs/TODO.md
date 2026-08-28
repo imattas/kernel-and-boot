@@ -97,6 +97,7 @@ kernel gate below is explicitly marked complete.
 - [x] Add standalone `TOUCH.ELF` utility using the create/close ABI.
 - [x] Add standalone `WRITE.ELF` utility using the create/write ABI.
 - [x] Add standalone `LS.ELF` utility using directory enumeration.
+- [x] Add standalone `CHMOD.ELF` utility using the permission-update ABI.
 - [ ] Add reliable QEMU live keyboard verification for `run INIT.ELF`.
 - [ ] Add the command-line shell and terminal/console I/O.
 - [ ] Add process tools and initial utilities (`init`, `echo`, `ls`, `cat`,

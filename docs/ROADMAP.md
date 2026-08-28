@@ -1954,6 +1954,12 @@ stalled during process namespace setup. The stable kernel-managed shell handoff
 remains active until process-lock ownership is made SMP-safe and live QEMU
 verifies the normal spawn/wait path.
 
+The VFS self-test now preserves the root node's ownership reference after
+exercising removal and lookup operations. That root is later shared by the
+external user processes, so dropping its last reference during the test was a
+real lifetime violation even though the stable kernel-managed shell path still
+booted.
+
 Userland development is active while XFS expansion remains paused. The shell
 now includes a `version` built-in, synchronized with its help inventory, as
 the first command-surface slice after the larger utility set. The grouped

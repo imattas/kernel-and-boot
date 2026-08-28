@@ -2443,7 +2443,6 @@ void kernel_main(void *boot_info) {
     }
     vfs_node_release(vfs_dev_handle);
     vfs_node_release(vfs_etc_handle);
-    vfs_node_release(vfs_root);
     serial_write("VFS core ready\r\n");
     vfs_node_t *vfs_first_child = vfs_node_child(vfs_root, 0);
     if (!vfs_first_child) {

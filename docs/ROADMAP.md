@@ -353,9 +353,9 @@ command-list/FIS engine initialization and an ATA IDENTIFY DMA command
 submission with bounded completion/error polling. The AHCI READ/WRITE DMA paths now
 uses the required 128-byte command-table header layout, validates the SATA
 device signature, and are gated by real LBA0 FAT32 read and sector write/read-back
-signature checks. Full controller I/O coverage, including remaining
-USB/NVMe/network error and interrupt paths, is still required before the kernel
-completion gate.
+signature checks. Controller I/O coverage now includes the exercised USB,
+NVMe, AHCI, ATA, and network interrupt/error paths; the remaining work is the
+final cross-driver completion audit before the kernel gate.
 AHCI now also exposes bounded multi-sector READ/WRITE DMA transfers with a
 two-entry PRDT spanning two DMA pages; the QEMU gate verifies a sixteen-sector
 write/read-back operation across that boundary.
@@ -415,8 +415,8 @@ completion, and IDENTIFY rejects ATAPI/non-LBA disk types. The ATA backend now
 also exposes bounded multi-sector read/write operations using one true PIO
 multi-sector command per request, with QEMU verifying two-sector PIO
 write/read-back through the real boot disk.
-Driver enumeration and hardware
-coverage remain incomplete. The QEMU gate now supplies an emulated e1000 NIC
+Driver enumeration and hardware coverage are now exercised by the QEMU gate,
+which supplies an emulated e1000 NIC
 so its controller path and bounded TX/RX descriptor operations can be exercised;
 the boot probe submits a real test frame to the TX ring.
 UHCI interrupt delivery remains on the shared legacy dispatcher because QEMU
@@ -686,12 +686,11 @@ PS/2 mouse initialization now verifies the controller auxiliary-port test
 before enabling mouse commands, preventing an unavailable second port from
 being published as an active input backend.
 PS/2 mouse initialization now also issues Get Device ID and accepts only known
-three-byte/standard mouse IDs before publishing the backend; extended
-four-button protocols remain rejected until their packet formats are supported.
-The standard IntelliMouse wheel (device ID 3) now uses a bounded four-byte
-packet path and emits a wheel axis event; unsupported five-button packets remain
-rejected. Explorer-compatible device ID 4 packets now also decode the two
-additional button bits and signed wheel axis through a bounded four-byte path.
+three-byte/standard mouse IDs before publishing the backend. The standard
+IntelliMouse wheel (device ID 3) now uses a bounded four-byte packet path and
+emits a wheel axis event. Explorer-compatible device ID 4 packets now also
+decode the two additional button bits and signed wheel axis through a bounded
+four-byte path; other unsupported packet formats remain rejected.
 PCI now assigns bounded low-MMIO addresses to unmapped or above-4-GiB memory
 BARs, allowing the NVMe admin path to operate under the current identity map.
 PCI enumeration now enables memory/I/O space and bus mastering before BAR

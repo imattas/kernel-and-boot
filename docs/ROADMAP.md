@@ -220,7 +220,7 @@ QEMU now exercises a real blocked receiver and producer task across a context
 switch, including wakeup, payload delivery, task exit, and channel close.
 The QEMU target now truncates its serial log before each run so validation
 cannot pass from stale output left by an earlier boot.
-The QEMU milestone gate now allows 30 seconds for a complete boot under host
+The QEMU milestone gate now allows 60 seconds for a complete boot under host
 load, preventing a valid scheduler probe from being truncated by the harness
 timeout.
 

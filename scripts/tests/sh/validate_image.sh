@@ -21,7 +21,8 @@ fat = data[32 * 512:(32 + 520) * 512]
 assert int.from_bytes(fat[8:12], 'little') == 5
 assert int.from_bytes(fat[20:24], 'little') == 6
 assert int.from_bytes(fat[24:28], 'little') == 7
-assert int.from_bytes(fat[28:32], 'little') >= 0x0fffffff
+assert int.from_bytes(fat[28:32], 'little') == 8
+assert int.from_bytes(fat[32:36], 'little') >= 0x0fffffff
 root = data[(32 + 2 * 520) * 512:(33 + 2 * 520) * 512]
 assert root[:11] == b'EFI        '
 assert root[26:28] == b'\x03\x00'
@@ -126,6 +127,9 @@ assert root_extension_third[32:43] == b'UPTIME  ELF'
 assert root_extension_third[64:75] == b'DATE    ELF'
 assert root_extension_third[96:107] == b'CLEAR   ELF'
 assert int.from_bytes(root_extension_third[26:28], 'little') >= 5
+root_extension_fourth = data[(32 + 2 * 520 + 6) * 512:(32 + 2 * 520 + 7) * 512]
+assert root_extension_fourth[:11] == b'TEST    ELF'
+assert int.from_bytes(root_extension_fourth[26:28], 'little') >= 5
 assert data[(33 + 2 * 520) * 512 + 64:(33 + 2 * 520) * 512 + 75] == b'BOOT       '
 assert data[(34 + 2 * 520) * 512 + 64:(34 + 2 * 520) * 512 + 75] == b'BOOTX64 EFI'
 print('FAT image contract: PASS')

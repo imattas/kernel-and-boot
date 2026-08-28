@@ -1972,3 +1972,8 @@ machine-readable UID/GID output while preserving the full identity report.
 The shell `cd` command now accepts an empty operand and resolves it to the
 root directory, matching the normal shell default without changing the VFS
 working-directory ABI.
+
+The initial predicate utility `test.elf` is now built into the userland image.
+It provides bounded `PATH`-resolvable existence (`-e`), non-empty (`-n`), and
+string equality predicates with conventional zero/one/two exit statuses for
+shell conditionals.

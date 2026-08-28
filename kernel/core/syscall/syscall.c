@@ -32,6 +32,25 @@ static int valid_signal_number(uint64_t value) {
     return value >= 1 && value <= PROCESS_SIGNAL_MAX;
 }
 
+static int syscall_namespace_snapshot(process_t *process, vfs_node_t **root,
+                                      vfs_node_t **working,
+                                      security_context_t *security) {
+    if (!process || !root || !working || !security) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&process->lock);
+    *root = process->root_directory;
+    *working = process->working_directory;
+    *security = process->security;
+    spinlock_unlock_irqrestore(&process->lock, flags);
+    return *root != 0 && *working != 0;
+}
+
+static int syscall_inherit_environment(process_t *parent, process_t *child) {
+    if (!parent || !child || parent == child) return 0;
+    for (uint32_t index = 0; index < PROCESS_ENVIRONMENT_SIZE; ++index)
+        child->environment[index] = parent->environment[index];
+    return 1;
+}
+
 static vfs_node_t *syscall_parent(process_t *process, char *path,
                                   uint64_t length, char leaf[32],
                                   security_context_t *security) {
@@ -208,6 +227,7 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
             return valid ? 0 : OS_SYSCALL_ERROR;
         }
         case OS_SYSCALL_PROCESS_WAIT: {
+            serial_write("wait-enter\r\n");
             process_t *caller = process_current();
             if (!user_range(arg2, sizeof(int32_t), 1)) return OS_SYSCALL_ERROR;
             process_t *target = process_lookup_retain(arg1);
@@ -311,9 +331,12 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
             /* The current process cannot be destroyed while it is executing
                this syscall. Retain its namespace nodes without taking the
                process lock, avoiding the VFS-node/process-lock inversion. */
-            vfs_node_t *root = parent->root_directory;
-            vfs_node_t *working = parent->working_directory;
-            security_context_t security = parent->security;
+            vfs_node_t *root;
+            vfs_node_t *working;
+            security_context_t security;
+            if (!syscall_namespace_snapshot(parent, &root, &working,
+                                             &security))
+                return OS_SYSCALL_ERROR;
             if (root) vfs_node_retain(root);
             if (working) vfs_node_retain(working);
             vfs_node_t *node = root && working ?
@@ -347,7 +370,7 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
             int valid = child && process_set_parent(child, parent) &&
                         process_inherit_namespace(child, parent) &&
                         process_inherit_handles(child, parent) &&
-                        process_inherit_environment(child, parent) &&
+                        syscall_inherit_environment(parent, child) &&
                         process_set_standard_handles(child, redirected ?
                             redirected_input : 0, redirected ?
                             redirected_output : 0) &&

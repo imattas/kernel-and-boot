@@ -1,4 +1,5 @@
 #include "fat32.h"
+#include "../../mm/heap/heap.h"
 #include "../../drivers/storage/storage.h"
 
 static uint16_t load16(const uint8_t *data) {
@@ -244,15 +245,23 @@ int fat32_lookup_in_directory(fat32_fs_t *fs, uint32_t directory_cluster,
                               uint32_t *size, uint8_t *is_directory) {
     if (!fs || !fs->mounted || !cluster_valid(fs, directory_cluster) || !short_name ||
         !first_cluster || !size || !is_directory) return 0;
-    uint8_t directory[FAT32_MAX_SECTORS_PER_CLUSTER * FAT32_SECTOR_SIZE];
+    uint8_t *directory = (uint8_t *)kmalloc(
+        FAT32_MAX_SECTORS_PER_CLUSTER * FAT32_SECTOR_SIZE);
+    if (!directory) return 0;
     uint32_t cluster = directory_cluster;
     for (uint32_t hops = 0; hops < fs->data_clusters; ++hops) {
-        if (!fat32_read_cluster(fs, cluster, directory)) return 0;
+        if (!fat32_read_cluster(fs, cluster, directory)) {
+            kfree(directory);
+            return 0;
+        }
         for (uint32_t offset = 0;
              offset < fs->sectors_per_cluster * FAT32_SECTOR_SIZE; offset += 32) {
             uint8_t first = directory[offset];
             uint8_t attributes = directory[offset + 11];
-            if (first == 0x00) return 0;
+            if (first == 0x00) {
+                kfree(directory);
+                return 0;
+            }
             if (first == 0xe5 || attributes == 0x0f || (attributes & 0x08) != 0) continue;
             uint8_t match = 1;
             for (uint32_t byte = 0; byte < 11; ++byte)
@@ -262,14 +271,24 @@ int fat32_lookup_in_directory(fat32_fs_t *fs, uint32_t directory_cluster,
                                   load16(&directory[offset + 26]);
                 *size = load32(&directory[offset + 28]);
                 *is_directory = (uint8_t)((attributes & 0x10) != 0);
-                return cluster_valid(fs, *first_cluster) || (!*is_directory && *size == 0);
+                int valid = cluster_valid(fs, *first_cluster) ||
+                            (!*is_directory && *size == 0);
+                kfree(directory);
+                return valid;
             }
         }
         uint32_t next;
-        if (!fat_next(fs, cluster, &next) || next >= 0x0ffffff8U) return 0;
-        if (next == 0x0ffffff7U || !cluster_valid(fs, next)) return 0;
+        if (!fat_next(fs, cluster, &next) || next >= 0x0ffffff8U) {
+            kfree(directory);
+            return 0;
+        }
+        if (next == 0x0ffffff7U || !cluster_valid(fs, next)) {
+            kfree(directory);
+            return 0;
+        }
         cluster = next;
     }
+    kfree(directory);
     return 0;
 }
 
@@ -339,11 +358,15 @@ static int fat32_read_file_cluster(fat32_fs_t *fs, uint32_t cluster, uint32_t fi
             !cluster_valid(fs, next)) return 0;
         cluster = next;
     }
-    uint8_t cluster_data[FAT32_MAX_SECTORS_PER_CLUSTER * FAT32_SECTOR_SIZE];
+    uint8_t *cluster_data = (uint8_t *)kmalloc(cluster_size);
+    if (!cluster_data) return 0;
     uint8_t *output = (uint8_t *)buffer;
     uint32_t remaining = size;
     for (uint32_t hops = 0; remaining != 0 && hops < fs->data_clusters; ++hops) {
-        if (!fat32_read_cluster(fs, cluster, cluster_data)) return 0;
+        if (!fat32_read_cluster(fs, cluster, cluster_data)) {
+            kfree(cluster_data);
+            return 0;
+        }
         uint32_t available = cluster_size - inside;
         uint32_t copy = remaining < available ? remaining : available;
         for (uint32_t i = 0; i < copy; ++i) output[i] = cluster_data[inside + i];
@@ -353,11 +376,16 @@ static int fat32_read_file_cluster(fat32_fs_t *fs, uint32_t cluster, uint32_t fi
         if (remaining != 0) {
             uint32_t next;
             if (!fat_next(fs, cluster, &next) || next >= 0x0ffffff8U ||
-                !cluster_valid(fs, next)) return 0;
+                !cluster_valid(fs, next)) {
+                kfree(cluster_data);
+                return 0;
+            }
             cluster = next;
         }
     }
-    return remaining == 0;
+    int complete = remaining == 0;
+    kfree(cluster_data);
+    return complete;
 }
 
 int fat32_read_file(fat32_fs_t *fs, const char short_name[11],

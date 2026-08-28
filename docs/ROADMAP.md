@@ -2090,3 +2090,16 @@ requires final live proof.
 The normal `make run` target now explicitly selects `-display none` so its
 `os> ` prompt is visibly and reliably attached to the launching terminal;
 the graphical/VNC surface is not a terminal and does not accept shell input.
+### Current userland gate
+
+- Shell input reaches and parses `run`; explicit-path resolution now delegates
+  directly to `OS_SPAWN` instead of preflighting with a second `OS_OPEN`.
+- Added `run.bat` for Windows-hosted QEMU with WSL image building and
+  configurable OVMF firmware paths.
+- External ELF launch remains blocked in the kernel VFS namespace handoff and
+  must be fixed before this gate is considered complete.
+- FAT32 runtime reads now keep cluster and directory buffers off the kernel
+  stack; external launch progresses through image loading and stack mapping,
+  and argument token storage is now heap-backed, but argument-stack
+  preparation now completes and external ELF output is visible; wait/reap
+  return-to-shell behavior still needs completion proof.

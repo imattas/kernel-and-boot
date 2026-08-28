@@ -48,7 +48,8 @@ __attribute__((noreturn)) void process_exit_current(int32_t status) {
     process->state = PROCESS_EXITED;
     spinlock_unlock_irqrestore(&process->lock, flags);
     flags = spinlock_lock_irqsave(&process_table_lock);
-    if (current_process == process) current_process = 0;
+    if (current_process == process)
+        current_process = process->parent;
     spinlock_unlock_irqrestore(&process_table_lock, flags);
     wake_all_signal_waiters(process);
     while (scheduler_wake_one(&process->exit_waiters)) { }
@@ -644,6 +645,15 @@ static int process_user_stack_write(const process_t *process, uint64_t address,
     return 1;
 }
 
+typedef struct {
+    uint32_t environment_starts[16];
+    uint32_t environment_lengths[16];
+    char argument_tokens[8][257];
+    uint64_t argument_addresses[8];
+    uint64_t environment_addresses[16];
+    uint64_t values[32];
+} process_stack_build_t;
+
 int process_prepare_user_stack(process_t *process, const char *path,
                                const char *arguments, uint64_t *stack_pointer) {
     if (!process || !path || !arguments || !stack_pointer ||
@@ -653,8 +663,16 @@ int process_prepare_user_stack(process_t *process, const char *path,
     while (path[path_length] && path_length < 256U) ++path_length;
     while (arguments[argument_length] && argument_length < 256U) ++argument_length;
     if (path[path_length] || arguments[argument_length]) return 0;
-    uint32_t environment_starts[16] = {0};
-    uint32_t environment_lengths[16] = {0};
+    process_stack_build_t *build = (process_stack_build_t *)kmalloc(sizeof(*build));
+    if (!build) return 0;
+    uint32_t *environment_starts = build->environment_starts;
+    uint32_t *environment_lengths = build->environment_lengths;
+    char (*argument_tokens)[257] = build->argument_tokens;
+    uint64_t *argument_addresses = build->argument_addresses;
+    uint64_t *environment_addresses = build->environment_addresses;
+    uint64_t *values = build->values;
+    for (uint32_t index = 0; index < sizeof(*build) / sizeof(uint64_t); ++index)
+        ((uint64_t *)build)[index] = 0;
     uint32_t environment_count = 0;
     for (uint32_t index = 0; index < PROCESS_ENVIRONMENT_SIZE &&
          process->environment[index];) {
@@ -667,13 +685,12 @@ int process_prepare_user_stack(process_t *process, const char *path,
         ++environment_count;
         ++index;
     }
-    char argument_tokens[8][257] = {{0}};
     uint32_t argument_count = 0;
     for (uint32_t index = 0; index < argument_length;) {
         while (index < argument_length && (arguments[index] == ' ' ||
                                             arguments[index] == '\t')) ++index;
         if (index == argument_length) break;
-        if (argument_count == 8) return 0;
+        if (argument_count == 8) goto argument_fail;
         uint32_t token_length = 0;
         char quote = 0;
         int escaped = 0;
@@ -681,7 +698,7 @@ int process_prepare_user_stack(process_t *process, const char *path,
         while (index < argument_length) {
             char value = arguments[index++];
             if (escaped) {
-                if (token_length == sizeof(argument_tokens[0]) - 1U) return 0;
+                if (token_length == sizeof(argument_tokens[0]) - 1U) goto argument_fail;
                 argument_tokens[argument_count][token_length++] = value;
                 escaped = 0;
                 token_started = 1;
@@ -695,7 +712,7 @@ int process_prepare_user_stack(process_t *process, const char *path,
             if (quote) {
                 if (value == quote) quote = 0;
                 else {
-                    if (token_length == sizeof(argument_tokens[0]) - 1U) return 0;
+                    if (token_length == sizeof(argument_tokens[0]) - 1U) goto argument_fail;
                     argument_tokens[argument_count][token_length++] = value;
                 }
                 token_started = 1;
@@ -707,16 +724,15 @@ int process_prepare_user_stack(process_t *process, const char *path,
                 continue;
             }
             if (value == ' ' || value == '\t') break;
-            if (token_length == sizeof(argument_tokens[0]) - 1U) return 0;
+            if (token_length == sizeof(argument_tokens[0]) - 1U) goto argument_fail;
             argument_tokens[argument_count][token_length++] = value;
             token_started = 1;
         }
-        if (quote || escaped || !token_started) return 0;
+        if (quote || escaped || !token_started) goto argument_fail;
         argument_tokens[argument_count][token_length] = 0;
         ++argument_count;
     }
     uint64_t cursor = process->user_stack_top;
-    uint64_t argument_addresses[8] = {0};
     for (uint32_t index = argument_count; index != 0; --index) {
         uint32_t argument = index - 1U;
         uint32_t token_length = 0;
@@ -724,24 +740,24 @@ int process_prepare_user_stack(process_t *process, const char *path,
         cursor -= token_length + 1U;
         argument_addresses[argument] = cursor;
         if (!process_user_stack_write(process, cursor, argument_tokens[argument],
-                                      token_length + 1U)) return 0;
+                                      token_length + 1U)) goto argument_fail;
     }
     cursor -= path_length + 1U;
     uint64_t path_address = cursor;
     if (!process_user_stack_write(process, cursor, path, path_length + 1U))
-        return 0;
-    uint64_t environment_addresses[16] = {0};
+        goto argument_fail;
     for (uint32_t index = environment_count; index != 0; --index) {
         uint32_t environment = index - 1U;
         cursor -= environment_lengths[environment] + 1U;
         environment_addresses[environment] = cursor;
         if (!process_user_stack_write(process, cursor,
                                       &process->environment[environment_starts[environment]],
-                                      environment_lengths[environment] + 1U)) return 0;
+                                      environment_lengths[environment] + 1U)) goto argument_fail;
     }
     uint64_t value_count = 4U + argument_count + environment_count;
     cursor = (cursor - value_count * sizeof(uint64_t)) & ~0xfULL;
-    uint64_t values[32] = {1U + argument_count, path_address};
+    values[0] = 1U + argument_count;
+    values[1] = path_address;
     for (uint32_t index = 0; index < argument_count; ++index)
         values[2U + index] = argument_addresses[index];
     values[2U + argument_count] = 0;
@@ -750,9 +766,14 @@ int process_prepare_user_stack(process_t *process, const char *path,
     values[3U + argument_count + environment_count] = 0;
     if (!process_user_stack_write(process, cursor, values,
                                   value_count * sizeof(uint64_t)))
-        return 0;
+        goto argument_fail;
     *stack_pointer = cursor;
+    kfree(build);
     return 1;
+
+argument_fail:
+    kfree(build);
+    return 0;
 }
 
 int process_activate(process_t *process) {

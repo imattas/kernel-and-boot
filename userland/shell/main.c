@@ -423,9 +423,6 @@ static uint32_t resolve_command(const char *name, uint32_t name_length,
             for (uint32_t copy = 0; copy < name_length; ++copy)
                 path[copy] = name[copy];
             path[name_length] = 0;
-            uint64_t descriptor = os_open(path, name_length, 1);
-            if (descriptor == OS_SYSCALL_ERROR) return 0;
-            (void)os_close(descriptor);
             return name_length;
         }
     }

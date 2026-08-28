@@ -44,9 +44,12 @@ CACHE_TEST := $(TEST_DIR)/cache_contract
 DEVICE_TEST := $(TEST_DIR)/device_contract
 SHELL_TEST := $(TEST_DIR)/shell_contract
 USERLAND_INIT_ELF := $(BUILD_DIR)/userland/init.elf
+USERLAND_SHELL_ELF := $(BUILD_DIR)/userland/shell.elf
 USERLAND_INIT_OBJ := $(BUILD_DIR)/userland/init_start.o
 USERLAND_INIT_MAIN_OBJ := $(BUILD_DIR)/userland/init_main.o
 USERLAND_SYSCALL_OBJ := $(BUILD_DIR)/userland/syscall.o
+USERLAND_SHELL_START_OBJ := $(BUILD_DIR)/userland/shell_start.o
+USERLAND_SHELL_MAIN_OBJ := $(BUILD_DIR)/userland/shell_main.o
 USERLAND_LD := userland/init/init.ld
 UEFI_OBJ := $(BUILD_DIR)/uefi/efi_main.obj
 UEFI_ENTRY_OBJ := $(BUILD_DIR)/uefi/entry.obj
@@ -100,7 +103,7 @@ QEMU_LOG := $(BUILD_DIR)/qemu-serial.log
 
 .PHONY: all test userland-test shell-test image qemu-test fat32-test exfat-test ext4-test xfs-test xfs-rename-test xfs-alloc-test xfs-unwritten-test xfs-auth-test btrfs-test deflate-test lzo-test zstd-test fse-test cache-test device-test run clean distclean
 
-all: $(CONTRACT_ELF) $(UEFI_EFI) $(KERNEL_ELF) $(USERLAND_INIT_ELF)
+all: $(CONTRACT_ELF) $(UEFI_EFI) $(KERNEL_ELF) $(USERLAND_INIT_ELF) $(USERLAND_SHELL_ELF)
 
 userland-test: $(USERLAND_INIT_ELF)
 	sh scripts/tests/sh/validate_userland.sh $(USERLAND_INIT_ELF)
@@ -126,6 +129,18 @@ $(USERLAND_SYSCALL_OBJ): userland/lib/syscall.asm | $(BUILD_DIR)/userland
 
 $(USERLAND_INIT_ELF): $(USERLAND_INIT_OBJ) $(USERLAND_INIT_MAIN_OBJ) $(USERLAND_SYSCALL_OBJ) $(USERLAND_LD) | $(BUILD_DIR)/userland
 	$(LD) -m elf_x86_64 -T $(USERLAND_LD) --build-id=none -o $@ $(USERLAND_INIT_OBJ) $(USERLAND_INIT_MAIN_OBJ) $(USERLAND_SYSCALL_OBJ)
+
+$(USERLAND_SHELL_START_OBJ): userland/shell/start.asm | $(BUILD_DIR)/userland
+	$(NASM) -f elf64 $< -o $@
+
+$(USERLAND_SHELL_MAIN_OBJ): userland/shell/main.c userland/shell/shell.h userland/lib/os.h | $(BUILD_DIR)/userland
+	$(CC) -target x86_64-pc-none-elf -std=c11 -ffreestanding -fno-builtin \
+		-fno-stack-protector -fPIE -fno-plt -mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@
+
+$(USERLAND_SHELL_ELF): $(USERLAND_SHELL_START_OBJ) $(USERLAND_SHELL_MAIN_OBJ) userland/shell/shell.c userland/shell/shell.h $(USERLAND_SYSCALL_OBJ) userland/shell/shell.ld | $(BUILD_DIR)/userland
+	$(CC) -target x86_64-pc-none-elf -std=c11 -ffreestanding -fno-builtin \
+		-fno-stack-protector -fPIE -fno-plt -mno-red-zone -Wall -Wextra -Werror -c userland/shell/shell.c -o build/userland/shell_parser.o
+	$(LD) -m elf_x86_64 -T userland/shell/shell.ld --build-id=none -o $@ $(USERLAND_SHELL_START_OBJ) $(USERLAND_SHELL_MAIN_OBJ) build/userland/shell_parser.o $(USERLAND_SYSCALL_OBJ)
 
 $(TEST_DIR):
 	mkdir -p $@
@@ -747,8 +762,8 @@ $(FAT32_TEST): scripts/tests/c/fat32_contract.c kernel/fs/fat/fat32.c kernel/fs/
 
 image: $(IMAGE)
 
-$(IMAGE): $(UEFI_EFI) $(KERNEL_ELF) $(USERLAND_INIT_ELF) scripts/image/create_fat_image.py
-	python3 scripts/image/create_fat_image.py $(UEFI_EFI) $(KERNEL_ELF) $(USERLAND_INIT_ELF) $@
+$(IMAGE): $(UEFI_EFI) $(KERNEL_ELF) $(USERLAND_INIT_ELF) $(USERLAND_SHELL_ELF) scripts/image/create_fat_image.py
+	python3 scripts/image/create_fat_image.py $(UEFI_EFI) $(KERNEL_ELF) $(USERLAND_INIT_ELF) $(USERLAND_SHELL_ELF) $@
 	sh scripts/tests/sh/validate_image.sh $@
 
 qemu-test: $(IMAGE)

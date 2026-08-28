@@ -18,6 +18,12 @@ static inline uint64_t os_read(uint64_t descriptor, void *buffer,
     return os_syscall3(10, descriptor, (uint64_t)(uintptr_t)buffer, length);
 }
 
+static inline uint64_t os_getcwd(char *buffer, uint64_t capacity) {
+    return os_syscall3(23, (uint64_t)(uintptr_t)buffer, capacity, 0);
+}
+
+static inline uint64_t os_yield(void) { return os_syscall3(21, 0, 0, 0); }
+
 __attribute__((noreturn)) static inline void os_exit(int32_t status) {
     (void)os_syscall3(15, (uint32_t)status, 0, 0);
     for (;;) __asm__ volatile ("ud2");

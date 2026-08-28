@@ -23,6 +23,7 @@ efi_status_t efi_main(efi_handle_t image_handle, efi_system_table_t *st) {
     static const efi_char16_t message[] = {'o','s',' ','U','E','F','I',' ','l','o','a','d','e','r','\r','\n',0};
     static const efi_char16_t kernel_name[] = {'K','E','R','N','E','L','.','E','L','F',0};
     static const efi_char16_t init_name[] = {'I','N','I','T','.','E','L','F',0};
+    static const efi_char16_t shell_name[] = {'S','H','E','L','L','.','E','L','F',0};
     efi_boot_services_t *bs = st ? st->boot_services : 0;
     if (!bs || !bs->handle_protocol || !bs->allocate_pool || !bs->free_pool ||
         !st->con_out) return 1;
@@ -33,7 +34,7 @@ efi_status_t efi_main(efi_handle_t image_handle, efi_system_table_t *st) {
     if (bs->handle_protocol(image_handle, (efi_guid_t *)&loaded_image_guid, (void **)&loaded) != 0 || !loaded) return uefi_fail(st, '2', 2);
     efi_simple_file_system_protocol_t *fs = 0;
     if (bs->handle_protocol(loaded->device_handle, (efi_guid_t *)&simple_file_system_guid, (void **)&fs) != 0 || !fs) return uefi_fail(st, '3', 3);
-    efi_file_protocol_t *root = 0, *kernel = 0, *init = 0;
+    efi_file_protocol_t *root = 0, *kernel = 0, *init = 0, *shell = 0;
     if (fs->open_volume(fs, &root) != 0 || !root || !root->open ||
         root->open(root, &kernel, kernel_name, 1, 0) != 0 || !kernel)
         { close_file(root); return uefi_fail(st, '4', 4); }
@@ -41,6 +42,8 @@ efi_status_t efi_main(efi_handle_t image_handle, efi_system_table_t *st) {
     efi_uintn_t read_size = 0;
     uint8_t *init_buffer = 0;
     efi_uintn_t init_size = 0;
+    uint8_t *shell_buffer = 0;
+    efi_uintn_t shell_size = 0;
     if (uefi_read_file(bs, kernel, &file_buffer, &read_size) != 0 ||
         read_size < sizeof(elf64_header_t))
         { close_file(kernel); close_file(root); free_pool(bs, file_buffer);
@@ -52,7 +55,7 @@ efi_status_t efi_main(efi_handle_t image_handle, efi_system_table_t *st) {
     if (uefi_elf_load(bs, file_buffer, read_size, &load_address,
                       &image_size, &entry) != 0) {
         free_pool(bs, file_buffer);
-        free_pool(bs, init_buffer);
+        free_pool(bs, init_buffer); free_pool(bs, shell_buffer);
         return uefi_fail(st, '9', 9);
     }
     free_pool(bs, file_buffer);
@@ -63,6 +66,13 @@ efi_status_t efi_main(efi_handle_t image_handle, efi_system_table_t *st) {
         return uefi_fail(st, 'I', 16);
     }
     close_file(init);
+    if (!root->open || root->open(root, &shell, shell_name, 1, 0) != 0 || !shell ||
+        uefi_read_file(bs, shell, &shell_buffer, &shell_size) != 0) {
+        close_file(shell); close_file(root); free_pool(bs, init_buffer);
+        free_pool(bs, shell_buffer);
+        return uefi_fail(st, 'S', 17);
+    }
+    close_file(shell); close_file(root);
     uint8_t *memory_map = 0; os_boot_info_t *boot_info = 0;
     efi_uintn_t memory_map_capacity = 256 * 1024, map_key = 0;
     if (!bs->exit_boot_services ||
@@ -70,7 +80,7 @@ efi_status_t efi_main(efi_handle_t image_handle, efi_system_table_t *st) {
         bs->allocate_pool(2, sizeof(*boot_info), (void **)&boot_info) != 0 || !boot_info ||
         uefi_capture_memory_map(bs, &memory_map, &memory_map_capacity, boot_info, &map_key) != 0) {
         free_pool(bs, memory_map); free_pool(bs, boot_info);
-        free_pool(bs, init_buffer);
+        free_pool(bs, init_buffer); free_pool(bs, shell_buffer);
         return uefi_fail(st, 'E', 14);
     }
     static const efi_char16_t base_prefix[] = {'B','A','S','E',' ',0};
@@ -81,6 +91,8 @@ efi_status_t efi_main(efi_handle_t image_handle, efi_system_table_t *st) {
     boot_info->kernel_size = image_size;
     boot_info->init_image = (uint64_t)(uintptr_t)init_buffer;
     boot_info->init_image_size = init_size;
+    boot_info->shell_image = (uint64_t)(uintptr_t)shell_buffer;
+    boot_info->shell_image_size = shell_size;
     boot_info->acpi_rsdp = uefi_find_acpi_rsdp(st);
     uefi_find_framebuffer(bs, boot_info);
     efi_status_t exit_status = 1;
@@ -94,7 +106,7 @@ efi_status_t efi_main(efi_handle_t image_handle, efi_system_table_t *st) {
     }
     if (exit_status != 0) {
         free_pool(bs, memory_map); free_pool(bs, boot_info);
-        free_pool(bs, init_buffer);
+        free_pool(bs, init_buffer); free_pool(bs, shell_buffer);
         return uefi_fail(st, 'F', 15);
     }
     entry(boot_info);

@@ -66,6 +66,7 @@ kernel gate below is explicitly marked complete.
 - [x] Add nonblocking standard-input reads backed by the kernel keyboard queue.
 - [x] Add and contract-test the first shell command parser (`help`, `echo`, and
   `pwd`, with bounded unknown-command handling).
+- [x] Build and launch the persistent ring-3 shell process with standard I/O.
 - [ ] Add the command-line shell and terminal/console I/O.
 - [ ] Add process tools and initial utilities (`init`, `echo`, `ls`, `cat`,
   `pwd`, `mkdir`, `rm`, and `sh`).

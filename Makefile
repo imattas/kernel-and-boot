@@ -72,6 +72,7 @@ USERLAND_WAIT_ELF := $(BUILD_DIR)/userland/wait.elf
 USERLAND_TRUNCATE_ELF := $(BUILD_DIR)/userland/truncate.elf
 USERLAND_SEEK_ELF := $(BUILD_DIR)/userland/seek.elf
 USERLAND_CHDIR_ELF := $(BUILD_DIR)/userland/chdir.elf
+USERLAND_CP_ELF := $(BUILD_DIR)/userland/cp.elf
 USERLAND_INIT_OBJ := $(BUILD_DIR)/userland/init_start.o
 USERLAND_INIT_MAIN_OBJ := $(BUILD_DIR)/userland/init_main.o
 USERLAND_SYSCALL_OBJ := $(BUILD_DIR)/userland/syscall.o
@@ -159,6 +160,9 @@ USERLAND_SEEK_LD := userland/apps/seek/seek.ld
 USERLAND_CHDIR_START_OBJ := $(BUILD_DIR)/userland/chdir_start.o
 USERLAND_CHDIR_MAIN_OBJ := $(BUILD_DIR)/userland/chdir_main.o
 USERLAND_CHDIR_LD := userland/apps/chdir/chdir.ld
+USERLAND_CP_START_OBJ := $(BUILD_DIR)/userland/cp_start.o
+USERLAND_CP_MAIN_OBJ := $(BUILD_DIR)/userland/cp_main.o
+USERLAND_CP_LD := userland/apps/cp/cp.ld
 UEFI_OBJ := $(BUILD_DIR)/uefi/efi_main.obj
 UEFI_ENTRY_OBJ := $(BUILD_DIR)/uefi/entry.obj
 UEFI_CONSOLE_OBJ := $(BUILD_DIR)/uefi/console.obj
@@ -209,9 +213,9 @@ OVMF_CODE ?= /usr/share/edk2/x64/OVMF_CODE.4m.fd
 OVMF_VARS ?= /usr/share/edk2/x64/OVMF_VARS.4m.fd
 QEMU_LOG := $(BUILD_DIR)/qemu-serial.log
 
-.PHONY: all test userland-test shell-test args-test env-test cat-test pwd-test mkdir-test rm-test rmdir-test touch-test write-test ls-test chmod-test echo-test stat-test mv-test kill-test sleep-test setenv-test ipc-test dup-test true-test false-test id-test ps-test wait-test truncate-test seek-test chdir-test image qemu-test fat32-test exfat-test ext4-test xfs-test xfs-rename-test xfs-alloc-test xfs-unwritten-test xfs-auth-test btrfs-test deflate-test lzo-test zstd-test fse-test cache-test device-test run clean distclean
+.PHONY: all test userland-test shell-test args-test env-test cat-test pwd-test mkdir-test rm-test rmdir-test touch-test write-test ls-test chmod-test echo-test stat-test mv-test kill-test sleep-test setenv-test ipc-test dup-test true-test false-test id-test ps-test wait-test truncate-test seek-test chdir-test cp-test image qemu-test fat32-test exfat-test ext4-test xfs-test xfs-rename-test xfs-alloc-test xfs-unwritten-test xfs-auth-test btrfs-test deflate-test lzo-test zstd-test fse-test cache-test device-test run clean distclean
 
-all: $(CONTRACT_ELF) $(UEFI_EFI) $(KERNEL_ELF) $(USERLAND_INIT_ELF) $(USERLAND_SHELL_ELF) $(USERLAND_ARGS_ELF) $(USERLAND_ENV_ELF) $(USERLAND_CAT_ELF) $(USERLAND_PWD_ELF) $(USERLAND_MKDIR_ELF) $(USERLAND_RM_ELF) $(USERLAND_RMDIR_ELF) $(USERLAND_TOUCH_ELF) $(USERLAND_WRITE_ELF) $(USERLAND_LS_ELF) $(USERLAND_CHMOD_ELF) $(USERLAND_ECHO_ELF) $(USERLAND_STAT_ELF) $(USERLAND_MV_ELF) $(USERLAND_KILL_ELF) $(USERLAND_SLEEP_ELF) $(USERLAND_SETENV_ELF) $(USERLAND_IPC_ELF) $(USERLAND_DUP_ELF) $(USERLAND_TRUE_ELF) $(USERLAND_FALSE_ELF) $(USERLAND_ID_ELF) $(USERLAND_PS_ELF) $(USERLAND_WAIT_ELF) $(USERLAND_TRUNCATE_ELF) $(USERLAND_SEEK_ELF) $(USERLAND_CHDIR_ELF)
+all: $(CONTRACT_ELF) $(UEFI_EFI) $(KERNEL_ELF) $(USERLAND_INIT_ELF) $(USERLAND_SHELL_ELF) $(USERLAND_ARGS_ELF) $(USERLAND_ENV_ELF) $(USERLAND_CAT_ELF) $(USERLAND_PWD_ELF) $(USERLAND_MKDIR_ELF) $(USERLAND_RM_ELF) $(USERLAND_RMDIR_ELF) $(USERLAND_TOUCH_ELF) $(USERLAND_WRITE_ELF) $(USERLAND_LS_ELF) $(USERLAND_CHMOD_ELF) $(USERLAND_ECHO_ELF) $(USERLAND_STAT_ELF) $(USERLAND_MV_ELF) $(USERLAND_KILL_ELF) $(USERLAND_SLEEP_ELF) $(USERLAND_SETENV_ELF) $(USERLAND_IPC_ELF) $(USERLAND_DUP_ELF) $(USERLAND_TRUE_ELF) $(USERLAND_FALSE_ELF) $(USERLAND_ID_ELF) $(USERLAND_PS_ELF) $(USERLAND_WAIT_ELF) $(USERLAND_TRUNCATE_ELF) $(USERLAND_SEEK_ELF) $(USERLAND_CHDIR_ELF) $(USERLAND_CP_ELF)
 
 userland-test: $(USERLAND_INIT_ELF)
 	sh scripts/tests/sh/validate_userland.sh $(USERLAND_INIT_ELF)
@@ -299,6 +303,9 @@ seek-test: $(USERLAND_SEEK_ELF)
 
 chdir-test: $(USERLAND_CHDIR_ELF)
 	sh scripts/tests/sh/validate_userland.sh $(USERLAND_CHDIR_ELF)
+
+cp-test: $(USERLAND_CP_ELF)
+	sh scripts/tests/sh/validate_userland.sh $(USERLAND_CP_ELF)
 
 $(SHELL_TEST): scripts/tests/c/shell_contract.c userland/shell/shell.c userland/shell/shell.h
 	$(CC) -std=c11 -Wall -Wextra -Werror -I. -o $@ scripts/tests/c/shell_contract.c userland/shell/shell.c
@@ -600,6 +607,16 @@ $(USERLAND_CHDIR_MAIN_OBJ): userland/apps/chdir/main.c userland/lib/os.h | $(BUI
 
 $(USERLAND_CHDIR_ELF): $(USERLAND_CHDIR_START_OBJ) $(USERLAND_CHDIR_MAIN_OBJ) $(USERLAND_SYSCALL_OBJ) $(USERLAND_CHDIR_LD) | $(BUILD_DIR)/userland
 	$(LD) -m elf_x86_64 -T $(USERLAND_CHDIR_LD) --build-id=none -o $@ $(USERLAND_CHDIR_START_OBJ) $(USERLAND_CHDIR_MAIN_OBJ) $(USERLAND_SYSCALL_OBJ)
+
+$(USERLAND_CP_START_OBJ): userland/apps/cp/start.asm | $(BUILD_DIR)/userland
+	$(NASM) -f elf64 $< -o $@
+
+$(USERLAND_CP_MAIN_OBJ): userland/apps/cp/main.c userland/lib/os.h | $(BUILD_DIR)/userland
+	$(CC) -target x86_64-pc-none-elf -std=c11 -ffreestanding -fno-builtin \
+		-fno-stack-protector -fPIE -fno-plt -mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@
+
+$(USERLAND_CP_ELF): $(USERLAND_CP_START_OBJ) $(USERLAND_CP_MAIN_OBJ) $(USERLAND_SYSCALL_OBJ) $(USERLAND_CP_LD) | $(BUILD_DIR)/userland
+	$(LD) -m elf_x86_64 -T $(USERLAND_CP_LD) --build-id=none -o $@ $(USERLAND_CP_START_OBJ) $(USERLAND_CP_MAIN_OBJ) $(USERLAND_SYSCALL_OBJ)
 
 $(TEST_DIR):
 	mkdir -p $@
@@ -1139,6 +1156,7 @@ test: all image
 	$(MAKE) truncate-test
 	$(MAKE) seek-test
 	$(MAKE) chdir-test
+	$(MAKE) cp-test
 	$(MAKE) shell-test
 	$(MAKE) fat32-test
 	$(MAKE) exfat-test
@@ -1255,8 +1273,8 @@ $(FAT32_TEST): scripts/tests/c/fat32_contract.c kernel/fs/fat/fat32.c kernel/fs/
 
 image: $(IMAGE)
 
-$(IMAGE): $(UEFI_EFI) $(KERNEL_ELF) $(USERLAND_INIT_ELF) $(USERLAND_SHELL_ELF) $(USERLAND_ARGS_ELF) $(USERLAND_ENV_ELF) $(USERLAND_CAT_ELF) $(USERLAND_PWD_ELF) $(USERLAND_MKDIR_ELF) $(USERLAND_RM_ELF) $(USERLAND_RMDIR_ELF) $(USERLAND_TOUCH_ELF) $(USERLAND_WRITE_ELF) $(USERLAND_LS_ELF) $(USERLAND_CHMOD_ELF) $(USERLAND_ECHO_ELF) $(USERLAND_STAT_ELF) $(USERLAND_MV_ELF) $(USERLAND_KILL_ELF) $(USERLAND_SLEEP_ELF) $(USERLAND_SETENV_ELF) $(USERLAND_IPC_ELF) $(USERLAND_DUP_ELF) $(USERLAND_TRUE_ELF) $(USERLAND_FALSE_ELF) $(USERLAND_ID_ELF) $(USERLAND_PS_ELF) $(USERLAND_WAIT_ELF) $(USERLAND_TRUNCATE_ELF) $(USERLAND_SEEK_ELF) $(USERLAND_CHDIR_ELF) scripts/image/create_fat_image.py
-	python3 scripts/image/create_fat_image.py $(UEFI_EFI) $(KERNEL_ELF) $(USERLAND_INIT_ELF) $(USERLAND_SHELL_ELF) $(USERLAND_ARGS_ELF) $(USERLAND_ENV_ELF) $(USERLAND_CAT_ELF) $(USERLAND_PWD_ELF) $(USERLAND_MKDIR_ELF) $(USERLAND_RM_ELF) $(USERLAND_RMDIR_ELF) $(USERLAND_TOUCH_ELF) $(USERLAND_WRITE_ELF) $(USERLAND_LS_ELF) $(USERLAND_CHMOD_ELF) $(USERLAND_ECHO_ELF) $(USERLAND_STAT_ELF) $(USERLAND_MV_ELF) $(USERLAND_KILL_ELF) $(USERLAND_SLEEP_ELF) $(USERLAND_SETENV_ELF) $(USERLAND_IPC_ELF) $(USERLAND_DUP_ELF) $(USERLAND_TRUE_ELF) $(USERLAND_FALSE_ELF) $(USERLAND_ID_ELF) $(USERLAND_PS_ELF) $(USERLAND_WAIT_ELF) $(USERLAND_TRUNCATE_ELF) $(USERLAND_SEEK_ELF) $(USERLAND_CHDIR_ELF) $@
+$(IMAGE): $(UEFI_EFI) $(KERNEL_ELF) $(USERLAND_INIT_ELF) $(USERLAND_SHELL_ELF) $(USERLAND_ARGS_ELF) $(USERLAND_ENV_ELF) $(USERLAND_CAT_ELF) $(USERLAND_PWD_ELF) $(USERLAND_MKDIR_ELF) $(USERLAND_RM_ELF) $(USERLAND_RMDIR_ELF) $(USERLAND_TOUCH_ELF) $(USERLAND_WRITE_ELF) $(USERLAND_LS_ELF) $(USERLAND_CHMOD_ELF) $(USERLAND_ECHO_ELF) $(USERLAND_STAT_ELF) $(USERLAND_MV_ELF) $(USERLAND_KILL_ELF) $(USERLAND_SLEEP_ELF) $(USERLAND_SETENV_ELF) $(USERLAND_IPC_ELF) $(USERLAND_DUP_ELF) $(USERLAND_TRUE_ELF) $(USERLAND_FALSE_ELF) $(USERLAND_ID_ELF) $(USERLAND_PS_ELF) $(USERLAND_WAIT_ELF) $(USERLAND_TRUNCATE_ELF) $(USERLAND_SEEK_ELF) $(USERLAND_CHDIR_ELF) $(USERLAND_CP_ELF) scripts/image/create_fat_image.py
+	python3 scripts/image/create_fat_image.py $(UEFI_EFI) $(KERNEL_ELF) $(USERLAND_INIT_ELF) $(USERLAND_SHELL_ELF) $(USERLAND_ARGS_ELF) $(USERLAND_ENV_ELF) $(USERLAND_CAT_ELF) $(USERLAND_PWD_ELF) $(USERLAND_MKDIR_ELF) $(USERLAND_RM_ELF) $(USERLAND_RMDIR_ELF) $(USERLAND_TOUCH_ELF) $(USERLAND_WRITE_ELF) $(USERLAND_LS_ELF) $(USERLAND_CHMOD_ELF) $(USERLAND_ECHO_ELF) $(USERLAND_STAT_ELF) $(USERLAND_MV_ELF) $(USERLAND_KILL_ELF) $(USERLAND_SLEEP_ELF) $(USERLAND_SETENV_ELF) $(USERLAND_IPC_ELF) $(USERLAND_DUP_ELF) $(USERLAND_TRUE_ELF) $(USERLAND_FALSE_ELF) $(USERLAND_ID_ELF) $(USERLAND_PS_ELF) $(USERLAND_WAIT_ELF) $(USERLAND_TRUNCATE_ELF) $(USERLAND_SEEK_ELF) $(USERLAND_CHDIR_ELF) $(USERLAND_CP_ELF) $@
 	sh scripts/tests/sh/validate_image.sh $@
 
 qemu-test: $(IMAGE)

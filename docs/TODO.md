@@ -137,6 +137,7 @@ kernel gate below is explicitly marked complete.
   `TRUNCATE.ELF` file-size utility.
 - [x] Add standalone `SEEK.ELF` seek/read file-position utility.
 - [x] Add standalone `CHDIR.ELF` directory-change/cwd utility.
+- [x] Add standalone `CP.ELF` file-copy utility using read/create/write.
 - [x] Add bounded shell command history with ANSI up/down navigation.
 - [x] Add bounded shell expansion for environment variables, `$?`, and `$$`
   with quote/escape-aware behavior.

@@ -1210,6 +1210,9 @@ adapter carries those on-disk permissions into the mounted node instead of
 hard-coding a mode.
 The XFS VFS truncate boundary now forwards valid zero-length truncation to the
 filesystem implementation, matching the persistent inode path.
+The XFS VFS adapter can now materialize validated short-form directory trees,
+including nested regular files/directories and on-disk permission modes, with a
+bounded recursion depth and child-count guard.
 The XFS allocator now explicitly distinguishes its legacy contract AGF layout
 from authentic AGF metadata with separate BNO/CNT fields, and mount validates
 authentic BNO/CNT ordering, child pointers, child boundary keys, free-block

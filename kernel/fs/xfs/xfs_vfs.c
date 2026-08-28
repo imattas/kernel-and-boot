@@ -4,6 +4,11 @@
 
 typedef struct { xfs_fs_t *fs; uint64_t inode; uint64_t size; spinlock_t lock; } xfs_vfs_file_t;
 static void xfs_vfs_destroy(void *data) { kfree(data); }
+static int xfs_vfs_dot_name(const char *name, const char *dot) {
+    uint32_t i = 0;
+    while (name && dot && name[i] && dot[i] && name[i] == dot[i]) ++i;
+    return name && dot && name[i] == 0 && dot[i] == 0;
+}
 static int xfs_vfs_read(vfs_node_t *node, uint64_t offset, void *buffer, uint32_t size) {
     xfs_vfs_file_t *file = node ? (xfs_vfs_file_t *)node->private_data : 0;
     if (!file || offset > file->size || size > file->size - offset) return 0;
@@ -65,4 +70,58 @@ int xfs_vfs_attach_file(xfs_fs_t *fs, vfs_node_t *root,
                         const char *filesystem_name, const char *name) {
     return xfs_vfs_attach_file_in_directory(fs, root, fs ? fs->root_inode : 0,
                                              filesystem_name, name);
+}
+
+static int xfs_vfs_attach_directory_tree(xfs_fs_t *fs, vfs_node_t *parent,
+                                          uint64_t directory, const char *name,
+                                          uint32_t depth) {
+    uint16_t mode = 0;
+    if (!fs || !parent || parent->type != VFS_NODE_DIRECTORY || !name ||
+        !name[0] || depth > 32U || !xfs_inode_mode(fs, directory, &mode) ||
+        (mode & 0xf000U) != 0x4000U) return 0;
+    vfs_node_t *node = vfs_node_create(name, VFS_NODE_DIRECTORY, 0, 0,
+                                       mode & 0777U);
+    if (!node) return 0;
+    char entry_name[32]; uint64_t child = 0;
+    for (uint32_t index = 0; index < 256U &&
+         xfs_directory_entry(fs, directory, index, entry_name,
+                             sizeof(entry_name), &child); ++index) {
+        if (xfs_vfs_dot_name(entry_name, ".") ||
+            xfs_vfs_dot_name(entry_name, "..")) continue;
+        uint16_t child_mode = 0;
+        if (!xfs_inode_mode(fs, child, &child_mode)) {
+            vfs_node_release(node); return 0;
+        }
+        if ((child_mode & 0xf000U) == 0x4000U) {
+            if (!xfs_vfs_attach_directory_tree(fs, node, child, entry_name,
+                                               depth + 1U)) {
+                vfs_node_release(node); return 0;
+            }
+        } else if ((child_mode & 0xf000U) == 0x8000U) {
+            if (!xfs_vfs_attach_file_in_directory(fs, node, directory,
+                                                   entry_name, entry_name)) {
+                vfs_node_release(node); return 0;
+            }
+        }
+    }
+    if (!vfs_node_add_child(parent, node)) {
+        vfs_node_release(node); return 0;
+    }
+    vfs_node_release(node);
+    return 1;
+}
+
+int xfs_vfs_attach_directory_in_directory(xfs_fs_t *fs, vfs_node_t *root,
+                                           uint64_t directory,
+                                           const char *filesystem_name,
+                                           const char *name) {
+    (void)filesystem_name;
+    return xfs_vfs_attach_directory_tree(fs, root, directory, name, 0);
+}
+
+int xfs_vfs_attach_directory(xfs_fs_t *fs, vfs_node_t *root,
+                             const char *name) {
+    return xfs_vfs_attach_directory_in_directory(fs, root,
+                                                 fs ? fs->root_inode : 0,
+                                                 0, name);
 }

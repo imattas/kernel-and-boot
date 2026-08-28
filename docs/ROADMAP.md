@@ -1968,3 +1968,7 @@ userland boundary issue.
 
 The identity utility slice now adds bounded `id -u` and `id -g` selectors for
 machine-readable UID/GID output while preserving the full identity report.
+
+The shell `cd` command now accepts an empty operand and resolves it to the
+root directory, matching the normal shell default without changing the VFS
+working-directory ABI.

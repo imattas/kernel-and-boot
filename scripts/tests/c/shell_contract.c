@@ -58,6 +58,8 @@ int main(void) {
     assert(shell_parse("pwd", 3, argument, sizeof(argument)) == SHELL_PWD);
     assert(shell_parse("cd /tmp", 7, argument, sizeof(argument)) == SHELL_CD);
     assert(strcmp(argument, "/tmp") == 0);
+    assert(shell_parse("cd", 2, argument, sizeof(argument)) == SHELL_CD);
+    assert(argument[0] == 0);
     assert(shell_parse("ls", 2, argument, sizeof(argument)) == SHELL_LS);
     assert(shell_parse("cat /hello", 10, argument, sizeof(argument)) == SHELL_CAT);
     assert(strcmp(argument, "/hello") == 0);

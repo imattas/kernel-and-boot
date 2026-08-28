@@ -1178,7 +1178,9 @@ void shell_main(void) {
             } else if (command == SHELL_CD) {
                 uint32_t argument_length = 0;
                 while (argument[argument_length]) ++argument_length;
-                if (os_chdir(argument, argument_length) == OS_SYSCALL_ERROR)
+                const char *directory = argument_length == 0 ? "/" : argument;
+                uint32_t directory_length = argument_length == 0 ? 1 : argument_length;
+                if (os_chdir(directory, directory_length) == OS_SYSCALL_ERROR)
                     print(unknown, sizeof(unknown) - 1U);
             } else if (command == SHELL_LS) {
                 static const char current[] = ".";

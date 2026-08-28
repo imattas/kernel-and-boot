@@ -49,9 +49,9 @@ kernel gate below is explicitly marked complete.
 - [x] Bound device-driver name validation and duplicate comparisons.
 - [x] Serialize every XFS journal-backed publication path across journal
   prepare, target writes, flush, and clear.
-- [ ] Final kernel audit: no required kernel directory is empty or only a
+- [x] Final kernel audit: no required kernel directory is empty or only a
   placeholder; every retained component has build integration and evidence.
-- [ ] Final completion gate: clean build, image validation/mountability checks,
+- [x] Final completion gate: clean build, image validation/mountability checks,
   focused contracts, full `make test`, and QEMU boot with `os kernel entry ok`.
 - [ ] Notify the user that the kernel is complete and mark the goal complete.
 

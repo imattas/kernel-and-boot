@@ -15,11 +15,16 @@ static int contains(const char *line, uint64_t length,
 
 int grep_main(uint64_t argc, char **argv, char **environment) {
     (void)environment;
-    if (argc != 3) os_exit(2);
+    if (argc != 2 && argc != 3) os_exit(2);
     const char *pattern = argv[1];
     uint64_t pattern_length = os_userland_length(pattern);
-    uint64_t descriptor = os_open(argv[2], os_userland_length(argv[2]), 1);
-    if (descriptor == OS_SYSCALL_ERROR) os_exit(1);
+    uint64_t descriptor = 0;
+    int close_descriptor = 0;
+    if (argc == 3) {
+        descriptor = os_open(argv[2], os_userland_length(argv[2]), 1);
+        close_descriptor = 1;
+        if (descriptor == OS_SYSCALL_ERROR) os_exit(1);
+    }
 
     char input[256];
     char line[256];
@@ -28,7 +33,7 @@ int grep_main(uint64_t argc, char **argv, char **environment) {
     for (;;) {
         uint64_t count = os_read(descriptor, input, sizeof(input));
         if (count == OS_SYSCALL_ERROR) {
-            (void)os_close(descriptor);
+            if (close_descriptor) (void)os_close(descriptor);
             os_exit(1);
         }
         if (count == 0) break;
@@ -38,7 +43,7 @@ int grep_main(uint64_t argc, char **argv, char **environment) {
                 if (contains(line, line_length, pattern, pattern_length)) {
                     if (!os_userland_write_all(1, line, line_length) ||
                         !os_userland_write_all(1, "\r\n", 2)) {
-                        (void)os_close(descriptor);
+                        if (close_descriptor) (void)os_close(descriptor);
                         os_exit(1);
                     }
                     matched = 1;
@@ -52,11 +57,12 @@ int grep_main(uint64_t argc, char **argv, char **environment) {
     if (line_length != 0 && contains(line, line_length, pattern, pattern_length)) {
         if (!os_userland_write_all(1, line, line_length) ||
             !os_userland_write_all(1, "\r\n", 2)) {
-            (void)os_close(descriptor);
+            if (close_descriptor) (void)os_close(descriptor);
             os_exit(1);
         }
         matched = 1;
     }
-    if (os_close(descriptor) == OS_SYSCALL_ERROR) os_exit(1);
+    if (close_descriptor && os_close(descriptor) == OS_SYSCALL_ERROR)
+        os_exit(1);
     os_exit(matched ? 0 : 1);
 }

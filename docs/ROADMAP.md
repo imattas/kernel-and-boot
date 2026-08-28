@@ -1217,6 +1217,8 @@ publication and XFS inode/directory metadata writes now request the storage
 device's flush operation when available.
 Successful XFS extent-file data writes that do not change inode metadata now
 also cross the same optional flush boundary.
+Legacy and deeper XFS BNO publication paths now use that same optional flush
+boundary after successful metadata commits.
 Ext4 VFS file attachment now accepts an explicit directory inode and validates
 the inode type while carrying its on-disk permission bits into the VFS node.
 ExFAT VFS files now retain their source directory cluster and use directory-

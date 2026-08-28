@@ -583,7 +583,7 @@ static int xfs_allocate_extent_locked(xfs_fs_t *fs, uint32_t allocation_group,
         (void)xfs_write_block(fs, ag_base + 1U, original_agf);
         return 0;
     }
-    return 1;
+    return xfs_flush_metadata(fs);
 }
 
 int xfs_allocate_extent(xfs_fs_t *fs, uint32_t allocation_group,
@@ -691,7 +691,7 @@ static int xfs_free_extent_locked(xfs_fs_t *fs, uint64_t start, uint32_t blocks)
         (void)xfs_write_block(fs, ag_base + 1U, original_agf);
         return 0;
     }
-    return 1;
+    return xfs_flush_metadata(fs);
 }
 
 int xfs_free_extent(xfs_fs_t *fs, uint64_t start, uint32_t blocks) {
@@ -1066,7 +1066,8 @@ static int xfs_deep_bno_mutate(xfs_fs_t *fs, uint32_t allocation_group,
         if (depth == 0) break;
     }
     store_be32(&agf[44], context.longest);
-    if (!xfs_write_block(fs, ag_base + 1U, agf)) goto rollback;
+    if (!xfs_write_block(fs, ag_base + 1U, agf) ||
+        !xfs_flush_metadata(fs)) goto rollback;
     return 1;
 rollback:
     for (uint32_t depth = 0; depth <= context.root_level; ++depth)
@@ -1191,7 +1192,8 @@ static int xfs_allocate_real_bno(xfs_fs_t *fs, uint32_t allocation_group,
     *start = ag_base + selected_start;
     if (!xfs_write_block(fs, ag_base + selected_leaf, leaf) ||
         !xfs_write_block(fs, ag_base + root_block, root) ||
-        !xfs_write_block(fs, ag_base + 1U, agf)) {
+        !xfs_write_block(fs, ag_base + 1U, agf) ||
+        !xfs_flush_metadata(fs)) {
         (void)xfs_write_block(fs, ag_base + selected_leaf, original_leaf);
         (void)xfs_write_block(fs, ag_base + root_block, original_root);
         (void)xfs_write_block(fs, ag_base + 1U, original_agf);
@@ -1395,7 +1397,8 @@ static int xfs_free_real_bno(xfs_fs_t *fs, uint64_t start, uint32_t blocks) {
         (merged_next_child != 0 && merged_next_records != 0 &&
          !xfs_write_block(fs, ag_base + merged_next_child, next_leaf)) ||
         !xfs_write_block(fs, ag_base + root_block, root) ||
-        !xfs_write_block(fs, ag_base + 1U, agf)) {
+         !xfs_write_block(fs, ag_base + 1U, agf) ||
+         !xfs_flush_metadata(fs)) {
         (void)xfs_write_block(fs, ag_base + selected_leaf, original_leaf);
         if (merged_next_child != 0 && merged_next_records != 0)
             (void)xfs_write_block(fs, ag_base + merged_next_child, original_next);

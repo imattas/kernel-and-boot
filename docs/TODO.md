@@ -76,6 +76,8 @@ the init-owned shell supervisor remains the next kernel/userland boundary.
 - [ ] Add shell/application integration coverage for filesystem mutation,
   pipelines, redirection, background jobs, and inherited environment state.
 - [x] Add shell `clear` terminal control and parser coverage.
+- [x] Keep standalone `HELP.ELF` command inventory synchronized with shell
+  built-ins.
 - [ ] Make init supervise `shell.elf` through the normal spawn/wait ABI after
   the namespace-retain and shared-scheduler startup deadlocks are fixed.
 

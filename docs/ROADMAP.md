@@ -2022,3 +2022,6 @@ The shell now has a dedicated integration contract covering mutation commands,
 multi-stage pipelines, truncating and append redirection, input redirection,
 background execution syntax, inherited-environment command forms, and malformed
 operator rejection.
+
+Native shell `ls` now opens its supplied directory operand instead of silently
+falling back to the current directory; the no-operand form remains unchanged.

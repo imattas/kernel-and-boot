@@ -1244,9 +1244,10 @@ void shell_main(void) {
                     }
                 }
             } else if (command == SHELL_LS) {
-                static const char current[] = ".";
+                const char *path = argument[0] ? argument : ".";
+                uint32_t path_length = argument[0] ? argument_length : 1U;
                 shell_dirent_t entry;
-                uint64_t descriptor = os_open(current, 1, 1);
+                uint64_t descriptor = os_open(path, path_length, 1);
                 if (descriptor == OS_SYSCALL_ERROR) {
                     print(unknown, sizeof(unknown) - 1U);
                 } else {

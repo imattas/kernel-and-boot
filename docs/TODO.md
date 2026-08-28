@@ -95,6 +95,8 @@ type, string, and numeric tests.
   userland transitions.
 - [x] Add shell/application integration coverage for filesystem mutation,
   pipelines, redirection, background jobs, and inherited environment state.
+- [x] Make native shell `ls <path>` honor its directory operand consistently
+  with standalone `ls.elf`.
 - [ ] Implement and verify init-owned shell supervision through spawn/wait/reap;
   do not replace the stable direct shell handoff until live QEMU proves it.
 - [x] Add direct contract coverage for quote-aware command sequencing.

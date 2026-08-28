@@ -73,6 +73,8 @@ int main(void) {
     assert(shell_parse("cd -", 4, argument, sizeof(argument)) == SHELL_CD);
     assert(strcmp(argument, "-") == 0);
     assert(shell_parse("ls", 2, argument, sizeof(argument)) == SHELL_LS);
+    assert(shell_parse("ls /tmp", 7, argument, sizeof(argument)) == SHELL_LS);
+    assert(strcmp(argument, "/tmp") == 0);
     assert(shell_parse("cat /hello", 10, argument, sizeof(argument)) == SHELL_CAT);
     assert(strcmp(argument, "/hello") == 0);
     assert(shell_parse("head /hello", 11, argument, sizeof(argument)) == SHELL_HEAD);

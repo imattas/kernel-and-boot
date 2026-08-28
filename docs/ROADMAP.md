@@ -1028,6 +1028,7 @@ useful for postmortem debugging without changing the normal interrupt return
 path.
 The shell also includes a `cat` builtin using the file open/read/close syscall
 path for bounded streaming reads.
+The shell also includes `mkdir`, using the kernel directory-creation syscall.
 
 This gate includes all non-driver kernel core services and VFS abstractions,
 then the complete driver phase, with build integration, focused tests, and QEMU

@@ -30,6 +30,7 @@ shell_command_t shell_parse(const char *line, uint32_t length,
     if (same_word(line, command_length, "ls")) return SHELL_LS;
     if (same_word(line, command_length, "exit")) return SHELL_EXIT;
     if (!same_word(line, command_length, "cat") &&
+        !same_word(line, command_length, "mkdir") &&
         !same_word(line, command_length, "echo") &&
         !same_word(line, command_length, "cd")) return SHELL_UNKNOWN;
     uint32_t start = command_length;
@@ -41,5 +42,6 @@ shell_command_t shell_parse(const char *line, uint32_t length,
     argument[argument_length] = 0;
     if (same_word(line, command_length, "cd")) return SHELL_CD;
     if (same_word(line, command_length, "cat")) return SHELL_CAT;
+    if (same_word(line, command_length, "mkdir")) return SHELL_MKDIR;
     return SHELL_ECHO;
 }

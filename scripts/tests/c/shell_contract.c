@@ -13,6 +13,8 @@ int main(void) {
     assert(shell_parse("ls", 2, argument, sizeof(argument)) == SHELL_LS);
     assert(shell_parse("cat /hello", 10, argument, sizeof(argument)) == SHELL_CAT);
     assert(strcmp(argument, "/hello") == 0);
+    assert(shell_parse("mkdir /tmp", 10, argument, sizeof(argument)) == SHELL_MKDIR);
+    assert(strcmp(argument, "/tmp") == 0);
     assert(shell_parse("exit", 4, argument, sizeof(argument)) == SHELL_EXIT);
     assert(shell_parse("wat", 3, argument, sizeof(argument)) == SHELL_UNKNOWN);
     assert(shell_parse("", 0, argument, sizeof(argument)) == SHELL_EMPTY);

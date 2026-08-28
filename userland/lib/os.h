@@ -44,6 +44,11 @@ static inline uint64_t os_file_read(uint64_t descriptor, void *buffer,
     return os_syscall3(10, descriptor, (uint64_t)(uintptr_t)buffer, length);
 }
 
+static inline uint64_t os_mkdir(const char *path, uint64_t length,
+                                uint64_t mode) {
+    return os_syscall3(32, (uint64_t)(uintptr_t)path, length, mode);
+}
+
 static inline uint64_t os_yield(void) { return os_syscall3(21, 0, 0, 0); }
 
 __attribute__((noreturn)) static inline void os_exit(int32_t status) {

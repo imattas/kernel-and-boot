@@ -70,6 +70,7 @@ kernel gate below is explicitly marked complete.
 - [x] Add shell `cd` and `exit` command dispatch through the syscall runtime.
 - [x] Add the first core utility: shell `ls` backed by open/readdir/close.
 - [x] Add shell `cat` backed by open/read/close.
+- [x] Add shell `mkdir` backed by the mkdir syscall.
 - [ ] Add the command-line shell and terminal/console I/O.
 - [ ] Add process tools and initial utilities (`init`, `echo`, `ls`, `cat`,
   `pwd`, `mkdir`, `rm`, and `sh`).

@@ -1,5 +1,29 @@
 #include "shell.h"
 
+shell_edit_result_t shell_edit_line(char *line, uint32_t *length,
+                                    uint32_t capacity, char value) {
+    if (!line || !length || capacity == 0 || *length > capacity)
+        return SHELL_EDIT_CONTINUE;
+    if (value == '\r' || value == '\n') return SHELL_EDIT_SUBMIT;
+    if (value == 0x03 || value == 0x15) {
+        *length = 0;
+        line[0] = 0;
+        return value == 0x03 ? SHELL_EDIT_CANCEL : SHELL_EDIT_CONTINUE;
+    }
+    if (value == '\b' || (unsigned char)value == 0x7f) {
+        if (*length != 0) {
+            --*length;
+            line[*length] = 0;
+        }
+        return SHELL_EDIT_CONTINUE;
+    }
+    if ((unsigned char)value < 0x20) return SHELL_EDIT_CONTINUE;
+    if (*length == capacity) return SHELL_EDIT_CONTINUE;
+    line[(*length)++] = value;
+    line[*length] = 0;
+    return SHELL_EDIT_CONTINUE;
+}
+
 static int same_word(const char *line, uint32_t length, const char *word) {
     uint32_t index = 0;
     while (word[index] != 0) {

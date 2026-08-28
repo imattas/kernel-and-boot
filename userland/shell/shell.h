@@ -26,7 +26,16 @@ typedef enum {
     SHELL_UNKNOWN
 } shell_command_t;
 
+typedef enum {
+    SHELL_EDIT_CONTINUE,
+    SHELL_EDIT_SUBMIT,
+    SHELL_EDIT_CANCEL
+} shell_edit_result_t;
+
 shell_command_t shell_parse(const char *line, uint32_t length,
                             char *argument, uint32_t capacity);
+
+shell_edit_result_t shell_edit_line(char *line, uint32_t *length,
+                                    uint32_t capacity, char value);
 
 #endif

@@ -109,9 +109,25 @@ void shell_main(void) {
         }
         for (uint64_t index = 0; index < received; ++index) {
             char value = line[start + index];
-            if (value != '\n' && value != '\r' && length < sizeof(line) - 1U)
-                line[length++] = value;
-            if (value != '\n' && value != '\r') continue;
+            uint32_t previous_length = length;
+            shell_edit_result_t edit = shell_edit_line(line, &length,
+                                                        sizeof(line) - 1U,
+                                                        value);
+            if (value == '\b' || (unsigned char)value == 0x7f) {
+                if (previous_length != length) print("\b \b", 3);
+                continue;
+            }
+            if (value == 0x15) {
+                while (previous_length-- != 0) print("\b \b", 3);
+                continue;
+            }
+            if (edit == SHELL_EDIT_CANCEL) {
+                while (previous_length-- != 0) print("\b \b", 3);
+                print("^C\r\n", 4);
+                print(prompt, sizeof(prompt) - 1U);
+                continue;
+            }
+            if (edit != SHELL_EDIT_SUBMIT) continue;
             shell_command_t command = shell_parse(line, length, argument,
                                                    sizeof(argument));
             if (command == SHELL_HELP) print(help, sizeof(help) - 1U);

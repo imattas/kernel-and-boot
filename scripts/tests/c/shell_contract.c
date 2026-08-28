@@ -4,6 +4,22 @@
 
 int main(void) {
     char argument[32] = {0};
+    char line[16] = {0};
+    uint32_t line_length = 0;
+    assert(shell_edit_line(line, &line_length, sizeof(line) - 1U, 'a') == SHELL_EDIT_CONTINUE);
+    assert(shell_edit_line(line, &line_length, sizeof(line) - 1U, 'b') == SHELL_EDIT_CONTINUE);
+    assert(line_length == 2 && strcmp(line, "ab") == 0);
+    assert(shell_edit_line(line, &line_length, sizeof(line) - 1U, '\b') == SHELL_EDIT_CONTINUE);
+    assert(line_length == 1 && strcmp(line, "a") == 0);
+    assert(shell_edit_line(line, &line_length, sizeof(line) - 1U, 0x7f) == SHELL_EDIT_CONTINUE);
+    assert(line_length == 0 && line[0] == 0);
+    shell_edit_line(line, &line_length, sizeof(line) - 1U, 'x');
+    shell_edit_line(line, &line_length, sizeof(line) - 1U, 'y');
+    assert(shell_edit_line(line, &line_length, sizeof(line) - 1U, 0x15) == SHELL_EDIT_CONTINUE);
+    assert(line_length == 0);
+    shell_edit_line(line, &line_length, sizeof(line) - 1U, 'z');
+    assert(shell_edit_line(line, &line_length, sizeof(line) - 1U, '\n') == SHELL_EDIT_SUBMIT);
+    assert(line_length == 1 && line[0] == 'z');
     assert(shell_parse("help", 4, argument, sizeof(argument)) == SHELL_HELP);
     assert(shell_parse("id", 2, argument, sizeof(argument)) == SHELL_ID);
     assert(shell_parse("ps", 2, argument, sizeof(argument)) == SHELL_PS);

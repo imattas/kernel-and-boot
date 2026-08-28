@@ -85,6 +85,7 @@ kernel gate below is explicitly marked complete.
 - [x] Pass initial arguments to spawned user programs.
 - [x] Resolve bare `run` commands through the inherited `PATH` environment.
 - [x] Add shell `which` executable discovery through inherited `PATH`.
+- [x] Add shell line editing for backspace/delete and cancel-line controls.
 - [x] Add the first standalone ring-3 argument-printing utility to the image.
 - [ ] Add reliable QEMU live keyboard verification for `run INIT.ELF`.
 - [ ] Add the command-line shell and terminal/console I/O.

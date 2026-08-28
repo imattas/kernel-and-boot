@@ -1830,6 +1830,10 @@ supporting bounded string and decimal-style substitutions, literal percent
 output, and common escaped control characters. It is included in the FAT32
 image and available through shell PATH resolution.
 
+The path-utility slice now also provides `basename.elf`, which strips trailing
+separators and emits the final bounded path component through the same runtime,
+PATH, and FAT32 image integration.
+
 Shell integration contracts now directly cover the quote-aware sequence
 splitter, including semicolons and conditional operators preserved inside
 quoted arguments; this joins

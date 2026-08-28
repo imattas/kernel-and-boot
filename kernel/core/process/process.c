@@ -250,27 +250,90 @@ int process_inherit_environment(process_t *child, process_t *parent) {
     return 1;
 }
 
+static int environment_key_matches(const char *entry, uint32_t entry_length,
+                                   const char *key, uint32_t key_length) {
+    uint32_t separator = 0;
+    while (separator < entry_length && entry[separator] != '=') ++separator;
+    if (separator != key_length) return 0;
+    for (uint32_t index = 0; index < key_length; ++index)
+        if (entry[index] != key[index]) return 0;
+    return 1;
+}
+
 int process_environment_get(process_t *process, const char *key,
                             uint32_t key_length, char *value,
                             uint32_t capacity) {
-    static const char path_key[] = "PATH";
-    if (!process || !key || !value || key_length != sizeof(path_key) - 1U ||
-        capacity == 0) return 0;
-    for (uint32_t index = 0; index < key_length; ++index)
-        if (key[index] != path_key[index]) return 0;
+    if (!process || !key || !value || key_length == 0 || capacity == 0) return 0;
     uint64_t flags = spinlock_lock_irqsave(&process->lock);
-    uint32_t prefix = sizeof(path_key);
-    uint32_t length = 0;
-    while (prefix + length < sizeof(process->environment) &&
-           process->environment[prefix + length]) ++length;
-    if (length + 1U > capacity) {
+    uint32_t offset = 0;
+    while (offset < sizeof(process->environment) &&
+           process->environment[offset]) {
+        uint32_t end = offset;
+        while (end < sizeof(process->environment) &&
+               process->environment[end]) ++end;
+        if (environment_key_matches(&process->environment[offset],
+                                     end - offset, key, key_length)) {
+            uint32_t separator = offset;
+            while (separator < end && process->environment[separator] != '=')
+                ++separator;
+            if (separator == end) break;
+            uint32_t length = end - separator - 1U;
+            if (length + 1U > capacity) break;
+            for (uint32_t index = 0; index <= length; ++index)
+                value[index] = process->environment[separator + 1U + index];
+            spinlock_unlock_irqrestore(&process->lock, flags);
+            return (int)length;
+        }
+        offset = end + 1U;
+    }
+    spinlock_unlock_irqrestore(&process->lock, flags);
+    return 0;
+}
+
+int process_environment_set(process_t *process, const char *key,
+                            uint32_t key_length, const char *value,
+                            uint32_t value_length) {
+    if (!process || !key || !value || key_length == 0 || key_length > 32U ||
+        value_length > PROCESS_ENVIRONMENT_SIZE - 2U) return 0;
+    for (uint32_t index = 0; index < key_length; ++index)
+        if (key[index] == '=' || key[index] == 0) return 0;
+    char updated[PROCESS_ENVIRONMENT_SIZE] = {0};
+    uint32_t output = 0;
+    uint64_t flags = spinlock_lock_irqsave(&process->lock);
+    uint32_t offset = 0;
+    while (offset < sizeof(process->environment) &&
+           process->environment[offset]) {
+        uint32_t end = offset;
+        while (end < sizeof(process->environment) &&
+               process->environment[end]) ++end;
+        if (!environment_key_matches(&process->environment[offset],
+                                     end - offset, key, key_length)) {
+            uint32_t length = end - offset;
+            if (output + length + 1U >= sizeof(updated)) {
+                spinlock_unlock_irqrestore(&process->lock, flags);
+                return 0;
+            }
+            for (uint32_t index = 0; index <= length; ++index)
+                updated[output + index] = process->environment[offset + index];
+            output += length + 1U;
+        }
+        offset = end + 1U;
+    }
+    uint32_t entry_length = key_length + 1U + value_length;
+    if (output + entry_length + 1U >= sizeof(updated)) {
         spinlock_unlock_irqrestore(&process->lock, flags);
         return 0;
     }
-    for (uint32_t index = 0; index <= length; ++index)
-        value[index] = process->environment[prefix + index];
+    for (uint32_t index = 0; index < key_length; ++index)
+        updated[output + index] = key[index];
+    updated[output + key_length] = '=';
+    for (uint32_t index = 0; index < value_length; ++index)
+        updated[output + key_length + 1U + index] = value[index];
+    output += entry_length + 1U;
+    for (uint32_t index = 0; index < sizeof(updated); ++index)
+        process->environment[index] = updated[index];
     spinlock_unlock_irqrestore(&process->lock, flags);
-    return (int)length;
+    return 1;
 }
 
 int process_set_working_directory(process_t *process, vfs_node_t *directory) {
@@ -533,10 +596,20 @@ int process_prepare_user_stack(process_t *process, const char *path,
     while (path[path_length] && path_length < 256U) ++path_length;
     while (arguments[argument_length] && argument_length < 256U) ++argument_length;
     if (path[path_length] || arguments[argument_length]) return 0;
-    uint32_t environment_length = 0;
-    while (environment_length < PROCESS_ENVIRONMENT_SIZE &&
-           process->environment[environment_length]) ++environment_length;
-    if (environment_length == PROCESS_ENVIRONMENT_SIZE) return 0;
+    uint32_t environment_starts[16] = {0};
+    uint32_t environment_lengths[16] = {0};
+    uint32_t environment_count = 0;
+    for (uint32_t index = 0; index < PROCESS_ENVIRONMENT_SIZE &&
+         process->environment[index];) {
+        if (environment_count == 16) return 0;
+        environment_starts[environment_count] = index;
+        while (index < PROCESS_ENVIRONMENT_SIZE && process->environment[index])
+            ++index;
+        environment_lengths[environment_count] = index -
+                                                   environment_starts[environment_count];
+        ++environment_count;
+        ++index;
+    }
     uint32_t starts[8] = {0};
     uint32_t lengths[8] = {0};
     uint32_t argument_count = 0;
@@ -568,18 +641,24 @@ int process_prepare_user_stack(process_t *process, const char *path,
     uint64_t path_address = cursor;
     if (!process_user_stack_write(process, cursor, path, path_length + 1U))
         return 0;
-    cursor -= environment_length + 1U;
-    uint64_t environment_address = cursor;
-    if (!process_user_stack_write(process, cursor, process->environment,
-                                   environment_length + 1U)) return 0;
-    uint64_t value_count = 5U + argument_count;
+    uint64_t environment_addresses[16] = {0};
+    for (uint32_t index = environment_count; index != 0; --index) {
+        uint32_t environment = index - 1U;
+        cursor -= environment_lengths[environment] + 1U;
+        environment_addresses[environment] = cursor;
+        if (!process_user_stack_write(process, cursor,
+                                      &process->environment[environment_starts[environment]],
+                                      environment_lengths[environment] + 1U)) return 0;
+    }
+    uint64_t value_count = 4U + argument_count + environment_count;
     cursor = (cursor - value_count * sizeof(uint64_t)) & ~0xfULL;
-    uint64_t values[16] = {1U + argument_count, path_address};
+    uint64_t values[32] = {1U + argument_count, path_address};
     for (uint32_t index = 0; index < argument_count; ++index)
         values[2U + index] = argument_addresses[index];
     values[2U + argument_count] = 0;
-    values[3U + argument_count] = environment_address;
-    values[4U + argument_count] = 0;
+    for (uint32_t index = 0; index < environment_count; ++index)
+        values[3U + argument_count + index] = environment_addresses[index];
+    values[3U + argument_count + environment_count] = 0;
     if (!process_user_stack_write(process, cursor, values,
                                   value_count * sizeof(uint64_t)))
         return 0;

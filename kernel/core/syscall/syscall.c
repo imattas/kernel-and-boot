@@ -215,7 +215,7 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
         }
         case OS_SYSCALL_GETENV: {
             process_t *process = process_current();
-            if (!process || arg1 == 0 || arg2 == 0 || arg2 > 32 || arg3 == 0 ||
+            if (!process || arg1 == 0 || arg2 == 0 || arg3 == 0 ||
                 arg3 > PROCESS_ENVIRONMENT_SIZE || !user_range(arg2, arg3, 1))
                 return OS_SYSCALL_ERROR;
             char key[33];
@@ -229,6 +229,21 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
             return length >= 0 && syscall_copy_to_user(arg2, value,
                                                         (uint32_t)length + 1U) ?
                    (uint64_t)length : OS_SYSCALL_ERROR;
+        }
+        case OS_SYSCALL_SETENV: {
+            process_t *process = process_current();
+            char key[33];
+            char value[PROCESS_ENVIRONMENT_SIZE];
+            if (!process || arg1 == 0 || arg2 == 0 ||
+                !syscall_copy_string(key, arg1, sizeof(key)) ||
+                !syscall_copy_string(value, arg2, sizeof(value)))
+                return OS_SYSCALL_ERROR;
+            uint32_t key_length = 0;
+            uint32_t value_length = 0;
+            while (key[key_length]) ++key_length;
+            while (value[value_length]) ++value_length;
+            return process_environment_set(process, key, key_length, value,
+                                           value_length) ? 0 : OS_SYSCALL_ERROR;
         }
         case OS_SYSCALL_SPAWN: {
             process_t *parent = process_current();

@@ -1603,6 +1603,8 @@ The standalone `KILL.ELF` utility is packaged as the first process-control
 tool using targeted signal delivery.
 The standalone `SLEEP.ELF` utility is also packaged and uses monotonic time
 with scheduler yielding.
+The process environment now supports bounded multi-entry updates through
+`setenv`, and spawned user programs receive each inherited entry in `envp[]`.
 The FAT32 image builder now chains a second root-directory cluster, removing
 the one-sector root-entry ceiling for continued userland growth.
 The standalone `ECHO.ELF` utility is now stored in the expanded root directory

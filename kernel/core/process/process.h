@@ -67,6 +67,9 @@ int process_inherit_environment(process_t *child, process_t *parent);
 int process_environment_get(process_t *process, const char *key,
                              uint32_t key_length, char *value,
                              uint32_t capacity);
+int process_environment_set(process_t *process, const char *key,
+                             uint32_t key_length, const char *value,
+                             uint32_t value_length);
 int process_set_working_directory(process_t *process, vfs_node_t *directory);
 process_t *process_lookup(uint64_t id);
 process_t *process_lookup_retain(uint64_t id);

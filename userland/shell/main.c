@@ -129,7 +129,7 @@ static uint32_t resolve_command(const char *name, uint32_t name_length,
 
 void shell_main(void) {
     static const char prompt[] = "os> ";
-    static const char help[] = "help id ps env jobs which inherit echo pwd cd ls cat stat chmod kill sleep mv mkdir rm rmdir touch write run wait exit\r\n";
+    static const char help[] = "help id ps env setenv jobs which inherit echo pwd cd ls cat stat chmod kill sleep mv mkdir rm rmdir touch write run wait exit\r\n";
     static const char unknown[] = "unknown command\r\n";
     static char line[128];
     static char argument[128];
@@ -371,6 +371,19 @@ void shell_main(void) {
                 if (separator == 0 || new_length == 0 ||
                     os_rename(argument, separator, argument + new_start,
                               new_length) == OS_SYSCALL_ERROR)
+                    print(unknown, sizeof(unknown) - 1U);
+            } else if (command == SHELL_SETENV) {
+                uint32_t argument_length = 0;
+                while (argument[argument_length]) ++argument_length;
+                uint32_t separator = 0;
+                while (separator < argument_length && argument[separator] != ' ' &&
+                       argument[separator] != '\t') ++separator;
+                uint32_t value_start = separator;
+                while (value_start < argument_length &&
+                       (argument[value_start] == ' ' || argument[value_start] == '\t'))
+                    ++value_start;
+                if (separator == 0 || value_start == argument_length ||
+                    os_setenv(argument, argument + value_start) == OS_SYSCALL_ERROR)
                     print(unknown, sizeof(unknown) - 1U);
             } else if (command == SHELL_MKDIR) {
                 uint32_t argument_length = 0;

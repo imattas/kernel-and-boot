@@ -1442,6 +1442,21 @@ static int xfs_deep_bno_mutate(xfs_fs_t *fs, uint32_t allocation_group,
             if (count > context.longest) context.longest = count;
         }
     }
+    uint64_t journal_targets[6];
+    const uint8_t *journal_images[6];
+    uint32_t journal_records = 0;
+    for (uint32_t depth = 0; depth <= context.root_level; ++depth) {
+        journal_targets[journal_records] = ag_base + context.selected_blocks[depth];
+        journal_images[journal_records++] = context.selected[depth];
+    }
+    journal_targets[journal_records] = ag_base + 1U;
+    journal_images[journal_records++] = agf;
+    int journal_active = 0;
+    if (fs->journal_blocks) {
+        if (!xfs_journal_prepare(fs, journal_targets, journal_images, journal_records))
+            return xfs_journal_clear(fs);
+        journal_active = 1;
+    }
     for (uint32_t depth = context.root_level; ; --depth) {
         if (!xfs_write_block(fs, ag_base + context.selected_blocks[depth],
                              context.selected[depth])) goto rollback;
@@ -1450,12 +1465,14 @@ static int xfs_deep_bno_mutate(xfs_fs_t *fs, uint32_t allocation_group,
     store_be32(&agf[44], context.longest);
     if (!xfs_write_block(fs, ag_base + 1U, agf) ||
         !xfs_flush_metadata(fs)) goto rollback;
+    if (journal_active && !xfs_journal_clear(fs)) return 0;
     return 1;
 rollback:
     for (uint32_t depth = 0; depth <= context.root_level; ++depth)
         (void)xfs_write_block(fs, ag_base + context.selected_blocks[depth],
                               original_path[depth]);
     (void)xfs_write_block(fs, ag_base + 1U, original_agf);
+    if (journal_active) (void)xfs_journal_clear(fs);
     return 0;
 }
 

@@ -1213,6 +1213,9 @@ filesystem implementation, matching the persistent inode path.
 The XFS VFS adapter can now materialize validated short-form directory trees,
 including nested regular files/directories and on-disk permission modes, with a
 bounded recursion depth and child-count guard.
+The explicit XFS directory-attachment API now resolves its on-disk directory
+entry relative to the supplied parent, matching the file-attachment contract;
+the recursive tree walker remains inode-based after that validated lookup.
 XFS directory validation now requires the encoded record count to consume the
 entire inline payload and rejects zero-inode records before VFS materialization;
 the adapter no longer treats malformed trailing entries as end-of-directory.

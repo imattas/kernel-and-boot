@@ -121,13 +121,16 @@ int xfs_vfs_attach_directory_in_directory(xfs_fs_t *fs, vfs_node_t *root,
                                            uint64_t directory,
                                            const char *filesystem_name,
                                            const char *name) {
-    (void)filesystem_name;
-    return xfs_vfs_attach_directory_tree(fs, root, directory, name, 0);
+    uint64_t inode = 0;
+    if (!fs || !root || !filesystem_name || !filesystem_name[0] ||
+        !name || !name[0] || !xfs_lookup(fs, directory, filesystem_name, &inode))
+        return 0;
+    return xfs_vfs_attach_directory_tree(fs, root, inode, name, 0);
 }
 
 int xfs_vfs_attach_directory(xfs_fs_t *fs, vfs_node_t *root,
                              const char *name) {
     return xfs_vfs_attach_directory_in_directory(fs, root,
                                                  fs ? fs->root_inode : 0,
-                                                 0, name);
+                                                 name, name);
 }

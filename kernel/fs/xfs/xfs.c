@@ -2415,6 +2415,49 @@ int xfs_read_file(xfs_fs_t *fs, uint64_t inode, uint64_t offset,
     return 1;
 }
 
+int xfs_extend_file(xfs_fs_t *fs, uint64_t inode, uint64_t size) {
+    uint8_t data[4096];
+    if (!fs || !fs->mounted || !xfs_read_inode(fs, inode, data) ||
+        (be16(&data[2]) & 0xf000U) != 0x8000U || data[5] != XFS_FORMAT_EXTENTS)
+        return 0;
+    uint32_t core = data[4] == 2 ? XFS_CORE_V2_SIZE : 100U;
+    uint64_t old_size = be64(&data[56]);
+    if (size <= old_size || size > UINT64_MAX - (fs->block_size - 1U)) return 0;
+    uint64_t old_blocks = (old_size + fs->block_size - 1U) / fs->block_size;
+    uint64_t new_blocks = (size + fs->block_size - 1U) / fs->block_size;
+    if (new_blocks <= old_blocks || new_blocks - old_blocks > UINT32_MAX) return 0;
+    uint32_t extent_count = be32(&data[76]);
+    uint32_t capacity = (fs->inode_size - core) / 16U;
+    if (extent_count == 0 || extent_count >= capacity) return 0;
+    uint64_t maximum_end = 0;
+    for (uint32_t i = 0; i < extent_count; ++i) {
+        uint64_t high = be64(&data[core + i * 16U]);
+        uint64_t low = be64(&data[core + i * 16U + 8U]);
+        uint64_t logical = (high & 0x7fffffffffffffffULL) >> 9;
+        uint64_t length = low & 0x1fffffULL;
+        if (!length || logical > UINT64_MAX - length ||
+            (i && logical < maximum_end)) return 0;
+        maximum_end = logical + length;
+    }
+    if (maximum_end != old_blocks || new_blocks - old_blocks > 0x1fffffULL)
+        return 0;
+    uint64_t physical = 0;
+    uint32_t requested = (uint32_t)(new_blocks - old_blocks);
+    int allocated = 0;
+    for (uint32_t agno = 0; agno < fs->ag_count; ++agno)
+        if (xfs_allocate_extent(fs, agno, requested, &physical)) {
+            allocated = 1; break;
+        }
+    if (!allocated || physical > UINT64_MAX - requested) return 0;
+    xfs_store_extent(&data[core + extent_count * 16U], old_blocks,
+                     physical, requested, 1);
+    store_be32(&data[76], extent_count + 1U);
+    store_be64(&data[56], size);
+    if (xfs_write_inode(fs, inode, data)) return 1;
+    (void)xfs_free_extent(fs, physical, requested);
+    return 0;
+}
+
 int xfs_write_file(xfs_fs_t *fs, uint64_t inode, uint64_t offset,
                    const void *buffer, uint32_t size) {
     uint8_t data[4096], block[4096];
@@ -2447,7 +2490,11 @@ int xfs_write_file(xfs_fs_t *fs, uint64_t inode, uint64_t offset,
         for (uint32_t i = 0; i < extent_count; ++i)
             if (xfs_extent(&data[core + i * 16U], last_logical, &physical,
                            &extent_length, &unwritten)) { found = 1; break; }
-        if (!found) return 0;
+        if (!found) {
+            if (!xfs_extend_file(fs, inode, end) ||
+                !xfs_read_inode(fs, inode, data)) return 0;
+            extent_count = be32(&data[76]);
+        }
     }
     uint64_t logical = offset / fs->block_size;
     uint32_t in_block = (uint32_t)(offset % fs->block_size);

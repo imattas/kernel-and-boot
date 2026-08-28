@@ -45,10 +45,15 @@ int main(void) {
                                .write = write_image};
     assert(storage_register(&device));
     xfs_fs_t fs; assert(xfs_mount(&fs, 0));
+    assert(xfs_extend_file(&fs, 128, 16384));
+    uint64_t extended_size = 0;
+    assert(xfs_inode_size(&fs, 128, &extended_size) && extended_size == 16384);
+    assert(xfs_write_file(&fs, 128, 12288, "z", 1));
+    assert(image[12 * 4096U] == 'z');
     assert(xfs_write_file(&fs, 128, 4096U + 7U, "x", 1));
     assert(image[10 * 4096U + 7U] == 'x');
     assert(image[8 * 4096U + 116U + 6U] == 2);
-    uint64_t debug_size = 0; assert(xfs_inode_size(&fs, 128, &debug_size) && debug_size == 12288);
+    uint64_t debug_size = 0; assert(xfs_inode_size(&fs, 128, &debug_size) && debug_size == 16384);
     uint8_t output[16]; memset(output, 0xa5, sizeof(output));
     assert(xfs_read_file(&fs, 128, 4096, output, sizeof(output)));
     assert(output[0] == 0); assert(output[6] == 0); assert(output[7] == 'x'); assert(output[8] == 0);

@@ -1097,6 +1097,11 @@ allocation is tracked through the AG free-space milestone below.
 XFS extent files now accept writes to preallocated unwritten extents, treating
 untouched bytes as zero, converting written extents to initialized state, and
 allowing file-size growth only within verified allocated extent coverage.
+XFS extent files now support bounded append allocation when the existing
+allocation ends at the file boundary: new blocks are allocated as unwritten,
+published in the inode, and released again if inode publication fails.
+The XFS unwritten-extent contract now covers append allocation followed by a
+real write into the newly allocated extent.
 Writes into multi-block unwritten extents now split the extent into preserved
 unwritten ranges and an initialized block, so untouched sectors remain zero.
 The XFS contract now exercises a partial write through a multi-block unwritten

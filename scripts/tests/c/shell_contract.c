@@ -87,7 +87,7 @@ int main(void) {
     assert(strcmp(argument, "/hello") == 0);
     assert(shell_parse("printf %d 42", 12, argument, sizeof(argument)) == SHELL_RUN);
     assert(strcmp(argument, "%d 42") == 0);
-    assert(shell_parse("basename /hello", 15, argument, sizeof(argument)) == SHELL_RUN);
+    assert(shell_parse("basename /hello", 15, argument, sizeof(argument)) == SHELL_BASENAME);
     assert(strcmp(argument, "/hello") == 0);
     assert(shell_parse("cmp /a /b", 9, argument, sizeof(argument)) == SHELL_RUN);
     assert(strcmp(argument, "/a /b") == 0);
@@ -98,7 +98,8 @@ int main(void) {
     assert(shell_parse("tail /hello", 11, argument, sizeof(argument)) == SHELL_RUN);
     assert(shell_parse("sort /hello", 11, argument, sizeof(argument)) == SHELL_RUN);
     assert(shell_parse("uniq /hello", 11, argument, sizeof(argument)) == SHELL_RUN);
-    assert(shell_parse("dirname /hello", 14, argument, sizeof(argument)) == SHELL_RUN);
+    assert(shell_parse("dirname /hello", 14, argument, sizeof(argument)) == SHELL_DIRNAME);
+    assert(shell_parse("basename /hello | cat", 21, argument, sizeof(argument)) == SHELL_RUN);
     assert(shell_parse("cut -d , -f 1", 13, argument, sizeof(argument)) == SHELL_RUN);
     assert(shell_parse("tr a b", 6, argument, sizeof(argument)) == SHELL_RUN);
     assert(shell_parse("printf x | wc", 13, argument, sizeof(argument)) == SHELL_RUN);

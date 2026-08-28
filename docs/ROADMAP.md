@@ -2031,6 +2031,11 @@ operator rejection.
 Native shell `ls` now opens its supplied directory operand instead of silently
 falling back to the current directory; the no-operand form remains unchanged.
 
+The shell now handles `basename` and `dirname` natively for single-path
+commands, while retaining the external PATH form when used in pipelines or
+with redirection operators. This keeps common path inspection usable without
+depending on the still-deferred external spawn handoff.
+
 The userland spawn path now snapshots and retains the current process namespace
 outside the process lock before resolving an executable. This removes the
 process-lock/VFS-node lock inversion from PATH-resolved application startup;

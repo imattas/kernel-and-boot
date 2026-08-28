@@ -282,6 +282,10 @@ shell_command_t shell_parse(const char *line, uint32_t length,
     for (uint32_t index = 0; index < argument_length; ++index)
         argument[index] = line[start + index];
     argument[argument_length] = 0;
+    if (same_word(line, command_length, "basename") &&
+        !shell_has_operator(line, length)) return SHELL_BASENAME;
+    if (same_word(line, command_length, "dirname") &&
+        !shell_has_operator(line, length)) return SHELL_DIRNAME;
     if ((same_word(line, command_length, "echo") ||
          same_word(line, command_length, "cat") ||
          same_word(line, command_length, "pwd") ||

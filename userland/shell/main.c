@@ -53,6 +53,21 @@ static void print_stat(const os_stat_t *stat) {
     print("\r\n", 2);
 }
 
+static int shell_print_path_part(const char *path, uint32_t length, int dirname) {
+    if (!path || length == 0) return 0;
+    while (length > 1 && path[length - 1U] == '/') --length;
+    uint32_t separator = length;
+    while (separator != 0 && path[separator - 1U] != '/') --separator;
+    const char *output = path;
+    uint32_t output_length = length - separator;
+    if (dirname) {
+        output_length = separator == 0 ? 1 : separator == 1 ? 1 : separator - 1U;
+        if (separator == 0) output = ".";
+    } else output += separator;
+    return os_write(1, output, output_length) == output_length &&
+           os_write(1, "\r\n", 2) == 2;
+}
+
 static int parse_octal(const char *text, uint32_t length, uint64_t *value) {
     if (!text || !value || length == 0 || length > 4) return 0;
     uint64_t result = 0;
@@ -1215,6 +1230,10 @@ void shell_main(void) {
                 if (result != OS_SYSCALL_ERROR) print(argument, result);
                 else print(unknown, sizeof(unknown) - 1U);
                 print("\r\n", 2);
+            } else if (command == SHELL_BASENAME || command == SHELL_DIRNAME) {
+                if (!shell_print_path_part(argument, argument_length,
+                                           command == SHELL_DIRNAME))
+                    print(unknown, sizeof(unknown) - 1U);
             } else if (command == SHELL_CD) {
                 uint32_t argument_length = 0;
                 while (argument[argument_length]) ++argument_length;

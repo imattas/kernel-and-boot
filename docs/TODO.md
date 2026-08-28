@@ -169,6 +169,8 @@ type, string, and numeric tests.
 - [x] Add standalone `find.elf` bounded recursive directory traversal and
   `-type f`/`-type d` filtering through the existing readdir/stat ABI; package
   it in the FAT32 image.
+- [x] Add native shell `basename` and `dirname` path inspection commands while
+  preserving their external pipeline/redirection forms.
 - [x] Add standalone `which.elf` PATH executable discovery through the shared
   runtime and FAT32 image namespace.
 - [x] Add background execution and job-table tracking for PATH-resolved

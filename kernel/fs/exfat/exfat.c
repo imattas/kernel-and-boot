@@ -115,7 +115,7 @@ int exfat_mount(exfat_fs_t *fs, uint32_t device) {
     fs->device = device; fs->fat_start = fat_start; fs->fat_sectors = fat_length;
     fs->heap_start = heap_start; fs->cluster_count = cluster_count;
     fs->root_cluster = root_cluster; fs->sectors_per_cluster = sectors_per_cluster;
-    fs->volume_sectors = volume_length; fs->mounted = 1;
+    fs->volume_sectors = volume_length; spinlock_init(&fs->write_lock); fs->mounted = 1;
     return 1;
 }
 
@@ -460,7 +460,7 @@ int exfat_write_file(exfat_fs_t *fs, const char *name, uint64_t offset,
                                          name, offset, buffer, size);
 }
 
-int exfat_write_file_in_directory(exfat_fs_t *fs, uint32_t directory_cluster,
+static int exfat_write_file_in_directory_unlocked(exfat_fs_t *fs, uint32_t directory_cluster,
                                   const char *name, uint64_t offset,
                                   const void *buffer, uint32_t size) {
     uint32_t cluster = 0;
@@ -519,9 +519,24 @@ int exfat_write_file_in_directory(exfat_fs_t *fs, uint32_t directory_cluster,
     return 1;
 }
 
+int exfat_write_file_in_directory(exfat_fs_t *fs, uint32_t directory_cluster,
+                                  const char *name, uint64_t offset,
+                                  const void *buffer, uint32_t size) {
+    if (!fs) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&fs->write_lock);
+    int result = exfat_write_file_in_directory_unlocked(fs, directory_cluster,
+                                                        name, offset, buffer, size);
+    spinlock_unlock_irqrestore(&fs->write_lock, flags);
+    return result;
+}
+
 int exfat_truncate_file_in_directory(exfat_fs_t *fs, uint32_t directory_cluster,
                                      const char *name, uint64_t size) {
-    return exfat_resize_file(fs, directory_cluster, name, size);
+    if (!fs) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&fs->write_lock);
+    int result = exfat_resize_file(fs, directory_cluster, name, size);
+    spinlock_unlock_irqrestore(&fs->write_lock, flags);
+    return result;
 }
 
 int exfat_set_attributes_in_directory(exfat_fs_t *fs, uint32_t directory_cluster,

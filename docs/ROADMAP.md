@@ -1196,6 +1196,9 @@ truncation is idempotent.
 The exFAT VFS adapter now forwards its existing cluster-chain growth path for
 append writes and refreshes its cached size after successful growth; equal-size
 truncation is idempotent.
+ExFAT file data writes and resize/truncate metadata updates now share an
+IRQ-safe filesystem write lock, preventing concurrent handles from interleaving
+cluster-chain mutations.
 Ext4 now supports bounded nonzero shrink/truncation by persistently updating
 the inode low/high size fields, with the VFS adapter synchronizing its cached
 file size and the contract verifying the on-disk result.

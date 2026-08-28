@@ -19,6 +19,7 @@ kernel gate below is explicitly marked complete.
 - [x] Root build/image contracts and QEMU UEFI handoff gate.
 - [x] Filesystem VFS append-growth boundaries for FAT32, exFAT, ext4, and XFS
   now update cached sizes after successful writes.
+- [x] Serialize exFAT data-write and resize mutations across file handles.
 
 ## Current kernel milestone
 

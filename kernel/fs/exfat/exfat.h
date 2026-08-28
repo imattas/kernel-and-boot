@@ -1,6 +1,7 @@
 #ifndef OS_KERNEL_FS_EXFAT_H
 #define OS_KERNEL_FS_EXFAT_H
 #include <stdint.h>
+#include "../../core/sync/spinlock.h"
 
 typedef struct {
     uint32_t device;
@@ -11,6 +12,7 @@ typedef struct {
     uint32_t root_cluster;
     uint32_t sectors_per_cluster;
     uint64_t volume_sectors;
+    spinlock_t write_lock;
     uint8_t mounted;
 } exfat_fs_t;
 

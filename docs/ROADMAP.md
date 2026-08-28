@@ -1868,6 +1868,10 @@ The shell contract now covers the complete text-command set and verifies that
 direct utility invocations retain their full command line for pipeline and
 redirection execution.
 
+The first PATH-inspection application, `which.elf`, now searches inherited
+PATH entries, validates executable candidates through the VFS, and reports the
+resolved path using the normal freestanding userland runtime.
+
 Shell integration contracts now directly cover the quote-aware sequence
 splitter, including semicolons and conditional operators preserved inside
 quoted arguments; this joins

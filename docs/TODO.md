@@ -115,6 +115,8 @@ the init-owned shell supervisor remains the next kernel/userland boundary.
   PATH and the FAT32 image.
 - [x] Add standalone `cmp.elf` status-based file comparison for shell
   conditional sequencing through PATH and the FAT32 image.
+- [x] Add standalone `which.elf` PATH executable discovery through the shared
+  runtime and FAT32 image namespace.
 - [x] Add background execution and job-table tracking for PATH-resolved
   external commands.
 - [x] Poll, reap, and remove completed background jobs without blocking the

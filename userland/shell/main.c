@@ -45,6 +45,50 @@ static int parse_number(const char *text, uint32_t length, uint64_t *value) {
     return 1;
 }
 
+static uint32_t resolve_command(const char *name, uint32_t name_length,
+                                char *path, uint32_t capacity) {
+    if (!name || !path || capacity == 0 || name_length == 0) return 0;
+    for (uint32_t index = 0; index < name_length; ++index) {
+        if (name[index] == '/') {
+            if (name_length >= capacity) return 0;
+            for (uint32_t copy = 0; copy < name_length; ++copy)
+                path[copy] = name[copy];
+            path[name_length] = 0;
+            return name_length;
+        }
+    }
+
+    char environment[128];
+    uint64_t environment_length = os_getenv("PATH", environment,
+                                             sizeof(environment));
+    if (environment_length == OS_SYSCALL_ERROR ||
+        environment_length >= sizeof(environment)) return 0;
+    uint32_t start = 0;
+    while (start <= environment_length) {
+        uint32_t end = start;
+        while (end < environment_length && environment[end] != ':') ++end;
+        uint32_t directory_length = end - start;
+        uint32_t separator = directory_length == 0 ? 0 : 1;
+        if (directory_length + separator + name_length < capacity) {
+            uint32_t candidate_length = 0;
+            for (uint32_t index = 0; index < directory_length; ++index)
+                path[candidate_length++] = environment[start + index];
+            if (separator) path[candidate_length++] = '/';
+            for (uint32_t index = 0; index < name_length; ++index)
+                path[candidate_length++] = name[index];
+            path[candidate_length] = 0;
+            uint64_t descriptor = os_open(path, candidate_length, 1);
+            if (descriptor != OS_SYSCALL_ERROR) {
+                (void)os_close(descriptor);
+                return candidate_length;
+            }
+        }
+        if (end == environment_length) break;
+        start = end + 1;
+    }
+    return 0;
+}
+
 void shell_main(void) {
     static const char prompt[] = "os> ";
     static const char help[] = "help id ps env inherit echo pwd cd ls cat mkdir rm rmdir touch write run exit\r\n";
@@ -231,11 +275,13 @@ void shell_main(void) {
                 while (run_arguments < argument_length &&
                        (argument[run_arguments] == ' ' ||
                         argument[run_arguments] == '\t')) ++run_arguments;
-                char saved = argument[path_length];
-                argument[path_length] = 0;
-                uint64_t process_id = os_spawn(argument, path_length,
+                char resolved_path[128];
+                uint32_t resolved_length = resolve_command(argument, path_length,
+                                                            resolved_path,
+                                                            sizeof(resolved_path));
+                uint64_t process_id = resolved_length == 0 ? OS_SYSCALL_ERROR :
+                    os_spawn(resolved_path, resolved_length,
                                                 argument + run_arguments);
-                argument[path_length] = saved;
                 int32_t status = -1;
                 if (process_id == OS_SYSCALL_ERROR) {
                     print(unknown, sizeof(unknown) - 1U);

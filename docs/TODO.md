@@ -83,6 +83,7 @@ kernel gate below is explicitly marked complete.
 - [x] Add shell descriptor inheritance policy control.
 - [x] Reap completed spawned processes and report `run` exit status.
 - [x] Pass initial arguments to spawned user programs.
+- [x] Resolve bare `run` commands through the inherited `PATH` environment.
 - [ ] Add reliable QEMU live keyboard verification for `run INIT.ELF`.
 - [ ] Add the command-line shell and terminal/console I/O.
 - [ ] Add process tools and initial utilities (`init`, `echo`, `ls`, `cat`,

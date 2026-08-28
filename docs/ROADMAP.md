@@ -1579,6 +1579,8 @@ The shell command surface now also recognizes bounded `cd` and `exit` commands,
 using the existing working-directory and process-exit syscalls.
 The shell now includes an `ls` builtin backed by the open/readdir/close syscall
 path.
+The shell `run` command now resolves bare executable names through the
+process's inherited `PATH`, while preserving explicit paths.
 
 ## Phase 10 — BIOS boot path
 

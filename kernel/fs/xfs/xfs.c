@@ -243,7 +243,8 @@ static int xfs_auth_one_child_mutate(xfs_fs_t *fs, uint32_t agno,
     if (index_capacity == 0 || leaf_capacity == 0 ||
         be32(bno_root) != XFS_BNO_MAGIC_REAL || be32(cnt_root) != XFS_BNO_MAGIC_REAL ||
         be16(&bno_root[4]) != 1U || be16(&cnt_root[4]) != 1U ||
-        be16(&bno_root[6]) != 1U || be16(&cnt_root[6]) != 1U) return 0;
+        be16(&bno_root[6]) > 1U || be16(&cnt_root[6]) > 1U ||
+        be16(&bno_root[6]) != be16(&cnt_root[6])) return 0;
     uint32_t bno_child = be32(&bno_root[16U + index_capacity * 8U]);
     uint32_t cnt_child = be32(&cnt_root[16U + index_capacity * 8U]);
     if (!bno_child || !cnt_child || bno_child >= fs->ag_blocks ||
@@ -252,7 +253,8 @@ static int xfs_auth_one_child_mutate(xfs_fs_t *fs, uint32_t agno,
         be32(bno_leaf) != XFS_BNO_MAGIC_REAL || be32(cnt_leaf) != XFS_BNO_MAGIC_REAL ||
         be16(&bno_leaf[4]) != 0U || be16(&cnt_leaf[4]) != 0U) return 0;
     uint32_t count = be16(&bno_leaf[6]);
-    if (count == 0 || count > leaf_capacity || be16(&cnt_leaf[6]) != count) return 0;
+    if (count > leaf_capacity || be16(&cnt_leaf[6]) != count ||
+        (count == 0 && (view.free_blocks != 0 || view.longest != 0))) return 0;
     uint32_t total = 0, previous_end = 0;
     for (uint32_t i = 0; i < count; ++i) {
         uint32_t record_start = be32(&bno_leaf[16U + i * 8U]);
@@ -284,10 +286,15 @@ static int xfs_auth_one_child_mutate(xfs_fs_t *fs, uint32_t agno,
         for (uint32_t i = 0; i < count; ++i)
             if (records[i].count >= blocks &&
                 (selected == UINT32_MAX || records[i].count < records[selected].count)) selected = i;
-        if (selected == UINT32_MAX || records[selected].count == blocks || view.free_blocks < blocks)
+        if (selected == UINT32_MAX || view.free_blocks < blocks)
             return 0;
         *start = ag_base + records[selected].start;
-        records[selected].start += blocks; records[selected].count -= blocks;
+        if (records[selected].count == blocks) {
+            for (uint32_t i = selected; i + 1U < count; ++i) records[i] = records[i + 1U];
+            --count;
+        } else {
+            records[selected].start += blocks; records[selected].count -= blocks;
+        }
         store_be32(&agf[52], view.free_blocks - blocks);
     } else {
         if (target > fs->ag_blocks - blocks) return 0;
@@ -334,10 +341,14 @@ static int xfs_auth_one_child_mutate(xfs_fs_t *fs, uint32_t agno,
         store_be32(&cnt_leaf[20U + i * 8U], records[i].count);
     }
     store_be16(&cnt_leaf[6], (uint16_t)count);
-    store_be32(&bno_root[16], be32(&bno_leaf[16]));
-    store_be32(&bno_root[20], be32(&bno_leaf[20]));
-    store_be32(&cnt_root[16], be32(&cnt_leaf[16]));
-    store_be32(&cnt_root[20], be32(&cnt_leaf[20]));
+    store_be16(&bno_root[6], (uint16_t)(count ? 1U : 0U));
+    store_be16(&cnt_root[6], (uint16_t)(count ? 1U : 0U));
+    if (count) {
+        store_be32(&bno_root[16], be32(&bno_leaf[16]));
+        store_be32(&bno_root[20], be32(&bno_leaf[20]));
+        store_be32(&cnt_root[16], be32(&cnt_leaf[16]));
+        store_be32(&cnt_root[20], be32(&cnt_leaf[20]));
+    }
     uint32_t longest = 0;
     for (uint32_t i = 0; i < count; ++i)
         if (records[i].count > longest) longest = records[i].count;

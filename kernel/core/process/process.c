@@ -451,6 +451,59 @@ int process_map_user_stack(process_t *process, uint64_t page_address) {
     return 1;
 }
 
+static int process_user_stack_write(const process_t *process, uint64_t address,
+                                    const void *source, uint32_t size) {
+    if (!process || !source || address < process->user_stack_top -
+        PROCESS_USER_STACK_PAGES * PAGE_SIZE ||
+        address > process->user_stack_top ||
+        size > process->user_stack_top - address) return 0;
+    const uint8_t *from = (const uint8_t *)source;
+    uint64_t base = process->user_stack_top - PROCESS_USER_STACK_PAGES * PAGE_SIZE;
+    for (uint32_t copied = 0; copied < size;) {
+        uint64_t offset = address + copied - base;
+        uint32_t page = (uint32_t)(offset / PAGE_SIZE);
+        uint32_t in_page = (uint32_t)(offset % PAGE_SIZE);
+        uint32_t count = PAGE_SIZE - in_page;
+        if (count > size - copied) count = size - copied;
+        volatile uint8_t *to = (volatile uint8_t *)(uintptr_t)
+            (process->user_stack_pages[page] + in_page);
+        for (uint32_t index = 0; index < count; ++index)
+            to[index] = from[copied + index];
+        copied += count;
+    }
+    return 1;
+}
+
+int process_prepare_user_stack(process_t *process, const char *path,
+                               const char *arguments, uint64_t *stack_pointer) {
+    if (!process || !path || !arguments || !stack_pointer ||
+        process->user_stack_page_count != PROCESS_USER_STACK_PAGES) return 0;
+    uint32_t path_length = 0;
+    uint32_t argument_length = 0;
+    while (path[path_length] && path_length < 256U) ++path_length;
+    while (arguments[argument_length] && argument_length < 256U) ++argument_length;
+    if (path[path_length] || arguments[argument_length]) return 0;
+    uint64_t cursor = process->user_stack_top;
+    uint64_t argument_address = 0;
+    if (argument_length != 0) {
+        cursor -= argument_length + 1U;
+        argument_address = cursor;
+        if (!process_user_stack_write(process, cursor, arguments,
+                                      argument_length + 1U)) return 0;
+    }
+    cursor -= path_length + 1U;
+    uint64_t path_address = cursor;
+    if (!process_user_stack_write(process, cursor, path, path_length + 1U))
+        return 0;
+    cursor = (cursor - 5U * sizeof(uint64_t)) & ~0xfULL;
+    uint64_t values[5] = {argument_length ? 2U : 1U, path_address,
+                          argument_address, 0, 0};
+    if (!process_user_stack_write(process, cursor, values, sizeof(values)))
+        return 0;
+    *stack_pointer = cursor;
+    return 1;
+}
+
 int process_activate(process_t *process) {
     if (!process) return 0;
     uint64_t flags = spinlock_lock_irqsave(&process->lock);

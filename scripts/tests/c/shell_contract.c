@@ -25,8 +25,8 @@ int main(void) {
     assert(strcmp(argument, "/tmp/file") == 0);
     assert(shell_parse("write /tmp/file hello", 21, argument, sizeof(argument)) == SHELL_WRITE);
     assert(strcmp(argument, "/tmp/file hello") == 0);
-    assert(shell_parse("run INIT.ELF", 12, argument, sizeof(argument)) == SHELL_RUN);
-    assert(strcmp(argument, "INIT.ELF") == 0);
+    assert(shell_parse("run INIT.ELF hello", 18, argument, sizeof(argument)) == SHELL_RUN);
+    assert(strcmp(argument, "INIT.ELF hello") == 0);
     assert(shell_parse("exit", 4, argument, sizeof(argument)) == SHELL_EXIT);
     assert(shell_parse("wat", 3, argument, sizeof(argument)) == SHELL_UNKNOWN);
     assert(shell_parse("", 0, argument, sizeof(argument)) == SHELL_EMPTY);

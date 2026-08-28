@@ -1048,6 +1048,8 @@ Waiting now reaps completed child processes, and `run` reports their exit
 status before returning to the prompt.
 Reaping is exposed as a separate parent-validated syscall, preserving the
 existing wait ABI used by kernel lifecycle probes.
+Spawned programs now receive an initial `argc`/`argv` stack, including the
+path and one bounded command-argument string.
 
 This gate includes all non-driver kernel core services and VFS abstractions,
 then the complete driver phase, with build integration, focused tests, and QEMU

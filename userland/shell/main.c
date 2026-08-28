@@ -181,7 +181,18 @@ void shell_main(void) {
             } else if (command == SHELL_RUN) {
                 uint32_t argument_length = 0;
                 while (argument[argument_length]) ++argument_length;
-                uint64_t process_id = os_spawn(argument, argument_length);
+                uint32_t path_length = 0;
+                while (path_length < argument_length && argument[path_length] != ' ' &&
+                       argument[path_length] != '\t') ++path_length;
+                uint32_t run_arguments = path_length;
+                while (run_arguments < argument_length &&
+                       (argument[run_arguments] == ' ' ||
+                        argument[run_arguments] == '\t')) ++run_arguments;
+                char saved = argument[path_length];
+                argument[path_length] = 0;
+                uint64_t process_id = os_spawn(argument, path_length,
+                                                argument + run_arguments);
+                argument[path_length] = saved;
                 int32_t status = -1;
                 if (process_id == OS_SYSCALL_ERROR) {
                     print(unknown, sizeof(unknown) - 1U);

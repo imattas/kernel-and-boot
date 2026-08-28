@@ -67,6 +67,8 @@ process_t *process_lookup_retain(uint64_t id);
 void process_release(process_t *process);
 int process_load_image(process_t *process, const void *image, uint64_t size);
 int process_map_user_stack(process_t *process, uint64_t page_address);
+int process_prepare_user_stack(process_t *process, const char *path,
+                               const char *arguments, uint64_t *stack_pointer);
 int process_activate(process_t *process);
 int process_destroy(process_t *process);
 process_t *process_current(void);

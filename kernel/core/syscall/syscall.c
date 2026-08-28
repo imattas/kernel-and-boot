@@ -96,6 +96,17 @@ static int syscall_copy_path(char *destination, uint64_t source,
     return 1;
 }
 
+static int syscall_copy_string(char *destination, uint64_t source,
+                               uint32_t capacity) {
+    if (!destination || capacity < 2U) return 0;
+    for (uint32_t index = 0; index < capacity; ++index) {
+        if (!syscall_copy_from_user(&destination[index], source + index, 1))
+            return 0;
+        if (destination[index] == '\0') return 1;
+    }
+    return 0;
+}
+
 uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
                           uint64_t arg3) {
     switch (number) {
@@ -208,6 +219,9 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
                 return OS_SYSCALL_ERROR;
             char path[OS_SYSCALL_MAX_PATH + 1];
             if (!syscall_copy_path(path, arg1, arg2)) return OS_SYSCALL_ERROR;
+            char arguments[257] = {0};
+            if (arg3 && !syscall_copy_string(arguments, arg3, sizeof(arguments)))
+                return OS_SYSCALL_ERROR;
             uint64_t flags = spinlock_lock_irqsave(&parent->lock);
             vfs_node_t *root = parent->root_directory;
             vfs_node_t *working = parent->working_directory;
@@ -242,14 +256,17 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
             }
             process_t *child = process_create_auto();
             process_thread_t *thread = 0;
+            uint64_t stack_pointer = 0;
             int valid = child && process_set_parent(child, parent) &&
                         process_inherit_namespace(child, parent) &&
                         process_inherit_handles(child, parent) &&
                         process_load_image(child, image, image_size) &&
                         process_map_user_stack(child, 0x8000100000ULL +
                             (child->id * 0x10000ULL)) &&
+                        process_prepare_user_stack(child, path, arguments,
+                                                   &stack_pointer) &&
                         (thread = process_thread_create_user(child, (uint32_t)child->id,
-                            child->image.entry, child->user_stack_top, 4096)) != 0 &&
+                            child->image.entry, stack_pointer, 4096)) != 0 &&
                         process_thread_start(thread);
             kfree(image);
             if (!valid) {

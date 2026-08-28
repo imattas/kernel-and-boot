@@ -26,7 +26,8 @@ kernel gate below is explicitly marked complete.
   inode-core handling, and the corresponding contract coverage.
 - [x] Run one grouped filesystem, kernel, image, and QEMU verification gate;
   update `ROADMAP.md` and commit the milestone.
-- [ ] Push the milestone to `main` when the remote connection responds.
+- [x] Push the milestone to `main` after configuring the authenticated GitHub
+  CLI credential helper.
 
 ## Remaining kernel completion work
 

@@ -62,6 +62,9 @@ Current focus: continue userland contracts and shell/application behavior;
 XFS feature expansion is paused. Kernel hardening continues separately, and
 the init-owned shell supervisor remains the next kernel/userland boundary.
 
+The current userland slice adds the `version` shell built-in. XFS expansion
+and init-owned supervision remain paused while the stable boot path is kept.
+
 - [x] Add a small userland runtime layer for shared argument parsing, status
   handling, and diagnostic output across standalone applications.
 - [x] Migrate the remaining standalone applications to the shared runtime

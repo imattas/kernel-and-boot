@@ -6,6 +6,7 @@
 typedef enum {
     SHELL_EMPTY,
     SHELL_HELP,
+    SHELL_VERSION,
     SHELL_CLEAR,
     SHELL_ID,
     SHELL_PS,

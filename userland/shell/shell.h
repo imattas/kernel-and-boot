@@ -10,6 +10,7 @@ typedef enum {
     SHELL_PWD,
     SHELL_CD,
     SHELL_LS,
+    SHELL_CAT,
     SHELL_EXIT,
     SHELL_UNKNOWN
 } shell_command_t;

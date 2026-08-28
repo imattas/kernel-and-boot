@@ -29,7 +29,8 @@ shell_command_t shell_parse(const char *line, uint32_t length,
     if (same_word(line, command_length, "pwd")) return SHELL_PWD;
     if (same_word(line, command_length, "ls")) return SHELL_LS;
     if (same_word(line, command_length, "exit")) return SHELL_EXIT;
-    if (!same_word(line, command_length, "echo") &&
+    if (!same_word(line, command_length, "cat") &&
+        !same_word(line, command_length, "echo") &&
         !same_word(line, command_length, "cd")) return SHELL_UNKNOWN;
     uint32_t start = command_length;
     while (start < length && (line[start] == ' ' || line[start] == '\t')) ++start;
@@ -38,5 +39,7 @@ shell_command_t shell_parse(const char *line, uint32_t length,
     for (uint32_t index = 0; index < argument_length; ++index)
         argument[index] = line[start + index];
     argument[argument_length] = 0;
-    return same_word(line, command_length, "cd") ? SHELL_CD : SHELL_ECHO;
+    if (same_word(line, command_length, "cd")) return SHELL_CD;
+    if (same_word(line, command_length, "cat")) return SHELL_CAT;
+    return SHELL_ECHO;
 }

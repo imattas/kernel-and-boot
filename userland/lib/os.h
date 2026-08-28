@@ -39,6 +39,11 @@ static inline uint64_t os_readdir(uint64_t descriptor, void *entry) {
     return os_syscall3(14, descriptor, (uint64_t)(uintptr_t)entry, 0);
 }
 
+static inline uint64_t os_file_read(uint64_t descriptor, void *buffer,
+                                    uint64_t length) {
+    return os_syscall3(10, descriptor, (uint64_t)(uintptr_t)buffer, length);
+}
+
 static inline uint64_t os_yield(void) { return os_syscall3(21, 0, 0, 0); }
 
 __attribute__((noreturn)) static inline void os_exit(int32_t status) {

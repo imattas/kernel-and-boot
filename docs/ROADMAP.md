@@ -1759,7 +1759,7 @@ The shell now polls those jobs without blocking, reaps processes after both
 members of a pipeline exit, removes completed entries, and reports `done`.
 The standalone `HELP.ELF` utility now provides the same command inventory through
 the external process path as the native shell `help` command.
-The complete `make test` gate now passes with the expanded 34-artifact
+The complete `make test` gate now passes with the expanded 38-artifact
 userland set, including shell/runtime contracts, filesystem/device contracts,
 image validation, and QEMU UEFI execution.
 The ring-3 shell now includes a `clear` command that emits the standard ANSI

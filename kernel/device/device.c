@@ -8,10 +8,21 @@ static uint32_t driver_count;
 static spinlock_t resource_lock;
 static spinlock_t registry_lock;
 static spinlock_t binding_lock;
+#define DEVICE_NAME_LIMIT 32U
 
 static int same_name(const char *left, const char *right) {
-    while (*left && *left == *right) { ++left; ++right; }
-    return *left == *right;
+    for (uint32_t i = 0; i < DEVICE_NAME_LIMIT; ++i) {
+        if (left[i] != right[i]) return 0;
+        if (left[i] == 0) return 1;
+    }
+    return 0;
+}
+
+static int valid_name(const char *name) {
+    if (!name || !name[0]) return 0;
+    for (uint32_t i = 0; i < DEVICE_NAME_LIMIT; ++i)
+        if (name[i] == 0) return 1;
+    return 0;
 }
 
 static int same_pci_device(const device_t *left, const device_t *right) {
@@ -81,7 +92,7 @@ const device_t *device_at(uint32_t index) {
 int device_driver_register(const device_driver_t *driver) {
     if (!driver) return 0;
     uint64_t flags = spinlock_lock_irqsave(&registry_lock);
-    if (!driver || !driver->name || !driver->name[0] ||
+    if (!driver || !valid_name(driver->name) ||
         driver->bus != DEVICE_BUS_PCI || !driver->match || !driver->probe ||
         driver_count >= DEVICE_DRIVER_CAPACITY) {
         spinlock_unlock_irqrestore(&registry_lock, flags);

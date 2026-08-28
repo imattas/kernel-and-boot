@@ -120,11 +120,12 @@ def main():
     which_clusters = max(1, math.ceil(len(which_source) / SECTOR))
     unsetenv_clusters = max(1, math.ceil(len(unsetenv_source) / SECTOR))
     efi_chain = list(range(8, 8 + efi_clusters))
-    kernel_chain = list(range(7 + efi_clusters, 7 + efi_clusters + kernel_clusters))
-    init_chain = list(range(7 + efi_clusters + kernel_clusters,
-                            7 + efi_clusters + kernel_clusters + init_clusters))
-    shell_chain = list(range(7 + efi_clusters + kernel_clusters + init_clusters,
-                             7 + efi_clusters + kernel_clusters + init_clusters + shell_clusters))
+    kernel_chain = list(range(efi_chain[-1] + 1,
+                              efi_chain[-1] + 1 + kernel_clusters))
+    init_chain = list(range(kernel_chain[-1] + 1,
+                            kernel_chain[-1] + 1 + init_clusters))
+    shell_chain = list(range(init_chain[-1] + 1,
+                             init_chain[-1] + 1 + shell_clusters))
     args_chain = list(range(shell_chain[-1] + 1, shell_chain[-1] + 1 + args_clusters))
     env_chain = list(range(args_chain[-1] + 1, args_chain[-1] + 1 + env_clusters))
     cat_chain = list(range(env_chain[-1] + 1, env_chain[-1] + 1 + cat_clusters))

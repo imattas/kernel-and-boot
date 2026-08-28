@@ -667,32 +667,64 @@ int process_prepare_user_stack(process_t *process, const char *path,
         ++environment_count;
         ++index;
     }
-    uint32_t starts[8] = {0};
-    uint32_t lengths[8] = {0};
+    char argument_tokens[8][257] = {{0}};
     uint32_t argument_count = 0;
     for (uint32_t index = 0; index < argument_length;) {
         while (index < argument_length && (arguments[index] == ' ' ||
                                             arguments[index] == '\t')) ++index;
         if (index == argument_length) break;
         if (argument_count == 8) return 0;
-        starts[argument_count] = index;
-        while (index < argument_length && arguments[index] != ' ' &&
-               arguments[index] != '\t') ++index;
-        lengths[argument_count] = index - starts[argument_count];
+        uint32_t token_length = 0;
+        char quote = 0;
+        int escaped = 0;
+        int token_started = 0;
+        while (index < argument_length) {
+            char value = arguments[index++];
+            if (escaped) {
+                if (token_length == sizeof(argument_tokens[0]) - 1U) return 0;
+                argument_tokens[argument_count][token_length++] = value;
+                escaped = 0;
+                token_started = 1;
+                continue;
+            }
+            if (value == '\\') {
+                escaped = 1;
+                token_started = 1;
+                continue;
+            }
+            if (quote) {
+                if (value == quote) quote = 0;
+                else {
+                    if (token_length == sizeof(argument_tokens[0]) - 1U) return 0;
+                    argument_tokens[argument_count][token_length++] = value;
+                }
+                token_started = 1;
+                continue;
+            }
+            if (value == '\'' || value == '"') {
+                quote = value;
+                token_started = 1;
+                continue;
+            }
+            if (value == ' ' || value == '\t') break;
+            if (token_length == sizeof(argument_tokens[0]) - 1U) return 0;
+            argument_tokens[argument_count][token_length++] = value;
+            token_started = 1;
+        }
+        if (quote || escaped || !token_started) return 0;
+        argument_tokens[argument_count][token_length] = 0;
         ++argument_count;
     }
     uint64_t cursor = process->user_stack_top;
     uint64_t argument_addresses[8] = {0};
     for (uint32_t index = argument_count; index != 0; --index) {
         uint32_t argument = index - 1U;
-        char token[257];
-        for (uint32_t character = 0; character < lengths[argument]; ++character)
-            token[character] = arguments[starts[argument] + character];
-        token[lengths[argument]] = 0;
-        cursor -= lengths[argument] + 1U;
+        uint32_t token_length = 0;
+        while (argument_tokens[argument][token_length]) ++token_length;
+        cursor -= token_length + 1U;
         argument_addresses[argument] = cursor;
-        if (!process_user_stack_write(process, cursor, token,
-                                      lengths[argument] + 1U)) return 0;
+        if (!process_user_stack_write(process, cursor, argument_tokens[argument],
+                                      token_length + 1U)) return 0;
     }
     cursor -= path_length + 1U;
     uint64_t path_address = cursor;

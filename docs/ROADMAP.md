@@ -1679,6 +1679,9 @@ pipeline, redirection, and wait results continue to publish their real exit
 status.
 The shell now also provides `true` and `false` built-ins, giving command
 scripts an explicit success/failure source for exercising status propagation.
+External program argument construction now removes shell-style single/double
+quotes and backslash escapes, preserving quoted whitespace and empty quoted
+arguments in the bounded ring-3 `argv` stack.
 
 ## Phase 10 — BIOS boot path
 

@@ -126,6 +126,8 @@ assert root_extension_third[:11] == b'UNSETENVELF'
 assert root_extension_third[32:43] == b'UPTIME  ELF'
 assert root_extension_third[64:75] == b'DATE    ELF'
 assert root_extension_third[96:107] == b'CLEAR   ELF'
+assert root_extension_third[128:139] == b'EXPR    ELF'
+assert int.from_bytes(root_extension_third[154:156], 'little') >= 5
 assert int.from_bytes(root_extension_third[26:28], 'little') >= 5
 root_extension_fourth = data[(32 + 2 * 520 + 6) * 512:(32 + 2 * 520 + 7) * 512]
 assert root_extension_fourth[:11] == b'TEST    ELF'

@@ -173,6 +173,8 @@ type, string, and numeric tests.
 - [x] Add standalone `find.elf` bounded recursive directory traversal and
   `-type f`/`-type d` filtering through the existing readdir/stat ABI; package
   it in the FAT32 image.
+- [x] Add standalone `expr.elf` with checked signed integer arithmetic for
+  `+`, `-`, `*`, `/`, and `%`, packaged in the FAT32 image and VFS namespace.
 - [x] Add native shell `basename` and `dirname` path inspection commands while
   preserving their external pipeline/redirection forms.
 - [x] Add standalone `which.elf` PATH executable discovery through the shared

@@ -1985,6 +1985,9 @@ The shell `cd` command now accepts an empty operand and resolves it to the
 root directory, matching the normal shell default without changing the VFS
 working-directory ABI.
 
+The userland utility set now includes `expr.elf`, a bounded freestanding
+signed-integer arithmetic utility with overflow and division-error checks.
+
 Process teardown now releases each process lock before removing the process
 from the global process table, preserving the lock ordering used by activation
 and reducing the init-supervisor spawn deadlock surface.

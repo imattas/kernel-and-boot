@@ -332,7 +332,7 @@ static int xfs_auth_multi_child_mutate(xfs_fs_t *fs, uint32_t agno,
         be32(cnt_root) != XFS_BNO_MAGIC_REAL || be16(&bno_root[4]) != 1U ||
         be16(&cnt_root[4]) != 1U) return 0;
     uint32_t children = be16(&bno_root[6]);
-    if (!children || children > 4U || children != be16(&cnt_root[6])) return 0;
+    if (children > 4U || children != be16(&cnt_root[6])) return 0;
     /* A collapsed transaction retains the second child pointer outside the
      * active root count so a later release can repopulate that child. */
     uint32_t pointer_offset = 16U + index_capacity * 8U;
@@ -343,6 +343,7 @@ static int xfs_auth_multi_child_mutate(xfs_fs_t *fs, uint32_t agno,
             children = i + 1U;
         }
     }
+    if (!children) return 0;
     uint32_t record_pos = 0;
     for (uint32_t i = 0; i < children; ++i) {
         uint32_t bchild = be32(&bno_root[16U + index_capacity * 8U + i * 4U]);
@@ -370,7 +371,7 @@ static int xfs_auth_multi_child_mutate(xfs_fs_t *fs, uint32_t agno,
         }
     }
     uint32_t count = record_pos, total_free = 0;
-    if (!count || count > 512U) return 0;
+    if ((!count && allocate) || count > 512U) return 0;
     /* Leaves must already be globally sorted and CNT must contain the same set. */
     for (uint32_t i = 0; i < count; ++i) {
         if (i && records[i].start < records[i - 1U].start + records[i - 1U].count)

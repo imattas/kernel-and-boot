@@ -165,5 +165,13 @@ int main(void) {
     assert(xfs_free_extent(&fs, 2, 1));
     assert(((bno_root[6] << 8) | bno_root[7]) == 4 &&
            g32(&bno_root[16]) == 2 && g32(&bno_root[40]) == 10);
+    assert(xfs_allocate_extent(&fs, 0, 1, &start) && start == 2);
+    assert(xfs_allocate_extent(&fs, 0, 1, &start) && start == 5);
+    assert(xfs_allocate_extent(&fs, 0, 1, &start) && start == 8);
+    assert(xfs_allocate_extent(&fs, 0, 1, &start) && start == 10);
+    assert(((bno_root[6] << 8) | bno_root[7]) == 0 && g32(&agf[52]) == 0);
+    assert(xfs_free_extent(&fs, 2, 1));
+    assert(((bno_root[6] << 8) | bno_root[7]) == 1 &&
+           g32(&bno_root[16]) == 2 && g32(&agf[52]) == 1);
     return 0;
 }

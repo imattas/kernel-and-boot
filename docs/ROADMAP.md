@@ -1977,3 +1977,5 @@ The initial predicate utility `test.elf` is now built into the userland image.
 It provides bounded `PATH`-resolvable existence (`-e`), non-empty (`-n`), and
 string equality predicates, plus regular-file (`-f`) and directory (`-d`)
 checks, with conventional zero/one/two exit statuses for shell conditionals.
+Numeric comparisons (`-eq`, `-ne`, `-lt`, `-le`, `-gt`, and `-ge`) are also
+bounded through the shared decimal parser.

@@ -17,6 +17,22 @@ static int type_is(const char *path, uint32_t type) {
     return result;
 }
 
+static int numeric_compare(const char *left, const char *operator,
+                           const char *right) {
+    uint64_t a;
+    uint64_t b;
+    if (!os_userland_parse_u64(left, &a) ||
+        !os_userland_parse_u64(right, &b)) return 0;
+    if (operator[0] != '-' || operator[3] != 0) return 0;
+    if (operator[1] == 'e' && operator[2] == 'q') return a == b;
+    if (operator[1] == 'n' && operator[2] == 'e') return a != b;
+    if (operator[1] == 'l' && operator[2] == 't') return a < b;
+    if (operator[1] == 'l' && operator[2] == 'e') return a <= b;
+    if (operator[1] == 'g' && operator[2] == 't') return a > b;
+    if (operator[1] == 'g' && operator[2] == 'e') return a >= b;
+    return 0;
+}
+
 int test_main(uint64_t argc, char **argv, char **environment) {
     (void)environment;
     if (argc == 2) {
@@ -39,5 +55,7 @@ int test_main(uint64_t argc, char **argv, char **environment) {
             if (argv[1][index] != argv[3][index]) os_exit(1);
         os_exit(0);
     }
+    if (argc == 4)
+        os_exit(numeric_compare(argv[1], argv[2], argv[3]) ? 0 : 1);
     os_exit(2);
 }

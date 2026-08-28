@@ -22,6 +22,7 @@ typedef struct {
 
 int xfs_mount(xfs_fs_t *fs, uint32_t device);
 int xfs_inode_size(xfs_fs_t *fs, uint64_t inode, uint64_t *size);
+int xfs_inode_mode(xfs_fs_t *fs, uint64_t inode, uint16_t *mode);
 int xfs_set_mode(xfs_fs_t *fs, uint64_t inode, uint16_t mode);
 int xfs_allocate_extent(xfs_fs_t *fs, uint32_t allocation_group,
                         uint32_t blocks, uint64_t *start);

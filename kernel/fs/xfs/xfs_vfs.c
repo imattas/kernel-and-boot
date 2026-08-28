@@ -39,14 +39,14 @@ int xfs_vfs_attach_file_in_directory(xfs_fs_t *fs, vfs_node_t *root,
                                      const char *name) {
     if (!fs || !fs->mounted || !root || root->type != VFS_NODE_DIRECTORY ||
         !filesystem_name || !name || !name[0]) return 0;
-    uint64_t inode = 0, size = 0;
+    uint64_t inode = 0, size = 0; uint16_t mode = 0;
     if (!xfs_lookup(fs, directory, filesystem_name, &inode) ||
-        !xfs_inode_size(fs, inode, &size)) return 0;
+        !xfs_inode_size(fs, inode, &size) || !xfs_inode_mode(fs, inode, &mode)) return 0;
     xfs_vfs_file_t *file = (xfs_vfs_file_t *)kmalloc(sizeof(*file));
     if (!file) return 0;
     file->fs = fs; file->inode = inode; file->size = size;
     spinlock_init(&file->lock);
-    vfs_node_t *node = vfs_node_create(name, VFS_NODE_REGULAR, 0, 0, 0644);
+    vfs_node_t *node = vfs_node_create(name, VFS_NODE_REGULAR, 0, 0, mode & 0777U);
     if (!node || !vfs_node_set_read(node, xfs_vfs_read, file) ||
         !vfs_node_set_write(node, xfs_vfs_write, file) ||
         !vfs_node_set_truncate(node, xfs_vfs_truncate) ||

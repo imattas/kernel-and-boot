@@ -1924,6 +1924,16 @@ int xfs_inode_size(xfs_fs_t *fs, uint64_t inode, uint64_t *size) {
     return 1;
 }
 
+int xfs_inode_mode(xfs_fs_t *fs, uint64_t inode, uint16_t *mode) {
+    uint8_t data[4096];
+    if (!mode || !xfs_read_inode(fs, inode, data)) return 0;
+    uint16_t value = be16(&data[2]);
+    uint16_t type = value & 0xf000U;
+    if (type != 0x4000U && type != 0x8000U && type != 0xa000U) return 0;
+    *mode = value & 0x0fffU;
+    return 1;
+}
+
 int xfs_set_mode(xfs_fs_t *fs, uint64_t inode, uint16_t mode) {
     uint8_t data[4096];
     if (!fs || !xfs_read_inode(fs, inode, data)) return 0;

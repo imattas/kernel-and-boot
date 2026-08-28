@@ -1205,6 +1205,9 @@ also forwards valid zero-length truncation instead of rejecting it at the VFS
 boundary.
 XFS VFS file attachment now likewise accepts an explicit directory inode, so
 validated files in nested short-form directories use the same adapter boundary.
+XFS inode metadata reads now expose validated permission bits, and the VFS file
+adapter carries those on-disk permissions into the mounted node instead of
+hard-coding a mode.
 The XFS allocator now explicitly distinguishes its legacy contract AGF layout
 from authentic AGF metadata with separate BNO/CNT fields, and mount validates
 authentic BNO/CNT ordering, child pointers, child boundary keys, free-block

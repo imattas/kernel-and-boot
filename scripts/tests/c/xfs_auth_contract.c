@@ -5,6 +5,7 @@
 #include "kernel/drivers/storage/storage.h"
 
 static uint8_t image[512U * 128U];
+static uint32_t flush_calls;
 static void p16(uint8_t *p, uint16_t v) { p[0] = (uint8_t)(v >> 8); p[1] = (uint8_t)v; }
 static void p32(uint8_t *p, uint32_t v) {
     p[0] = (uint8_t)(v >> 24); p[1] = (uint8_t)(v >> 16);
@@ -22,6 +23,9 @@ static int rd(uint64_t lba, uint32_t n, void *p) {
 static int wr(uint64_t lba, uint32_t n, const void *p) {
     if (lba + n > 128U) return 0;
     memcpy(image + lba * 512U, p, n * 512U); return 1;
+}
+static int flush(void *context) {
+    (void)context; ++flush_calls; return 1;
 }
 static void leaf(uint8_t *p, uint32_t start, uint32_t count) {
     p32(p, 0x41425442U); p16(&p[4], 0); p16(&p[6], 1);
@@ -42,7 +46,8 @@ int main(void) {
     leaf(&image[2U * 4096U], 10, 3); leaf(&image[3U * 4096U], 10, 3);
     storage_initialize();
     storage_device_t device = {.name = "xfs-auth", .block_size = 512,
-                               .block_count = 128, .read = rd, .write = wr};
+                               .block_count = 128, .read = rd, .write = wr,
+                               .flush = flush};
     assert(storage_register(&device));
     xfs_fs_t fs;
     assert(xfs_mount(&fs, 0));
@@ -52,6 +57,7 @@ int main(void) {
     assert(g32(&image[2U * 4096U + 16]) == 12 &&
            g32(&image[3U * 4096U + 16]) == 12);
     assert(xfs_free_extent(&fs, 10, 2));
+    assert(flush_calls >= 2);
     assert(g32(&image[4096 + 52]) == 3 && g32(&image[4096 + 56]) == 3);
     assert(g32(&image[2U * 4096U + 16]) == 10 &&
            g32(&image[3U * 4096U + 16]) == 10);

@@ -41,6 +41,17 @@ static void print_stat(const os_stat_t *stat) {
     print("\r\n", 2);
 }
 
+static int parse_octal(const char *text, uint32_t length, uint64_t *value) {
+    if (!text || !value || length == 0 || length > 4) return 0;
+    uint64_t result = 0;
+    for (uint32_t index = 0; index < length; ++index) {
+        if (text[index] < '0' || text[index] > '7') return 0;
+        result = (result << 3) | (uint64_t)(text[index] - '0');
+    }
+    *value = result;
+    return 1;
+}
+
 static int parse_number(const char *text, uint32_t length, uint64_t *value) {
     if (!text || !value || length == 0) return 0;
     uint64_t result = 0;
@@ -118,7 +129,7 @@ static uint32_t resolve_command(const char *name, uint32_t name_length,
 
 void shell_main(void) {
     static const char prompt[] = "os> ";
-    static const char help[] = "help id ps env jobs which inherit echo pwd cd ls cat stat mkdir rm rmdir touch write run wait exit\r\n";
+    static const char help[] = "help id ps env jobs which inherit echo pwd cd ls cat stat chmod mkdir rm rmdir touch write run wait exit\r\n";
     static const char unknown[] = "unknown command\r\n";
     static char line[128];
     static char argument[128];
@@ -300,6 +311,22 @@ void shell_main(void) {
                     print_stat(&stat);
                 }
                 if (descriptor != OS_SYSCALL_ERROR) (void)os_close(descriptor);
+            } else if (command == SHELL_CHMOD) {
+                uint32_t argument_length = 0;
+                while (argument[argument_length]) ++argument_length;
+                uint32_t separator = 0;
+                while (separator < argument_length && argument[separator] != ' ' &&
+                       argument[separator] != '\t') ++separator;
+                uint32_t path_start = separator;
+                while (path_start < argument_length &&
+                       (argument[path_start] == ' ' || argument[path_start] == '\t'))
+                    ++path_start;
+                uint64_t mode;
+                if (!parse_octal(argument, separator, &mode) ||
+                    path_start == argument_length ||
+                    os_chmod(argument + path_start, argument_length - path_start,
+                             mode) == OS_SYSCALL_ERROR)
+                    print(unknown, sizeof(unknown) - 1U);
             } else if (command == SHELL_MKDIR) {
                 uint32_t argument_length = 0;
                 while (argument[argument_length]) ++argument_length;

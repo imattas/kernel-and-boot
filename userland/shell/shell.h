@@ -18,6 +18,7 @@ typedef enum {
     SHELL_LS,
     SHELL_CAT,
     SHELL_STAT,
+    SHELL_CHMOD,
     SHELL_MKDIR,
     SHELL_RM,
     SHELL_RMDIR,

@@ -38,6 +38,8 @@ int main(void) {
     assert(strcmp(argument, "/hello") == 0);
     assert(shell_parse("stat /hello", 11, argument, sizeof(argument)) == SHELL_STAT);
     assert(strcmp(argument, "/hello") == 0);
+    assert(shell_parse("chmod 755 /hello", 16, argument, sizeof(argument)) == SHELL_CHMOD);
+    assert(strcmp(argument, "755 /hello") == 0);
     assert(shell_parse("mkdir /tmp", 10, argument, sizeof(argument)) == SHELL_MKDIR);
     assert(strcmp(argument, "/tmp") == 0);
     assert(shell_parse("rm /tmp/file", 12, argument, sizeof(argument)) == SHELL_RM);

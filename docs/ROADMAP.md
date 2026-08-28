@@ -1694,6 +1694,8 @@ independent ring-3 nonzero-exit path for shell and process-status validation.
 Standalone `ID.ELF` and `PS.ELF` utilities now exercise identity,
 credential, process-list, and process-status syscalls from ring 3 and are
 packaged in the FAT32 root.
+Standalone `WAIT.ELF` now exercises the ring-3 wait/reap lifecycle ABI and
+returns the waited process status to its caller.
 
 ## Phase 10 — BIOS boot path
 

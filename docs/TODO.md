@@ -163,6 +163,8 @@ kernel gate below is explicitly marked complete.
 - [x] Expose `args.elf` through the live FAT32-backed VFS namespace and grant
   boot-image ELF nodes execute permissions.
 - [x] Expose `env.elf` through the live FAT32-backed VFS namespace.
+- [x] Expose `cat.elf`, `pwd.elf`, and `mkdir.elf` through the live
+  FAT32-backed VFS namespace.
 - [ ] Add reliable QEMU live keyboard verification for `run INIT.ELF`.
 - [ ] Expose the complete multi-cluster FAT32 boot-image application set in the
   live VFS namespace for reliable external `run` execution.

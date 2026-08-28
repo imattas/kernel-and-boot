@@ -2115,6 +2115,22 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("userland env executable ready\r\n");
+    static const char cat_short_name[11] = {
+        'C','A','T',' ',' ',' ',' ',' ','E','L','F'
+    };
+    static const char pwd_short_name[11] = {
+        'P','W','D',' ',' ',' ',' ',' ','E','L','F'
+    };
+    static const char mkdir_short_name[11] = {
+        'M','K','D','I','R',' ',' ',' ','E','L','F'
+    };
+    if (!fat32_vfs_attach_file(&fat32, vfs_root, cat_short_name, "cat.elf") ||
+        !fat32_vfs_attach_file(&fat32, vfs_root, pwd_short_name, "pwd.elf") ||
+        !fat32_vfs_attach_file(&fat32, vfs_root, mkdir_short_name, "mkdir.elf")) {
+        serial_write("userland core utility VFS attach failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("userland core utility namespace ready\r\n");
     vfs_node_t *vfs_foreign = vfs_node_create("foreign", VFS_NODE_REGULAR,
                                                0, 0, 0444);
     int vfs_remove_result = vfs_foreign ?

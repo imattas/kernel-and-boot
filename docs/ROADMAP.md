@@ -1722,9 +1722,10 @@ The native shell `rm` command now supports bounded `rm -r` tree removal using
 directory enumeration and rejects attempts to recursively remove `/`.
 Input and network runtime services now start before the persistent shell, so an
 immediately-blocking shell cannot starve those services. The init-to-shell
-supervisor handoff remains deferred. `args.elf` and `env.elf` are now exposed
-as executable utilities through the live FAT32-backed VFS namespace; the
-remaining application set is the next userland boundary.
+supervisor handoff remains deferred. `args.elf`, `env.elf`, `cat.elf`,
+`pwd.elf`, and `mkdir.elf` are now exposed as executable utilities through the
+live FAT32-backed VFS namespace; the remaining application set is the next
+userland boundary.
 The shell now keeps a bounded eight-entry command history and handles split
 ANSI up/down escape sequences without feeding terminal control bytes into the
 command parser.

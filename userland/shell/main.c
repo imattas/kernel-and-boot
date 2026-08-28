@@ -1247,8 +1247,23 @@ void shell_main(void) {
             } else if (command == SHELL_UNSETENV) {
                 uint32_t argument_length = 0;
                 while (argument[argument_length]) ++argument_length;
-                if (argument_length == 0 ||
-                    os_unsetenv(argument) == OS_SYSCALL_ERROR)
+                uint32_t start = 0;
+                int failed = argument_length == 0;
+                while (!failed && start < argument_length) {
+                    while (start < argument_length &&
+                           (argument[start] == ' ' || argument[start] == '\t')) ++start;
+                    if (start == argument_length) break;
+                    uint32_t end = start;
+                    while (end < argument_length && argument[end] != ' ' &&
+                           argument[end] != '\t') ++end;
+                    char saved = argument[end];
+                    argument[end] = 0;
+                    if (os_unsetenv(argument + start) == OS_SYSCALL_ERROR)
+                        failed = 1;
+                    argument[end] = saved;
+                    start = end + 1U;
+                }
+                if (failed)
                     print(unknown, sizeof(unknown) - 1U);
             } else if (command == SHELL_STATUS) {
                 print_status(last_status);

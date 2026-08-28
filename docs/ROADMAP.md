@@ -1823,6 +1823,10 @@ The shell now preserves the zero-argument `env` builtin while dispatching
 assignment-prefixed `env NAME=VALUE COMMAND` invocations to packaged `env.elf`
 through PATH resolution and the normal process ABI.
 
+The shell `unsetenv` builtin now removes multiple whitespace-separated variable
+names in one bounded command, matching the standalone utility's multi-operand
+environment behavior.
+
 Shell operator validation now rejects empty pipeline/redirection operands,
 non-terminal background markers, unterminated quoting, and trailing escapes
 before any process-launch path is selected.

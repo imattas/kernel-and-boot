@@ -103,6 +103,9 @@ int main(void) {
     assert(shell_parse("export =test", 12, argument, sizeof(argument)) == SHELL_EXPORT);
     assert(shell_parse("unsetenv MODE", 13, argument, sizeof(argument)) == SHELL_UNSETENV);
     assert(strcmp(argument, "MODE") == 0);
+    assert(shell_parse("unsetenv MODE OTHER", 19, argument,
+                       sizeof(argument)) == SHELL_UNSETENV);
+    assert(strcmp(argument, "MODE OTHER") == 0);
     assert(shell_parse("status", 6, argument, sizeof(argument)) == SHELL_STATUS);
     assert(shell_parse("true", 4, argument, sizeof(argument)) == SHELL_TRUE);
     assert(shell_parse("false", 5, argument, sizeof(argument)) == SHELL_FALSE);

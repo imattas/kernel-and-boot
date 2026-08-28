@@ -93,6 +93,7 @@ the init-owned shell supervisor remains the next kernel/userland boundary.
 - [x] Centralize bounded `NAME=VALUE` parsing in the freestanding runtime.
 - [x] Add standalone `unsetenv.elf` and expose it through the FAT32 VFS.
 - [x] Dispatch `env NAME=VALUE COMMAND` through the shell's external PATH path.
+- [x] Allow shell `unsetenv` to remove multiple variable names per command.
 - [x] Reject malformed shell pipeline, redirection, and background operators
   before process launch.
 - [x] Preserve direct external utility commands through pipeline and

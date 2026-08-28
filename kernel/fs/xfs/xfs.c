@@ -971,25 +971,73 @@ int xfs_truncate_file(xfs_fs_t *fs, uint64_t inode, uint64_t size) {
         uint32_t core = data[4] == 2 ? XFS_CORE_V2_SIZE : 100U;
         if (size > fs->inode_size - core) return 0;
         for (uint64_t i = size; i < be64(&data[56]); ++i) data[core + i] = 0;
-    } else if (data[5] == XFS_FORMAT_EXTENTS && size % fs->block_size != 0) {
+    } else if (data[5] == XFS_FORMAT_EXTENTS) {
         uint32_t core = data[4] == 2 ? XFS_CORE_V2_SIZE : 100U;
         uint32_t extent_count = be32(&data[76]);
-        if (extent_count == 0 || extent_count > (fs->inode_size - core) / 16U)
+        if (extent_count == 0 || extent_count > (fs->inode_size - core) / 16U ||
+            extent_count > 256U)
             return 0;
-        uint64_t physical = 0, length = 0;
-        uint8_t unwritten = 0, found = 0;
-        uint64_t logical = size / fs->block_size;
-        for (uint32_t i = 0; i < extent_count; ++i)
-            if (xfs_extent(&data[core + i * 16U], logical, &physical, &length,
-                           &unwritten)) { found = 1; break; }
-        if (found && !unwritten) {
-            uint8_t block[4096];
-            if (physical >= fs->block_count || !xfs_read_block(fs, physical, block))
+        typedef struct {
+            uint64_t logical, physical, length;
+            uint8_t unwritten;
+        } truncate_extent_t;
+        truncate_extent_t retained[256], detached[256];
+        uint32_t retained_count = 0, detached_count = 0;
+        uint64_t keep_blocks = size / fs->block_size +
+                               (size % fs->block_size != 0);
+        for (uint32_t i = 0; i < extent_count; ++i) {
+            const uint8_t *record = &data[core + i * 16U];
+            uint64_t high = be64(record), low = be64(record + 8U);
+            uint64_t logical = (high & 0x7fffffffffffffffULL) >> 9;
+            uint64_t physical = ((high & 0x1ffU) << 43) | (low >> 21);
+            uint64_t length = low & 0x1fffffU;
+            uint8_t unwritten = (uint8_t)((high >> 63) != 0);
+            if (length == 0 || logical > UINT64_MAX - length ||
+                physical >= fs->block_count || length > fs->block_count - physical)
                 return 0;
-            for (uint32_t i = (uint32_t)(size % fs->block_size);
-                 i < fs->block_size; ++i) block[i] = 0;
-            if (!xfs_write_block(fs, physical, block)) return 0;
+            if (logical >= keep_blocks) {
+                detached[detached_count++] =
+                    (truncate_extent_t){logical, physical, length, unwritten};
+            } else if (logical + length > keep_blocks) {
+                uint64_t retained_length = keep_blocks - logical;
+                detached[detached_count++] = (truncate_extent_t){
+                    keep_blocks, physical + retained_length,
+                    length - retained_length, unwritten};
+                retained[retained_count++] =
+                    (truncate_extent_t){logical, physical, retained_length, unwritten};
+            } else {
+                retained[retained_count++] =
+                    (truncate_extent_t){logical, physical, length, unwritten};
+            }
         }
+        if (size % fs->block_size != 0) {
+            uint64_t logical = size / fs->block_size;
+            for (uint32_t i = 0; i < retained_count; ++i)
+                if (retained[i].logical <= logical &&
+                    logical - retained[i].logical < retained[i].length &&
+                    !retained[i].unwritten) {
+                    uint8_t block[4096];
+                    uint64_t physical = retained[i].physical +
+                                        (logical - retained[i].logical);
+                    if (physical >= fs->block_count ||
+                        !xfs_read_block(fs, physical, block)) return 0;
+                    for (uint32_t byte = (uint32_t)(size % fs->block_size);
+                         byte < fs->block_size; ++byte) block[byte] = 0;
+                    if (!xfs_write_block(fs, physical, block)) return 0;
+                    break;
+                }
+        }
+        for (uint32_t i = 0; i < retained_count; ++i)
+            xfs_store_extent(&data[core + i * 16U], retained[i].logical,
+                             retained[i].physical, retained[i].length,
+                             retained[i].unwritten);
+        store_be32(&data[76], retained_count);
+        store_be64(&data[56], size);
+        if (!xfs_write_inode(fs, inode, data)) return 0;
+        for (uint32_t i = 0; i < detached_count; ++i)
+            if (!xfs_free_extent(fs, detached[i].physical,
+                                 (uint32_t)detached[i].length)) return 0;
+        return 1;
     }
     store_be64(&data[56], size);
     return xfs_write_inode(fs, inode, data);

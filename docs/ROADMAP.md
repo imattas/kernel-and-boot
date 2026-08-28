@@ -331,7 +331,10 @@ boot-region validation, FAT/no-FAT-chain traversal, UTF-16 directory-name
 decoding, and file reads, backed by an independent in-memory contract test.
 The ext4, XFS, and Btrfs filesystem read/write milestones continue in bounded
 filesystem expansion; filesystem expansion is tracked separately from the
-kernel completion gate.
+kernel completion gate. XFS extent truncation now preserves the retained
+prefix, zeroes partial final blocks, publishes the shortened inode before
+releasing detached data extents, and updates validated AG BNO free-space
+metadata. Btrfs disk-space allocation remains temporarily deferred.
 
 ## Phase 8 — Kernel drivers
 

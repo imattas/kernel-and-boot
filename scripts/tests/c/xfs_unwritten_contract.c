@@ -33,6 +33,12 @@ int main(void) {
     put16(&inode[2], 0x8000); inode[4] = 2; inode[5] = 2;
     put64(&inode[56], 12288); put32(&inode[76], 1);
     put64(&inode[100], 1ULL << 63); put64(&inode[108], (9ULL << 21) | 3ULL);
+    uint8_t *agf = &image[4096];
+    put32(&agf[0], 0x58414746); put32(&agf[16], 2); put32(&agf[24], 1);
+    put32(&agf[40], 4); put32(&agf[44], 4);
+    uint8_t *bno = &image[8192];
+    put32(&bno[0], 0x58414254); put32(&bno[8], 1);
+    put32(&bno[16], 12); put32(&bno[20], 4);
     storage_initialize();
     storage_device_t device = {.name = "xfs-unwritten", .block_size = 512,
                                .block_count = 128, .read = read_image,

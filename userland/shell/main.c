@@ -129,11 +129,12 @@ static uint32_t resolve_command(const char *name, uint32_t name_length,
 
 void shell_main(void) {
     static const char prompt[] = "os> ";
-    static const char help[] = "help id ps env setenv unsetenv jobs which inherit echo pwd cd ls cat stat chmod kill sleep mv mkdir rm rmdir touch write run wait exit\r\n";
+    static const char help[] = "help id ps env setenv unsetenv status jobs which inherit echo pwd cd ls cat stat chmod kill sleep mv mkdir rm rmdir touch write run wait exit\r\n";
     static const char unknown[] = "unknown command\r\n";
     static char line[128];
     static char argument[128];
     uint32_t length = 0;
+    int32_t last_status = 0;
     print(prompt, sizeof(prompt) - 1U);
     for (;;) {
         uint32_t start = length;
@@ -391,6 +392,9 @@ void shell_main(void) {
                 if (argument_length == 0 ||
                     os_unsetenv(argument) == OS_SYSCALL_ERROR)
                     print(unknown, sizeof(unknown) - 1U);
+            } else if (command == SHELL_STATUS) {
+                print_status(last_status);
+                print("\r\n", 2);
             } else if (command == SHELL_MKDIR) {
                 uint32_t argument_length = 0;
                 while (argument[argument_length]) ++argument_length;
@@ -444,8 +448,10 @@ void shell_main(void) {
                 if (!parse_number(argument, pid_length, &process_id) ||
                     os_wait(process_id, &status) == OS_SYSCALL_ERROR ||
                     os_reap(process_id) == OS_SYSCALL_ERROR) {
+                    last_status = 1;
                     print(unknown, sizeof(unknown) - 1U);
                 } else {
+                    last_status = status;
                     print("exit=", 5);
                     print_status(status);
                     print("\r\n", 2);
@@ -480,6 +486,7 @@ void shell_main(void) {
                                                 argument + run_arguments);
                 int32_t status = -1;
                 if (process_id == OS_SYSCALL_ERROR) {
+                    last_status = 1;
                     print(unknown, sizeof(unknown) - 1U);
                 } else if (background) {
                     job_add(process_id);
@@ -488,8 +495,10 @@ void shell_main(void) {
                     print("\r\n", 2);
                 } else if (os_wait(process_id, &status) == OS_SYSCALL_ERROR ||
                            os_reap(process_id) == OS_SYSCALL_ERROR) {
+                    last_status = 1;
                     print(unknown, sizeof(unknown) - 1U);
                 } else {
+                    last_status = status;
                     print("exit=", 5);
                     print_status(status);
                     print("\r\n", 2);

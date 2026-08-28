@@ -24,6 +24,7 @@ typedef enum {
     SHELL_MV,
     SHELL_SETENV,
     SHELL_UNSETENV,
+    SHELL_STATUS,
     SHELL_MKDIR,
     SHELL_RM,
     SHELL_RMDIR,

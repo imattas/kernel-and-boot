@@ -1618,6 +1618,8 @@ The kernel now polls the configured COM1 serial console and feeds bounded input
 bytes into the same standard-input queue used by the shell, providing a
 terminal path without changing the userland ABI. A live QEMU typed-command
 probe remains a separate verification item.
+The shell also exposes the most recent waited-process result through a bounded
+`status` command.
 The FAT32 image builder now chains a second root-directory cluster, removing
 the one-sector root-entry ceiling for continued userland growth.
 The standalone `ECHO.ELF` utility is now stored in the expanded root directory

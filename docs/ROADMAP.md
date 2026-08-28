@@ -1190,6 +1190,12 @@ root when the final leaf is removed.
 Ext4 extent-root truncation now bounds and releases detached leaf blocks,
 removes empty extent records, and zeroes the retained partial block before
 persisting the reduced inode size.
+The ext4 VFS adapter now forwards bounded append writes to the existing growth
+allocator and refreshes its cached size after successful growth; equal-size
+truncation is idempotent.
+The exFAT VFS adapter now forwards its existing cluster-chain growth path for
+append writes and refreshes its cached size after successful growth; equal-size
+truncation is idempotent.
 Ext4 now supports bounded nonzero shrink/truncation by persistently updating
 the inode low/high size fields, with the VFS adapter synchronizing its cached
 file size and the contract verifying the on-disk result.

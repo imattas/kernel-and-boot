@@ -16,17 +16,20 @@ static int ext4_vfs_read(vfs_node_t *node, uint64_t offset,
 static int ext4_vfs_write(vfs_node_t *node, uint64_t offset,
                           const void *buffer, uint32_t size) {
     ext4_vfs_file_t *file = node ? (ext4_vfs_file_t *)node->private_data : 0;
-    if (!file || offset > file->size || (uint64_t)size > file->size - offset)
+    if (!file || !buffer || !size || offset > UINT64_MAX - size)
         return 0;
     uint64_t flags = spinlock_lock_irqsave(&file->lock);
+    uint64_t end = offset + size;
     int result = ext4_write_file(file->fs, file->inode, offset, buffer, size) ?
                  (int)size : 0;
+    if (result && end > file->size) file->size = end;
     spinlock_unlock_irqrestore(&file->lock, flags);
     return result;
 }
 static int ext4_vfs_truncate(vfs_node_t *node, uint32_t size) {
     ext4_vfs_file_t *file = node ? (ext4_vfs_file_t *)node->private_data : 0;
-    if (!file || size == 0 || (uint64_t)size >= file->size) return 0;
+    if (!file || (uint64_t)size > file->size) return 0;
+    if ((uint64_t)size == file->size) return 1;
     uint64_t flags = spinlock_lock_irqsave(&file->lock);
     int result = ext4_truncate_file(file->fs, file->inode, size);
     if (result) file->size = size;

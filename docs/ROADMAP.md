@@ -1594,6 +1594,8 @@ The standalone `ENV.ELF` utility now consumes that vector and is packaged in
 the boot image alongside `ARGS.ELF`.
 The standalone `CAT.ELF` utility now exercises the userland open/read/close
 path and is packaged in the boot image.
+The standalone `PWD.ELF` utility now exercises the userland working-directory
+query and is packaged in the boot image.
 
 ## Phase 10 — BIOS boot path
 

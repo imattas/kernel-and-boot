@@ -90,6 +90,7 @@ kernel gate below is explicitly marked complete.
 - [x] Pass inherited environment strings through spawned-process `envp`.
 - [x] Add standalone `ENV.ELF` utility consuming the inherited environment.
 - [x] Add standalone `CAT.ELF` utility using userland file descriptors.
+- [x] Add standalone `PWD.ELF` utility using the working-directory ABI.
 - [ ] Add reliable QEMU live keyboard verification for `run INIT.ELF`.
 - [ ] Add the command-line shell and terminal/console I/O.
 - [ ] Add process tools and initial utilities (`init`, `echo`, `ls`, `cat`,

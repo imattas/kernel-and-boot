@@ -2322,6 +2322,9 @@ void kernel_main(void *boot_info) {
     static const char expr_short_name[11] = {
         'E','X','P','R',' ',' ',' ',' ','E','L','F'
     };
+    static const char sh_short_name[11] = {
+        'S','H',' ',' ',' ',' ',' ',' ','E','L','F'
+    };
     if (!fat32_vfs_attach_file(&fat32, vfs_root, head_short_name,
                                "head.elf") ||
         !fat32_vfs_attach_file(&fat32, vfs_root, wc_short_name, "wc.elf") ||
@@ -2346,7 +2349,8 @@ void kernel_main(void *boot_info) {
         !fat32_vfs_attach_file(&fat32, vfs_root, which_short_name,
                                "which.elf") ||
         !fat32_vfs_attach_file(&fat32, vfs_root, expr_short_name,
-                               "expr.elf")) {
+                               "expr.elf") ||
+        !fat32_vfs_attach_file(&fat32, vfs_root, sh_short_name, "sh.elf")) {
         serial_write("userland text utility VFS attach failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }

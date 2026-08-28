@@ -1989,6 +1989,8 @@ The userland utility set now includes `expr.elf`, a bounded freestanding
 signed-integer arithmetic utility with overflow and division-error checks.
 The shell command inventory now recognizes bare `expr` invocations through
 PATH while preserving external pipeline and redirection dispatch.
+The packaged shell is also available as the conventional `sh.elf`/`sh` alias,
+sharing the existing shell image chain.
 
 Process teardown now releases each process lock before removing the process
 from the global process table, preserving the lock ordering used by activation

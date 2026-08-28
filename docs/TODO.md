@@ -177,6 +177,8 @@ type, string, and numeric tests.
   `+`, `-`, `*`, `/`, and `%`, packaged in the FAT32 image and VFS namespace.
 - [x] Expose `expr.elf` through bare shell PATH resolution and synchronized
   help/parser coverage.
+- [x] Expose the shell executable under conventional `sh.elf`/`sh` aliases
+  without duplicating its image payload.
 - [x] Add native shell `basename` and `dirname` path inspection commands while
   preserving their external pipeline/redirection forms.
 - [x] Add standalone `which.elf` PATH executable discovery through the shared

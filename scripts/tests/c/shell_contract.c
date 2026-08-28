@@ -29,6 +29,9 @@ int main(void) {
     assert(shell_parse("id", 2, argument, sizeof(argument)) == SHELL_ID);
     assert(shell_parse("ps", 2, argument, sizeof(argument)) == SHELL_PS);
     assert(shell_parse("env", 3, argument, sizeof(argument)) == SHELL_ENV);
+    assert(shell_parse("env MODE=test ECHO.ELF hello", 28, argument,
+                       sizeof(argument)) == SHELL_RUN);
+    assert(strcmp(argument, "env MODE=test ECHO.ELF hello") == 0);
     assert(shell_parse("jobs", 4, argument, sizeof(argument)) == SHELL_JOBS);
     assert(shell_parse("history", 7, argument, sizeof(argument)) == SHELL_HISTORY);
     assert(shell_parse("fg 4", 4, argument, sizeof(argument)) == SHELL_FG);

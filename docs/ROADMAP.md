@@ -1819,6 +1819,10 @@ The environment utility set now includes standalone `unsetenv.elf`, which
 removes one or more inherited variables through the normal syscall ABI and is
 packaged in the FAT32 image and live VFS namespace.
 
+The shell now preserves the zero-argument `env` builtin while dispatching
+assignment-prefixed `env NAME=VALUE COMMAND` invocations to packaged `env.elf`
+through PATH resolution and the normal process ABI.
+
 Shell operator validation now rejects empty pipeline/redirection operands,
 non-terminal background markers, unterminated quoting, and trailing escapes
 before any process-launch path is selected.

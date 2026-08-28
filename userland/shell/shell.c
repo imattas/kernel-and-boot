@@ -201,7 +201,13 @@ shell_command_t shell_parse(const char *line, uint32_t length,
     if (same_word(line, command_length, "clear")) return SHELL_CLEAR;
     if (same_word(line, command_length, "id")) return SHELL_ID;
     if (same_word(line, command_length, "ps")) return SHELL_PS;
-    if (same_word(line, command_length, "env")) return SHELL_ENV;
+    if (same_word(line, command_length, "env")) {
+        if (command_length == length) return SHELL_ENV;
+        if (length >= capacity) return SHELL_UNKNOWN;
+        for (uint32_t index = 0; index <= length; ++index)
+            argument[index] = line[index];
+        return SHELL_RUN;
+    }
     if (same_word(line, command_length, "jobs")) return SHELL_JOBS;
     if (same_word(line, command_length, "history")) return SHELL_HISTORY;
     if (same_word(line, command_length, "exit")) return SHELL_EXIT;

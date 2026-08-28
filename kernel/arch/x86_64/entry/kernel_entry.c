@@ -3185,6 +3185,8 @@ void kernel_main(void *boot_info) {
     static const char create_syscall_path[] = "/user/syscall_create_probe";
     static const char rename_syscall_path[] = "/user/syscall_rename_probe";
     static const char mkdir_syscall_path[] = "/user/syscall_dir_probe";
+    static const char rename_target_path[] =
+        "/user/syscall_dir_probe/syscall_rename_probe";
     uint64_t create_syscall_handle = OS_SYSCALL_ERROR;
     if (!syscall_copy_to_user(0x8000002000ULL, create_syscall_path,
                               sizeof(create_syscall_path)) ||
@@ -3192,18 +3194,20 @@ void kernel_main(void *boot_info) {
                               sizeof(rename_syscall_path)) ||
         !syscall_copy_to_user(0x8000003000ULL, mkdir_syscall_path,
                               sizeof(mkdir_syscall_path)) ||
+        !syscall_copy_to_user(0x8000007000ULL, rename_target_path,
+                              sizeof(rename_target_path)) ||
         (create_syscall_handle = syscall_dispatch(OS_SYSCALL_CREATE,
             0x8000002000ULL, sizeof(create_syscall_path) - 1,
             VFS_FILE_READ | VFS_FILE_WRITE)) == OS_SYSCALL_ERROR ||
         syscall_dispatch(OS_SYSCALL_CLOSE, create_syscall_handle, 0, 0) != 0 ||
-        syscall_dispatch(OS_SYSCALL_RENAME,
-                         0x8000002000ULL, 0x8000006000ULL,
-                         ((uint64_t)(sizeof(rename_syscall_path) - 1) << 32) |
-                         (sizeof(create_syscall_path) - 1)) == OS_SYSCALL_ERROR ||
         syscall_dispatch(OS_SYSCALL_MKDIR, 0x8000003000ULL,
                          sizeof(mkdir_syscall_path) - 1, 0755) != 0 ||
-        syscall_dispatch(OS_SYSCALL_UNLINK, 0x8000006000ULL,
-                         sizeof(rename_syscall_path) - 1, 0) != 0 ||
+        syscall_dispatch(OS_SYSCALL_RENAME,
+                         0x8000002000ULL, 0x8000007000ULL,
+                         ((uint64_t)(sizeof(rename_target_path) - 1) << 32) |
+                         (sizeof(create_syscall_path) - 1)) == OS_SYSCALL_ERROR ||
+        syscall_dispatch(OS_SYSCALL_UNLINK, 0x8000007000ULL,
+                         sizeof(rename_target_path) - 1, 0) != 0 ||
         syscall_dispatch(OS_SYSCALL_UNLINK, 0x8000003000ULL,
                          sizeof(mkdir_syscall_path) - 1, 0) != OS_SYSCALL_ERROR ||
         syscall_dispatch(OS_SYSCALL_RMDIR, 0x8000003000ULL,

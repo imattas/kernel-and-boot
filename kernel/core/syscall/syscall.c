@@ -559,13 +559,15 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
                                                      old_leaf, &old_security);
             vfs_node_t *new_parent = syscall_parent(process, new_path, new_length,
                                                      new_leaf, &new_security);
-            if (!old_parent || !new_parent || old_parent != new_parent) {
+            if (!old_parent || !new_parent) {
                 if (new_parent) vfs_node_release(new_parent);
                 if (old_parent) vfs_node_release(old_parent);
                 return OS_SYSCALL_ERROR;
             }
             vfs_node_t *child = vfs_node_lookup(old_parent, old_leaf);
-            int result = child && vfs_node_rename(old_parent, child, new_leaf);
+            int result = child && (old_parent == new_parent ?
+                         vfs_node_rename(old_parent, child, new_leaf) :
+                         vfs_node_move(old_parent, new_parent, child, new_leaf));
             if (child) vfs_node_release(child);
             vfs_node_release(new_parent); vfs_node_release(old_parent);
             return result ? 0 : OS_SYSCALL_ERROR;

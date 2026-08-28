@@ -462,3 +462,47 @@ int vfs_node_rename(vfs_node_t *parent, vfs_node_t *child, const char *name) {
     spinlock_unlock_irqrestore(&first->lock, first_flags);
     return 1;
 }
+
+int vfs_node_move(vfs_node_t *old_parent, vfs_node_t *new_parent,
+                  vfs_node_t *child, const char *name) {
+    if (!old_parent || !new_parent || !child || !name ||
+        old_parent == new_parent || old_parent == child ||
+        new_parent == child || old_parent->type != VFS_NODE_DIRECTORY ||
+        new_parent->type != VFS_NODE_DIRECTORY ||
+        child->type != VFS_NODE_REGULAR)
+        return 0;
+    uint32_t length = string_length(name);
+    if (length == 0 || length >= sizeof(child->name) ||
+        (length == 1 && name[0] == '.') ||
+        (length == 2 && name[0] == '.' && name[1] == '.')) return 0;
+    vfs_node_t *nodes[3] = {old_parent, new_parent, child};
+    for (uint32_t i = 0; i < 3; ++i)
+        for (uint32_t j = i + 1; j < 3; ++j)
+            if ((uintptr_t)nodes[j] < (uintptr_t)nodes[i]) {
+                vfs_node_t *swap = nodes[i]; nodes[i] = nodes[j]; nodes[j] = swap;
+            }
+    uint64_t flags[3];
+    for (uint32_t i = 0; i < 3; ++i)
+        flags[i] = spinlock_lock_irqsave(&nodes[i]->lock);
+    int valid = child->parent == old_parent && !child->destroying &&
+                child->references != 0;
+    for (vfs_node_t *existing = new_parent->first_child; valid && existing;
+         existing = existing->next_sibling)
+        if (existing != child && string_equal(existing->name, name)) valid = 0;
+    vfs_node_t **link = &old_parent->first_child;
+    while (valid && *link && *link != child) link = &(*link)->next_sibling;
+    if (!valid || !*link) valid = 0;
+    if (valid) {
+        *link = child->next_sibling;
+        child->next_sibling = new_parent->first_child;
+        new_parent->first_child = child;
+        child->parent = new_parent;
+        --old_parent->child_count;
+        ++new_parent->child_count;
+        for (uint32_t i = 0; i <= length; ++i) child->name[i] = name[i];
+    }
+    for (uint32_t i = 3; i != 0; --i)
+        spinlock_unlock_irqrestore(&nodes[i - 1U]->lock, flags[i - 1U]);
+    if (valid) { try_destroy(old_parent); try_destroy(new_parent); }
+    return valid;
+}

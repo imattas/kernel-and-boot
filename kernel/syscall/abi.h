@@ -46,7 +46,8 @@ enum {
     OS_SYSCALL_GETGID = 39,
     OS_SYSCALL_GETPPID = 40,
     OS_SYSCALL_SPAWN = 41,
-    OS_SYSCALL_PROCESS_LIST = 42
+    OS_SYSCALL_PROCESS_LIST = 42,
+    OS_SYSCALL_PROCESS_STATUS = 43
 };
 
 #define OS_SYSCALL_ERROR UINT64_MAX
@@ -65,5 +66,12 @@ typedef struct {
     uint32_t mode;
     uint32_t type;
 } os_syscall_stat_t;
+
+typedef struct {
+    uint64_t id;
+    uint64_t parent_id;
+    uint32_t state;
+    int32_t exit_status;
+} os_syscall_process_info_t;
 
 #endif

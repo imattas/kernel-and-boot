@@ -5,6 +5,13 @@
 
 #define OS_SYSCALL_ERROR UINT64_MAX
 
+typedef struct {
+    uint64_t id;
+    uint64_t parent_id;
+    uint32_t state;
+    int32_t exit_status;
+} os_process_info_t;
+
 uint64_t os_syscall3(uint64_t number, uint64_t arg1, uint64_t arg2,
                      uint64_t arg3);
 
@@ -15,6 +22,11 @@ static inline uint64_t os_getgid(void) { return os_syscall3(39, 0, 0, 0); }
 
 static inline uint64_t os_process_list(uint64_t *ids, uint64_t capacity) {
     return os_syscall3(42, (uint64_t)(uintptr_t)ids, capacity, 0);
+}
+
+static inline uint64_t os_process_status(uint64_t process_id,
+                                         os_process_info_t *info) {
+    return os_syscall3(43, process_id, (uint64_t)(uintptr_t)info, 0);
 }
 
 static inline uint64_t os_write(uint64_t descriptor, const void *buffer,

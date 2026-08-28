@@ -125,6 +125,22 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
                                         count * sizeof(uint64_t)) ? count :
                    OS_SYSCALL_ERROR;
         }
+        case OS_SYSCALL_PROCESS_STATUS: {
+            process_t *target = process_lookup_retain(arg1);
+            if (!target || !user_range(arg2, sizeof(os_syscall_process_info_t), 1)) {
+                process_release(target);
+                return OS_SYSCALL_ERROR;
+            }
+            uint64_t flags = spinlock_lock_irqsave(&target->lock);
+            os_syscall_process_info_t info = {
+                target->id, target->parent ? target->parent->id : 0,
+                (uint32_t)target->state, target->exit_status
+            };
+            spinlock_unlock_irqrestore(&target->lock, flags);
+            process_release(target);
+            return syscall_copy_to_user(arg2, &info, sizeof(info)) ? 0 :
+                   OS_SYSCALL_ERROR;
+        }
         case OS_SYSCALL_GETUID:
         case OS_SYSCALL_GETGID: {
             process_t *process = process_current();

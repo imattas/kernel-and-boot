@@ -65,7 +65,16 @@ void shell_main(void) {
                     print(unknown, sizeof(unknown) - 1U);
                 } else {
                     for (uint64_t index = 0; index < count; ++index) {
-                        print_number(ids[index]);
+                        os_process_info_t info;
+                        if (os_process_status(ids[index], &info) != 0) continue;
+                        print("pid=", 4);
+                        print_number(info.id);
+                        print(" ppid=", 6);
+                        print_number(info.parent_id);
+                        print(" state=", 7);
+                        print_number(info.state);
+                        print(" exit=", 6);
+                        print_number((uint32_t)info.exit_status);
                         print("\r\n", 2);
                     }
                 }

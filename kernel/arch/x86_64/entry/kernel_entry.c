@@ -2171,6 +2171,26 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("userland metadata utility namespace ready\r\n");
+    static const char mv_short_name[11] = {
+        'M','V',' ',' ',' ',' ',' ',' ','E','L','F'
+    };
+    static const char kill_short_name[11] = {
+        'K','I','L','L',' ',' ',' ',' ','E','L','F'
+    };
+    static const char sleep_short_name[11] = {
+        'S','L','E','E','P',' ',' ',' ','E','L','F'
+    };
+    static const char setenv_short_name[11] = {
+        'S','E','T','E','N','V',' ',' ','E','L','F'
+    };
+    if (!fat32_vfs_attach_file(&fat32, vfs_root, mv_short_name, "mv.elf") ||
+        !fat32_vfs_attach_file(&fat32, vfs_root, kill_short_name, "kill.elf") ||
+        !fat32_vfs_attach_file(&fat32, vfs_root, sleep_short_name, "sleep.elf") ||
+        !fat32_vfs_attach_file(&fat32, vfs_root, setenv_short_name, "setenv.elf")) {
+        serial_write("userland process utility VFS attach failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("userland process utility namespace ready\r\n");
     vfs_node_t *vfs_foreign = vfs_node_create("foreign", VFS_NODE_REGULAR,
                                                0, 0, 0444);
     int vfs_remove_result = vfs_foreign ?

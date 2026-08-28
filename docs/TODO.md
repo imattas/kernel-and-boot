@@ -169,6 +169,8 @@ kernel gate below is explicitly marked complete.
   live FAT32-backed VFS namespace.
 - [x] Expose `ls.elf`, `chmod.elf`, `echo.elf`, and `stat.elf` through the live
   FAT32-backed VFS namespace.
+- [x] Expose `mv.elf`, `kill.elf`, `sleep.elf`, and `setenv.elf` through the
+  live FAT32-backed VFS namespace.
 - [ ] Add reliable QEMU live keyboard verification for `run INIT.ELF`.
 - [ ] Expose the complete multi-cluster FAT32 boot-image application set in the
   live VFS namespace for reliable external `run` execution.

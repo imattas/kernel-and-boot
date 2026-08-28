@@ -1724,9 +1724,10 @@ Input and network runtime services now start before the persistent shell, so an
 immediately-blocking shell cannot starve those services. The init-to-shell
 supervisor handoff remains deferred. `args.elf`, `env.elf`, `cat.elf`,
 `pwd.elf`, `mkdir.elf`, `rm.elf`, `rmdir.elf`, `touch.elf`, `write.elf`,
-`ls.elf`, `chmod.elf`, `echo.elf`, and `stat.elf` are now exposed as executable
-utilities through the live FAT32-backed VFS namespace; the remaining
-application set is the next userland boundary.
+`ls.elf`, `chmod.elf`, `echo.elf`, `stat.elf`, `mv.elf`, `kill.elf`,
+`sleep.elf`, and `setenv.elf` are now exposed as executable utilities through
+the live FAT32-backed VFS namespace; the remaining application set is the
+next userland boundary.
 The shell now keeps a bounded eight-entry command history and handles split
 ANSI up/down escape sequences without feeding terminal control bytes into the
 command parser.

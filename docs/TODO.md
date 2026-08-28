@@ -89,6 +89,7 @@ kernel gate below is explicitly marked complete.
 - [x] Add the first standalone ring-3 argument-printing utility to the image.
 - [x] Pass inherited environment strings through spawned-process `envp`.
 - [x] Add standalone `ENV.ELF` utility consuming the inherited environment.
+- [x] Add standalone `CAT.ELF` utility using userland file descriptors.
 - [ ] Add reliable QEMU live keyboard verification for `run INIT.ELF`.
 - [ ] Add the command-line shell and terminal/console I/O.
 - [ ] Add process tools and initial utilities (`init`, `echo`, `ls`, `cat`,

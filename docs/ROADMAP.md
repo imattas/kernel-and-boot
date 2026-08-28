@@ -1592,6 +1592,8 @@ Spawned programs now receive the inherited environment block through a
 conventional `envp` pointer after their `argv` vector.
 The standalone `ENV.ELF` utility now consumes that vector and is packaged in
 the boot image alongside `ARGS.ELF`.
+The standalone `CAT.ELF` utility now exercises the userland open/read/close
+path and is packaged in the boot image.
 
 ## Phase 10 — BIOS boot path
 

@@ -1831,6 +1831,9 @@ Shell output redirection now supports `>>`: existing files are opened with
 read/write access and drained to EOF before the child inherits the descriptor,
 while `>` retains create-and-truncate behavior.
 
+Standalone `env.elf` now supports `-i` to clear inherited variables and repeated
+`-u NAME` filters before applying assignment prefixes and launching a command.
+
 Shell operator validation now rejects empty pipeline/redirection operands,
 non-terminal background markers, unterminated quoting, and trailing escapes
 before any process-launch path is selected.

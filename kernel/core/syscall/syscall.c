@@ -417,6 +417,8 @@ standard_io_rw:
                                     (uint32_t)arg3)) : 0;
             }
             process_handle_release_ref(&ref);
+            if (result == 0 && number == OS_SYSCALL_READ &&
+                ref.kind == PROCESS_HANDLE_OBJECT_PIPE_READ) return 0;
             return result > 0 ? (uint64_t)(uint32_t)result : OS_SYSCALL_ERROR;
         }
         case OS_SYSCALL_CLOSE:

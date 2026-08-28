@@ -127,6 +127,76 @@ static uint32_t resolve_command(const char *name, uint32_t name_length,
     return 0;
 }
 
+static int shell_run_pipeline(char *text, uint32_t length, int32_t *status) {
+    uint32_t separator = length;
+    for (uint32_t index = 0; index < length; ++index) {
+        if (text[index] != '|') continue;
+        if (separator != length) return 0;
+        separator = index;
+    }
+    if (separator == length) return 0;
+    text[separator] = 0;
+    uint32_t left_start = 0;
+    while (left_start < separator && (text[left_start] == ' ' ||
+                                      text[left_start] == '\t')) ++left_start;
+    uint32_t left_length = separator;
+    while (left_length > left_start && (text[left_length - 1U] == ' ' ||
+                                        text[left_length - 1U] == '\t'))
+        --left_length;
+    uint32_t right_start = separator + 1U;
+    while (right_start < length && (text[right_start] == ' ' ||
+                                    text[right_start] == '\t')) ++right_start;
+    if (left_start == left_length || right_start == length) return 0;
+    uint32_t left_name_length = left_start;
+    while (left_name_length < left_length && text[left_name_length] != ' ' &&
+           text[left_name_length] != '\t') ++left_name_length;
+    uint32_t right_length = length - right_start;
+    uint32_t right_name_length = 0;
+    while (right_name_length < right_length && text[right_start + right_name_length] != ' ' &&
+           text[right_start + right_name_length] != '\t') ++right_name_length;
+    char left_path[128];
+    char right_path[128];
+    uint32_t resolved_left = resolve_command(text + left_start, left_name_length - left_start,
+                                              left_path, sizeof(left_path));
+    uint32_t resolved_right = resolve_command(text + right_start, right_name_length,
+                                               right_path, sizeof(right_path));
+    if (resolved_left == 0 || resolved_right == 0) return 0;
+    uint32_t read_handle = 0;
+    uint32_t write_handle = 0;
+    if (os_pipe(&read_handle, &write_handle) == OS_SYSCALL_ERROR ||
+        os_set_inheritable(read_handle, 0) == OS_SYSCALL_ERROR)
+        return 0;
+    uint32_t left_args_start = left_name_length;
+    while (left_args_start < left_length && (text[left_args_start] == ' ' ||
+                                             text[left_args_start] == '\t')) ++left_args_start;
+    uint64_t left_process = os_spawn_redirected(
+        left_path, resolved_left, text + left_args_start, 0, write_handle);
+    (void)os_set_inheritable(read_handle, 1);
+    if (left_process == OS_SYSCALL_ERROR ||
+        os_set_inheritable(write_handle, 0) == OS_SYSCALL_ERROR) {
+        (void)os_close(read_handle);
+        (void)os_close(write_handle);
+        return 0;
+    }
+    uint32_t right_args_start = right_start + right_name_length;
+    while (right_args_start < length && (text[right_args_start] == ' ' ||
+                                         text[right_args_start] == '\t')) ++right_args_start;
+    uint64_t right_process = os_spawn_redirected(
+        right_path, resolved_right, text + right_args_start, read_handle, 0);
+    (void)os_set_inheritable(write_handle, 1);
+    (void)os_close(read_handle);
+    (void)os_close(write_handle);
+    if (right_process == OS_SYSCALL_ERROR) return 0;
+    int32_t left_status = -1;
+    int32_t right_status = -1;
+    if (os_wait(left_process, &left_status) == OS_SYSCALL_ERROR ||
+        os_reap(left_process) == OS_SYSCALL_ERROR ||
+        os_wait(right_process, &right_status) == OS_SYSCALL_ERROR ||
+        os_reap(right_process) == OS_SYSCALL_ERROR) return 0;
+    *status = right_status;
+    return 1;
+}
+
 void shell_main(void) {
     static const char prompt[] = "os> ";
     static const char help[] = "help id ps env setenv unsetenv status jobs which inherit echo pwd cd ls cat stat chmod kill sleep mv mkdir rm rmdir touch write run wait exit\r\n";
@@ -460,6 +530,21 @@ void shell_main(void) {
             } else if (command == SHELL_RUN) {
                 uint32_t argument_length = 0;
                 while (argument[argument_length]) ++argument_length;
+                uint32_t pipeline_count = 0;
+                for (uint32_t index = 0; index < argument_length; ++index)
+                    if (argument[index] == '|') ++pipeline_count;
+                if (pipeline_count != 0) {
+                    int32_t pipeline_status = 1;
+                    if (!shell_run_pipeline(argument, argument_length,
+                                             &pipeline_status))
+                        print(unknown, sizeof(unknown) - 1U);
+                    else {
+                        last_status = pipeline_status;
+                        print("exit=", 5);
+                        print_status(pipeline_status);
+                        print("\r\n", 2);
+                    }
+                } else {
                 int background = 0;
                 if (argument_length != 0 && argument[argument_length - 1U] == '&') {
                     background = 1;
@@ -502,6 +587,7 @@ void shell_main(void) {
                     print("exit=", 5);
                     print_status(status);
                     print("\r\n", 2);
+                }
                 }
             } else if (command == SHELL_EXIT) {
                 os_exit(0);

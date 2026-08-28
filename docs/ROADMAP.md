@@ -1626,6 +1626,11 @@ descriptor inheritance remains available for the next shell pipeline slice.
 Processes now retain optional standard-input and standard-output descriptor
 bindings, and redirected spawn requests can populate those bindings while
 preserving the default console path.
+The shell now executes a bounded two-process pipeline with
+`run <producer> | <consumer>`, inheriting only the required pipe end into each
+child and reporting the consumer's exit status. `CAT.ELF` consumes standard
+input when invoked without a path, providing the first packaged pipeline
+consumer.
 The FAT32 image builder now chains a second root-directory cluster, removing
 the one-sector root-entry ceiling for continued userland growth.
 The standalone `ECHO.ELF` utility is now stored in the expanded root directory

@@ -359,7 +359,7 @@ device signature, and are gated by real LBA0 FAT32 read and sector write/read-ba
 signature checks. Controller I/O coverage now includes the exercised USB,
 NVMe, AHCI, ATA, and network interrupt/error paths. The driver completion audit
 is covered by the grouped QEMU gate and the device-claim rollback contract;
-remaining kernel work is filesystem hardening.
+remaining work is the final kernel completion audit.
 AHCI now also exposes bounded multi-sector READ/WRITE DMA transfers with a
 two-entry PRDT spanning two DMA pages; the QEMU gate verifies a sixteen-sector
 write/read-back operation across that boundary.
@@ -1281,9 +1281,9 @@ transaction: all child leaves, both index roots, and the AGF are redistributed
 and restored together when publication fails, including empty-child collapse
 and later repopulation. The authenticated allocator now has a bounded
 on-disk intent journal with prepare/commit ordering, payload clearing, and
-mount-time committed replay. Larger fan-out trees and full filesystem-wide
-transaction logging remain pending; a device flush is a persistence barrier,
-not a recovery log. Nested empty-child transitions can now be repopulated
+mount-time committed replay. Larger fan-out trees remain a bounded-format
+limitation; a device flush is a persistence barrier, not a recovery log.
+Nested empty-child transitions can now be repopulated
 without leaving invalid AGF/CNT metadata. Authentic metadata and inode
 publications use the journal when configured, while XFS directory metadata
 writes still request the storage device's flush operation when available.

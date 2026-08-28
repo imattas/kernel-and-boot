@@ -384,9 +384,12 @@ vfs_node_t *vfs_lookup_path_at_access(vfs_node_t *root, vfs_node_t *working,
 
 void vfs_node_retain(vfs_node_t *node) {
     if (!node) return;
-    uint64_t flags = spinlock_lock_irqsave(&node->lock);
-    if (!node->destroying && node->references != 0) ++node->references;
-    spinlock_unlock_irqrestore(&node->lock, flags);
+    uint32_t references = __atomic_load_n(&node->references, __ATOMIC_ACQUIRE);
+    while (!__atomic_load_n(&node->destroying, __ATOMIC_ACQUIRE) &&
+           references != 0 &&
+           !__atomic_compare_exchange_n(&node->references, &references,
+                                        references + 1U, 0, __ATOMIC_ACQ_REL,
+                                        __ATOMIC_ACQUIRE)) { }
 }
 
 void vfs_node_release(vfs_node_t *node) {

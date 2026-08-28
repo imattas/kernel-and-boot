@@ -2079,6 +2079,11 @@ spawn: it snapshots the current process namespace before retaining VFS nodes.
 This removes the process-lock acquisition deadlock; final live verification is
 still pending because the subsequent VFS path walk has a separate blocker.
 
+VFS node reference acquisition now uses an atomic retain operation, allowing
+namespace inheritance and syscall snapshots to retain nodes without taking a
+node mutex while another process lock is held. External `run` execution still
+requires final live proof.
+
 The normal `make run` target now explicitly selects `-display none` so its
 `os> ` prompt is visibly and reliably attached to the launching terminal;
 the graphical/VNC surface is not a terminal and does not accept shell input.

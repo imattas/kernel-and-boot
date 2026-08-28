@@ -18,6 +18,8 @@ typedef struct {
     uint32_t framebuffer_height;
     uint32_t framebuffer_pitch;
     uint32_t framebuffer_format;
+    uint64_t init_image;
+    uint64_t init_image_size;
 } os_boot_info_t;
 
 #endif

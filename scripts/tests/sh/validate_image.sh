@@ -22,6 +22,8 @@ assert root[:11] == b'EFI        '
 assert root[26:28] == b'\x03\x00'
 assert root[32:43] == b'KERNEL  ELF'
 assert int.from_bytes(root[58:60], 'little') >= 5
+assert root[64:75] == b'INIT    ELF'
+assert int.from_bytes(root[90:92], 'little') >= 5
 assert data[(33 + 2 * 520) * 512 + 64:(33 + 2 * 520) * 512 + 75] == b'BOOT       '
 assert data[(34 + 2 * 520) * 512 + 64:(34 + 2 * 520) * 512 + 75] == b'BOOTX64 EFI'
 print('FAT image contract: PASS')

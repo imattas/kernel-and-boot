@@ -94,7 +94,9 @@ grep -F 'user process clone ready' "$log" >/dev/null
 grep -F 'process signals ready' "$log" >/dev/null
 grep -F 'signal blocking ready' "$log" >/dev/null
 grep -F 'process handles ready' "$log" >/dev/null
-grep -F 'user mode deferred until kernel completion' "$log" >/dev/null
+grep -F 'external userland init ready' "$log" >/dev/null
+grep -F 'userland runtime ready' "$log" >/dev/null
+grep -F 'os userland init' "$log" >/dev/null
 grep -F 'network runtime service ready' "$log" >/dev/null
 grep -F 'input runtime service ready' "$log" >/dev/null
 if grep -E 'X64 Exception|kernel contract invalid|KERNEL (PANIC|EXCEPTION)' "$log" >/dev/null; then

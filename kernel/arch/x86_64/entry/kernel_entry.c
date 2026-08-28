@@ -3439,9 +3439,56 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("ring3 transition ready\r\n");
+    if (!info || !info->init_image || !info->init_image_size) {
+        serial_write("external userland image missing\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    process_t *init_process = process_create(7);
+    process_thread_t *init_thread = 0;
+    if (!init_process) {
+        serial_write("external userland process creation failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    if (!process_load_image(init_process, (const void *)(uintptr_t)info->init_image,
+                            info->init_image_size)) {
+        serial_write("external userland image load failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    if (!process_map_user_stack(init_process, 0x8000008000ULL) ||
+        !process_set_namespace(init_process, vfs_root, vfs_root) ||
+        !(init_thread = process_thread_create_user(init_process, 7,
+            init_process->image.entry, init_process->user_stack_top, 4096))) {
+        serial_write("external userland setup failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    if (!process_thread_start(init_thread)) {
+        serial_write("external userland thread start failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    if (!scheduler_start()) {
+        serial_write("external userland scheduler failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    if (init_process->state != PROCESS_EXITED) {
+        serial_write("external userland exit failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    if (!process_thread_destroy(init_thread)) {
+        serial_write("external userland thread reap failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    if (!address_space_activate_kernel()) {
+        serial_write("external userland kernel address-space failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    if (!process_destroy(init_process)) {
+        serial_write("external userland process reap failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("external userland init ready\r\n");
     if (!kernel_init_state_advance(&init_state, KERNEL_INIT_SERVICES))
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
-    serial_write("user mode deferred until kernel completion\r\n");
+    serial_write("userland runtime ready\r\n");
     if (e1000_controller_count() != 0) {
         task_t *network_task = task_create_kernel(500, network_runtime_task,
                                                    &network_runtime, 16384);

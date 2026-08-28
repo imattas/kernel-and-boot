@@ -729,8 +729,8 @@ $(FAT32_TEST): scripts/tests/c/fat32_contract.c kernel/fs/fat/fat32.c kernel/fs/
 
 image: $(IMAGE)
 
-$(IMAGE): $(UEFI_EFI) $(KERNEL_ELF) scripts/image/create_fat_image.py
-	python3 scripts/image/create_fat_image.py $(UEFI_EFI) $(KERNEL_ELF) $@
+$(IMAGE): $(UEFI_EFI) $(KERNEL_ELF) $(USERLAND_INIT_ELF) scripts/image/create_fat_image.py
+	python3 scripts/image/create_fat_image.py $(UEFI_EFI) $(KERNEL_ELF) $(USERLAND_INIT_ELF) $@
 	sh scripts/tests/sh/validate_image.sh $@
 
 qemu-test: $(IMAGE)

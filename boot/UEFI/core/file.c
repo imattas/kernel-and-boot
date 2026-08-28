@@ -5,7 +5,7 @@ static const efi_guid_t file_info_guid = {0x09576e92,0x6d3f,0x11d2,
 #define EFI_BUFFER_TOO_SMALL 5U
 typedef efi_status_t (*efi_free_pool_t)(void *);
 
-efi_status_t uefi_read_kernel_file(efi_boot_services_t *bs,
+efi_status_t uefi_read_file(efi_boot_services_t *bs,
                                    efi_file_protocol_t *kernel,
                                    uint8_t **buffer, efi_uintn_t *size) {
     if (!bs || !bs->allocate_pool || !kernel || !kernel->get_info ||

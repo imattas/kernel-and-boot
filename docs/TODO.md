@@ -60,7 +60,7 @@ kernel gate below is explicitly marked complete.
 - [x] Tell the user before creating ring-3/userland implementation.
 - [x] Build the first freestanding ring-3 init ELF against the existing syscall
   ABI boundary.
-- [ ] Load `INIT.ELF` from the UEFI boot contract and launch it as the first
+- [x] Load `INIT.ELF` from the UEFI boot contract and launch it as the first
   external user process.
 - [ ] Add the command-line shell and terminal/console I/O.
 - [ ] Add process tools and initial utilities (`init`, `echo`, `ls`, `cat`,

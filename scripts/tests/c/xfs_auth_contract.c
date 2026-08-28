@@ -82,6 +82,14 @@ int main(void) {
     p32(&bno_root[16], 10); p32(&bno_root[20], 3); p32(&bno_root[2736], 5);
     leaf(bno_leaf, 10, 3);
     assert(xfs_mount(&fs, 0));
+    assert(xfs_allocate_extent(&fs, 0, 2, &start) && start == 10);
+    assert(g32(&bno_leaf[16]) == 12 && g32(&cnt_leaf[16]) == 12 &&
+           g32(&bno_root[16]) == 12 && g32(&cnt_root[16]) == 12 &&
+           g32(&agf[52]) == 1 && g32(&agf[56]) == 1);
+    assert(xfs_free_extent(&fs, 10, 2));
+    assert(g32(&bno_leaf[16]) == 10 && g32(&cnt_leaf[16]) == 10 &&
+           g32(&bno_root[16]) == 10 && g32(&cnt_root[16]) == 10 &&
+           g32(&agf[52]) == 3 && g32(&agf[56]) == 3);
     p32(&bno_root[16], 11);
     assert(!xfs_mount(&fs, 0));
     return 0;

@@ -3531,24 +3531,6 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("external userland init ready\r\n");
-    if (!info->shell_image || !info->shell_image_size) {
-        serial_write("external shell image missing\r\n");
-        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
-    }
-    process_t *shell_process = process_create(8);
-    process_thread_t *shell_thread = 0;
-    if (!shell_process ||
-        !process_load_image(shell_process, (const void *)(uintptr_t)info->shell_image,
-                            info->shell_image_size) ||
-        !process_map_user_stack(shell_process, 0x8000030000ULL) ||
-        !process_set_namespace(shell_process, vfs_root, vfs_root) ||
-        !(shell_thread = process_thread_create_user(shell_process, 8,
-            shell_process->image.entry, shell_process->user_stack_top, 4096)) ||
-        !process_thread_start(shell_thread)) {
-        serial_write("external shell setup failure\r\n");
-        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
-    }
-    serial_write("interactive shell ready\r\n");
     if (!kernel_init_state_advance(&init_state, KERNEL_INIT_SERVICES))
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     serial_write("userland runtime ready\r\n");
@@ -3569,12 +3551,29 @@ void kernel_main(void *boot_info) {
         }
         serial_write("input runtime service ready\r\n");
     }
-    if (e1000_controller_count() != 0 || input_runtime_ready) {
+    if (e1000_controller_count() != 0 || input_runtime_ready)
         scheduler_enable_preemption(1);
-        if (!scheduler_start()) {
-            serial_write("kernel runtime task start failure\r\n");
-            for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
-        }
+    if (!info->shell_image || !info->shell_image_size) {
+        serial_write("external shell image missing\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    process_t *shell_process = process_create(8);
+    process_thread_t *shell_thread = 0;
+    if (!shell_process ||
+        !process_load_image(shell_process, (const void *)(uintptr_t)info->shell_image,
+                            info->shell_image_size) ||
+        !process_map_user_stack(shell_process, 0x8000030000ULL) ||
+        !process_set_namespace(shell_process, vfs_root, vfs_root) ||
+        !(shell_thread = process_thread_create_user(shell_process, 8,
+            shell_process->image.entry, shell_process->user_stack_top, 4096)) ||
+        !process_thread_start(shell_thread)) {
+        serial_write("external shell setup failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("interactive shell ready\r\n");
+    if (!scheduler_start()) {
+        serial_write("userland scheduler start failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     for (;;) {
         __asm__ volatile ("cli\n\t hlt" ::: "memory");

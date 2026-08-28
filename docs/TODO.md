@@ -158,7 +158,11 @@ kernel gate below is explicitly marked complete.
   together through `wait`/`fg`.
 - [x] Add a bounded serial-input bridge into the standard-input queue for
   terminal-backed userland sessions.
+- [x] Start input and network runtime services before launching the persistent
+  shell, so an immediately-blocking shell cannot starve kernel services.
 - [ ] Add reliable QEMU live keyboard verification for `run INIT.ELF`.
+- [ ] Expose the complete multi-cluster FAT32 boot-image application set in the
+  live VFS namespace for reliable external `run` execution.
 - [ ] Make userland init spawn the shell through the normal process ABI after
   scheduler/runtime service startup can support an immediately-blocking child.
 - [ ] Add the command-line shell and terminal/console I/O.

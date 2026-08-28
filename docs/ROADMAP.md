@@ -1834,6 +1834,10 @@ The path-utility slice now also provides `basename.elf`, which strips trailing
 separators and emits the final bounded path component through the same runtime,
 PATH, and FAT32 image integration.
 
+The paired path utility `dirname.elf` now emits the bounded parent path, with
+root and separator edge cases handled through the same PATH and FAT32 image
+integration.
+
 Shell integration contracts now directly cover the quote-aware sequence
 splitter, including semicolons and conditional operators preserved inside
 quoted arguments; this joins

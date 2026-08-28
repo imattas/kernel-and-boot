@@ -1846,6 +1846,10 @@ The pipeline now also includes `tr.elf`, translating bounded character sets
 from standard input while preserving the existing freestanding, PATH, and
 FAT32 image contracts.
 
+`cmp.elf` now completes the status-oriented pipeline tools: it compares two
+files byte-for-byte and returns distinct equal, different, and error statuses,
+making it directly usable with shell `&&` and `||` sequencing.
+
 Shell integration contracts now directly cover the quote-aware sequence
 splitter, including semicolons and conditional operators preserved inside
 quoted arguments; this joins

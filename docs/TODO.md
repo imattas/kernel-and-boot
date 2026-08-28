@@ -113,6 +113,8 @@ the init-owned shell supervisor remains the next kernel/userland boundary.
   a file through PATH and the FAT32 image.
 - [x] Add standalone `tr.elf` bounded character translation from stdin through
   PATH and the FAT32 image.
+- [x] Add standalone `cmp.elf` status-based file comparison for shell
+  conditional sequencing through PATH and the FAT32 image.
 - [x] Add background execution and job-table tracking for PATH-resolved
   external commands.
 - [x] Poll, reap, and remove completed background jobs without blocking the

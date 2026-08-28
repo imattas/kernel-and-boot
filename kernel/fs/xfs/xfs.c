@@ -1677,7 +1677,7 @@ int xfs_write_file(xfs_fs_t *fs, uint64_t inode, uint64_t offset,
         if (grew) store_be64(&data[56], end);
         return xfs_write_inode(fs, inode, data);
     }
-    return 1;
+    return xfs_flush_metadata(fs);
 }
 
 int xfs_truncate_file(xfs_fs_t *fs, uint64_t inode, uint64_t size) {

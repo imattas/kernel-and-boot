@@ -110,8 +110,6 @@ shell_command_t shell_parse(const char *line, uint32_t length,
     if (same_word(line, command_length, "env")) return SHELL_ENV;
     if (same_word(line, command_length, "jobs")) return SHELL_JOBS;
     if (same_word(line, command_length, "history")) return SHELL_HISTORY;
-    if (same_word(line, command_length, "pwd")) return SHELL_PWD;
-    if (same_word(line, command_length, "ls")) return SHELL_LS;
     if (same_word(line, command_length, "exit")) return SHELL_EXIT;
     if (!same_word(line, command_length, "cat") &&
         !same_word(line, command_length, "head") &&
@@ -127,6 +125,8 @@ shell_command_t shell_parse(const char *line, uint32_t length,
         !same_word(line, command_length, "which") &&
         !same_word(line, command_length, "inherit") &&
         !same_word(line, command_length, "echo") &&
+        !same_word(line, command_length, "pwd") &&
+        !same_word(line, command_length, "ls") &&
         !same_word(line, command_length, "cd") &&
         !same_word(line, command_length, "stat") &&
         !same_word(line, command_length, "chmod") &&
@@ -153,7 +153,10 @@ shell_command_t shell_parse(const char *line, uint32_t length,
     for (uint32_t index = 0; index < argument_length; ++index)
         argument[index] = line[start + index];
     argument[argument_length] = 0;
-    if (same_word(line, command_length, "echo") &&
+    if ((same_word(line, command_length, "echo") ||
+         same_word(line, command_length, "cat") ||
+         same_word(line, command_length, "pwd") ||
+         same_word(line, command_length, "ls")) &&
         shell_has_operator(line, length)) {
         if (length >= capacity) return SHELL_UNKNOWN;
         for (uint32_t index = 0; index <= length; ++index)
@@ -162,6 +165,8 @@ shell_command_t shell_parse(const char *line, uint32_t length,
     }
     if (same_word(line, command_length, "cd")) return SHELL_CD;
     if (same_word(line, command_length, "cat")) return SHELL_CAT;
+    if (same_word(line, command_length, "pwd")) return SHELL_PWD;
+    if (same_word(line, command_length, "ls")) return SHELL_LS;
     if (same_word(line, command_length, "head")) return SHELL_HEAD;
     if (same_word(line, command_length, "wc")) return SHELL_WC;
     if (same_word(line, command_length, "grep")) return SHELL_GREP;

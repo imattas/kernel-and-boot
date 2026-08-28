@@ -1744,6 +1744,7 @@ names as well, allowing the same pipeline/redirection path to resolve them via
 `PATH`.
 The `echo` command follows that same route when redirected, so `echo text >
 file` uses the packaged external utility and descriptor redirection path.
+`cat`, `pwd`, and `ls` now use the same routing for redirected output.
 The shell now accepts a quote-aware bounded `;` sequence and dispatches each
 command in order before returning to the prompt.
 `grep.elf` now also reads standard input when invoked without a file operand,

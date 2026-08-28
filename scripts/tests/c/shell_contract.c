@@ -37,6 +37,12 @@ int main(void) {
     assert(shell_parse("echo hello > /tmp/out", 21, argument,
                        sizeof(argument)) == SHELL_RUN);
     assert(strcmp(argument, "echo hello > /tmp/out") == 0);
+    assert(shell_parse("cat /hello > /tmp/out", 21, argument,
+                       sizeof(argument)) == SHELL_RUN);
+    assert(shell_parse("pwd > /tmp/out", 14, argument,
+                       sizeof(argument)) == SHELL_RUN);
+    assert(shell_parse("ls > /tmp/out", 13, argument,
+                       sizeof(argument)) == SHELL_RUN);
     assert(shell_parse("pwd", 3, argument, sizeof(argument)) == SHELL_PWD);
     assert(shell_parse("cd /tmp", 7, argument, sizeof(argument)) == SHELL_CD);
     assert(strcmp(argument, "/tmp") == 0);

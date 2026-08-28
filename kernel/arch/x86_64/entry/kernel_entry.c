@@ -2568,6 +2568,18 @@ void kernel_main(void *boot_info) {
         serial_write("PS2 mouse wheel failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
+    static const uint8_t ps2_mouse_explorer_packet[4] = {0x09, 1, 0xfe, 0x31};
+    input_event_t ps2_mouse_explorer_events[4];
+    uint32_t ps2_mouse_explorer_count = 0;
+    if (!ps2_mouse_decode_explorer(ps2_mouse_explorer_packet,
+                                   ps2_mouse_explorer_events,
+                                   &ps2_mouse_explorer_count) ||
+        ps2_mouse_explorer_count != 4 ||
+        ps2_mouse_explorer_events[0].value != 0x19 ||
+        ps2_mouse_explorer_events[3].value != 1) {
+        serial_write("PS2 explorer mouse failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
     serial_write("PS2 mouse packet ready\r\n");
     if (ps2_mouse_initialize(&input_queue))
         serial_write("PS2 mouse controller ready\r\n");

@@ -685,7 +685,8 @@ three-byte/standard mouse IDs before publishing the backend; extended
 four-button protocols remain rejected until their packet formats are supported.
 The standard IntelliMouse wheel (device ID 3) now uses a bounded four-byte
 packet path and emits a wheel axis event; unsupported five-button packets remain
-rejected.
+rejected. Explorer-compatible device ID 4 packets now also decode the two
+additional button bits and signed wheel axis through a bounded four-byte path.
 PCI now assigns bounded low-MMIO addresses to unmapped or above-4-GiB memory
 BARs, allowing the NVMe admin path to operate under the current identity map.
 PCI enumeration now enables memory/I/O space and bus mastering before BAR

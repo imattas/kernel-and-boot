@@ -8,6 +8,7 @@ static uint8_t extended_scancode;
 static uint8_t mouse_packet[4];
 static uint8_t mouse_packet_length;
 static uint8_t mouse_packet_size;
+static uint8_t mouse_five_button;
 static int mouse_enabled;
 static spinlock_t ps2_lock;
 
@@ -90,7 +91,7 @@ static int mouse_command_id(uint8_t command, uint8_t *id) {
     out8(0x60, command);
     if (!wait_read() || in8(0x60) != 0xfa || !wait_read()) return 0;
     *id = in8(0x60);
-    return *id == 0 || *id == 3;
+    return *id == 0 || *id == 3 || *id == 4;
 }
 
 int ps2_keyboard_initialize(input_queue_t *queue) {
@@ -122,6 +123,7 @@ int ps2_mouse_initialize(input_queue_t *queue) {
     mouse_queue = 0;
     mouse_packet_length = 0;
     mouse_packet_size = 3;
+    mouse_five_button = 0;
     if (!queue || !wait_write()) return 0;
     if (!wait_write()) return 0;
     out8(0x64, 0xa8);
@@ -133,7 +135,8 @@ int ps2_mouse_initialize(input_queue_t *queue) {
     if (!controller_write_config(config) || !mouse_command_noarg(0xf4) ||
         !mouse_command_id(0xf2, &response))
         return 0;
-    mouse_packet_size = response == 3 ? 4 : 3;
+    mouse_packet_size = response == 3 || response == 4 ? 4 : 3;
+    mouse_five_button = response == 4;
     mouse_packet_length = 0;
     mouse_queue = queue;
     mouse_enabled = 1;
@@ -164,7 +167,10 @@ int ps2_mouse_poll(input_queue_t *queue) {
     uint32_t event_count = 0;
     mouse_packet_length = 0;
     if ((mouse_packet_size == 4 &&
-         !ps2_mouse_decode_wheel(mouse_packet, events, &event_count)) ||
+         !(mouse_five_button ? ps2_mouse_decode_explorer(mouse_packet, events,
+                                                         &event_count) :
+                               ps2_mouse_decode_wheel(mouse_packet, events,
+                                                      &event_count))) ||
         (mouse_packet_size == 3 &&
          !ps2_mouse_decode(mouse_packet, events, &event_count))) {
         spinlock_unlock_irqrestore(&ps2_lock, flags);
@@ -201,6 +207,18 @@ int ps2_mouse_decode_wheel(const uint8_t packet[4], input_event_t events[4],
                            uint32_t *event_count) {
     if (!packet || !events || !event_count || (packet[3] & 0xf0U) != 0 ||
         !ps2_mouse_decode(packet, events, event_count)) return 0;
+    int32_t wheel = (int32_t)(packet[3] & 0x0fU);
+    if ((wheel & 8) != 0) wheel -= 16;
+    events[3] = (input_event_t){INPUT_EVENT_AXIS, 2, wheel, timer_ticks()};
+    *event_count = 4;
+    return 1;
+}
+
+int ps2_mouse_decode_explorer(const uint8_t packet[4], input_event_t events[4],
+                              uint32_t *event_count) {
+    if (!packet || !events || !event_count || (packet[3] & 0xc0U) != 0 ||
+        !ps2_mouse_decode(packet, events, event_count)) return 0;
+    events[0].value |= (int32_t)((packet[3] & 0x30U) >> 1);
     int32_t wheel = (int32_t)(packet[3] & 0x0fU);
     if ((wheel & 8) != 0) wheel -= 16;
     events[3] = (input_event_t){INPUT_EVENT_AXIS, 2, wheel, timer_ticks()};

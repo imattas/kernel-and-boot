@@ -1200,6 +1200,9 @@ allowing validated files below the filesystem root to be exposed through the
 same adapter while preserving the inode permission bits.
 XFS VFS file attachment now likewise accepts an explicit directory inode, so
 validated files in nested short-form directories use the same adapter boundary.
+The XFS allocator now explicitly distinguishes its legacy contract AGF layout
+from authentic AGF metadata with separate BNO/CNT fields; authentic layouts
+are rejected until synchronized CNT mutation is implemented.
 Ext4 VFS file attachment now accepts an explicit directory inode and validates
 the inode type while carrying its on-disk permission bits into the VFS node.
 ExFAT VFS files now retain their source directory cluster and use directory-

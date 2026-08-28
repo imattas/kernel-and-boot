@@ -24,6 +24,41 @@ typedef struct {
     uint8_t real_header;
 } xfs_bno_layout_t;
 
+typedef struct {
+    uint32_t bno_root;
+    uint32_t cnt_root;
+    uint32_t bno_level;
+    uint32_t cnt_level;
+    uint32_t free_blocks;
+    uint32_t longest;
+    uint8_t authentic;
+} xfs_agf_view_t;
+
+/* Legacy contract images predate the separate CNT root.  Authentic AGF
+ * records use the upstream field order: BNO/CNT roots at 16/20, BNO/CNT
+ * levels at 28/32, and free/longest at 52/56. */
+static int xfs_agf_view(const uint8_t *agf, xfs_agf_view_t *view) {
+    if (!agf || !view || be32(agf) != XFS_AGF_MAGIC) return 0;
+    if (be32(&agf[20]) != 0U) {
+        view->bno_root = be32(&agf[16]);
+        view->cnt_root = be32(&agf[20]);
+        view->bno_level = be32(&agf[28]);
+        view->cnt_level = be32(&agf[32]);
+        view->free_blocks = be32(&agf[52]);
+        view->longest = be32(&agf[56]);
+        view->authentic = 1;
+    } else {
+        view->bno_root = be32(&agf[16]);
+        view->cnt_root = 0;
+        view->bno_level = be32(&agf[4]) == 1U ? be32(&agf[28]) : be32(&agf[24]);
+        view->cnt_level = 0;
+        view->free_blocks = be32(&agf[40]);
+        view->longest = be32(&agf[44]);
+        view->authentic = 0;
+    }
+    return view->bno_root != 0U && view->bno_level != 0U;
+}
+
 static int xfs_bno_layout(const uint8_t *tree, uint32_t block_size,
                           xfs_bno_layout_t *layout) {
     if (!tree || !layout || block_size < 24U) return 0;
@@ -83,12 +118,13 @@ static void store_be16(uint8_t *p, uint16_t value) {
 static int xfs_allocate_extent_locked(xfs_fs_t *fs, uint32_t allocation_group,
                         uint32_t blocks, uint64_t *start) {
     uint8_t agf[4096], tree[4096], original_agf[4096], original_tree[4096];
+    xfs_agf_view_t agf_view;
     if (!fs || !fs->mounted || !start || blocks == 0 || allocation_group >= fs->ag_count ||
         fs->ag_blocks < 2U || fs->block_count < 2U) return 0;
     uint64_t ag_base = (uint64_t)allocation_group * fs->ag_blocks;
     if (ag_base > fs->block_count - 2U || !xfs_read_block(fs, ag_base + 1U, agf) ||
-        be32(agf) != XFS_AGF_MAGIC) return 0;
-    if (be32(&agf[4]) == 1U && be32(&agf[28]) > 1U)
+        !xfs_agf_view(agf, &agf_view) || agf_view.authentic) return 0;
+    if (agf_view.bno_level > 1U)
         return xfs_allocate_real_bno(fs, allocation_group, blocks, start);
     uint32_t root = be32(&agf[16]);
     uint32_t level = be32(&agf[24]);
@@ -162,6 +198,7 @@ int xfs_allocate_extent(xfs_fs_t *fs, uint32_t allocation_group,
 
 static int xfs_free_extent_locked(xfs_fs_t *fs, uint64_t start, uint32_t blocks) {
     uint8_t agf[4096], tree[4096], original_agf[4096], original_tree[4096];
+    xfs_agf_view_t agf_view;
     if (!fs || !fs->mounted || blocks == 0 || fs->ag_blocks < 2U ||
         fs->block_count == 0 || start >= fs->block_count ||
         blocks > fs->block_count - start) return 0;
@@ -171,9 +208,10 @@ static int xfs_free_extent_locked(xfs_fs_t *fs, uint64_t start, uint32_t blocks)
         blocks > fs->ag_blocks - relative) return 0;
     uint64_t ag_base = (uint64_t)allocation_group * fs->ag_blocks;
     if (ag_base > fs->block_count - 2U ||
-        !xfs_read_block(fs, ag_base + 1U, agf) || be32(agf) != XFS_AGF_MAGIC)
+        !xfs_read_block(fs, ag_base + 1U, agf) ||
+        !xfs_agf_view(agf, &agf_view) || agf_view.authentic)
         return 0;
-    if (be32(&agf[4]) == 1U && be32(&agf[28]) > 1U)
+    if (agf_view.bno_level > 1U)
         return xfs_free_real_bno(fs, start, blocks);
     uint32_t root = be32(&agf[16]);
     uint32_t level = be32(&agf[24]);

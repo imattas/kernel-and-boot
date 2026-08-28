@@ -80,6 +80,8 @@ the init-owned shell supervisor remains the next kernel/userland boundary.
   built-ins.
 - [x] Add the first bounded file-reading utility, `head.elf`, to the packaged
   userland set and FAT32 VFS namespace.
+- [x] Add streaming `wc.elf` line, word, and byte counting to the packaged
+  userland set and FAT32 VFS namespace.
 - [ ] Make init supervise `shell.elf` through the normal spawn/wait ABI after
   the namespace-retain and shared-scheduler startup deadlocks are fixed.
 

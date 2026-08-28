@@ -1948,3 +1948,9 @@ quoted arguments; this joins
 the existing parser coverage for pipelines, redirection, jobs, and expansion.
 
 Continue hardening SMP, memory reclamation, storage, USB, networking, graphics, security, debugging, crash diagnostics, performance tooling, power management, hardware compatibility, and userland while maintaining explicit subsystem boundaries and automated regression coverage.
+
+The init-owned shell supervisor was retried after moving runtime services ahead
+of init and removing the VFS-lock acquisition from namespace inheritance. QEMU
+still stalls during the first spawn while acquiring the parent process lock, so
+the stable kernel-managed shell path was restored; init supervision remains
+deferred until process-lock ownership is made SMP-safe.

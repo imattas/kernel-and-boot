@@ -93,7 +93,7 @@ type, string, and numeric tests.
   standalone application expansion.
 - [x] Give active address-space and CR3 ownership per logical CPU for SMP
   userland transitions.
-- [ ] Add shell/application integration coverage for filesystem mutation,
+- [x] Add shell/application integration coverage for filesystem mutation,
   pipelines, redirection, background jobs, and inherited environment state.
 - [ ] Implement and verify init-owned shell supervision through spawn/wait/reap;
   do not replace the stable direct shell handoff until live QEMU proves it.

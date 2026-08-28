@@ -2017,3 +2017,8 @@ input remains an explicit follow-up item. A second probe using a bidirectional
 Unix serial chardev also reaches the prompt but does not deliver the injected
 bytes to the guest COM1 poller, so neither harness is currently evidence for
 interactive command execution.
+
+The shell now has a dedicated integration contract covering mutation commands,
+multi-stage pipelines, truncating and append redirection, input redirection,
+background execution syntax, inherited-environment command forms, and malformed
+operator rejection.

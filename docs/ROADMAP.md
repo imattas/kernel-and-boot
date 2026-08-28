@@ -1726,9 +1726,9 @@ supervisor handoff remains deferred. `args.elf`, `env.elf`, `cat.elf`,
 `pwd.elf`, `mkdir.elf`, `rm.elf`, `rmdir.elf`, `touch.elf`, `write.elf`,
 `ls.elf`, `chmod.elf`, `echo.elf`, `stat.elf`, `mv.elf`, `kill.elf`,
 `sleep.elf`, `setenv.elf`, `ipc.elf`, `dup.elf`, `true.elf`, `false.elf`,
-`id.elf`, `ps.elf`, and `wait.elf` are now exposed as executable utilities
-through the live FAT32-backed VFS namespace; the remaining application set is
-the next userland boundary.
+`id.elf`, `ps.elf`, `wait.elf`, `truncate.elf`, `seek.elf`, `chdir.elf`, and
+`cp.elf` are now exposed as executable utilities through the live FAT32-backed
+VFS namespace; the remaining application set is the next userland boundary.
 The shell now keeps a bounded eight-entry command history and handles split
 ANSI up/down escape sequences without feeding terminal control bytes into the
 command parser.

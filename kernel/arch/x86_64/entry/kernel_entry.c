@@ -2227,6 +2227,27 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("userland process inspection namespace ready\r\n");
+    static const char truncate_short_name[11] = {
+        'T','R','U','N','C','A','T','E','E','L','F'
+    };
+    static const char seek_short_name[11] = {
+        'S','E','E','K',' ',' ',' ',' ','E','L','F'
+    };
+    static const char chdir_short_name[11] = {
+        'C','H','D','I','R',' ',' ',' ','E','L','F'
+    };
+    static const char cp_short_name[11] = {
+        'C','P',' ',' ',' ',' ',' ',' ','E','L','F'
+    };
+    if (!fat32_vfs_attach_file(&fat32, vfs_root, truncate_short_name,
+                               "truncate.elf") ||
+        !fat32_vfs_attach_file(&fat32, vfs_root, seek_short_name, "seek.elf") ||
+        !fat32_vfs_attach_file(&fat32, vfs_root, chdir_short_name, "chdir.elf") ||
+        !fat32_vfs_attach_file(&fat32, vfs_root, cp_short_name, "cp.elf")) {
+        serial_write("userland file-position VFS attach failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("userland file-position namespace ready\r\n");
     vfs_node_t *vfs_foreign = vfs_node_create("foreign", VFS_NODE_REGULAR,
                                                0, 0, 0444);
     int vfs_remove_result = vfs_foreign ?

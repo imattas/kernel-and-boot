@@ -1744,6 +1744,8 @@ names as well, allowing the same pipeline/redirection path to resolve them via
 `PATH`.
 The `echo` command follows that same route when redirected, so `echo text >
 file` uses the packaged external utility and descriptor redirection path.
+The shell now accepts a quote-aware bounded `;` sequence and dispatches each
+command in order before returning to the prompt.
 PATH-resolved external commands can now also use the shell's background-job
 syntax (`command &`) and enter the existing `jobs`/`fg` tracking table.
 The shell now polls those jobs without blocking, reaps processes after both

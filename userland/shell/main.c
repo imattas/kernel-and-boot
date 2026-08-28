@@ -655,6 +655,44 @@ static int shell_remove_tree(const char *path, uint32_t length,
     return complete && os_rmdir(path, length) != OS_SYSCALL_ERROR;
 }
 
+static int shell_split_sequence(char *line, uint32_t *length,
+                                char *remainder, uint32_t capacity,
+                                uint32_t *remainder_length) {
+    if (!line || !length || !remainder || !remainder_length) return 0;
+    *remainder_length = 0;
+    char quote = 0;
+    int escaped = 0;
+    uint32_t separator = *length;
+    for (uint32_t index = 0; index < *length; ++index) {
+        char value = line[index];
+        if (escaped) escaped = 0;
+        else if (value == '\\') escaped = 1;
+        else if (quote) {
+            if (value == quote) quote = 0;
+        } else if (value == '\'' || value == '"') quote = value;
+        else if (value == ';') { separator = index; break; }
+    }
+    if (separator == *length) return 1;
+    uint32_t tail_start = separator + 1U;
+    while (tail_start < *length && (line[tail_start] == ' ' ||
+                                    line[tail_start] == '\t')) ++tail_start;
+    uint32_t tail_length = *length - tail_start;
+    while (tail_length != 0 && (line[tail_start + tail_length - 1U] == ' ' ||
+                                line[tail_start + tail_length - 1U] == '\t'))
+        --tail_length;
+    if (tail_length >= capacity) return 0;
+    for (uint32_t index = 0; index < tail_length; ++index)
+        remainder[index] = line[tail_start + index];
+    remainder[tail_length] = 0;
+    uint32_t first_length = separator;
+    while (first_length != 0 && (line[first_length - 1U] == ' ' ||
+                                 line[first_length - 1U] == '\t')) --first_length;
+    line[first_length] = 0;
+    *length = first_length;
+    *remainder_length = tail_length;
+    return 1;
+}
+
 void shell_main(void) {
     static const char prompt[] = "os> ";
     static const char help[] = "help clear id ps env setenv unsetenv status true false jobs history fg which inherit echo pwd cd ls cat head wc grep stat chmod kill sleep mv cp mkdir rm rmdir touch write run wait exit\r\n";
@@ -663,11 +701,13 @@ void shell_main(void) {
     static char input[64];
     static char argument[128];
     static char expanded_argument[128];
+    static char pending_line[128];
     static char history[8][SHELL_HISTORY_LINE_CAPACITY];
     uint32_t history_count = 0;
     uint32_t history_offset = 0;
     uint32_t escape_state = 0;
     uint32_t length = 0;
+    uint32_t pending_length = 0;
     int32_t last_status = 0;
     shell_active_status = &last_status;
     print(prompt, sizeof(prompt) - 1U);
@@ -734,6 +774,12 @@ void shell_main(void) {
                 continue;
             }
             if (edit != SHELL_EDIT_SUBMIT) continue;
+        command_ready:
+            if (!shell_split_sequence(line, &length, pending_line,
+                                      sizeof(pending_line), &pending_length)) {
+                length = 0;
+                line[0] = 0;
+            }
             history_count = shell_history_push(history,
                                                sizeof(history) /
                                                sizeof(history[0]),
@@ -1357,6 +1403,13 @@ void shell_main(void) {
                         print("\r\n", 2);
                     }
                 }
+            }
+            if (pending_length != 0) {
+                length = pending_length;
+                for (uint32_t index = 0; index <= length; ++index)
+                    line[index] = pending_line[index];
+                pending_length = 0;
+                goto command_ready;
             }
             length = 0;
             print(prompt, sizeof(prompt) - 1U);

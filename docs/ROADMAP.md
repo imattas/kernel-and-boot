@@ -1811,6 +1811,10 @@ The standalone `env.elf` utility now accepts bounded `NAME=VALUE` prefixes,
 launches a command through the spawn/wait/reap ABI, and returns the child status;
 with no command it retains its inherited-environment listing behavior.
 
+Shell operator validation now rejects empty pipeline/redirection operands,
+non-terminal background markers, unterminated quoting, and trailing escapes
+before any process-launch path is selected.
+
 ## Phase 10 — BIOS boot path
 
 Implement legacy BIOS support as a separate loader path. It should normalize legacy machine startup into the same kernel boot contract used by UEFI rather than creating a BIOS-specific kernel architecture.

@@ -75,6 +75,9 @@ int main(void) {
     assert(shell_parse("tr a b", 6, argument, sizeof(argument)) == SHELL_RUN);
     assert(shell_parse("printf x | wc", 13, argument, sizeof(argument)) == SHELL_RUN);
     assert(strcmp(argument, "printf x | wc") == 0);
+    assert(shell_parse("echo x &", 8, argument, sizeof(argument)) == SHELL_RUN);
+    assert(shell_parse("| wc", 4, argument, sizeof(argument)) == SHELL_UNKNOWN);
+    assert(shell_parse("echo x >", 8, argument, sizeof(argument)) == SHELL_UNKNOWN);
     assert(shell_parse("tail /hello > /tmp/out", 22, argument,
                        sizeof(argument)) == SHELL_RUN);
     assert(strcmp(argument, "tail /hello > /tmp/out") == 0);

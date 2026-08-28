@@ -151,9 +151,34 @@ static int shell_has_operator(const char *line, uint32_t length) {
         else if (quote) {
             if (value == quote) quote = 0;
         } else if (value == '\'' || value == '"') quote = value;
-        else if (value == '|' || value == '>' || value == '<') return 1;
+        else if (value == '|' || value == '>' || value == '<' || value == '&') return 1;
     }
     return 0;
+}
+
+static int shell_operator_syntax_valid(const char *line, uint32_t length) {
+    char quote = 0;
+    int escaped = 0;
+    uint32_t operators = 0;
+    for (uint32_t index = 0; index < length; ++index) {
+        char value = line[index];
+        if (escaped) { escaped = 0; continue; }
+        if (value == '\\') { escaped = 1; continue; }
+        if (quote) { if (value == quote) quote = 0; continue; }
+        if (value == '\'' || value == '"') { quote = value; continue; }
+        if (value != '|' && value != '>' && value != '<' && value != '&') continue;
+        uint32_t before = index;
+        while (before != 0 && (line[before - 1U] == ' ' ||
+                               line[before - 1U] == '\t')) --before;
+        uint32_t after = index + 1U;
+        while (after < length && (line[after] == ' ' || line[after] == '\t')) ++after;
+        if (before == 0 || after == length) {
+            if (value != '&' || after != length) return 0;
+        }
+        if (value == '&' && after != length) return 0;
+        ++operators;
+    }
+    return operators != 0 && !escaped && quote == 0;
 }
 
 shell_command_t shell_parse(const char *line, uint32_t length,
@@ -222,7 +247,8 @@ shell_command_t shell_parse(const char *line, uint32_t length,
         !same_word(line, command_length, "alias") &&
         !same_word(line, command_length, "unalias") &&
         !same_word(line, command_length, "fg")) {
-        if (!shell_has_operator(line, length) || length >= capacity)
+        if (!shell_has_operator(line, length) ||
+            !shell_operator_syntax_valid(line, length) || length >= capacity)
             return SHELL_UNKNOWN;
         for (uint32_t index = 0; index <= length; ++index)
             argument[index] = line[index];
@@ -253,7 +279,8 @@ shell_command_t shell_parse(const char *line, uint32_t length,
          same_word(line, command_length, "tr") ||
          same_word(line, command_length, "cmp")) &&
         shell_has_operator(line, length)) {
-        if (length >= capacity) return SHELL_UNKNOWN;
+        if (!shell_operator_syntax_valid(line, length) || length >= capacity)
+            return SHELL_UNKNOWN;
         for (uint32_t index = 0; index <= length; ++index)
             argument[index] = line[index];
         return SHELL_RUN;

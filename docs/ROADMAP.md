@@ -1449,6 +1449,9 @@ waiters, and the ring-3 gate verifies that exited processes are not reused by
 subsequent kernel work.
 The ring-3 lifecycle gate now also reaps the exited process, releasing its
 user image, address space, stack pages, handles, and registry entry.
+All path-taking syscall boundaries now reject embedded NUL bytes within the
+explicit user length, keeping pathname resolution tied to the validated ABI
+buffer rather than an early C-string terminator.
 The virtual-memory layer now exposes an explicit kernel-root activation path so
 an exited user address space is never destroyed while it remains the active
 page root.

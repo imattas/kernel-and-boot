@@ -30,6 +30,8 @@ static vfs_node_t *syscall_parent(process_t *process, char *path,
                                   security_context_t *security) {
     if (!process || !path || !leaf || !security || length == 0 ||
         length > OS_SYSCALL_MAX_PATH) return 0;
+    for (uint32_t i = 0; i < length; ++i)
+        if (path[i] == '\0') return 0;
     uint64_t flags = spinlock_lock_irqsave(&process->lock);
     vfs_node_t *root = process->root_directory;
     vfs_node_t *working = process->working_directory;
@@ -77,6 +79,16 @@ int syscall_copy_from_user(void *destination, uint64_t source, uint64_t size) {
 
 int syscall_copy_to_user(uint64_t destination, const void *source, uint64_t size) {
     return address_space_copy_to_user(destination, source, size);
+}
+
+static int syscall_copy_path(char *destination, uint64_t source,
+                             uint64_t length) {
+    if (!destination || length == 0 || length > OS_SYSCALL_MAX_PATH ||
+        !syscall_copy_from_user(destination, source, length)) return 0;
+    for (uint32_t i = 0; i < length; ++i)
+        if (destination[i] == '\0') return 0;
+    destination[length] = '\0';
+    return 1;
 }
 
 uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
@@ -149,8 +161,7 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
                 arg3 == 0 || (arg3 & ~(VFS_FILE_READ | VFS_FILE_WRITE)) != 0)
                 return OS_SYSCALL_ERROR;
             char path[OS_SYSCALL_MAX_PATH + 1];
-            if (!syscall_copy_from_user(path, arg1, arg2)) return OS_SYSCALL_ERROR;
-            path[arg2] = '\0';
+            if (!syscall_copy_path(path, arg1, arg2)) return OS_SYSCALL_ERROR;
             uint64_t flags = spinlock_lock_irqsave(&process->lock);
             vfs_node_t *root = process->root_directory;
             vfs_node_t *working = process->working_directory;
@@ -300,9 +311,8 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
             process_t *process = process_current();
             if (!process || arg2 == 0 || arg2 > OS_SYSCALL_MAX_PATH) return OS_SYSCALL_ERROR;
             char path[OS_SYSCALL_MAX_PATH + 1];
-            if (!syscall_copy_from_user(path, arg1, arg2) || path[0] == '\0')
+            if (!syscall_copy_path(path, arg1, arg2) || path[0] == '\0')
                 return OS_SYSCALL_ERROR;
-            path[arg2] = '\0';
             uint64_t flags = spinlock_lock_irqsave(&process->lock);
             vfs_node_t *root = process->root_directory;
             security_context_t security = process->security;
@@ -394,8 +404,7 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
             if (!process || arg2 == 0 || arg2 > OS_SYSCALL_MAX_PATH ||
                 (arg3 & ~0777U) != 0) return OS_SYSCALL_ERROR;
             char path[OS_SYSCALL_MAX_PATH + 1];
-            if (!syscall_copy_from_user(path, arg1, arg2)) return OS_SYSCALL_ERROR;
-            path[arg2] = '\0';
+            if (!syscall_copy_path(path, arg1, arg2)) return OS_SYSCALL_ERROR;
             uint64_t flags = spinlock_lock_irqsave(&process->lock);
             vfs_node_t *root = process->root_directory;
             vfs_node_t *working = process->working_directory;
@@ -417,8 +426,7 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
                 !user_range(arg3, sizeof(os_syscall_stat_t), 1))
                 return OS_SYSCALL_ERROR;
             char path[OS_SYSCALL_MAX_PATH + 1];
-            if (!syscall_copy_from_user(path, arg1, arg2)) return OS_SYSCALL_ERROR;
-            path[arg2] = '\0';
+            if (!syscall_copy_path(path, arg1, arg2)) return OS_SYSCALL_ERROR;
             uint64_t flags = spinlock_lock_irqsave(&process->lock);
             vfs_node_t *root = process->root_directory;
             vfs_node_t *working = process->working_directory;
@@ -503,8 +511,7 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
             char path[OS_SYSCALL_MAX_PATH + 1];
             char leaf[32];
             security_context_t security;
-            if (!syscall_copy_from_user(path, arg1, arg2)) return OS_SYSCALL_ERROR;
-            path[arg2] = '\0';
+            if (!syscall_copy_path(path, arg1, arg2)) return OS_SYSCALL_ERROR;
             vfs_node_t *parent = syscall_parent(process, path, arg2, leaf, &security);
             if (!parent) return OS_SYSCALL_ERROR;
             if (number == OS_SYSCALL_UNLINK) {
@@ -551,10 +558,9 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
             char new_path[OS_SYSCALL_MAX_PATH + 1];
             char old_leaf[32], new_leaf[32];
             security_context_t old_security, new_security;
-            if (!syscall_copy_from_user(old_path, arg1, old_length) ||
-                !syscall_copy_from_user(new_path, arg2, new_length))
+            if (!syscall_copy_path(old_path, arg1, old_length) ||
+                !syscall_copy_path(new_path, arg2, new_length))
                 return OS_SYSCALL_ERROR;
-            old_path[old_length] = '\0'; new_path[new_length] = '\0';
             vfs_node_t *old_parent = syscall_parent(process, old_path, old_length,
                                                      old_leaf, &old_security);
             vfs_node_t *new_parent = syscall_parent(process, new_path, new_length,

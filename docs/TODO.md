@@ -99,6 +99,7 @@ kernel gate below is explicitly marked complete.
 - [x] Add standalone `LS.ELF` utility using directory enumeration.
 - [x] Add standalone `CHMOD.ELF` utility using the permission-update ABI.
 - [x] Add shell background `run ... &` and explicit `wait <pid>` handling.
+- [x] Add bounded `jobs` tracking for background processes.
 - [x] Expand the FAT32 boot-image root directory beyond one cluster.
 - [x] Add standalone `ECHO.ELF` in the expanded root directory.
 - [x] Add standalone `STAT.ELF` using descriptor metadata.

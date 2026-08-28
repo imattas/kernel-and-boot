@@ -45,6 +45,22 @@ static int parse_number(const char *text, uint32_t length, uint64_t *value) {
     return 1;
 }
 
+static uint64_t jobs[16];
+static uint32_t job_count;
+
+static void job_add(uint64_t process_id) {
+    if (job_count < sizeof(jobs) / sizeof(jobs[0]))
+        jobs[job_count++] = process_id;
+}
+
+static void job_remove(uint64_t process_id) {
+    for (uint32_t index = 0; index < job_count; ++index) {
+        if (jobs[index] != process_id) continue;
+        jobs[index] = jobs[--job_count];
+        return;
+    }
+}
+
 static uint32_t resolve_command(const char *name, uint32_t name_length,
                                 char *path, uint32_t capacity) {
     if (!name || !path || capacity == 0 || name_length == 0) return 0;
@@ -94,7 +110,7 @@ static uint32_t resolve_command(const char *name, uint32_t name_length,
 
 void shell_main(void) {
     static const char prompt[] = "os> ";
-    static const char help[] = "help id ps env which inherit echo pwd cd ls cat mkdir rm rmdir touch write run wait exit\r\n";
+    static const char help[] = "help id ps env jobs which inherit echo pwd cd ls cat mkdir rm rmdir touch write run wait exit\r\n";
     static const char unknown[] = "unknown command\r\n";
     static char line[128];
     static char argument[128];
@@ -171,6 +187,17 @@ void shell_main(void) {
                 } else {
                     print("PATH=", 5);
                     print(value, length);
+                    print("\r\n", 2);
+                }
+            }
+            else if (command == SHELL_JOBS) {
+                for (uint32_t index = 0; index < job_count; ++index) {
+                    os_process_info_t info;
+                    if (os_process_status(jobs[index], &info) != 0) continue;
+                    print("pid=", 4);
+                    print_number(info.id);
+                    print(" state=", 7);
+                    print_number(info.state);
                     print("\r\n", 2);
                 }
             }
@@ -311,6 +338,7 @@ void shell_main(void) {
                     print("exit=", 5);
                     print_status(status);
                     print("\r\n", 2);
+                    job_remove(process_id);
                 }
             } else if (command == SHELL_RUN) {
                 uint32_t argument_length = 0;
@@ -335,13 +363,15 @@ void shell_main(void) {
                 uint32_t resolved_length = resolve_command(argument, path_length,
                                                             resolved_path,
                                                             sizeof(resolved_path));
-                uint64_t process_id = resolved_length == 0 ? OS_SYSCALL_ERROR :
+                uint64_t process_id = resolved_length == 0 ||
+                                      (background && job_count == 16) ? OS_SYSCALL_ERROR :
                     os_spawn(resolved_path, resolved_length,
                                                 argument + run_arguments);
                 int32_t status = -1;
                 if (process_id == OS_SYSCALL_ERROR) {
                     print(unknown, sizeof(unknown) - 1U);
                 } else if (background) {
+                    job_add(process_id);
                     print("pid=", 4);
                     print_number(process_id);
                     print("\r\n", 2);

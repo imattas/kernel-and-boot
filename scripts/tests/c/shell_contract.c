@@ -24,6 +24,7 @@ int main(void) {
     assert(shell_parse("id", 2, argument, sizeof(argument)) == SHELL_ID);
     assert(shell_parse("ps", 2, argument, sizeof(argument)) == SHELL_PS);
     assert(shell_parse("env", 3, argument, sizeof(argument)) == SHELL_ENV);
+    assert(shell_parse("jobs", 4, argument, sizeof(argument)) == SHELL_JOBS);
     assert(shell_parse("which ARGS.ELF", 14, argument, sizeof(argument)) == SHELL_WHICH);
     assert(strcmp(argument, "ARGS.ELF") == 0);
     assert(shell_parse("inherit 3 off", 13, argument, sizeof(argument)) == SHELL_INHERIT);

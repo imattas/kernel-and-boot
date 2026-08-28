@@ -1993,6 +1993,8 @@ The packaged shell is also available as the conventional `sh.elf`/`sh` alias,
 sharing the existing shell image chain.
 The shell also accepts bounded `exit [status]` values, retaining status zero
 for the no-argument form and rejecting values outside the byte exit range.
+Printable shell input is echoed on the active serial or USB/PS2 console, and a
+CRLF pair is treated as one command submission.
 
 Process teardown now releases each process lock before removing the process
 from the global process table, preserving the lock ordering used by activation

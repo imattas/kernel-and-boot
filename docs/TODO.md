@@ -68,6 +68,8 @@ focused lifecycle fix.
 The current userland slice adds the `version` shell built-in. XFS expansion
 and init-owned supervision remain paused while the stable boot path is kept.
 
+- [x] Echo printable shell input and coalesce CRLF console submissions.
+
 The identity utility slice now includes bounded `id -u` and `id -g` output.
 
 The shell directory-navigation slice now supports `cd` with no operand.

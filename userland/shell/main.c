@@ -947,6 +947,7 @@ void shell_main(void) {
     uint32_t history_count = 0;
     uint32_t history_offset = 0;
     uint32_t escape_state = 0;
+    uint32_t suppress_lf = 0;
     uint32_t length = 0;
     uint32_t pending_length = 0;
     shell_sequence_operator_t pending_operator = SHELL_SEQUENCE_NONE;
@@ -964,6 +965,10 @@ void shell_main(void) {
         }
         for (uint64_t index = 0; index < received; ++index) {
             char value = input[index];
+            if (suppress_lf) {
+                suppress_lf = 0;
+                if (value == '\n') continue;
+            }
             if (escape_state == 1) {
                 escape_state = value == '[' ? 2 : 0;
                 continue;
@@ -1011,6 +1016,10 @@ void shell_main(void) {
                 while (previous_length-- != 0) print("\b \b", 3);
                 continue;
             }
+            if (value == '\r') suppress_lf = 1;
+            if (edit == SHELL_EDIT_CONTINUE &&
+                (unsigned char)value >= 0x20)
+                print(&value, 1);
             if (edit == SHELL_EDIT_CANCEL) {
                 while (previous_length-- != 0) print("\b \b", 3);
                 print("^C\r\n", 4);

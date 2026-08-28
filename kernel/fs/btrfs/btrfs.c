@@ -456,19 +456,35 @@ static int btrfs_validate_data(const btrfs_fs_t *fs, uint64_t logical,
 }
 
 static int btrfs_write_node(btrfs_fs_t *fs, uint64_t bytenr, uint8_t *node) {
+    uint8_t original[65536], original_mirror[65536];
     uint32_t device = 0; uint64_t physical = 0;
     if (!fs || !node || !btrfs_map(fs, bytenr, fs->node_size, &device, &physical) ||
-        physical % BTRFS_SECTOR_SIZE != 0) return 0;
+        fs->node_size > sizeof(original) ||
+        physical % BTRFS_SECTOR_SIZE != 0 ||
+        !storage_read(device, physical / BTRFS_SECTOR_SIZE,
+                      fs->node_size / BTRFS_SECTOR_SIZE, original)) return 0;
     store32(node, crc32c(&node[32], fs->node_size - 32U));
     if (!storage_write(device, physical / BTRFS_SECTOR_SIZE,
                        fs->node_size / BTRFS_SECTOR_SIZE, node)) return 0;
     uint32_t mirror_device = 0; uint64_t mirror_physical = 0;
-    if (btrfs_map_at(fs, bytenr, fs->node_size, 1, &mirror_device,
-                     &mirror_physical) &&
-        (mirror_device != device || mirror_physical != physical)) {
-        if (mirror_physical % BTRFS_SECTOR_SIZE != 0 ||
-            !storage_write(mirror_device, mirror_physical / BTRFS_SECTOR_SIZE,
-                           fs->node_size / BTRFS_SECTOR_SIZE, node)) return 0;
+    int mirror_valid = btrfs_map_at(fs, bytenr, fs->node_size, 1, &mirror_device,
+                                    &mirror_physical);
+    if (mirror_valid && (mirror_device != device || mirror_physical != physical) &&
+        mirror_physical % BTRFS_SECTOR_SIZE == 0 &&
+        storage_read(mirror_device, mirror_physical / BTRFS_SECTOR_SIZE,
+                     fs->node_size / BTRFS_SECTOR_SIZE, original_mirror)) {
+        if (!storage_write(mirror_device, mirror_physical / BTRFS_SECTOR_SIZE,
+                           fs->node_size / BTRFS_SECTOR_SIZE, node)) {
+            (void)storage_write(device, physical / BTRFS_SECTOR_SIZE,
+                                fs->node_size / BTRFS_SECTOR_SIZE, original);
+            (void)storage_write(mirror_device, mirror_physical / BTRFS_SECTOR_SIZE,
+                                fs->node_size / BTRFS_SECTOR_SIZE, original_mirror);
+            return 0;
+        }
+    } else if (mirror_valid && (mirror_device != device || mirror_physical != physical)) {
+        (void)storage_write(device, physical / BTRFS_SECTOR_SIZE,
+                            fs->node_size / BTRFS_SECTOR_SIZE, original);
+        return 0;
     }
     return 1;
 }
@@ -958,8 +974,9 @@ static int btrfs_write_file_unlocked(btrfs_fs_t *fs, uint64_t tree_bytenr, uint6
             !storage_write(device, physical / BTRFS_SECTOR_SIZE,
                            fs->sector_size / BTRFS_SECTOR_SIZE, data)) return 0;
         uint32_t mirror_device = 0; uint64_t mirror_physical = 0;
-        if (btrfs_map_at(fs, sector_logical, fs->sector_size, 1,
-                         &mirror_device, &mirror_physical) &&
+        int mirror_valid = btrfs_map_at(fs, sector_logical, fs->sector_size, 1,
+                                        &mirror_device, &mirror_physical);
+        if (mirror_valid &&
             (mirror_device != device || mirror_physical != physical) &&
             (mirror_physical % BTRFS_SECTOR_SIZE != 0 ||
              !storage_write(mirror_device, mirror_physical / BTRFS_SECTOR_SIZE,
@@ -973,7 +990,7 @@ static int btrfs_write_file_unlocked(btrfs_fs_t *fs, uint64_t tree_bytenr, uint6
                                     crc32c(data, fs->sector_size), 0)) {
             (void)storage_write(device, physical / BTRFS_SECTOR_SIZE,
                                 fs->sector_size / BTRFS_SECTOR_SIZE, original);
-            if (mirror_physical != physical)
+            if (mirror_valid && mirror_physical != physical)
                 (void)storage_write(mirror_device, mirror_physical / BTRFS_SECTOR_SIZE,
                                     fs->sector_size / BTRFS_SECTOR_SIZE, original);
             return 0;

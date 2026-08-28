@@ -1228,6 +1228,11 @@ tree-node checksum regeneration; allocation, compression, and size-changing
 metadata operations remain separate.
 Btrfs in-place data writes and supported inode-size truncations now share an
 IRQ-safe filesystem write lock; disk-extent allocation remains deferred.
+Btrfs mirrored-write rollback now restores only a validated mirror mapping,
+avoiding accidental writes through an uninitialized device/offset when no
+mirror exists.
+Btrfs metadata-node publication now snapshots both mapped copies and restores
+them if mirrored publication fails, avoiding a half-published tree node.
 Btrfs inline regular files now support bounded nonzero shrink/truncation by
 updating the inode item in its checksum-protected tree node; the VFS adapter
 updates its cached size while extent allocation/freeing remains separate.

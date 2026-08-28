@@ -23,6 +23,8 @@ kernel gate below is explicitly marked complete.
 - [x] Serialize exFAT attribute, create, directory-create, and unlink mutations.
 - [x] Serialize ext4 mode, data-write, growth, and truncation mutations.
 - [x] Serialize Btrfs in-place data writes and supported truncation mutations.
+- [x] Harden Btrfs mirrored-write rollback against absent mirror mappings.
+- [x] Roll back both copies when mirrored Btrfs metadata-node publication fails.
 
 ## Current kernel milestone
 

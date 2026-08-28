@@ -365,6 +365,259 @@ static int xfs_write_block(const xfs_fs_t *fs, uint64_t block, const void *buffe
            storage_write(fs->device, block * sectors, sectors, buffer);
 }
 
+/* The existing two-level path handles a root and leaf set.  Keep the deeper
+ * path deliberately bounded: it supports one additional authenticated index
+ * level without silently treating an arbitrary on-disk tree as flat. */
+typedef struct {
+    xfs_fs_t *fs;
+    uint64_t ag_base;
+    uint32_t requested;
+    uint32_t target;
+    uint32_t root_level;
+    uint32_t path_blocks[4];
+    uint8_t path[4][4096];
+    uint32_t selected_blocks[4];
+    uint8_t selected[4][4096];
+    uint32_t selected_depth;
+    uint32_t selected_record;
+    uint32_t selected_start;
+    uint32_t selected_count;
+    uint32_t last_blocks[4];
+    uint8_t last[4][4096];
+    uint32_t last_depth;
+    uint32_t total_free;
+    uint32_t longest;
+    uint32_t longest_records;
+    uint8_t allocate;
+    uint8_t invalid;
+    uint8_t found;
+} xfs_deep_bno_context_t;
+
+static void xfs_deep_copy_path(xfs_deep_bno_context_t *context,
+                               uint8_t destination[4][4096],
+                               uint32_t blocks[4], uint32_t *depth) {
+    *depth = context->root_level + 1U;
+    for (uint32_t i = 0; i < *depth; ++i) {
+        blocks[i] = context->path_blocks[i];
+        for (uint32_t byte = 0; byte < context->fs->block_size; ++byte)
+            destination[i][byte] = context->path[i][byte];
+    }
+}
+
+static int xfs_deep_scan(xfs_deep_bno_context_t *context, uint32_t block,
+                         uint32_t level, uint32_t depth) {
+    uint8_t node[4096];
+    if (!context || !context->fs || depth >= 4U || block == 0 ||
+        block >= context->fs->ag_blocks ||
+        !xfs_read_block(context->fs, context->ag_base + block, node) ||
+        be32(node) != XFS_BNO_MAGIC_REAL || be16(&node[4]) != level)
+        return 0;
+    context->path_blocks[depth] = block;
+    for (uint32_t byte = 0; byte < context->fs->block_size; ++byte)
+        context->path[depth][byte] = node[byte];
+    uint32_t capacity = (context->fs->block_size - 16U) /
+                        (level == 0 ? 8U : 12U);
+    uint32_t records = be16(&node[6]);
+    if (records == 0 || records > capacity) return 0;
+    if (level != 0) {
+        uint32_t pointer_offset = 16U + capacity * 8U;
+        for (uint32_t i = 0; i < records; ++i) {
+            uint32_t key = be32(&node[16U + i * 8U]);
+            uint32_t count = be32(&node[20U + i * 8U]);
+            uint32_t child = be32(&node[pointer_offset + i * 4U]);
+            if (count == 0 || key > context->fs->ag_blocks - count ||
+                child == 0 || child >= context->fs->ag_blocks ||
+                (i != 0 && key < be32(&node[16U + (i - 1U) * 8U]))) return 0;
+            if (!xfs_deep_scan(context, child, level - 1U, depth + 1U)) return 0;
+        }
+        return 1;
+    }
+    uint32_t previous_end = 0;
+    uint32_t last_end = 0;
+    for (uint32_t i = 0; i < records; ++i) {
+        uint32_t start = be32(&node[16U + i * 8U]);
+        uint32_t count = be32(&node[20U + i * 8U]);
+        if (count == 0 || start > context->fs->ag_blocks - count ||
+            (i != 0 && start < previous_end) ||
+            context->total_free > UINT32_MAX - count) return 0;
+        previous_end = start + count;
+        last_end = previous_end;
+        context->total_free += count;
+        if (count > context->longest) {
+            context->longest = count;
+            context->longest_records = 1;
+        } else if (count == context->longest) {
+            ++context->longest_records;
+        }
+        if (context->allocate && count >= context->requested &&
+            (!context->found || count < context->selected_count)) {
+            context->found = 1;
+            context->selected_record = i;
+            context->selected_start = start;
+            context->selected_count = count;
+            xfs_deep_copy_path(context, context->selected,
+                               context->selected_blocks,
+                               &context->selected_depth);
+        }
+        if (!context->allocate) {
+            if (context->target >= start && context->target < start + count)
+                context->invalid = 1;
+            if (!context->found && context->target <= start) {
+                context->found = 1;
+                xfs_deep_copy_path(context, context->selected,
+                                   context->selected_blocks,
+                                   &context->selected_depth);
+            }
+        }
+    }
+    if (!context->allocate) {
+        if (context->target <= last_end && !context->found) {
+            context->found = 1;
+            xfs_deep_copy_path(context, context->selected,
+                               context->selected_blocks,
+                               &context->selected_depth);
+        }
+        xfs_deep_copy_path(context, context->last, context->last_blocks,
+                           &context->last_depth);
+    }
+    return 1;
+}
+
+static int xfs_deep_bno_mutate(xfs_fs_t *fs, uint32_t allocation_group,
+                               uint32_t blocks, uint32_t target, int allocate,
+                               uint64_t *start) {
+    uint8_t agf[4096], original_agf[4096];
+    uint8_t original_path[4][4096];
+    xfs_deep_bno_context_t context = {0};
+    if (!fs || !fs->mounted || !blocks || allocation_group >= fs->ag_count ||
+        fs->block_size < 512U) return 0;
+    uint64_t ag_base = (uint64_t)allocation_group * fs->ag_blocks;
+    if (ag_base > fs->block_count - 2U ||
+        !xfs_read_block(fs, ag_base + 1U, agf) || be32(agf) != XFS_AGF_MAGIC ||
+        be32(&agf[4]) != 1U || be32(&agf[28]) < 3U || be32(&agf[28]) > 4U)
+        return 0;
+    uint32_t root = be32(&agf[16]);
+    context.fs = fs; context.ag_base = ag_base; context.requested = blocks;
+    context.target = target; context.root_level = be32(&agf[28]);
+    context.allocate = (uint8_t)allocate;
+    if (!xfs_deep_scan(&context, root, context.root_level, 0) ||
+        context.total_free != be32(&agf[40]) || context.invalid) return 0;
+    if (!allocate && !context.found) {
+        if (context.last_depth == 0) return 0;
+        context.found = 1;
+        for (uint32_t i = 0; i < context.last_depth; ++i) {
+            context.selected_blocks[i] = context.last_blocks[i];
+            for (uint32_t byte = 0; byte < fs->block_size; ++byte)
+                context.selected[i][byte] = context.last[i][byte];
+        }
+        context.selected_depth = context.last_depth;
+    }
+    if (!context.found || context.selected_depth != context.root_level + 1U)
+        return 0;
+    uint8_t *leaf = context.selected[context.root_level];
+    for (uint32_t depth = 0; depth <= context.root_level; ++depth)
+        for (uint32_t byte = 0; byte < fs->block_size; ++byte)
+            original_path[depth][byte] = context.selected[depth][byte];
+    uint32_t leaf_records = be16(&leaf[6]);
+    if (allocate) {
+        uint32_t record = context.selected_record;
+        if (context.selected_count == blocks) return 0;
+        store_be32(&leaf[16U + record * 8U], context.selected_start + blocks);
+        store_be32(&leaf[20U + record * 8U], context.selected_count - blocks);
+        *start = ag_base + context.selected_start;
+        if (context.selected_count == context.longest &&
+            context.longest_records == 1U) {
+            context.longest = 0;
+            for (uint32_t i = 0; i < be16(&leaf[6]); ++i) {
+                uint32_t count = be32(&leaf[20U + i * 8U]);
+                if (count > context.longest) context.longest = count;
+            }
+        }
+    } else {
+        uint32_t relative = target;
+        uint32_t insert = leaf_records;
+        for (uint32_t i = 0; i < leaf_records; ++i)
+            if (relative < be32(&leaf[16U + i * 8U])) { insert = i; break; }
+        uint32_t previous = insert == 0 ? UINT32_MAX : insert - 1U;
+        uint32_t next = insert < leaf_records ? insert : UINT32_MAX;
+        int joins_previous = previous != UINT32_MAX &&
+            be32(&leaf[16U + previous * 8U]) +
+                be32(&leaf[20U + previous * 8U]) == relative;
+        int joins_next = next != UINT32_MAX && relative + blocks ==
+                         be32(&leaf[16U + next * 8U]);
+        if (joins_previous && joins_next) {
+            store_be32(&leaf[20U + previous * 8U],
+                       be32(&leaf[20U + previous * 8U]) + blocks +
+                       be32(&leaf[20U + next * 8U]));
+            for (uint32_t i = next; i + 1U < leaf_records; ++i)
+                for (uint32_t byte = 0; byte < 8U; ++byte)
+                    leaf[16U + i * 8U + byte] = leaf[16U + (i + 1U) * 8U + byte];
+            --leaf_records;
+        } else if (joins_previous) {
+            store_be32(&leaf[20U + previous * 8U],
+                       be32(&leaf[20U + previous * 8U]) + blocks);
+        } else if (joins_next) {
+            store_be32(&leaf[16U + next * 8U], relative);
+            store_be32(&leaf[20U + next * 8U],
+                       be32(&leaf[20U + next * 8U]) + blocks);
+        } else {
+            if (leaf_records >= (fs->block_size - 16U) / 8U) return 0;
+            for (uint32_t i = leaf_records; i > insert; --i)
+                for (uint32_t byte = 0; byte < 8U; ++byte)
+                    leaf[16U + i * 8U + byte] = leaf[16U + (i - 1U) * 8U + byte];
+            store_be32(&leaf[16U + insert * 8U], relative);
+            store_be32(&leaf[20U + insert * 8U], blocks);
+            ++leaf_records;
+        }
+        store_be16(&leaf[6], (uint16_t)leaf_records);
+    }
+    for (uint32_t depth = context.root_level; depth != 0; --depth) {
+        uint8_t *parent = context.selected[depth - 1U];
+        uint32_t capacity = (fs->block_size - 16U) / 12U;
+        uint32_t pointer_offset = 16U + capacity * 8U;
+        uint32_t child = context.selected_blocks[depth];
+        uint32_t records = be16(&parent[6]);
+        uint32_t first = be32(&leaf[16]);
+        uint32_t first_count = be32(&leaf[20]);
+        int found = 0;
+        for (uint32_t i = 0; i < records; ++i)
+            if (be32(&parent[pointer_offset + i * 4U]) == child) {
+                store_be32(&parent[16U + i * 8U], first);
+                store_be32(&parent[20U + i * 8U], first_count);
+                found = 1; break;
+            }
+        if (!found) return 0;
+        leaf = parent;
+    }
+    for (uint32_t i = 0; i < fs->block_size; ++i) original_agf[i] = agf[i];
+    uint32_t free_blocks = be32(&agf[40]);
+    if (allocate) {
+        if (free_blocks < blocks) return 0;
+        store_be32(&agf[40], free_blocks - blocks);
+    } else {
+        if (free_blocks > UINT32_MAX - blocks) return 0;
+        store_be32(&agf[40], free_blocks + blocks);
+        for (uint32_t i = 0; i < be16(&context.selected[context.root_level][6]); ++i) {
+            uint32_t count = be32(&context.selected[context.root_level][20U + i * 8U]);
+            if (count > context.longest) context.longest = count;
+        }
+    }
+    for (uint32_t depth = context.root_level; ; --depth) {
+        if (!xfs_write_block(fs, ag_base + context.selected_blocks[depth],
+                             context.selected[depth])) goto rollback;
+        if (depth == 0) break;
+    }
+    store_be32(&agf[44], context.longest);
+    if (!xfs_write_block(fs, ag_base + 1U, agf)) goto rollback;
+    return 1;
+rollback:
+    for (uint32_t depth = 0; depth <= context.root_level; ++depth)
+        (void)xfs_write_block(fs, ag_base + context.selected_blocks[depth],
+                              original_path[depth]);
+    (void)xfs_write_block(fs, ag_base + 1U, original_agf);
+    return 0;
+}
+
 static int xfs_allocate_real_bno(xfs_fs_t *fs, uint32_t allocation_group,
                                  uint32_t blocks, uint64_t *start) {
     uint8_t agf[4096], original_agf[4096], root[4096], original_root[4096];
@@ -375,7 +628,10 @@ static int xfs_allocate_real_bno(xfs_fs_t *fs, uint32_t allocation_group,
     uint64_t ag_base = (uint64_t)allocation_group * fs->ag_blocks;
     if (ag_base > fs->block_count - 2U ||
         !xfs_read_block(fs, ag_base + 1U, agf) || be32(agf) != XFS_AGF_MAGIC ||
-        be32(&agf[4]) != 1U || be32(&agf[28]) != 2U) return 0;
+        be32(&agf[4]) != 1U) return 0;
+    if (be32(&agf[28]) >= 3U)
+        return xfs_deep_bno_mutate(fs, allocation_group, blocks, 0, 1, start);
+    if (be32(&agf[28]) != 2U) return 0;
     uint32_t root_block = be32(&agf[16]);
     uint32_t capacity = (fs->block_size - 16U) / 12U;
     if (root_block == 0 || root_block >= fs->ag_blocks || capacity == 0 ||
@@ -498,7 +754,10 @@ static int xfs_free_real_bno(xfs_fs_t *fs, uint64_t start, uint32_t blocks) {
     uint64_t ag_base = (uint64_t)agno * fs->ag_blocks;
     if (ag_base > fs->block_count - 2U ||
         !xfs_read_block(fs, ag_base + 1U, agf) || be32(agf) != XFS_AGF_MAGIC ||
-        be32(&agf[4]) != 1U || be32(&agf[28]) != 2U) return 0;
+        be32(&agf[4]) != 1U) return 0;
+    if (be32(&agf[28]) >= 3U)
+        return xfs_deep_bno_mutate(fs, agno, blocks, relative, 0, 0);
+    if (be32(&agf[28]) != 2U) return 0;
     uint32_t root_block = be32(&agf[16]);
     uint32_t capacity = (fs->block_size - 16U) / 12U;
     if (root_block == 0 || root_block >= fs->ag_blocks || capacity == 0 ||

@@ -93,5 +93,29 @@ int main(void) {
            g32(&real_root[16]) == 10 && g32(&real_root[20]) == 6 &&
            g32(&real_root[2736]) == 3 && g32(&real_leaf[16]) == 10 &&
            g32(&real_leaf[20]) == 6 && g32(&agf[40]) == 6);
+    uint8_t *deep_index = &image[4U * 4096U];
+    uint8_t *deep_index2 = &image[5U * 4096U];
+    uint8_t *deep_leaf = &image[6U * 4096U];
+    memset(real_root, 0, 4096); memset(real_leaf, 0, 4096);
+    memset(deep_index, 0, 4096); memset(deep_index2, 0, 4096);
+    memset(deep_leaf, 0, 4096);
+    p32(&agf[16], 2); p32(&agf[28], 3); p32(&agf[40], 3); p32(&agf[44], 3);
+    p32(real_root, 0x41425442U); p16(&real_root[4], 3); p16(&real_root[6], 1);
+    p32(&real_root[16], 10); p32(&real_root[20], 3); p32(&real_root[2736], 4);
+    p32(deep_index, 0x41425442U); p16(&deep_index[4], 2); p16(&deep_index[6], 1);
+    p32(&deep_index[16], 10); p32(&deep_index[20], 3); p32(&deep_index[2736], 5);
+    p32(deep_index2, 0x41425442U); p16(&deep_index2[4], 1); p16(&deep_index2[6], 1);
+    p32(&deep_index2[16], 10); p32(&deep_index2[20], 3); p32(&deep_index2[2736], 6);
+    p32(deep_leaf, 0x41425442U); p16(&deep_leaf[4], 0); p16(&deep_leaf[6], 1);
+    p32(&deep_leaf[16], 10); p32(&deep_leaf[20], 3);
+    assert(xfs_allocate_extent(&fs, 0, 2, &start) && start == 10);
+    assert(g32(&deep_leaf[16]) == 12 && g32(&deep_leaf[20]) == 1 &&
+           g32(&deep_index[16]) == 12 && g32(&deep_index2[16]) == 12 &&
+           g32(&real_root[16]) == 12 && g32(&agf[40]) == 1 &&
+           g32(&agf[44]) == 1);
+    assert(xfs_free_extent(&fs, 10, 2) && g32(&deep_leaf[16]) == 10 &&
+           g32(&deep_leaf[20]) == 3 && g32(&deep_index[16]) == 10 &&
+           g32(&deep_index2[16]) == 10 && g32(&real_root[16]) == 10 &&
+           g32(&agf[40]) == 3 && g32(&agf[44]) == 3);
     return 0;
 }

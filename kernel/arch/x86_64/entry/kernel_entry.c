@@ -2106,6 +2106,15 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("userland args executable ready\r\n");
+    static const char env_short_name[11] = {
+        'E','N','V',' ',' ',' ',' ',' ','E','L','F'
+    };
+    if (!fat32_vfs_attach_file(&fat32, vfs_root, env_short_name,
+                               "env.elf")) {
+        serial_write("userland env VFS attach failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("userland env executable ready\r\n");
     vfs_node_t *vfs_foreign = vfs_node_create("foreign", VFS_NODE_REGULAR,
                                                0, 0, 0444);
     int vfs_remove_result = vfs_foreign ?

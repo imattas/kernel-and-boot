@@ -20,8 +20,8 @@ def short_entry(name, attributes, cluster, size):
         "<HI", cluster & 0xffff, size)
 
 def main():
-    if len(sys.argv) != 52:
-        raise SystemExit("usage: create_fat_image.py ... <UNSETENV.ELF> <UPTIME.ELF> <DATE.ELF> <os.img>")
+    if len(sys.argv) != 53:
+        raise SystemExit("usage: create_fat_image.py ... <UNSETENV.ELF> <UPTIME.ELF> <DATE.ELF> <CLEAR.ELF> <os.img>")
     efi_source = Path(sys.argv[1]).read_bytes()
     kernel_source = Path(sys.argv[2]).read_bytes()
     init_source = Path(sys.argv[3]).read_bytes()
@@ -72,7 +72,8 @@ def main():
     unsetenv_source = Path(sys.argv[48]).read_bytes()
     uptime_source = Path(sys.argv[49]).read_bytes()
     date_source = Path(sys.argv[50]).read_bytes()
-    output = Path(sys.argv[51])
+    clear_source = Path(sys.argv[51]).read_bytes()
+    output = Path(sys.argv[52])
     efi_clusters = max(1, math.ceil(len(efi_source) / SECTOR))
     kernel_clusters = max(1, math.ceil(len(kernel_source) / SECTOR))
     init_clusters = max(1, math.ceil(len(init_source) / SECTOR))
@@ -123,6 +124,7 @@ def main():
     unsetenv_clusters = max(1, math.ceil(len(unsetenv_source) / SECTOR))
     uptime_clusters = max(1, math.ceil(len(uptime_source) / SECTOR))
     date_clusters = max(1, math.ceil(len(date_source) / SECTOR))
+    clear_clusters = max(1, math.ceil(len(clear_source) / SECTOR))
     efi_chain = list(range(8, 8 + efi_clusters))
     kernel_chain = list(range(efi_chain[-1] + 1,
                               efi_chain[-1] + 1 + kernel_clusters))
@@ -176,7 +178,8 @@ def main():
     unsetenv_chain = list(range(which_chain[-1] + 1, which_chain[-1] + 1 + unsetenv_clusters))
     uptime_chain = list(range(unsetenv_chain[-1] + 1, unsetenv_chain[-1] + 1 + uptime_clusters))
     date_chain = list(range(uptime_chain[-1] + 1, uptime_chain[-1] + 1 + date_clusters))
-    if date_chain[-1] >= TOTAL_SECTORS - DATA_START + 2:
+    clear_chain = list(range(date_chain[-1] + 1, date_chain[-1] + 1 + clear_clusters))
+    if clear_chain[-1] >= TOTAL_SECTORS - DATA_START + 2:
         raise SystemExit("boot files are too large for the FAT32 image")
     image = bytearray(TOTAL_SECTORS * SECTOR)
     boot = bytearray(SECTOR)
@@ -198,7 +201,7 @@ def main():
     fsinfo = bytearray(SECTOR)
     struct.pack_into("<I", fsinfo, 0, 0x41615252)
     struct.pack_into("<I", fsinfo, 484, 0x61417272)
-    struct.pack_into("<I", fsinfo, 488, TOTAL_SECTORS - DATA_START - len(efi_chain) - len(kernel_chain) - len(init_chain) - len(shell_chain) - len(args_chain) - len(env_chain) - len(cat_chain) - len(pwd_chain) - len(mkdir_chain) - len(rm_chain) - len(rmdir_chain) - len(touch_chain) - len(write_chain) - len(ls_chain) - len(chmod_chain) - len(echo_chain) - len(help_chain) - len(stat_chain) - len(mv_chain) - len(kill_chain) - len(sleep_chain) - len(setenv_chain) - len(ipc_chain) - len(dup_chain) - len(true_chain) - len(false_chain) - len(id_chain) - len(ps_chain) - len(wait_chain) - len(truncate_chain) - len(seek_chain) - len(chdir_chain) - len(cp_chain) - len(head_chain) - len(wc_chain) - len(grep_chain) - len(tee_chain) - len(tail_chain) - len(sort_chain) - len(uniq_chain) - len(printf_chain) - len(basename_chain) - len(dirname_chain) - len(cut_chain) - len(tr_chain) - len(cmp_chain) - len(which_chain) - len(unsetenv_chain) - len(uptime_chain) - len(date_chain) - 6)
+    struct.pack_into("<I", fsinfo, 488, TOTAL_SECTORS - DATA_START - len(efi_chain) - len(kernel_chain) - len(init_chain) - len(shell_chain) - len(args_chain) - len(env_chain) - len(cat_chain) - len(pwd_chain) - len(mkdir_chain) - len(rm_chain) - len(rmdir_chain) - len(touch_chain) - len(write_chain) - len(ls_chain) - len(chmod_chain) - len(echo_chain) - len(help_chain) - len(stat_chain) - len(mv_chain) - len(kill_chain) - len(sleep_chain) - len(setenv_chain) - len(ipc_chain) - len(dup_chain) - len(true_chain) - len(false_chain) - len(id_chain) - len(ps_chain) - len(wait_chain) - len(truncate_chain) - len(seek_chain) - len(chdir_chain) - len(cp_chain) - len(head_chain) - len(wc_chain) - len(grep_chain) - len(tee_chain) - len(tail_chain) - len(sort_chain) - len(uniq_chain) - len(printf_chain) - len(basename_chain) - len(dirname_chain) - len(cut_chain) - len(tr_chain) - len(cmp_chain) - len(which_chain) - len(unsetenv_chain) - len(uptime_chain) - len(date_chain) - len(clear_chain) - 6)
     struct.pack_into("<I", fsinfo, 492, 8 + efi_clusters + kernel_clusters + shell_clusters)
     struct.pack_into("<I", fsinfo, 508, 0xaa550000)
     image[SECTOR:2 * SECTOR] = fsinfo
@@ -211,7 +214,7 @@ def main():
                            (2, 5), (3, 0x0fffffff), (4, 0x0fffffff),
                            (5, 6), (6, 7), (7, 0x0fffffff)):
         set_fat(cluster, value)
-    for chain in (efi_chain, kernel_chain, init_chain, shell_chain, args_chain, env_chain, cat_chain, pwd_chain, mkdir_chain, rm_chain, rmdir_chain, touch_chain, write_chain, ls_chain, chmod_chain, echo_chain, help_chain, stat_chain, mv_chain, kill_chain, sleep_chain, setenv_chain, ipc_chain, dup_chain, true_chain, false_chain, id_chain, ps_chain, wait_chain, truncate_chain, seek_chain, chdir_chain, cp_chain, head_chain, wc_chain, grep_chain, tee_chain, tail_chain, sort_chain, uniq_chain, printf_chain, basename_chain, dirname_chain, cut_chain, tr_chain, cmp_chain, which_chain, unsetenv_chain, uptime_chain, date_chain):
+    for chain in (efi_chain, kernel_chain, init_chain, shell_chain, args_chain, env_chain, cat_chain, pwd_chain, mkdir_chain, rm_chain, rmdir_chain, touch_chain, write_chain, ls_chain, chmod_chain, echo_chain, help_chain, stat_chain, mv_chain, kill_chain, sleep_chain, setenv_chain, ipc_chain, dup_chain, true_chain, false_chain, id_chain, ps_chain, wait_chain, truncate_chain, seek_chain, chdir_chain, cp_chain, head_chain, wc_chain, grep_chain, tee_chain, tail_chain, sort_chain, uniq_chain, printf_chain, basename_chain, dirname_chain, cut_chain, tr_chain, cmp_chain, which_chain, unsetenv_chain, uptime_chain, date_chain, clear_chain):
         for index, cluster in enumerate(chain):
             set_fat(cluster, chain[index + 1] if index + 1 < len(chain) else 0x0fffffff)
     for fat_index in range(FAT_COUNT):
@@ -277,6 +280,7 @@ def main():
     root_extension_third[0:32] = short_entry("UNSETENVELF", 0x20, unsetenv_chain[0], len(unsetenv_source))
     root_extension_third[32:64] = short_entry("UPTIME  ELF", 0x20, uptime_chain[0], len(uptime_source))
     root_extension_third[64:96] = short_entry("DATE    ELF", 0x20, date_chain[0], len(date_source))
+    root_extension_third[96:128] = short_entry("CLEAR   ELF", 0x20, clear_chain[0], len(clear_source))
     image[cluster_offset(7):cluster_offset(7) + SECTOR] = root_extension_third
     efi_dir = bytearray(SECTOR)
     efi_dir[0:32] = short_entry(".          ", 0x10, 3, 0)
@@ -388,6 +392,8 @@ def main():
         image[cluster_offset(cluster):cluster_offset(cluster) + len(uptime_source[index * SECTOR:(index + 1) * SECTOR])] = uptime_source[index * SECTOR:(index + 1) * SECTOR]
     for index, cluster in enumerate(date_chain):
         image[cluster_offset(cluster):cluster_offset(cluster) + len(date_source[index * SECTOR:(index + 1) * SECTOR])] = date_source[index * SECTOR:(index + 1) * SECTOR]
+    for index, cluster in enumerate(clear_chain):
+        image[cluster_offset(cluster):cluster_offset(cluster) + len(clear_source[index * SECTOR:(index + 1) * SECTOR])] = clear_source[index * SECTOR:(index + 1) * SECTOR]
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_bytes(image)
 

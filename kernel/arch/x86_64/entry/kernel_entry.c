@@ -2196,13 +2196,17 @@ void kernel_main(void *boot_info) {
     static const char date_short_name[11] = {
         'D','A','T','E',' ',' ',' ',' ','E','L','F'
     };
+    static const char clear_short_name[11] = {
+        'C','L','E','A','R',' ',' ',' ','E','L','F'
+    };
     if (!fat32_vfs_attach_file(&fat32, vfs_root, mv_short_name, "mv.elf") ||
         !fat32_vfs_attach_file(&fat32, vfs_root, kill_short_name, "kill.elf") ||
         !fat32_vfs_attach_file(&fat32, vfs_root, sleep_short_name, "sleep.elf") ||
         !fat32_vfs_attach_file(&fat32, vfs_root, setenv_short_name, "setenv.elf") ||
         !fat32_vfs_attach_file(&fat32, vfs_root, unsetenv_short_name, "unsetenv.elf") ||
         !fat32_vfs_attach_file(&fat32, vfs_root, uptime_short_name, "uptime.elf") ||
-        !fat32_vfs_attach_file(&fat32, vfs_root, date_short_name, "date.elf")) {
+        !fat32_vfs_attach_file(&fat32, vfs_root, date_short_name, "date.elf") ||
+        !fat32_vfs_attach_file(&fat32, vfs_root, clear_short_name, "clear.elf")) {
         serial_write("userland process utility VFS attach failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }

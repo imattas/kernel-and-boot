@@ -1829,6 +1829,9 @@ monotonic clock syscall and is packaged in the FAT32 image and live VFS.
 Standalone `date.elf` now reports the validated RTC date and time through a
 bounded realtime-clock syscall and is packaged in the FAT32 image and live VFS.
 
+Standalone `clear.elf` now provides the shell's ANSI terminal-clear sequence
+through PATH and the live FAT32 VFS namespace.
+
 The shell `unsetenv` builtin now removes multiple whitespace-separated variable
 names in one bounded command, matching the standalone utility's multi-operand
 environment behavior.

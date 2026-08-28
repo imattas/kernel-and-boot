@@ -533,22 +533,44 @@ int process_prepare_user_stack(process_t *process, const char *path,
     while (path[path_length] && path_length < 256U) ++path_length;
     while (arguments[argument_length] && argument_length < 256U) ++argument_length;
     if (path[path_length] || arguments[argument_length]) return 0;
+    uint32_t starts[8] = {0};
+    uint32_t lengths[8] = {0};
+    uint32_t argument_count = 0;
+    for (uint32_t index = 0; index < argument_length;) {
+        while (index < argument_length && (arguments[index] == ' ' ||
+                                            arguments[index] == '\t')) ++index;
+        if (index == argument_length) break;
+        if (argument_count == 8) return 0;
+        starts[argument_count] = index;
+        while (index < argument_length && arguments[index] != ' ' &&
+               arguments[index] != '\t') ++index;
+        lengths[argument_count] = index - starts[argument_count];
+        ++argument_count;
+    }
     uint64_t cursor = process->user_stack_top;
-    uint64_t argument_address = 0;
-    if (argument_length != 0) {
-        cursor -= argument_length + 1U;
-        argument_address = cursor;
-        if (!process_user_stack_write(process, cursor, arguments,
-                                      argument_length + 1U)) return 0;
+    uint64_t argument_addresses[8] = {0};
+    for (uint32_t index = argument_count; index != 0; --index) {
+        uint32_t argument = index - 1U;
+        char token[257];
+        for (uint32_t character = 0; character < lengths[argument]; ++character)
+            token[character] = arguments[starts[argument] + character];
+        token[lengths[argument]] = 0;
+        cursor -= lengths[argument] + 1U;
+        argument_addresses[argument] = cursor;
+        if (!process_user_stack_write(process, cursor, token,
+                                      lengths[argument] + 1U)) return 0;
     }
     cursor -= path_length + 1U;
     uint64_t path_address = cursor;
     if (!process_user_stack_write(process, cursor, path, path_length + 1U))
         return 0;
-    cursor = (cursor - 5U * sizeof(uint64_t)) & ~0xfULL;
-    uint64_t values[5] = {argument_length ? 2U : 1U, path_address,
-                          argument_address, 0, 0};
-    if (!process_user_stack_write(process, cursor, values, sizeof(values)))
+    uint64_t value_count = 3U + argument_count;
+    cursor = (cursor - value_count * sizeof(uint64_t)) & ~0xfULL;
+    uint64_t values[11] = {1U + argument_count, path_address};
+    for (uint32_t index = 0; index < argument_count; ++index)
+        values[2U + index] = argument_addresses[index];
+    if (!process_user_stack_write(process, cursor, values,
+                                  value_count * sizeof(uint64_t)))
         return 0;
     *stack_pointer = cursor;
     return 1;

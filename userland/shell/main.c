@@ -485,21 +485,60 @@ void shell_main(void) {
     static const char help[] = "help id ps env setenv unsetenv status true false jobs fg which inherit echo pwd cd ls cat stat chmod kill sleep mv mkdir rm rmdir touch write run wait exit\r\n";
     static const char *unknown = shell_unknown;
     static char line[128];
+    static char input[64];
     static char argument[128];
     static char expanded_argument[128];
+    static char history[8][SHELL_HISTORY_LINE_CAPACITY];
+    uint32_t history_count = 0;
+    uint32_t history_offset = 0;
+    uint32_t escape_state = 0;
     uint32_t length = 0;
     int32_t last_status = 0;
     shell_active_status = &last_status;
     print(prompt, sizeof(prompt) - 1U);
     for (;;) {
-        uint32_t start = length;
-        uint64_t received = os_read(0, line + length, sizeof(line) - 1U - length);
+        uint64_t received = os_read(0, input, sizeof(input));
         if (received == 0 || received == OS_SYSCALL_ERROR) {
             os_yield();
             continue;
         }
         for (uint64_t index = 0; index < received; ++index) {
-            char value = line[start + index];
+            char value = input[index];
+            if (escape_state == 1) {
+                escape_state = value == '[' ? 2 : 0;
+                continue;
+            }
+            if (escape_state == 2) {
+                escape_state = 0;
+                if (value == 'A' || value == 'B') {
+                    uint32_t previous_length = length;
+                    if (value == 'A') {
+                        if (history_offset < history_count) ++history_offset;
+                    } else if (history_offset != 0) {
+                        --history_offset;
+                    }
+                    while (previous_length-- != 0) print("\b \b", 3);
+                    if (history_offset == 0) {
+                        length = 0;
+                        line[0] = 0;
+                    } else if (!shell_history_get(history, history_count,
+                                                   history_offset - 1U, line,
+                                                   sizeof(line), &length)) {
+                        length = 0;
+                        line[0] = 0;
+                    }
+                    print(line, length);
+                    continue;
+                }
+                continue;
+            }
+            if ((unsigned char)value == 0x1b) {
+                escape_state = 1;
+                continue;
+            }
+            if (value != '\b' && (unsigned char)value != 0x7f &&
+                value != 0x15 && value != '\r' && value != '\n')
+                history_offset = 0;
             uint32_t previous_length = length;
             shell_edit_result_t edit = shell_edit_line(line, &length,
                                                         sizeof(line) - 1U,
@@ -516,9 +555,15 @@ void shell_main(void) {
                 while (previous_length-- != 0) print("\b \b", 3);
                 print("^C\r\n", 4);
                 print(prompt, sizeof(prompt) - 1U);
+                history_offset = 0;
                 continue;
             }
             if (edit != SHELL_EDIT_SUBMIT) continue;
+            history_count = shell_history_push(history,
+                                               sizeof(history) /
+                                               sizeof(history[0]),
+                                               history_count, line, length);
+            history_offset = 0;
             shell_command_t command = shell_parse(line, length, argument,
                                                    sizeof(argument));
             uint32_t argument_length = 0;

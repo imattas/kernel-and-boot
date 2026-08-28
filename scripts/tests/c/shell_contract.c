@@ -66,6 +66,20 @@ int main(void) {
     argument_length = 4;
     memcpy(argument, "bad\\", argument_length + 1);
     assert(!shell_unquote_argument(argument, &argument_length));
+    char history[2][SHELL_HISTORY_LINE_CAPACITY] = {{0}};
+    uint32_t history_count = shell_history_push(history, 2, 0, "first", 5);
+    history_count = shell_history_push(history, 2, history_count, "second", 6);
+    history_count = shell_history_push(history, 2, history_count, "second", 6);
+    assert(history_count == 2);
+    uint32_t history_length = 0;
+    assert(shell_history_get(history, history_count, 0, argument,
+                             sizeof(argument), &history_length));
+    assert(history_length == 6 && strcmp(argument, "second") == 0);
+    history_count = shell_history_push(history, 2, history_count, "third", 5);
+    assert(history_count == 2);
+    assert(shell_history_get(history, history_count, 1, argument,
+                             sizeof(argument), &history_length));
+    assert(history_length == 6 && strcmp(argument, "second") == 0);
     assert(shell_parse("mkdir /tmp", 10, argument, sizeof(argument)) == SHELL_MKDIR);
     assert(strcmp(argument, "/tmp") == 0);
     assert(shell_parse("rm /tmp/file", 12, argument, sizeof(argument)) == SHELL_RM);

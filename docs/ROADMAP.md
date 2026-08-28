@@ -1706,6 +1706,9 @@ status (`$?`), and the shell PID (`$$`); single quotes suppress expansion and
 escaped dollars remain literal.
 `CHDIR.ELF` now exercises directory changes followed by cwd retrieval from
 ring 3 and is packaged in the FAT32 root.
+The shell now keeps a bounded eight-entry command history and handles split
+ANSI up/down escape sequences without feeding terminal control bytes into the
+command parser.
 
 ## Phase 10 — BIOS boot path
 

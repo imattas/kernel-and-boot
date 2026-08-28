@@ -45,6 +45,15 @@ typedef enum {
     SHELL_EDIT_CANCEL
 } shell_edit_result_t;
 
+#define SHELL_HISTORY_LINE_CAPACITY 128
+
+uint32_t shell_history_push(char history[][SHELL_HISTORY_LINE_CAPACITY],
+                            uint32_t capacity, uint32_t count,
+                            const char *line, uint32_t length);
+int shell_history_get(char history[][SHELL_HISTORY_LINE_CAPACITY],
+                      uint32_t count, uint32_t offset, char *line,
+                      uint32_t capacity, uint32_t *length);
+
 shell_command_t shell_parse(const char *line, uint32_t length,
                             char *argument, uint32_t capacity);
 

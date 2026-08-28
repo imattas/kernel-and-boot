@@ -1,5 +1,44 @@
 #include "shell.h"
 
+uint32_t shell_history_push(char history[][SHELL_HISTORY_LINE_CAPACITY],
+                            uint32_t capacity, uint32_t count,
+                            const char *line, uint32_t length) {
+    if (!history || capacity == 0 || !line || length == 0 ||
+        length >= SHELL_HISTORY_LINE_CAPACITY) return count;
+    if (count != 0 && history[count - 1U][0] == line[0]) {
+        uint32_t index = 0;
+        while (index < length && history[count - 1U][index] == line[index])
+            ++index;
+        if (index == length && history[count - 1U][index] == 0) return count;
+    }
+    if (count == capacity) {
+        for (uint32_t index = 1; index < count; ++index)
+            for (uint32_t character = 0;
+                 character < SHELL_HISTORY_LINE_CAPACITY; ++character)
+                history[index - 1U][character] = history[index][character];
+        --count;
+    }
+    for (uint32_t index = 0; index < length; ++index)
+        history[count][index] = line[index];
+    history[count][length] = 0;
+    return count + 1U;
+}
+
+int shell_history_get(char history[][SHELL_HISTORY_LINE_CAPACITY],
+                      uint32_t count, uint32_t offset, char *line,
+                      uint32_t capacity, uint32_t *length) {
+    if (!history || !line || !length || capacity == 0 || offset >= count)
+        return 0;
+    const char *source = history[count - 1U - offset];
+    uint32_t size = 0;
+    while (source[size] && size + 1U < SHELL_HISTORY_LINE_CAPACITY) ++size;
+    if (size >= capacity) return 0;
+    for (uint32_t index = 0; index < size; ++index) line[index] = source[index];
+    line[size] = 0;
+    *length = size;
+    return 1;
+}
+
 shell_edit_result_t shell_edit_line(char *line, uint32_t *length,
                                     uint32_t capacity, char value) {
     if (!line || !length || capacity == 0 || *length > capacity)

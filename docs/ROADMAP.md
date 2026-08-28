@@ -1682,6 +1682,9 @@ scripts an explicit success/failure source for exercising status propagation.
 External program argument construction now removes shell-style single/double
 quotes and backslash escapes, preserving quoted whitespace and empty quoted
 arguments in the bounded ring-3 `argv` stack.
+Built-in shell arguments now apply the same bounded quote and backslash rules,
+rejecting unterminated escapes/quotes while leaving external `run` argument
+text intact for kernel-side argv construction.
 
 ## Phase 10 — BIOS boot path
 

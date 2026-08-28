@@ -371,6 +371,11 @@ void shell_main(void) {
             if (edit != SHELL_EDIT_SUBMIT) continue;
             shell_command_t command = shell_parse(line, length, argument,
                                                    sizeof(argument));
+            uint32_t argument_length = 0;
+            while (argument[argument_length]) ++argument_length;
+            if (command != SHELL_EMPTY && command != SHELL_RUN &&
+                !shell_unquote_argument(argument, &argument_length))
+                command = SHELL_UNKNOWN;
             if (command != SHELL_EMPTY && command != SHELL_STATUS)
                 last_status = 0;
             if (command == SHELL_HELP) print(help, sizeof(help) - 1U);

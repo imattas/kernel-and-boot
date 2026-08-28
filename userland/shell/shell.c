@@ -111,3 +111,31 @@ shell_command_t shell_parse(const char *line, uint32_t length,
     if (same_word(line, command_length, "inherit")) return SHELL_INHERIT;
     return SHELL_ECHO;
 }
+
+int shell_unquote_argument(char *argument, uint32_t *length) {
+    if (!argument || !length) return 0;
+    uint32_t input = 0;
+    uint32_t output = 0;
+    char quote = 0;
+    int escaped = 0;
+    while (input < *length) {
+        char value = argument[input++];
+        if (escaped) {
+            argument[output++] = value;
+            escaped = 0;
+        } else if (value == '\\') {
+            escaped = 1;
+        } else if (quote) {
+            if (value == quote) quote = 0;
+            else argument[output++] = value;
+        } else if (value == '\'' || value == '"') {
+            quote = value;
+        } else {
+            argument[output++] = value;
+        }
+    }
+    if (quote || escaped) return 0;
+    argument[output] = 0;
+    *length = output;
+    return 1;
+}

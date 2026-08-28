@@ -122,6 +122,8 @@ kernel gate below is explicitly marked complete.
   status control.
 - [x] Parse quoted and escaped external-program arguments while constructing
   the ring-3 argv stack.
+- [x] Unquote and unescape shell built-in arguments with bounded validation,
+  while preserving raw quoting for external `run` arguments.
 - [x] Add typed pipe descriptors and blocking userland read/write wrappers.
 - [x] Add optional per-process standard-input and standard-output bindings for
   redirected child processes.

@@ -55,6 +55,17 @@ int main(void) {
     assert(shell_parse("status", 6, argument, sizeof(argument)) == SHELL_STATUS);
     assert(shell_parse("true", 4, argument, sizeof(argument)) == SHELL_TRUE);
     assert(shell_parse("false", 5, argument, sizeof(argument)) == SHELL_FALSE);
+    uint32_t argument_length = 13;
+    memcpy(argument, "\"hello world\"", argument_length + 1);
+    assert(shell_unquote_argument(argument, &argument_length));
+    assert(argument_length == 11 && strcmp(argument, "hello world") == 0);
+    argument_length = 6;
+    memcpy(argument, "'open'", argument_length + 1);
+    assert(shell_unquote_argument(argument, &argument_length));
+    assert(argument_length == 4 && strcmp(argument, "open") == 0);
+    argument_length = 4;
+    memcpy(argument, "bad\\", argument_length + 1);
+    assert(!shell_unquote_argument(argument, &argument_length));
     assert(shell_parse("mkdir /tmp", 10, argument, sizeof(argument)) == SHELL_MKDIR);
     assert(strcmp(argument, "/tmp") == 0);
     assert(shell_parse("rm /tmp/file", 12, argument, sizeof(argument)) == SHELL_RM);

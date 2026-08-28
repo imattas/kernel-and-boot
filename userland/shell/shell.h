@@ -48,6 +48,8 @@ typedef enum {
 shell_command_t shell_parse(const char *line, uint32_t length,
                             char *argument, uint32_t capacity);
 
+int shell_unquote_argument(char *argument, uint32_t *length);
+
 shell_edit_result_t shell_edit_line(char *line, uint32_t *length,
                                     uint32_t capacity, char value);
 

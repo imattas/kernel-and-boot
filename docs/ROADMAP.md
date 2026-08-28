@@ -1838,6 +1838,10 @@ The paired path utility `dirname.elf` now emits the bounded parent path, with
 root and separator edge cases handled through the same PATH and FAT32 image
 integration.
 
+The text-pipeline slice now also provides `cut.elf`, selecting one bounded
+delimiter-separated field from standard input or a file and packaging it in
+the FAT32 userland namespace.
+
 Shell integration contracts now directly cover the quote-aware sequence
 splitter, including semicolons and conditional operators preserved inside
 quoted arguments; this joins

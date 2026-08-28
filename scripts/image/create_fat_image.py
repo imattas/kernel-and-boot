@@ -20,8 +20,8 @@ def short_entry(name, attributes, cluster, size):
         "<HI", cluster & 0xffff, size)
 
 def main():
-    if len(sys.argv) != 45:
-        raise SystemExit("usage: create_fat_image.py ... <CP.ELF> <HEAD.ELF> <WC.ELF> <GREP.ELF> <TEE.ELF> <TAIL.ELF> <SORT.ELF> <UNIQ.ELF> <PRINTF.ELF> <BASENAME.ELF> <DIRNAME.ELF> <os.img>")
+    if len(sys.argv) != 46:
+        raise SystemExit("usage: create_fat_image.py ... <CP.ELF> <HEAD.ELF> <WC.ELF> <GREP.ELF> <TEE.ELF> <TAIL.ELF> <SORT.ELF> <UNIQ.ELF> <PRINTF.ELF> <BASENAME.ELF> <DIRNAME.ELF> <CUT.ELF> <os.img>")
     efi_source = Path(sys.argv[1]).read_bytes()
     kernel_source = Path(sys.argv[2]).read_bytes()
     init_source = Path(sys.argv[3]).read_bytes()
@@ -65,7 +65,8 @@ def main():
     printf_source = Path(sys.argv[41]).read_bytes()
     basename_source = Path(sys.argv[42]).read_bytes()
     dirname_source = Path(sys.argv[43]).read_bytes()
-    output = Path(sys.argv[44])
+    cut_source = Path(sys.argv[44]).read_bytes()
+    output = Path(sys.argv[45])
     efi_clusters = max(1, math.ceil(len(efi_source) / SECTOR))
     kernel_clusters = max(1, math.ceil(len(kernel_source) / SECTOR))
     init_clusters = max(1, math.ceil(len(init_source) / SECTOR))
@@ -109,6 +110,7 @@ def main():
     printf_clusters = max(1, math.ceil(len(printf_source) / SECTOR))
     basename_clusters = max(1, math.ceil(len(basename_source) / SECTOR))
     dirname_clusters = max(1, math.ceil(len(dirname_source) / SECTOR))
+    cut_clusters = max(1, math.ceil(len(cut_source) / SECTOR))
     efi_chain = list(range(7, 7 + efi_clusters))
     kernel_chain = list(range(7 + efi_clusters, 7 + efi_clusters + kernel_clusters))
     init_chain = list(range(7 + efi_clusters + kernel_clusters,
@@ -154,7 +156,8 @@ def main():
     printf_chain = list(range(uniq_chain[-1] + 1, uniq_chain[-1] + 1 + printf_clusters))
     basename_chain = list(range(printf_chain[-1] + 1, printf_chain[-1] + 1 + basename_clusters))
     dirname_chain = list(range(basename_chain[-1] + 1, basename_chain[-1] + 1 + dirname_clusters))
-    if dirname_chain[-1] >= TOTAL_SECTORS - DATA_START + 2:
+    cut_chain = list(range(dirname_chain[-1] + 1, dirname_chain[-1] + 1 + cut_clusters))
+    if cut_chain[-1] >= TOTAL_SECTORS - DATA_START + 2:
         raise SystemExit("boot files are too large for the FAT32 image")
     image = bytearray(TOTAL_SECTORS * SECTOR)
     boot = bytearray(SECTOR)
@@ -176,7 +179,7 @@ def main():
     fsinfo = bytearray(SECTOR)
     struct.pack_into("<I", fsinfo, 0, 0x41615252)
     struct.pack_into("<I", fsinfo, 484, 0x61417272)
-    struct.pack_into("<I", fsinfo, 488, TOTAL_SECTORS - DATA_START - len(efi_chain) - len(kernel_chain) - len(init_chain) - len(shell_chain) - len(args_chain) - len(env_chain) - len(cat_chain) - len(pwd_chain) - len(mkdir_chain) - len(rm_chain) - len(rmdir_chain) - len(touch_chain) - len(write_chain) - len(ls_chain) - len(chmod_chain) - len(echo_chain) - len(help_chain) - len(stat_chain) - len(mv_chain) - len(kill_chain) - len(sleep_chain) - len(setenv_chain) - len(ipc_chain) - len(dup_chain) - len(true_chain) - len(false_chain) - len(id_chain) - len(ps_chain) - len(wait_chain) - len(truncate_chain) - len(seek_chain) - len(chdir_chain) - len(cp_chain) - len(head_chain) - len(wc_chain) - len(grep_chain) - len(tee_chain) - len(tail_chain) - len(sort_chain) - len(uniq_chain) - len(printf_chain) - len(basename_chain) - len(dirname_chain) - 5)
+    struct.pack_into("<I", fsinfo, 488, TOTAL_SECTORS - DATA_START - len(efi_chain) - len(kernel_chain) - len(init_chain) - len(shell_chain) - len(args_chain) - len(env_chain) - len(cat_chain) - len(pwd_chain) - len(mkdir_chain) - len(rm_chain) - len(rmdir_chain) - len(touch_chain) - len(write_chain) - len(ls_chain) - len(chmod_chain) - len(echo_chain) - len(help_chain) - len(stat_chain) - len(mv_chain) - len(kill_chain) - len(sleep_chain) - len(setenv_chain) - len(ipc_chain) - len(dup_chain) - len(true_chain) - len(false_chain) - len(id_chain) - len(ps_chain) - len(wait_chain) - len(truncate_chain) - len(seek_chain) - len(chdir_chain) - len(cp_chain) - len(head_chain) - len(wc_chain) - len(grep_chain) - len(tee_chain) - len(tail_chain) - len(sort_chain) - len(uniq_chain) - len(printf_chain) - len(basename_chain) - len(dirname_chain) - len(cut_chain) - 5)
     struct.pack_into("<I", fsinfo, 492, 7 + efi_clusters + kernel_clusters + init_clusters + shell_clusters)
     struct.pack_into("<I", fsinfo, 508, 0xaa550000)
     image[SECTOR:2 * SECTOR] = fsinfo
@@ -189,7 +192,7 @@ def main():
                            (2, 5), (3, 0x0fffffff), (4, 0x0fffffff),
                            (5, 6), (6, 0x0fffffff)):
         set_fat(cluster, value)
-    for chain in (efi_chain, kernel_chain, init_chain, shell_chain, args_chain, env_chain, cat_chain, pwd_chain, mkdir_chain, rm_chain, rmdir_chain, touch_chain, write_chain, ls_chain, chmod_chain, echo_chain, help_chain, stat_chain, mv_chain, kill_chain, sleep_chain, setenv_chain, ipc_chain, dup_chain, true_chain, false_chain, id_chain, ps_chain, wait_chain, truncate_chain, seek_chain, chdir_chain, cp_chain, head_chain, wc_chain, grep_chain, tee_chain, tail_chain, sort_chain, uniq_chain, printf_chain, basename_chain, dirname_chain):
+    for chain in (efi_chain, kernel_chain, init_chain, shell_chain, args_chain, env_chain, cat_chain, pwd_chain, mkdir_chain, rm_chain, rmdir_chain, touch_chain, write_chain, ls_chain, chmod_chain, echo_chain, help_chain, stat_chain, mv_chain, kill_chain, sleep_chain, setenv_chain, ipc_chain, dup_chain, true_chain, false_chain, id_chain, ps_chain, wait_chain, truncate_chain, seek_chain, chdir_chain, cp_chain, head_chain, wc_chain, grep_chain, tee_chain, tail_chain, sort_chain, uniq_chain, printf_chain, basename_chain, dirname_chain, cut_chain):
         for index, cluster in enumerate(chain):
             set_fat(cluster, chain[index + 1] if index + 1 < len(chain) else 0x0fffffff)
     for fat_index in range(FAT_COUNT):
@@ -246,6 +249,7 @@ def main():
     root_extension_second[288:320] = short_entry("PRINTF  ELF", 0x20, printf_chain[0], len(printf_source))
     root_extension_second[320:352] = short_entry("BASENAMEELF", 0x20, basename_chain[0], len(basename_source))
     root_extension_second[352:384] = short_entry("DIRNAME ELF", 0x20, dirname_chain[0], len(dirname_source))
+    root_extension_second[384:416] = short_entry("CUT     ELF", 0x20, cut_chain[0], len(cut_source))
     image[cluster_offset(6):cluster_offset(6) + SECTOR] = root_extension_second
     efi_dir = bytearray(SECTOR)
     efi_dir[0:32] = short_entry(".          ", 0x10, 3, 0)
@@ -343,6 +347,8 @@ def main():
         image[cluster_offset(cluster):cluster_offset(cluster) + len(basename_source[index * SECTOR:(index + 1) * SECTOR])] = basename_source[index * SECTOR:(index + 1) * SECTOR]
     for index, cluster in enumerate(dirname_chain):
         image[cluster_offset(cluster):cluster_offset(cluster) + len(dirname_source[index * SECTOR:(index + 1) * SECTOR])] = dirname_source[index * SECTOR:(index + 1) * SECTOR]
+    for index, cluster in enumerate(cut_chain):
+        image[cluster_offset(cluster):cluster_offset(cluster) + len(cut_source[index * SECTOR:(index + 1) * SECTOR])] = cut_source[index * SECTOR:(index + 1) * SECTOR]
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_bytes(image)
 

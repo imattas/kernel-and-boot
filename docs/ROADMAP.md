@@ -1121,6 +1121,8 @@ overlap, inserts or coalesces within the selected leaf, updates its root key,
 and rolls back the leaf, root, and AGF on publication failure.
 The two-level v4 BNO release path now coalesces an extent across adjacent
 leaf boundaries and removes an emptied child from the root index.
+XFS allocation and release now share an IRQ-safe per-filesystem lock, keeping
+multi-CPU BNO/AGF mutations and rollback publication serialized.
 Multi-level BNO/CNT trees and full transaction logging remain later hardening
 work.
 Btrfs regular-file truncation now accepts zero-length targets, updating the

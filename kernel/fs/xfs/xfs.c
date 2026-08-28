@@ -80,7 +80,7 @@ static void store_be16(uint8_t *p, uint16_t value) {
     p[0] = (uint8_t)(value >> 8); p[1] = (uint8_t)value;
 }
 
-int xfs_allocate_extent(xfs_fs_t *fs, uint32_t allocation_group,
+static int xfs_allocate_extent_locked(xfs_fs_t *fs, uint32_t allocation_group,
                         uint32_t blocks, uint64_t *start) {
     uint8_t agf[4096], tree[4096], original_agf[4096], original_tree[4096];
     if (!fs || !fs->mounted || !start || blocks == 0 || allocation_group >= fs->ag_count ||
@@ -151,7 +151,16 @@ int xfs_allocate_extent(xfs_fs_t *fs, uint32_t allocation_group,
     return 1;
 }
 
-int xfs_free_extent(xfs_fs_t *fs, uint64_t start, uint32_t blocks) {
+int xfs_allocate_extent(xfs_fs_t *fs, uint32_t allocation_group,
+                        uint32_t blocks, uint64_t *start) {
+    if (!fs) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&fs->lock);
+    int result = xfs_allocate_extent_locked(fs, allocation_group, blocks, start);
+    spinlock_unlock_irqrestore(&fs->lock, flags);
+    return result;
+}
+
+static int xfs_free_extent_locked(xfs_fs_t *fs, uint64_t start, uint32_t blocks) {
     uint8_t agf[4096], tree[4096], original_agf[4096], original_tree[4096];
     if (!fs || !fs->mounted || blocks == 0 || fs->ag_blocks < 2U ||
         fs->block_count == 0 || start >= fs->block_count ||
@@ -246,6 +255,14 @@ int xfs_free_extent(xfs_fs_t *fs, uint64_t start, uint32_t blocks) {
     return 1;
 }
 
+int xfs_free_extent(xfs_fs_t *fs, uint64_t start, uint32_t blocks) {
+    if (!fs) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&fs->lock);
+    int result = xfs_free_extent_locked(fs, start, blocks);
+    spinlock_unlock_irqrestore(&fs->lock, flags);
+    return result;
+}
+
 static void xfs_store_extent(uint8_t *record, uint64_t logical,
                              uint64_t physical, uint64_t length,
                              uint8_t unwritten) {
@@ -326,6 +343,7 @@ int xfs_mount(xfs_fs_t *fs, uint32_t device) {
         (1U << inode_log) != inode_size || (1U << inopblock_log) != (block_size / inode_size) ||
         (uint64_t)ag_blocks * ag_count < blocks ||
         blocks > storage_device_at(device)->block_count / (block_size / XFS_SECTOR_SIZE)) return 0;
+    spinlock_init(&fs->lock);
     fs->device = device; fs->block_size = block_size; fs->inode_size = inode_size;
     fs->ag_count = ag_count; fs->ag_blocks = ag_blocks; fs->block_count = blocks;
     fs->ag_block_log = sb[112]; fs->inode_per_block_log = inopblock_log;

@@ -4,6 +4,7 @@
 #include "../vfs/vfs.h"
 
 typedef struct {
+    spinlock_t lock;
     uint32_t device;
     uint32_t block_size;
     uint32_t inode_size;

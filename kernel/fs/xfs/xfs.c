@@ -86,6 +86,10 @@ static void xfs_bno_store_records(uint8_t *tree,
 
 static int xfs_read_block(const xfs_fs_t *fs, uint64_t block, void *buffer);
 static int xfs_write_block(const xfs_fs_t *fs, uint64_t block, const void *buffer);
+static int xfs_flush_metadata(const xfs_fs_t *fs) {
+    const storage_device_t *device = fs ? storage_device_at(fs->device) : 0;
+    return device && (!device->flush || storage_flush(fs->device));
+}
 static int xfs_validate_auth_cnt(const xfs_fs_t *fs, uint64_t ag_base,
                                  const xfs_agf_view_t *view);
 static int xfs_validate_auth_bno(const xfs_fs_t *fs, uint64_t ag_base,
@@ -357,7 +361,8 @@ static int xfs_auth_one_child_mutate(xfs_fs_t *fs, uint32_t agno,
         !xfs_write_block(fs, ag_base + cnt_child, cnt_leaf) ||
         !xfs_write_block(fs, ag_base + view.bno_root, bno_root) ||
         !xfs_write_block(fs, ag_base + view.cnt_root, cnt_root) ||
-        !xfs_write_block(fs, ag_base + 1U, agf)) goto rollback;
+        !xfs_write_block(fs, ag_base + 1U, agf) ||
+        !xfs_flush_metadata(fs)) goto rollback;
     return 1;
 rollback:
     (void)xfs_write_block(fs, ag_base + bno_child, original_bno_leaf);
@@ -496,7 +501,8 @@ static int xfs_auth_bno_mutate(xfs_fs_t *fs, uint32_t agno, uint32_t blocks,
     store_be32(&agf[56], longest);
     if (!xfs_write_block(fs, ag_base + view.bno_root, bno) ||
         !xfs_write_block(fs, ag_base + view.cnt_root, cnt) ||
-        !xfs_write_block(fs, ag_base + 1U, agf)) goto rollback;
+        !xfs_write_block(fs, ag_base + 1U, agf) ||
+        !xfs_flush_metadata(fs)) goto rollback;
     return 1;
 rollback:
     (void)xfs_write_block(fs, ag_base + view.bno_root, original_bno);

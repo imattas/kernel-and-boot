@@ -1212,7 +1212,8 @@ and release now update both indexes and AGF counters with rollback on failed
 publication. A bounded authentic root-plus-single-child BNO/CNT path now also
 updates both indexes and AGF counters with rollback; larger fan-out trees and
 transaction logging remain pending. Nested empty-child transitions can now be
-repopulated without leaving invalid AGF/CNT metadata.
+repopulated without leaving invalid AGF/CNT metadata. Authentic metadata
+publication now requests the storage device's flush operation when available.
 Ext4 VFS file attachment now accepts an explicit directory inode and validates
 the inode type while carrying its on-disk permission bits into the VFS node.
 ExFAT VFS files now retain their source directory cluster and use directory-

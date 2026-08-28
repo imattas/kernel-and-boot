@@ -32,6 +32,8 @@ int xfs_lookup(xfs_fs_t *fs, uint64_t directory_inode, const char *name,
 int xfs_directory_entry(xfs_fs_t *fs, uint64_t directory_inode,
                         uint32_t index, char *name, uint32_t name_size,
                         uint64_t *inode);
+int xfs_directory_count(xfs_fs_t *fs, uint64_t directory_inode,
+                        uint32_t *count);
 int xfs_add_local_entry(xfs_fs_t *fs, uint64_t directory_inode,
                         const char *name, uint64_t child_inode);
 int xfs_remove_local_entry(xfs_fs_t *fs, uint64_t directory_inode,

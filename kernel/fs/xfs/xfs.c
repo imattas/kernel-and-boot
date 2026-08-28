@@ -2025,6 +2025,33 @@ int xfs_directory_entry(xfs_fs_t *fs, uint64_t directory_inode,
     return 0;
 }
 
+int xfs_directory_count(xfs_fs_t *fs, uint64_t directory_inode,
+                        uint32_t *count) {
+    uint8_t data[4096];
+    if (!fs || !count || !xfs_read_inode(fs, directory_inode, data) ||
+        (be16(&data[2]) & 0xf000U) != 0x4000U || data[5] != XFS_FORMAT_LOCAL)
+        return 0;
+    uint32_t core = data[4] == 2 ? XFS_CORE_V2_SIZE : 100U;
+    uint64_t directory_size = be64(&data[56]);
+    uint32_t inode_bytes = data[core + 1] ? 8U : 4U;
+    uint32_t position = 2U + inode_bytes, entries = data[core];
+    if (directory_size < position || directory_size > fs->inode_size - core)
+        return 0;
+    for (uint32_t i = 0; i < entries; ++i) {
+        if (position + 3U > directory_size) return 0;
+        uint32_t length = data[core + position];
+        uint32_t record = 3U + inode_bytes + length;
+        if (position + record > directory_size ||
+            (inode_bytes == 8U ? be64(&data[core + position + 3U]) :
+                                 be32(&data[core + position + 3U])) == 0)
+            return 0;
+        position += record;
+    }
+    if (position != directory_size) return 0;
+    *count = entries;
+    return 1;
+}
+
 int xfs_add_local_entry(xfs_fs_t *fs, uint64_t directory_inode,
                         const char *name, uint64_t child_inode) {
     uint8_t data[4096];

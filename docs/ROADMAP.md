@@ -1213,6 +1213,9 @@ filesystem implementation, matching the persistent inode path.
 The XFS VFS adapter can now materialize validated short-form directory trees,
 including nested regular files/directories and on-disk permission modes, with a
 bounded recursion depth and child-count guard.
+XFS directory validation now requires the encoded record count to consume the
+entire inline payload and rejects zero-inode records before VFS materialization;
+the adapter no longer treats malformed trailing entries as end-of-directory.
 The XFS allocator now explicitly distinguishes its legacy contract AGF layout
 from authentic AGF metadata with separate BNO/CNT fields, and mount validates
 authentic BNO/CNT ordering, child pointers, child boundary keys, free-block

@@ -82,10 +82,16 @@ static int xfs_vfs_attach_directory_tree(xfs_fs_t *fs, vfs_node_t *parent,
     vfs_node_t *node = vfs_node_create(name, VFS_NODE_DIRECTORY, 0, 0,
                                        mode & 0777U);
     if (!node) return 0;
+    uint32_t entry_count = 0;
+    if (!xfs_directory_count(fs, directory, &entry_count) || entry_count > 256U) {
+        vfs_node_release(node); return 0;
+    }
     char entry_name[32]; uint64_t child = 0;
-    for (uint32_t index = 0; index < 256U &&
-         xfs_directory_entry(fs, directory, index, entry_name,
-                             sizeof(entry_name), &child); ++index) {
+    for (uint32_t index = 0; index < entry_count; ++index) {
+        if (!xfs_directory_entry(fs, directory, index, entry_name,
+                                  sizeof(entry_name), &child)) {
+            vfs_node_release(node); return 0;
+        }
         if (xfs_vfs_dot_name(entry_name, ".") ||
             xfs_vfs_dot_name(entry_name, "..")) continue;
         uint16_t child_mode = 0;

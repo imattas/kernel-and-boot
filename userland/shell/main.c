@@ -890,6 +890,7 @@ void shell_main(void) {
     static char argument[128];
     static char expanded_argument[128];
     static char pending_line[128];
+    static char previous_directory[128] = "/";
     static char history[8][SHELL_HISTORY_LINE_CAPACITY];
     uint32_t history_count = 0;
     uint32_t history_offset = 0;
@@ -1212,10 +1213,31 @@ void shell_main(void) {
             } else if (command == SHELL_CD) {
                 uint32_t argument_length = 0;
                 while (argument[argument_length]) ++argument_length;
-                const char *directory = argument_length == 0 ? "/" : argument;
-                uint32_t directory_length = argument_length == 0 ? 1 : argument_length;
-                if (os_chdir(directory, directory_length) == OS_SYSCALL_ERROR)
+                char current_directory[128];
+                uint64_t current_length = os_getcwd(current_directory,
+                                                     sizeof(current_directory));
+                int switch_previous = argument_length == 1 && argument[0] == '-';
+                const char *directory = switch_previous ? previous_directory :
+                    (argument_length == 0 ? "/" : argument);
+                uint32_t directory_length = switch_previous ?
+                    shell_text_length(previous_directory) :
+                    (argument_length == 0 ? 1 : argument_length);
+                if (os_chdir(directory, directory_length) == OS_SYSCALL_ERROR ||
+                    current_length == OS_SYSCALL_ERROR ||
+                    current_length >= sizeof(previous_directory))
                     print(unknown, sizeof(unknown) - 1U);
+                else {
+                    for (uint32_t character = 0; character <= current_length;
+                         ++character)
+                        previous_directory[character] = current_directory[character];
+                    if (switch_previous) {
+                        uint64_t next = os_getcwd(current_directory,
+                                                  sizeof(current_directory));
+                        if (next != OS_SYSCALL_ERROR)
+                            print(current_directory, next);
+                        print("\r\n", 2);
+                    }
+                }
             } else if (command == SHELL_LS) {
                 static const char current[] = ".";
                 shell_dirent_t entry;

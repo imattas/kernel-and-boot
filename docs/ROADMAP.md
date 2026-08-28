@@ -1993,3 +1993,7 @@ standalone help inventory is synchronized with the new command.
 
 The shell also provides bounded `uname` and `uname -a` identification output
 for the x86_64 system personality.
+
+The shell directory-navigation slice now tracks a bounded previous directory
+and implements `cd -`, printing the destination after a successful switch;
+the normal empty-operand `cd` behavior remains unchanged.

@@ -39,6 +39,9 @@ int main(void) {
     uint8_t *bno = &image[8192];
     put32(&bno[0], 0x58414254); put32(&bno[8], 1);
     put32(&bno[16], 12); put32(&bno[20], 4);
+    uint8_t *empty = inode + 1280; put16(empty, 0x494e);
+    put16(&empty[2], 0x8000); empty[4] = 2; empty[5] = 2;
+    put64(&empty[56], 0); put32(&empty[76], 0);
     storage_initialize();
     storage_device_t device = {.name = "xfs-unwritten", .block_size = 512,
                                .block_count = 128, .read = read_image,
@@ -50,6 +53,9 @@ int main(void) {
     assert(xfs_inode_size(&fs, 128, &extended_size) && extended_size == 16384);
     assert(xfs_write_file(&fs, 128, 12288, "z", 1));
     assert(image[12 * 4096U] == 'z');
+    assert(xfs_write_file(&fs, 133, 0, "q", 1));
+    assert(image[13 * 4096U] == 'q');
+    assert(xfs_inode_size(&fs, 133, &extended_size) && extended_size == 1);
     assert(xfs_write_file(&fs, 128, 4096U + 7U, "x", 1));
     assert(image[10 * 4096U + 7U] == 'x');
     assert(image[8 * 4096U + 116U + 6U] == 2);

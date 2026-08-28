@@ -18,6 +18,10 @@
 #define XFS_JOURNAL_COMMIT 2U
 #define XFS_JOURNAL_MAX_BLOCKS 12U
 
+static uint32_t xfs_inode_core_size(const xfs_fs_t *fs) {
+    return fs && fs->inode_size == 256U ? XFS_CORE_V2_SIZE : 176U;
+}
+
 static uint32_t be32(const uint8_t *p);
 static uint16_t be16(const uint8_t *p);
 static void store_be16(uint8_t *p, uint16_t value);
@@ -1991,7 +1995,7 @@ int xfs_lookup(xfs_fs_t *fs, uint64_t directory_inode, const char *name,
     uint8_t data[4096];
     if (!fs || !name || !inode_number || !name[0] || !xfs_read_inode(fs, directory_inode, data) ||
         (be16(&data[2]) & 0xf000U) != 0x4000U || data[5] != XFS_FORMAT_LOCAL) return 0;
-    uint32_t core = data[4] == 2 ? XFS_CORE_V2_SIZE : 100U;
+    uint32_t core = xfs_inode_core_size(fs);
     uint64_t directory_size = be64(&data[56]);
     if (directory_size < 6 || directory_size > fs->inode_size - core) return 0;
     const uint8_t *local = &data[core]; uint32_t count = local[0];
@@ -2019,7 +2023,7 @@ int xfs_directory_entry(xfs_fs_t *fs, uint64_t directory_inode,
         !xfs_read_inode(fs, directory_inode, data) ||
         (be16(&data[2]) & 0xf000U) != 0x4000U || data[5] != XFS_FORMAT_LOCAL)
         return 0;
-    uint32_t core = data[4] == 2 ? XFS_CORE_V2_SIZE : 100U;
+    uint32_t core = xfs_inode_core_size(fs);
     uint64_t directory_size = be64(&data[56]);
     uint8_t wide = data[core + 1] != 0;
     uint32_t inode_bytes = wide ? 8U : 4U;
@@ -2052,7 +2056,7 @@ int xfs_directory_count(xfs_fs_t *fs, uint64_t directory_inode,
     if (!fs || !count || !xfs_read_inode(fs, directory_inode, data) ||
         (be16(&data[2]) & 0xf000U) != 0x4000U || data[5] != XFS_FORMAT_LOCAL)
         return 0;
-    uint32_t core = data[4] == 2 ? XFS_CORE_V2_SIZE : 100U;
+    uint32_t core = xfs_inode_core_size(fs);
     uint64_t directory_size = be64(&data[56]);
     uint32_t inode_bytes = data[core + 1] ? 8U : 4U;
     uint32_t position = 2U + inode_bytes, entries = data[core];
@@ -2080,7 +2084,7 @@ int xfs_add_local_entry(xfs_fs_t *fs, uint64_t directory_inode,
         !xfs_read_inode(fs, directory_inode, data) ||
         (be16(&data[2]) & 0xf000U) != 0x4000U || data[5] != XFS_FORMAT_LOCAL)
         return 0;
-    uint32_t core = data[4] == 2 ? XFS_CORE_V2_SIZE : 100U;
+    uint32_t core = xfs_inode_core_size(fs);
     uint64_t directory_size = be64(&data[56]);
     uint8_t wide = data[core + 1] != 0;
     uint32_t inode_bytes = wide ? 8U : 4U, length = 0;
@@ -2111,7 +2115,7 @@ int xfs_remove_local_entry(xfs_fs_t *fs, uint64_t directory_inode,
     if (!fs || !name || !name[0] || !xfs_read_inode(fs, directory_inode, data) ||
         (be16(&data[2]) & 0xf000U) != 0x4000U || data[5] != XFS_FORMAT_LOCAL)
         return 0;
-    uint32_t core = data[4] == 2 ? XFS_CORE_V2_SIZE : 100U;
+    uint32_t core = xfs_inode_core_size(fs);
     uint64_t directory_size = be64(&data[56]); uint8_t wide = data[core + 1] != 0;
     uint32_t inode_bytes = wide ? 8U : 4U, position = 2U + inode_bytes;
     uint32_t wanted_length = 0;
@@ -2159,7 +2163,7 @@ int xfs_rename_local_entry(xfs_fs_t *fs, uint64_t directory_inode,
             return 0;
         ++new_length;
     }
-    uint32_t core = data[4] == 2 ? XFS_CORE_V2_SIZE : 100U;
+    uint32_t core = xfs_inode_core_size(fs);
     uint64_t directory_size = be64(&data[56]);
     uint8_t wide = data[core + 1] != 0;
     uint32_t inode_bytes = wide ? 8U : 4U;
@@ -2229,7 +2233,7 @@ static int xfs_local_remove_data(const xfs_fs_t *fs, uint8_t *data,
     if (!fs || !data || !name || !name[0] || !child_inode ||
         (be16(&data[2]) & 0xf000U) != 0x4000U || data[5] != XFS_FORMAT_LOCAL)
         return 0;
-    uint32_t core = data[4] == 2 ? XFS_CORE_V2_SIZE : 100U;
+    uint32_t core = xfs_inode_core_size(fs);
     uint64_t directory_size = be64(&data[56]);
     uint32_t inode_bytes = data[core + 1] ? 8U : 4U;
     uint32_t position = 2U + inode_bytes, wanted_length = 0;
@@ -2269,7 +2273,7 @@ static int xfs_local_add_data(const xfs_fs_t *fs, uint8_t *data,
     if (!fs || !data || !name || !name[0] || child_inode == 0 ||
         (be16(&data[2]) & 0xf000U) != 0x4000U || data[5] != XFS_FORMAT_LOCAL)
         return 0;
-    uint32_t core = data[4] == 2 ? XFS_CORE_V2_SIZE : 100U;
+    uint32_t core = xfs_inode_core_size(fs);
     uint64_t directory_size = be64(&data[56]);
     uint32_t inode_bytes = data[core + 1] ? 8U : 4U, length = 0;
     for (const char *p = name; *p; ++p) {
@@ -2387,14 +2391,14 @@ int xfs_read_file(xfs_fs_t *fs, uint64_t inode, uint64_t offset,
     uint64_t file_size = be64(&data[56]);
     if (offset > file_size || size > file_size - offset) return 0;
     if (data[5] == XFS_FORMAT_LOCAL) {
-        uint32_t core = data[4] == 2 ? XFS_CORE_V2_SIZE : 100U;
+        uint32_t core = xfs_inode_core_size(fs);
         if (offset > fs->inode_size - core || size > fs->inode_size - core - offset) return 0;
         for (uint32_t i = 0; i < size; ++i) ((uint8_t *)buffer)[i] = data[core + offset + i];
         return 1;
     }
     if (data[5] != XFS_FORMAT_EXTENTS) return 0;
     uint32_t extent_count = be32(&data[76]);
-    uint32_t core = data[4] == 2 ? XFS_CORE_V2_SIZE : 100U;
+    uint32_t core = xfs_inode_core_size(fs);
     if (extent_count == 0 || extent_count > (fs->inode_size - core) / 16U) return 0;
     uint8_t *destination = buffer; uint32_t remaining = size;
     uint64_t logical = offset / fs->block_size; uint32_t in_block = (uint32_t)(offset % fs->block_size);
@@ -2420,7 +2424,7 @@ int xfs_extend_file(xfs_fs_t *fs, uint64_t inode, uint64_t size) {
     if (!fs || !fs->mounted || !xfs_read_inode(fs, inode, data) ||
         (be16(&data[2]) & 0xf000U) != 0x8000U || data[5] != XFS_FORMAT_EXTENTS)
         return 0;
-    uint32_t core = data[4] == 2 ? XFS_CORE_V2_SIZE : 100U;
+    uint32_t core = xfs_inode_core_size(fs);
     uint64_t old_size = be64(&data[56]);
     if (size <= old_size || size > UINT64_MAX - (fs->block_size - 1U)) return 0;
     uint64_t old_blocks = (old_size + fs->block_size - 1U) / fs->block_size;
@@ -2428,7 +2432,7 @@ int xfs_extend_file(xfs_fs_t *fs, uint64_t inode, uint64_t size) {
     if (new_blocks <= old_blocks || new_blocks - old_blocks > UINT32_MAX) return 0;
     uint32_t extent_count = be32(&data[76]);
     uint32_t capacity = (fs->inode_size - core) / 16U;
-    if (extent_count == 0 || extent_count >= capacity) return 0;
+    if (extent_count >= capacity) return 0;
     uint64_t maximum_end = 0;
     for (uint32_t i = 0; i < extent_count; ++i) {
         uint64_t high = be64(&data[core + i * 16U]);
@@ -2463,7 +2467,7 @@ int xfs_write_file(xfs_fs_t *fs, uint64_t inode, uint64_t offset,
     uint8_t data[4096], block[4096];
     if (!fs || !fs->mounted || !buffer || size == 0 ||
         !xfs_read_inode(fs, inode, data)) return 0;
-    uint32_t core = fs->inode_size == 256 ? 100U : 176U;
+    uint32_t core = xfs_inode_core_size(fs);
     uint64_t file_size = be64(&data[56]);
     if (offset > file_size || offset > UINT64_MAX - size ||
         core > fs->inode_size || (be16(&data[2]) & 0xf000U) != 0x8000U)
@@ -2478,7 +2482,7 @@ int xfs_write_file(xfs_fs_t *fs, uint64_t inode, uint64_t offset,
     }
     if (data[5] != XFS_FORMAT_EXTENTS) return 0;
     uint32_t extent_count = be32(&data[76]);
-    if (extent_count == 0 || extent_count > (fs->inode_size - core) / 16U)
+    if (extent_count > (fs->inode_size - core) / 16U)
         return 0;
     uint64_t end = offset + size;
     int grew = end > file_size;
@@ -2550,11 +2554,11 @@ int xfs_truncate_file(xfs_fs_t *fs, uint64_t inode, uint64_t size) {
     if (!fs || !fs->mounted || !xfs_read_inode(fs, inode, data) ||
         (be16(&data[2]) & 0xf000U) != 0x8000U || size > be64(&data[56])) return 0;
     if (data[5] == XFS_FORMAT_LOCAL) {
-        uint32_t core = data[4] == 2 ? XFS_CORE_V2_SIZE : 100U;
+        uint32_t core = xfs_inode_core_size(fs);
         if (size > fs->inode_size - core) return 0;
         for (uint64_t i = size; i < be64(&data[56]); ++i) data[core + i] = 0;
     } else if (data[5] == XFS_FORMAT_EXTENTS) {
-        uint32_t core = data[4] == 2 ? XFS_CORE_V2_SIZE : 100U;
+        uint32_t core = xfs_inode_core_size(fs);
         uint32_t extent_count = be32(&data[76]);
         if (extent_count == 0 || extent_count > (fs->inode_size - core) / 16U ||
             extent_count > 256U)

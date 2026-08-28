@@ -989,6 +989,8 @@ Design and implement syscall entry/exit, ABI validation, process address spaces,
 ## Kernel completion gate — required before userland
 
 `userland/` remains empty until the kernel is complete as a usable operating-system kernel. Every planned kernel subsystem and directory must either contain its real implementation, build integration, focused tests, and QEMU/integration evidence, or be deliberately removed from the architecture and roadmap. Empty directories are roadmap scaffolding, not completed work.
+The active completion ledger and the first userland checklist are maintained in
+`docs/TODO.md`.
 
 Process thread ownership now enforces nonzero per-process thread IDs and
 rejects duplicate IDs before allocation; callers can resolve an owned thread
@@ -1102,6 +1104,15 @@ allocation ends at the file boundary: new blocks are allocated as unwritten,
 published in the inode, and released again if inode publication fails.
 The XFS unwritten-extent contract now covers append allocation followed by a
 real write into the newly allocated extent.
+Zero-extent XFS regular files can now grow through the same bounded append
+allocator, allowing a newly created extent-format inode to receive its first
+data block through `xfs_write_file`.
+The XFS VFS file adapter now forwards bounded append writes to that allocator
+and updates its cached file size after successful growth; same-size truncation
+is also an idempotent operation.
+XFS inode payload operations now derive the data-core boundary from the mounted
+inode size, allowing the 512-byte inode layout to use its 176-byte core instead
+of incorrectly treating it as the 256-byte layout.
 Writes into multi-block unwritten extents now split the extent into preserved
 unwritten ranges and an initialized block, so untouched sectors remain zero.
 The XFS contract now exercises a partial write through a multi-block unwritten

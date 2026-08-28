@@ -1938,7 +1938,7 @@ resolved path using the normal freestanding userland runtime.
 `which.elf` now accepts multiple command operands, emits one resolved path per
 operand, and returns a failure status when any operand cannot be resolved.
 
-The image contract now explicitly validates the complete 45-entry userland
+The image contract now explicitly validates the complete 49-entry userland
 set, including every second extension-cluster entry through `WHICH.ELF`, so
 packaging regressions cannot silently omit a late application.
 
@@ -1954,3 +1954,9 @@ of init and removing the VFS-lock acquisition from namespace inheritance. QEMU
 still stalls during the first spawn while acquiring the parent process lock, so
 the stable kernel-managed shell path was restored; init supervision remains
 deferred until process-lock ownership is made SMP-safe.
+
+Userland development is active while XFS expansion remains paused. The shell
+now includes a `version` built-in, synchronized with its help inventory, as
+the first command-surface slice after the larger utility set. The grouped
+`make test` gate passed again, including the image contract and QEMU UEFI
+handoff.

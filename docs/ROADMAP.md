@@ -1809,4 +1809,8 @@ using the existing freestanding runtime and file-creation ABI. It is packaged
 in the FAT32 image and remains available through the shell's external-command
 PATH resolution.
 
+The following text-tool slice adds `tail.elf`, which keeps the final ten
+bounded lines from either a file or standard input and is packaged in the same
+FAT32 image namespace.
+
 Continue hardening SMP, memory reclamation, storage, USB, networking, graphics, security, debugging, crash diagnostics, performance tooling, power management, hardware compatibility, and userland while maintaining explicit subsystem boundaries and automated regression coverage.

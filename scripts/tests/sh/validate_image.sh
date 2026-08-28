@@ -99,6 +99,8 @@ assert root_extension_second[128:139] == b'GREP    ELF'
 assert int.from_bytes(root_extension_second[154:156], 'little') >= 5
 assert root_extension_second[160:171] == b'TEE     ELF'
 assert int.from_bytes(root_extension_second[186:188], 'little') >= 5
+assert root_extension_second[192:203] == b'TAIL    ELF'
+assert int.from_bytes(root_extension_second[218:220], 'little') >= 5
 assert data[(33 + 2 * 520) * 512 + 64:(33 + 2 * 520) * 512 + 75] == b'BOOT       '
 assert data[(34 + 2 * 520) * 512 + 64:(34 + 2 * 520) * 512 + 75] == b'BOOTX64 EFI'
 print('FAT image contract: PASS')

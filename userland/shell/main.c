@@ -695,7 +695,7 @@ static int shell_split_sequence(char *line, uint32_t *length,
 
 void shell_main(void) {
     static const char prompt[] = "os> ";
-    static const char help[] = "help clear id ps env setenv unsetenv status true false jobs history fg which inherit echo pwd cd ls cat head wc grep tee stat chmod kill sleep mv cp mkdir rm rmdir touch write run wait exit\r\n";
+    static const char help[] = "help clear id ps env setenv unsetenv status true false jobs history fg which inherit echo pwd cd ls cat head wc grep tee tail stat chmod kill sleep mv cp mkdir rm rmdir touch write run wait exit\r\n";
     static const char *unknown = shell_unknown;
     static char line[128];
     static char input[64];

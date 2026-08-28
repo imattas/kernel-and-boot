@@ -20,8 +20,8 @@ def short_entry(name, attributes, cluster, size):
         "<HI", cluster & 0xffff, size)
 
 def main():
-    if len(sys.argv) != 39:
-        raise SystemExit("usage: create_fat_image.py ... <CP.ELF> <HEAD.ELF> <WC.ELF> <GREP.ELF> <TEE.ELF> <os.img>")
+    if len(sys.argv) != 40:
+        raise SystemExit("usage: create_fat_image.py ... <CP.ELF> <HEAD.ELF> <WC.ELF> <GREP.ELF> <TEE.ELF> <TAIL.ELF> <os.img>")
     efi_source = Path(sys.argv[1]).read_bytes()
     kernel_source = Path(sys.argv[2]).read_bytes()
     init_source = Path(sys.argv[3]).read_bytes()
@@ -59,7 +59,8 @@ def main():
     wc_source = Path(sys.argv[35]).read_bytes()
     grep_source = Path(sys.argv[36]).read_bytes()
     tee_source = Path(sys.argv[37]).read_bytes()
-    output = Path(sys.argv[38])
+    tail_source = Path(sys.argv[38]).read_bytes()
+    output = Path(sys.argv[39])
     efi_clusters = max(1, math.ceil(len(efi_source) / SECTOR))
     kernel_clusters = max(1, math.ceil(len(kernel_source) / SECTOR))
     init_clusters = max(1, math.ceil(len(init_source) / SECTOR))
@@ -97,6 +98,7 @@ def main():
     wc_clusters = max(1, math.ceil(len(wc_source) / SECTOR))
     grep_clusters = max(1, math.ceil(len(grep_source) / SECTOR))
     tee_clusters = max(1, math.ceil(len(tee_source) / SECTOR))
+    tail_clusters = max(1, math.ceil(len(tail_source) / SECTOR))
     efi_chain = list(range(7, 7 + efi_clusters))
     kernel_chain = list(range(7 + efi_clusters, 7 + efi_clusters + kernel_clusters))
     init_chain = list(range(7 + efi_clusters + kernel_clusters,
@@ -136,7 +138,8 @@ def main():
     wc_chain = list(range(head_chain[-1] + 1, head_chain[-1] + 1 + wc_clusters))
     grep_chain = list(range(wc_chain[-1] + 1, wc_chain[-1] + 1 + grep_clusters))
     tee_chain = list(range(grep_chain[-1] + 1, grep_chain[-1] + 1 + tee_clusters))
-    if tee_chain[-1] >= TOTAL_SECTORS - DATA_START + 2:
+    tail_chain = list(range(tee_chain[-1] + 1, tee_chain[-1] + 1 + tail_clusters))
+    if tail_chain[-1] >= TOTAL_SECTORS - DATA_START + 2:
         raise SystemExit("boot files are too large for the FAT32 image")
     image = bytearray(TOTAL_SECTORS * SECTOR)
     boot = bytearray(SECTOR)
@@ -158,7 +161,7 @@ def main():
     fsinfo = bytearray(SECTOR)
     struct.pack_into("<I", fsinfo, 0, 0x41615252)
     struct.pack_into("<I", fsinfo, 484, 0x61417272)
-    struct.pack_into("<I", fsinfo, 488, TOTAL_SECTORS - DATA_START - len(efi_chain) - len(kernel_chain) - len(init_chain) - len(shell_chain) - len(args_chain) - len(env_chain) - len(cat_chain) - len(pwd_chain) - len(mkdir_chain) - len(rm_chain) - len(rmdir_chain) - len(touch_chain) - len(write_chain) - len(ls_chain) - len(chmod_chain) - len(echo_chain) - len(help_chain) - len(stat_chain) - len(mv_chain) - len(kill_chain) - len(sleep_chain) - len(setenv_chain) - len(ipc_chain) - len(dup_chain) - len(true_chain) - len(false_chain) - len(id_chain) - len(ps_chain) - len(wait_chain) - len(truncate_chain) - len(seek_chain) - len(chdir_chain) - len(cp_chain) - len(head_chain) - len(wc_chain) - len(grep_chain) - len(tee_chain) - 5)
+    struct.pack_into("<I", fsinfo, 488, TOTAL_SECTORS - DATA_START - len(efi_chain) - len(kernel_chain) - len(init_chain) - len(shell_chain) - len(args_chain) - len(env_chain) - len(cat_chain) - len(pwd_chain) - len(mkdir_chain) - len(rm_chain) - len(rmdir_chain) - len(touch_chain) - len(write_chain) - len(ls_chain) - len(chmod_chain) - len(echo_chain) - len(help_chain) - len(stat_chain) - len(mv_chain) - len(kill_chain) - len(sleep_chain) - len(setenv_chain) - len(ipc_chain) - len(dup_chain) - len(true_chain) - len(false_chain) - len(id_chain) - len(ps_chain) - len(wait_chain) - len(truncate_chain) - len(seek_chain) - len(chdir_chain) - len(cp_chain) - len(head_chain) - len(wc_chain) - len(grep_chain) - len(tee_chain) - len(tail_chain) - 5)
     struct.pack_into("<I", fsinfo, 492, 7 + efi_clusters + kernel_clusters + init_clusters + shell_clusters)
     struct.pack_into("<I", fsinfo, 508, 0xaa550000)
     image[SECTOR:2 * SECTOR] = fsinfo
@@ -171,7 +174,7 @@ def main():
                            (2, 5), (3, 0x0fffffff), (4, 0x0fffffff),
                            (5, 6), (6, 0x0fffffff)):
         set_fat(cluster, value)
-    for chain in (efi_chain, kernel_chain, init_chain, shell_chain, args_chain, env_chain, cat_chain, pwd_chain, mkdir_chain, rm_chain, rmdir_chain, touch_chain, write_chain, ls_chain, chmod_chain, echo_chain, help_chain, stat_chain, mv_chain, kill_chain, sleep_chain, setenv_chain, ipc_chain, dup_chain, true_chain, false_chain, id_chain, ps_chain, wait_chain, truncate_chain, seek_chain, chdir_chain, cp_chain, head_chain, wc_chain, grep_chain, tee_chain):
+    for chain in (efi_chain, kernel_chain, init_chain, shell_chain, args_chain, env_chain, cat_chain, pwd_chain, mkdir_chain, rm_chain, rmdir_chain, touch_chain, write_chain, ls_chain, chmod_chain, echo_chain, help_chain, stat_chain, mv_chain, kill_chain, sleep_chain, setenv_chain, ipc_chain, dup_chain, true_chain, false_chain, id_chain, ps_chain, wait_chain, truncate_chain, seek_chain, chdir_chain, cp_chain, head_chain, wc_chain, grep_chain, tee_chain, tail_chain):
         for index, cluster in enumerate(chain):
             set_fat(cluster, chain[index + 1] if index + 1 < len(chain) else 0x0fffffff)
     for fat_index in range(FAT_COUNT):
@@ -222,6 +225,7 @@ def main():
     root_extension_second[96:128] = short_entry("WC      ELF", 0x20, wc_chain[0], len(wc_source))
     root_extension_second[128:160] = short_entry("GREP    ELF", 0x20, grep_chain[0], len(grep_source))
     root_extension_second[160:192] = short_entry("TEE     ELF", 0x20, tee_chain[0], len(tee_source))
+    root_extension_second[192:224] = short_entry("TAIL    ELF", 0x20, tail_chain[0], len(tail_source))
     root_extension_second[160:192] = short_entry("TEE     ELF", 0x20, tee_chain[0], len(tee_source))
     image[cluster_offset(6):cluster_offset(6) + SECTOR] = root_extension_second
     efi_dir = bytearray(SECTOR)
@@ -308,6 +312,8 @@ def main():
         image[cluster_offset(cluster):cluster_offset(cluster) + len(grep_source[index * SECTOR:(index + 1) * SECTOR])] = grep_source[index * SECTOR:(index + 1) * SECTOR]
     for index, cluster in enumerate(tee_chain):
         image[cluster_offset(cluster):cluster_offset(cluster) + len(tee_source[index * SECTOR:(index + 1) * SECTOR])] = tee_source[index * SECTOR:(index + 1) * SECTOR]
+    for index, cluster in enumerate(tail_chain):
+        image[cluster_offset(cluster):cluster_offset(cluster) + len(tail_source[index * SECTOR:(index + 1) * SECTOR])] = tail_source[index * SECTOR:(index + 1) * SECTOR]
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_bytes(image)
 

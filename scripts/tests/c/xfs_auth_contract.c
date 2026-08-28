@@ -73,5 +73,16 @@ int main(void) {
     assert(xfs_mount(&fs, 0));
     p32(&cnt_root[16], 11);
     assert(!xfs_mount(&fs, 0));
+    p32(&cnt_root[16], 10);
+    uint8_t *bno_root = &image[2U * 4096U];
+    uint8_t *bno_leaf = &image[5U * 4096U];
+    memset(bno_root, 0, 4096); memset(bno_leaf, 0, 4096);
+    p32(&agf[28], 2);
+    p32(bno_root, 0x41425442U); p16(&bno_root[4], 1); p16(&bno_root[6], 1);
+    p32(&bno_root[16], 10); p32(&bno_root[20], 3); p32(&bno_root[2736], 5);
+    leaf(bno_leaf, 10, 3);
+    assert(xfs_mount(&fs, 0));
+    p32(&bno_root[16], 11);
+    assert(!xfs_mount(&fs, 0));
     return 0;
 }

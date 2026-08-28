@@ -1205,8 +1205,8 @@ XFS VFS file attachment now likewise accepts an explicit directory inode, so
 validated files in nested short-form directories use the same adapter boundary.
 The XFS allocator now explicitly distinguishes its legacy contract AGF layout
 from authentic AGF metadata with separate BNO/CNT fields, and mount validates
-authentic CNT ordering, child pointers, child boundary keys, free-block totals,
-and longest extent
+authentic BNO/CNT ordering, child pointers, child boundary keys, free-block
+totals, and longest extent
 before exposing the filesystem. Bounded authentic leaf-root BNO/CNT allocation
 and release now update both indexes and AGF counters with rollback on failed
 publication; deeper CNT trees and transaction logging remain pending.

@@ -2001,4 +2001,7 @@ the normal empty-operand `cd` behavior remains unchanged.
 A headless QEMU input probe reaches the live `os> ` prompt but monitor-injected
 USB keyboard events do not yet arrive at the shell input queue. The probe was
 discarded rather than promoted to a passing test; reliable interactive QEMU
-input remains an explicit follow-up item.
+input remains an explicit follow-up item. A second probe using a bidirectional
+Unix serial chardev also reaches the prompt but does not deliver the injected
+bytes to the guest COM1 poller, so neither harness is currently evidence for
+interactive command execution.

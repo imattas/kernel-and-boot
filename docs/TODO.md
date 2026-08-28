@@ -89,6 +89,7 @@ the init-owned shell supervisor remains the next kernel/userland boundary.
   spawn/wait/reap integration.
 - [x] Add PATH-based fallback execution for packaged external applications.
 - [x] Add shell `export NAME=VALUE` environment assignment syntax.
+- [x] Extend standalone `env` with bounded assignment-and-command execution.
 - [x] Preserve direct external utility commands through pipeline and
   redirection dispatch.
 - [x] Preserve arbitrary external commands through pipeline and redirection

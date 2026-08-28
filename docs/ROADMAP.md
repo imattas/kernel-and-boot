@@ -1807,6 +1807,10 @@ The shell now accepts conventional `export NAME=VALUE` assignments and routes
 them through the existing inherited-environment syscall path; parser and help
 surface contracts remain synchronized.
 
+The standalone `env.elf` utility now accepts bounded `NAME=VALUE` prefixes,
+launches a command through the spawn/wait/reap ABI, and returns the child status;
+with no command it retains its inherited-environment listing behavior.
+
 ## Phase 10 — BIOS boot path
 
 Implement legacy BIOS support as a separate loader path. It should normalize legacy machine startup into the same kernel boot contract used by UEFI rather than creating a BIOS-specific kernel architecture.

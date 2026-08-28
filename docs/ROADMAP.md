@@ -1704,6 +1704,8 @@ offset, reading one byte, and reporting it from ring 3.
 The shell now expands bounded environment references (`$KEY`), the previous
 status (`$?`), and the shell PID (`$$`); single quotes suppress expansion and
 escaped dollars remain literal.
+`CHDIR.ELF` now exercises directory changes followed by cwd retrieval from
+ring 3 and is packaged in the FAT32 root.
 
 ## Phase 10 — BIOS boot path
 

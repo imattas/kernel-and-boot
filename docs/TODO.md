@@ -136,6 +136,7 @@ kernel gate below is explicitly marked complete.
 - [x] Expose seek/truncate syscalls through userland and add standalone
   `TRUNCATE.ELF` file-size utility.
 - [x] Add standalone `SEEK.ELF` seek/read file-position utility.
+- [x] Add standalone `CHDIR.ELF` directory-change/cwd utility.
 - [x] Add bounded shell expansion for environment variables, `$?`, and `$$`
   with quote/escape-aware behavior.
 - [x] Add typed pipe descriptors and blocking userland read/write wrappers.

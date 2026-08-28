@@ -2261,6 +2261,70 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("userland shell executable namespace ready\r\n");
+    static const char head_short_name[11] = {
+        'H','E','A','D',' ',' ',' ',' ','E','L','F'
+    };
+    static const char wc_short_name[11] = {
+        'W','C',' ',' ',' ',' ',' ',' ','E','L','F'
+    };
+    static const char grep_short_name[11] = {
+        'G','R','E','P',' ',' ',' ',' ','E','L','F'
+    };
+    static const char tee_short_name[11] = {
+        'T','E','E',' ',' ',' ',' ',' ','E','L','F'
+    };
+    static const char tail_short_name[11] = {
+        'T','A','I','L',' ',' ',' ',' ','E','L','F'
+    };
+    static const char sort_short_name[11] = {
+        'S','O','R','T',' ',' ',' ',' ','E','L','F'
+    };
+    static const char uniq_short_name[11] = {
+        'U','N','I','Q',' ',' ',' ',' ','E','L','F'
+    };
+    static const char printf_short_name[11] = {
+        'P','R','I','N','T','F',' ',' ','E','L','F'
+    };
+    static const char basename_short_name[11] = {
+        'B','A','S','E','N','A','M','E','E','L','F'
+    };
+    static const char dirname_short_name[11] = {
+        'D','I','R','N','A','M','E',' ','E','L','F'
+    };
+    static const char cut_short_name[11] = {
+        'C','U','T',' ',' ',' ',' ',' ','E','L','F'
+    };
+    static const char tr_short_name[11] = {
+        'T','R',' ',' ',' ',' ',' ',' ','E','L','F'
+    };
+    static const char cmp_short_name[11] = {
+        'C','M','P',' ',' ',' ',' ',' ','E','L','F'
+    };
+    if (!fat32_vfs_attach_file(&fat32, vfs_root, head_short_name,
+                               "head.elf") ||
+        !fat32_vfs_attach_file(&fat32, vfs_root, wc_short_name, "wc.elf") ||
+        !fat32_vfs_attach_file(&fat32, vfs_root, grep_short_name,
+                               "grep.elf") ||
+        !fat32_vfs_attach_file(&fat32, vfs_root, tee_short_name, "tee.elf") ||
+        !fat32_vfs_attach_file(&fat32, vfs_root, tail_short_name,
+                               "tail.elf") ||
+        !fat32_vfs_attach_file(&fat32, vfs_root, sort_short_name,
+                               "sort.elf") ||
+        !fat32_vfs_attach_file(&fat32, vfs_root, uniq_short_name,
+                               "uniq.elf") ||
+        !fat32_vfs_attach_file(&fat32, vfs_root, printf_short_name,
+                               "printf.elf") ||
+        !fat32_vfs_attach_file(&fat32, vfs_root, basename_short_name,
+                               "basename.elf") ||
+        !fat32_vfs_attach_file(&fat32, vfs_root, dirname_short_name,
+                               "dirname.elf") ||
+        !fat32_vfs_attach_file(&fat32, vfs_root, cut_short_name, "cut.elf") ||
+        !fat32_vfs_attach_file(&fat32, vfs_root, tr_short_name, "tr.elf") ||
+        !fat32_vfs_attach_file(&fat32, vfs_root, cmp_short_name, "cmp.elf")) {
+        serial_write("userland text utility VFS attach failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("userland text utility namespace ready\r\n");
     vfs_node_t *vfs_foreign = vfs_node_create("foreign", VFS_NODE_REGULAR,
                                                0, 0, 0444);
     int vfs_remove_result = vfs_foreign ?

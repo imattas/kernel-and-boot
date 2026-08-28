@@ -245,7 +245,7 @@ the init-owned shell supervisor remains the next kernel/userland boundary.
 - [x] Expose `shell.elf` through the live FAT32-backed VFS namespace and allow
   partial final reads for unaligned ELF loading.
 - [ ] Add reliable QEMU live keyboard verification for `run INIT.ELF`.
-- [ ] Expose the complete multi-cluster FAT32 boot-image application set in the
+- [x] Expose the complete multi-cluster FAT32 boot-image application set in the
   live VFS namespace for reliable external `run` execution.
 - [ ] Make userland init spawn the shell through the normal process ABI after
   scheduler/runtime service startup can support an immediately-blocking child.

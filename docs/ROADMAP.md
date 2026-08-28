@@ -1854,6 +1854,11 @@ The packaged `printf` utility now handles escaped control characters, string
 arguments, signed `%d`/`%i` decimal arguments, unsigned `%u` arguments, and
 explicit malformed-number status handling.
 
+All packaged userland ELF applications, including the multi-cluster text
+utilities, are now attached to the live FAT32 VFS namespace. External process
+lookup and execution therefore see the same complete application set that is
+present in `dist/os.img`.
+
 Shell integration contracts now directly cover the quote-aware sequence
 splitter, including semicolons and conditional operators preserved inside
 quoted arguments; this joins

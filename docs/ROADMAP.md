@@ -1600,6 +1600,8 @@ The standalone `MKDIR.ELF` utility now exercises userland directory creation
 and is packaged in the boot image.
 The standalone `TOUCH.ELF` utility now exercises userland file creation and
 is packaged in the boot image.
+The standalone `WRITE.ELF` utility now exercises userland file creation and
+writing and is packaged in the boot image.
 The standalone `RM.ELF` utility now exercises userland file removal and is
 packaged in the boot image.
 The standalone `RMDIR.ELF` utility now exercises userland directory removal

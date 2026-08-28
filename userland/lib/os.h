@@ -26,6 +26,19 @@ static inline uint64_t os_chdir(const char *path, uint64_t length) {
     return os_syscall3(22, (uint64_t)(uintptr_t)path, length, 0);
 }
 
+static inline uint64_t os_open(const char *path, uint64_t length,
+                               uint64_t flags) {
+    return os_syscall3(9, (uint64_t)(uintptr_t)path, length, flags);
+}
+
+static inline uint64_t os_close(uint64_t descriptor) {
+    return os_syscall3(12, descriptor, 0, 0);
+}
+
+static inline uint64_t os_readdir(uint64_t descriptor, void *entry) {
+    return os_syscall3(14, descriptor, (uint64_t)(uintptr_t)entry, 0);
+}
+
 static inline uint64_t os_yield(void) { return os_syscall3(21, 0, 0, 0); }
 
 __attribute__((noreturn)) static inline void os_exit(int32_t status) {

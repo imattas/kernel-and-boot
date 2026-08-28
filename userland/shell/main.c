@@ -1,13 +1,18 @@
 #include "../lib/os.h"
 #include "shell.h"
 
+typedef struct {
+    char name[32];
+    uint32_t type;
+} shell_dirent_t;
+
 static void print(const char *text, uint64_t length) {
     (void)os_write(1, text, length);
 }
 
 void shell_main(void) {
     static const char prompt[] = "os> ";
-    static const char help[] = "help echo pwd cd exit\r\n";
+    static const char help[] = "help echo pwd cd ls exit\r\n";
     static const char unknown[] = "unknown command\r\n";
     static char line[128];
     static char argument[128];
@@ -42,6 +47,22 @@ void shell_main(void) {
                 while (argument[argument_length]) ++argument_length;
                 if (os_chdir(argument, argument_length) == OS_SYSCALL_ERROR)
                     print(unknown, sizeof(unknown) - 1U);
+            } else if (command == SHELL_LS) {
+                static const char current[] = ".";
+                shell_dirent_t entry;
+                uint64_t descriptor = os_open(current, 1, 1);
+                if (descriptor == OS_SYSCALL_ERROR) {
+                    print(unknown, sizeof(unknown) - 1U);
+                } else {
+                    while (os_readdir(descriptor, &entry) == 1) {
+                        uint32_t name_length = 0;
+                        while (name_length < sizeof(entry.name) &&
+                               entry.name[name_length] != 0) ++name_length;
+                        print(entry.name, name_length);
+                        print("\r\n", 2);
+                    }
+                    (void)os_close(descriptor);
+                }
             } else if (command == SHELL_EXIT) {
                 os_exit(0);
             } else if (command != SHELL_EMPTY) {

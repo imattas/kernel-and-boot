@@ -1549,6 +1549,8 @@ The persistent shell ELF is now loaded by UEFI and enqueued by the kernel after
 init, with a prompt running on the standard input/output boundary.
 The shell command surface now also recognizes bounded `cd` and `exit` commands,
 using the existing working-directory and process-exit syscalls.
+The shell now includes an `ls` builtin backed by the open/readdir/close syscall
+path.
 
 ## Phase 10 — BIOS boot path
 

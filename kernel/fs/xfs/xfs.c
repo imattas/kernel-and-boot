@@ -2121,6 +2121,7 @@ int xfs_rename_local_entry(xfs_fs_t *fs, uint64_t directory_inode,
             old_record_position = position; old_record_size = record;
             old_child_wide = wide ? be64(&data[core + position + 3U]) :
                                     be32(&data[core + position + 3U]);
+            if (old_child_wide == 0) return 0;
             old_child = 1;
         }
         position += record;

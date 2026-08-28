@@ -129,6 +129,8 @@ assert root_extension_third[96:107] == b'CLEAR   ELF'
 assert int.from_bytes(root_extension_third[26:28], 'little') >= 5
 root_extension_fourth = data[(32 + 2 * 520 + 6) * 512:(32 + 2 * 520 + 7) * 512]
 assert root_extension_fourth[:11] == b'TEST    ELF'
+assert root_extension_fourth[32:43] == b'SEQ     ELF'
+assert root_extension_fourth[64:75] == b'FIND    ELF'
 assert int.from_bytes(root_extension_fourth[26:28], 'little') >= 5
 assert data[(33 + 2 * 520) * 512 + 64:(33 + 2 * 520) * 512 + 75] == b'BOOT       '
 assert data[(34 + 2 * 520) * 512 + 64:(34 + 2 * 520) * 512 + 75] == b'BOOTX64 EFI'

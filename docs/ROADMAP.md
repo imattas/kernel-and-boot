@@ -2002,6 +2002,10 @@ The userland application set now includes `seq.elf`, a bounded signed decimal
 sequence generator supporting one, two, or three numeric operands, ascending
 and descending ranges, and overflow-safe iteration with FAT32/PATH packaging.
 
+The userland application set now also includes `find.elf`, which recursively
+walks bounded directory paths through the existing open/stat/readdir/close ABI
+and is available through the packaged FAT32/PATH namespace.
+
 Shell history now supports bounded `history -c` clearing while preserving the
 existing listing and ANSI navigation behavior.
 

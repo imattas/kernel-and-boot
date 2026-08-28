@@ -1598,6 +1598,8 @@ The standalone `PWD.ELF` utility now exercises the userland working-directory
 query and is packaged in the boot image.
 The standalone `MKDIR.ELF` utility now exercises userland directory creation
 and is packaged in the boot image.
+The standalone `RM.ELF` utility now exercises userland file removal and is
+packaged in the boot image.
 
 ## Phase 10 — BIOS boot path
 

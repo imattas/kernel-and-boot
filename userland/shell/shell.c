@@ -255,7 +255,8 @@ shell_command_t shell_parse(const char *line, uint32_t length,
         !same_word(line, command_length, "false") &&
         !same_word(line, command_length, "alias") &&
         !same_word(line, command_length, "unalias") &&
-        !same_word(line, command_length, "fg")) {
+        !same_word(line, command_length, "fg") &&
+        !same_word(line, command_length, "test")) {
         if (!shell_has_operator(line, length) ||
             !shell_operator_syntax_valid(line, length) || length >= capacity)
             return SHELL_UNKNOWN;
@@ -315,6 +316,7 @@ shell_command_t shell_parse(const char *line, uint32_t length,
         same_word(line, command_length, "cmp")) return SHELL_RUN;
     if (same_word(line, command_length, "uptime") ||
         same_word(line, command_length, "date")) return SHELL_RUN;
+    if (same_word(line, command_length, "test")) return SHELL_RUN;
     if (same_word(line, command_length, "stat")) return SHELL_STAT;
     if (same_word(line, command_length, "chmod")) return SHELL_CHMOD;
     if (same_word(line, command_length, "kill")) return SHELL_KILL;

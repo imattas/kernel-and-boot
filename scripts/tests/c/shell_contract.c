@@ -41,6 +41,8 @@ int main(void) {
     assert(strcmp(argument, "ARGS.ELF") == 0);
     assert(shell_parse("uptime", 6, argument, sizeof(argument)) == SHELL_RUN);
     assert(shell_parse("date", 4, argument, sizeof(argument)) == SHELL_RUN);
+    assert(shell_parse("test -e /hello", 14, argument, sizeof(argument)) == SHELL_RUN);
+    assert(strcmp(argument, "-e /hello") == 0);
     assert(shell_parse("inherit 3 off", 13, argument, sizeof(argument)) == SHELL_INHERIT);
     assert(shell_parse("echo hello", 10, argument, sizeof(argument)) == SHELL_ECHO);
     assert(strcmp(argument, "hello") == 0);

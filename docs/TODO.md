@@ -45,6 +45,7 @@ kernel gate below is explicitly marked complete.
   ownership, and QEMU coverage for all enabled drivers.
 - [x] AHCI failed-probe and failed-IDENTIFY command-list/FIS cleanup is bounded
   by port-idle confirmation.
+- [x] Bound storage-device name validation and duplicate comparisons.
 - [ ] Final kernel audit: no required kernel directory is empty or only a
   placeholder; every retained component has build integration and evidence.
 - [ ] Final completion gate: clean build, image validation/mountability checks,

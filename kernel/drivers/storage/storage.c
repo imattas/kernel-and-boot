@@ -4,6 +4,7 @@
 static storage_device_t devices[STORAGE_DEVICE_CAPACITY];
 static uint32_t device_count;
 static spinlock_t storage_lock;
+#define STORAGE_NAME_LIMIT 32U
 
 void storage_initialize(void) {
     spinlock_init(&storage_lock);
@@ -11,12 +12,22 @@ void storage_initialize(void) {
 }
 
 static int same_name(const char *left, const char *right) {
-    while (*left && *left == *right) { ++left; ++right; }
-    return *left == *right;
+    for (uint32_t i = 0; i < STORAGE_NAME_LIMIT; ++i) {
+        if (left[i] != right[i]) return 0;
+        if (left[i] == 0) return 1;
+    }
+    return 0;
+}
+
+static int valid_name(const char *name) {
+    if (!name || !name[0]) return 0;
+    for (uint32_t i = 0; i < STORAGE_NAME_LIMIT; ++i)
+        if (name[i] == 0) return 1;
+    return 0;
 }
 
 int storage_register(const storage_device_t *device) {
-    if (!device || !device->name || !device->name[0] ||
+    if (!device || !valid_name(device->name) ||
         ((!device->read || !device->write) &&
          (!device->read_context || !device->write_context)) ||
         device->block_size == 0 || device->block_count == 0 ||

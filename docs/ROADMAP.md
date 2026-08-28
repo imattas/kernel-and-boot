@@ -371,6 +371,8 @@ quiescence and error-state clearing before DMA buffers are released.
 AHCI IDENTIFY failures and zero-ready-port probe failures now quiesce ports
 before releasing command-list/FIS frames, retaining resources when hardware
 does not prove idle instead of risking DMA use-after-free.
+The shared storage registry now rejects unterminated names and performs bounded
+duplicate-name comparisons before publishing a driver-backed block device.
 The identified AHCI disk is now registered with the generic storage layer;
 the FAT32 and VFS probes therefore exercise the AHCI-backed storage device.
 ATA PIO writes now issue and await the appropriate LBA48 or legacy FLUSH CACHE

@@ -1589,6 +1589,15 @@ static int xfs_allocate_real_bno(xfs_fs_t *fs, uint32_t allocation_group,
     }
     store_be32(&agf[44], longest);
     *start = ag_base + selected_start;
+    uint64_t journal_targets[3] = {ag_base + selected_leaf, ag_base + root_block,
+                                   ag_base + 1U};
+    const uint8_t *journal_images[3] = {leaf, root, agf};
+    int journal_active = 0;
+    if (fs->journal_blocks) {
+        if (!xfs_journal_prepare(fs, journal_targets, journal_images, 3U))
+            return xfs_journal_clear(fs);
+        journal_active = 1;
+    }
     if (!xfs_write_block(fs, ag_base + selected_leaf, leaf) ||
         !xfs_write_block(fs, ag_base + root_block, root) ||
         !xfs_write_block(fs, ag_base + 1U, agf) ||
@@ -1596,8 +1605,10 @@ static int xfs_allocate_real_bno(xfs_fs_t *fs, uint32_t allocation_group,
         (void)xfs_write_block(fs, ag_base + selected_leaf, original_leaf);
         (void)xfs_write_block(fs, ag_base + root_block, original_root);
         (void)xfs_write_block(fs, ag_base + 1U, original_agf);
+        if (journal_active) (void)xfs_journal_clear(fs);
         return 0;
     }
+    if (journal_active && !xfs_journal_clear(fs)) return 0;
     return 1;
 }
 
@@ -1792,6 +1803,25 @@ static int xfs_free_real_bno(xfs_fs_t *fs, uint64_t start, uint32_t blocks) {
     }
     store_be32(&agf[40], be32(&agf[40]) + blocks);
     store_be32(&agf[44], longest);
+    uint64_t journal_targets[4];
+    const uint8_t *journal_images[4];
+    uint32_t journal_records = 0;
+    journal_targets[journal_records] = ag_base + selected_leaf;
+    journal_images[journal_records++] = leaf;
+    if (merged_next_child != 0 && merged_next_records != 0) {
+        journal_targets[journal_records] = ag_base + merged_next_child;
+        journal_images[journal_records++] = next_leaf;
+    }
+    journal_targets[journal_records] = ag_base + root_block;
+    journal_images[journal_records++] = root;
+    journal_targets[journal_records] = ag_base + 1U;
+    journal_images[journal_records++] = agf;
+    int journal_active = 0;
+    if (fs->journal_blocks) {
+        if (!xfs_journal_prepare(fs, journal_targets, journal_images, journal_records))
+            return xfs_journal_clear(fs);
+        journal_active = 1;
+    }
     if (!xfs_write_block(fs, ag_base + selected_leaf, leaf) ||
         (merged_next_child != 0 && merged_next_records != 0 &&
          !xfs_write_block(fs, ag_base + merged_next_child, next_leaf)) ||
@@ -1803,8 +1833,10 @@ static int xfs_free_real_bno(xfs_fs_t *fs, uint64_t start, uint32_t blocks) {
             (void)xfs_write_block(fs, ag_base + merged_next_child, original_next);
         (void)xfs_write_block(fs, ag_base + root_block, original_root);
         (void)xfs_write_block(fs, ag_base + 1U, original_agf);
+        if (journal_active) (void)xfs_journal_clear(fs);
         return 0;
     }
+    if (journal_active && !xfs_journal_clear(fs)) return 0;
     return 1;
 }
 

@@ -105,5 +105,32 @@ int main(void) {
            g32(&agf[52]) == 3 && g32(&agf[56]) == 3);
     p32(&bno_root[16], 11);
     assert(!xfs_mount(&fs, 0));
+    /* Bounded multi-child level-2 transaction: both indexes contain two
+     * leaves, then allocation collapses and release repopulates the root. */
+    p32(&bno_root[16], 10);
+    memset(bno_root, 0, 4096); memset(cnt_root, 0, 4096);
+    memset(&image[5U * 4096U], 0, 4096); memset(&image[6U * 4096U], 0, 4096);
+    memset(&image[4U * 4096U], 0, 4096); memset(&image[7U * 4096U], 0, 4096);
+    p32(bno_root, 0x41425442U); p16(&bno_root[4], 1); p16(&bno_root[6], 2);
+    p32(&bno_root[16], 10); p32(&bno_root[20], 2);
+    p32(&bno_root[24], 13); p32(&bno_root[28], 3);
+    p32(&bno_root[2736], 5); p32(&bno_root[2740], 6);
+    p32(cnt_root, 0x41425442U); p16(&cnt_root[4], 1); p16(&cnt_root[6], 2);
+    p32(&cnt_root[16], 10); p32(&cnt_root[20], 2);
+    p32(&cnt_root[24], 13); p32(&cnt_root[28], 3);
+    p32(&cnt_root[2736], 4); p32(&cnt_root[2740], 7);
+    leaf(&image[5U * 4096U], 10, 2); leaf(&image[6U * 4096U], 13, 3);
+    leaf(&image[4U * 4096U], 10, 2); leaf(&image[7U * 4096U], 13, 3);
+    p32(&agf[52], 5); p32(&agf[56], 3);
+    assert(xfs_mount(&fs, 0));
+    assert(xfs_allocate_extent(&fs, 0, 2, &start) && start == 10);
+    assert(g32(&agf[52]) == 3 && g32(&agf[56]) == 3 &&
+           g32(&bno_root[16]) == 13 && g32(&cnt_root[16]) == 13 &&
+           g32(&bno_root[2736]) == 5 && g32(&cnt_root[2736]) == 4);
+    assert(xfs_free_extent(&fs, 10, 2));
+    assert(g32(&agf[52]) == 5 && g32(&agf[56]) == 3 &&
+           ((bno_root[6] << 8) | bno_root[7]) == 2 &&
+           ((cnt_root[6] << 8) | cnt_root[7]) == 2 &&
+           g32(&bno_root[16]) == 10 && g32(&bno_root[24]) == 13);
     return 0;
 }

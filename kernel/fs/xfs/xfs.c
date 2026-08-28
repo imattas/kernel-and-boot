@@ -1,5 +1,6 @@
 #include "xfs.h"
 #include "../../drivers/storage/storage.h"
+#include "../../lib/memory.h"
 
 #define XFS_SECTOR_SIZE 512U
 #define XFS_SB_MAGIC 0x58465342U
@@ -227,6 +228,249 @@ typedef struct {
     uint32_t count;
 } xfs_free_record_t;
 
+static void xfs_sort_count_records(xfs_free_record_t *records, uint32_t count) {
+    for (uint32_t i = 0; i < count; ++i)
+        for (uint32_t j = i + 1U; j < count; ++j)
+            if (records[j].count < records[i].count ||
+                (records[j].count == records[i].count &&
+                 records[j].start < records[i].start)) {
+                xfs_free_record_t swap = records[i];
+                records[i] = records[j];
+                records[j] = swap;
+            }
+}
+
+static int xfs_mutate_free_records(xfs_free_record_t *records, uint32_t *count,
+                                    uint32_t capacity, uint32_t blocks,
+                                    uint32_t target, int allocate,
+                                    uint32_t ag_blocks, uint64_t ag_base,
+                                    uint64_t *start) {
+    uint32_t n = *count;
+    uint32_t selected = UINT32_MAX;
+    if (allocate) {
+        for (uint32_t i = 0; i < n; ++i)
+            if (records[i].count >= blocks &&
+                (selected == UINT32_MAX ||
+                 records[i].count < records[selected].count)) selected = i;
+        if (selected == UINT32_MAX) return 0;
+        if (start) *start = ag_base + records[selected].start;
+        if (records[selected].count == blocks) {
+            for (uint32_t i = selected; i + 1U < n; ++i)
+                records[i] = records[i + 1U];
+            --n;
+        } else {
+            records[selected].start += blocks;
+            records[selected].count -= blocks;
+        }
+    } else {
+        if (target > ag_blocks - blocks) return 0;
+        uint32_t insert = n;
+        for (uint32_t i = 0; i < n; ++i) {
+            if (target < records[i].start) {
+                if (target > UINT32_MAX - blocks ||
+                    target + blocks > records[i].start) return 0;
+                insert = i;
+                break;
+            }
+            if (target < records[i].start + records[i].count) return 0;
+        }
+        uint32_t previous = insert == 0 ? UINT32_MAX : insert - 1U;
+        uint32_t next = insert < n ? insert : UINT32_MAX;
+        int join_previous = previous != UINT32_MAX &&
+            records[previous].start + records[previous].count == target;
+        int join_next = next != UINT32_MAX && target + blocks == records[next].start;
+        if (join_previous && join_next) {
+            if (blocks > UINT32_MAX - records[previous].count ||
+                records[previous].count + blocks >
+                    UINT32_MAX - records[next].count) return 0;
+            records[previous].count += blocks + records[next].count;
+            for (uint32_t i = next; i + 1U < n; ++i)
+                records[i] = records[i + 1U];
+            --n;
+        } else if (join_previous) {
+            if (records[previous].count > UINT32_MAX - blocks) return 0;
+            records[previous].count += blocks;
+        } else if (join_next) {
+            if (records[next].count > UINT32_MAX - blocks) return 0;
+            records[next].start = target;
+            records[next].count += blocks;
+        } else {
+            if (n >= capacity) return 0;
+            for (uint32_t i = n; i > insert; --i) records[i] = records[i - 1U];
+            records[insert] = (xfs_free_record_t){target, blocks};
+            ++n;
+        }
+    }
+    *count = n;
+    return 1;
+}
+
+/* Authenticated level-2 BNO/CNT roots.  The current transaction layer keeps
+ * the fan-out bounded by two children: all affected leaves, both index roots,
+ * and the AGF are published as one rollback-able metadata transaction. */
+static int xfs_auth_multi_child_mutate(xfs_fs_t *fs, uint32_t agno,
+                                       uint32_t blocks, uint32_t target,
+                                       int allocate, uint64_t *start) {
+    uint8_t agf[4096], original_agf[4096];
+    uint8_t bno_root[4096], original_bno_root[4096];
+    uint8_t cnt_root[4096], original_cnt_root[4096];
+    uint8_t bno_leaf[2][4096], original_bno_leaf[2][4096];
+    uint8_t cnt_leaf[2][4096], original_cnt_leaf[2][4096];
+    xfs_free_record_t records[512], count_records[512];
+    xfs_agf_view_t view;
+    if (!fs || !fs->mounted || !blocks || agno >= fs->ag_count ||
+        fs->block_size < 512U || blocks > fs->ag_blocks) return 0;
+    uint64_t ag_base = (uint64_t)agno * fs->ag_blocks;
+    if (ag_base > fs->block_count - 2U ||
+        !xfs_read_block(fs, ag_base + 1U, agf) || !xfs_agf_view(agf, &view) ||
+        !view.authentic || view.bno_level != 2U || view.cnt_level != 2U ||
+        !xfs_read_block(fs, ag_base + view.bno_root, bno_root) ||
+        !xfs_read_block(fs, ag_base + view.cnt_root, cnt_root)) return 0;
+    uint32_t index_capacity = (fs->block_size - 16U) / 12U;
+    uint32_t leaf_capacity = (fs->block_size - 16U) / 8U;
+    if (!index_capacity || !leaf_capacity || be32(bno_root) != XFS_BNO_MAGIC_REAL ||
+        be32(cnt_root) != XFS_BNO_MAGIC_REAL || be16(&bno_root[4]) != 1U ||
+        be16(&cnt_root[4]) != 1U) return 0;
+    uint32_t children = be16(&bno_root[6]);
+    if (!children || children > 2U || children != be16(&cnt_root[6])) return 0;
+    /* A collapsed transaction retains the second child pointer outside the
+     * active root count so a later release can repopulate that child. */
+    uint32_t pointer_offset = 16U + index_capacity * 8U;
+    if (children == 1U && be32(&bno_root[pointer_offset + 4U]) != 0U &&
+        be32(&cnt_root[pointer_offset + 4U]) != 0U) children = 2U;
+    uint32_t record_pos = 0;
+    for (uint32_t i = 0; i < children; ++i) {
+        uint32_t bchild = be32(&bno_root[16U + index_capacity * 8U + i * 4U]);
+        uint32_t cchild = be32(&cnt_root[16U + index_capacity * 8U + i * 4U]);
+        if (!bchild || !cchild || bchild >= fs->ag_blocks || cchild >= fs->ag_blocks ||
+            !xfs_read_block(fs, ag_base + bchild, bno_leaf[i]) ||
+            !xfs_read_block(fs, ag_base + cchild, cnt_leaf[i]) ||
+            be32(bno_leaf[i]) != XFS_BNO_MAGIC_REAL ||
+            be32(cnt_leaf[i]) != XFS_BNO_MAGIC_REAL || be16(&bno_leaf[i][4]) ||
+            be16(&cnt_leaf[i][4]) || be16(&bno_leaf[i][6]) > leaf_capacity ||
+            be16(&cnt_leaf[i][6]) > leaf_capacity)
+            return 0;
+        uint32_t bn = be16(&bno_leaf[i][6]);
+        uint32_t cn = be16(&cnt_leaf[i][6]);
+        if (bn != cn || (i && be32(&bno_root[16U + i * 8U]) !=
+                         be32(&bno_leaf[i][16])) ||
+            (i && be32(&cnt_root[16U + i * 8U]) !=
+                         be32(&cnt_leaf[i][16]))) return 0;
+        for (uint32_t j = 0; j < bn; ++j) {
+            uint32_t s = be32(&bno_leaf[i][16U + j * 8U]);
+            uint32_t c = be32(&bno_leaf[i][20U + j * 8U]);
+            if (!c || s > fs->ag_blocks - c) return 0;
+            if (record_pos >= 512U) return 0;
+            records[record_pos++] = (xfs_free_record_t){s, c};
+        }
+    }
+    uint32_t count = record_pos, total_free = 0;
+    if (!count || count > 512U) return 0;
+    /* Leaves must already be globally sorted and CNT must contain the same set. */
+    for (uint32_t i = 0; i < count; ++i) {
+        if (i && records[i].start < records[i - 1U].start + records[i - 1U].count)
+            return 0;
+        if (total_free > UINT32_MAX - records[i].count) return 0;
+        total_free += records[i].count;
+        count_records[i] = records[i];
+    }
+    if (total_free != view.free_blocks) return 0;
+    xfs_sort_count_records(count_records, count);
+    uint32_t cnt_pos = 0;
+    for (uint32_t i = 0; i < children; ++i)
+        for (uint32_t j = 0; j < be16(&cnt_leaf[i][6]); ++j) {
+            uint32_t s = be32(&cnt_leaf[i][16U + j * 8U]);
+            uint32_t c = be32(&cnt_leaf[i][20U + j * 8U]);
+            uint32_t k = cnt_pos++;
+            if (k >= count || count_records[k].start != s || count_records[k].count != c)
+                return 0;
+        }
+    for (uint32_t i = 0; i < fs->block_size; ++i) {
+        original_agf[i] = agf[i]; original_bno_root[i] = bno_root[i];
+        original_cnt_root[i] = cnt_root[i];
+        for (uint32_t j = 0; j < children; ++j) {
+            original_bno_leaf[j][i] = bno_leaf[j][i];
+            original_cnt_leaf[j][i] = cnt_leaf[j][i];
+        }
+    }
+    if (allocate && view.free_blocks < blocks) return 0;
+    if (!xfs_mutate_free_records(records, &count, 512U, blocks, target, allocate,
+                                 fs->ag_blocks, ag_base, start)) return 0;
+    if (allocate) store_be32(&agf[52], view.free_blocks - blocks);
+    else {
+        if (view.free_blocks > UINT32_MAX - blocks) return 0;
+        store_be32(&agf[52], view.free_blocks + blocks);
+    }
+    xfs_sort_count_records(count_records, 0); /* keep helper linkage deterministic */
+    for (uint32_t i = 0; i < count; ++i) count_records[i] = records[i];
+    xfs_sort_count_records(count_records, count);
+    uint32_t new_children = count < children ? count : children;
+    uint32_t bpos = 0, cpos = 0;
+    for (uint32_t i = 0; i < 2U; ++i) {
+        memset(&bno_leaf[i][16], 0, fs->block_size - 16U);
+        memset(&cnt_leaf[i][16], 0, fs->block_size - 16U);
+        uint32_t bn = i < new_children ? (count - bpos + (new_children - i) - 1U) /
+                                           (new_children - i) : 0;
+        uint32_t cn = i < new_children ? (count - cpos + (new_children - i) - 1U) /
+                                           (new_children - i) : 0;
+        for (uint32_t j = 0; j < bn; ++j) {
+            store_be32(&bno_leaf[i][16U + j * 8U], records[bpos + j].start);
+            store_be32(&bno_leaf[i][20U + j * 8U], records[bpos + j].count);
+        }
+        for (uint32_t j = 0; j < cn; ++j) {
+            store_be32(&cnt_leaf[i][16U + j * 8U], count_records[cpos + j].start);
+            store_be32(&cnt_leaf[i][20U + j * 8U], count_records[cpos + j].count);
+        }
+        store_be16(&bno_leaf[i][6], (uint16_t)bn);
+        store_be16(&cnt_leaf[i][6], (uint16_t)cn);
+        bpos += bn; cpos += cn;
+    }
+    memset(&bno_root[16], 0, fs->block_size - 16U);
+    memset(&cnt_root[16], 0, fs->block_size - 16U);
+    for (uint32_t i = 0; i < children; ++i) {
+        store_be32(&bno_root[pointer_offset + i * 4U],
+                   be32(&original_bno_root[pointer_offset + i * 4U]));
+        store_be32(&cnt_root[pointer_offset + i * 4U],
+                   be32(&original_cnt_root[pointer_offset + i * 4U]));
+    }
+    store_be16(&bno_root[6], (uint16_t)new_children);
+    store_be16(&cnt_root[6], (uint16_t)new_children);
+    uint32_t longest = 0;
+    for (uint32_t i = 0; i < count; ++i)
+        if (records[i].count > longest) longest = records[i].count;
+    store_be32(&agf[56], longest);
+    bpos = cpos = 0;
+    for (uint32_t i = 0; i < new_children; ++i) {
+        uint32_t bn = be16(&bno_leaf[i][6]), cn = be16(&cnt_leaf[i][6]);
+        uint32_t bchild = be32(&original_bno_root[pointer_offset + i * 4U]);
+        uint32_t cchild = be32(&original_cnt_root[pointer_offset + i * 4U]);
+        store_be32(&bno_root[16U + i * 8U], be32(&bno_leaf[i][16]));
+        store_be32(&bno_root[20U + i * 8U], be32(&bno_leaf[i][20]));
+        store_be32(&cnt_root[16U + i * 8U], be32(&cnt_leaf[i][16]));
+        store_be32(&cnt_root[20U + i * 8U], be32(&cnt_leaf[i][20]));
+        store_be32(&bno_root[pointer_offset + i * 4U], bchild);
+        store_be32(&cnt_root[pointer_offset + i * 4U], cchild);
+        bpos += bn; cpos += cn;
+    }
+    if (!xfs_write_block(fs, ag_base + be32(&original_bno_root[16U + index_capacity * 8U]), bno_leaf[0]) ||
+        (children > 1U && !xfs_write_block(fs, ag_base + be32(&original_bno_root[16U + index_capacity * 8U + 4U]), bno_leaf[1])) ||
+        !xfs_write_block(fs, ag_base + be32(&original_cnt_root[16U + index_capacity * 8U]), cnt_leaf[0]) ||
+        (children > 1U && !xfs_write_block(fs, ag_base + be32(&original_cnt_root[16U + index_capacity * 8U + 4U]), cnt_leaf[1])) ||
+        !xfs_write_block(fs, ag_base + view.bno_root, bno_root) ||
+        !xfs_write_block(fs, ag_base + view.cnt_root, cnt_root) ||
+        !xfs_write_block(fs, ag_base + 1U, agf) || !xfs_flush_metadata(fs)) goto rollback;
+    return 1;
+rollback:
+    (void)xfs_write_block(fs, ag_base + view.bno_root, original_bno_root);
+    (void)xfs_write_block(fs, ag_base + view.cnt_root, original_cnt_root);
+    (void)xfs_write_block(fs, ag_base + 1U, original_agf);
+    for (uint32_t i = 0; i < children; ++i) {
+        (void)xfs_write_block(fs, ag_base + be32(&original_bno_root[pointer_offset + i * 4U]), original_bno_leaf[i]);
+        (void)xfs_write_block(fs, ag_base + be32(&original_cnt_root[pointer_offset + i * 4U]), original_cnt_leaf[i]);
+    }
+    return 0;
+}
+
 static int xfs_auth_one_child_mutate(xfs_fs_t *fs, uint32_t agno,
                                      uint32_t blocks, uint32_t target,
                                      int allocate, uint64_t *start) {
@@ -386,8 +630,15 @@ static int xfs_auth_bno_mutate(xfs_fs_t *fs, uint32_t agno, uint32_t blocks,
     if (ag_base > fs->block_count - 2U || blocks > fs->ag_blocks ||
         !xfs_read_block(fs, ag_base + 1U, agf) ||
         !xfs_agf_view(agf, &view) || !view.authentic) return 0;
-    if (view.bno_level == 2U && view.cnt_level == 2U)
-        return xfs_auth_one_child_mutate(fs, agno, blocks, target, allocate, start);
+    if (view.bno_level == 2U && view.cnt_level == 2U) {
+        uint8_t root[4096];
+        if (!xfs_read_block(fs, ag_base + view.bno_root, root)) return 0;
+        uint32_t root_capacity = (fs->block_size - 16U) / 12U;
+        uint32_t root_pointer = 16U + root_capacity * 8U;
+        if (be16(&root[6]) <= 1U && be32(&root[root_pointer + 4U]) == 0U)
+            return xfs_auth_one_child_mutate(fs, agno, blocks, target, allocate, start);
+        return xfs_auth_multi_child_mutate(fs, agno, blocks, target, allocate, start);
+    }
     if (view.bno_level != 1U || view.cnt_level != 1U ||
         !xfs_read_block(fs, ag_base + view.bno_root, bno) ||
         !xfs_read_block(fs, ag_base + view.cnt_root, cnt) ||

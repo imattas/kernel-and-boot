@@ -1209,10 +1209,13 @@ authentic BNO/CNT ordering, child pointers, child boundary keys, free-block
 totals, and longest extent
 before exposing the filesystem. Bounded authentic leaf-root BNO/CNT allocation
 and release now update both indexes and AGF counters with rollback on failed
-publication. A bounded authentic root-plus-single-child BNO/CNT path now also
-updates both indexes and AGF counters with rollback; larger fan-out trees and
-transaction logging remain pending. Nested empty-child transitions can now be
-repopulated without leaving invalid AGF/CNT metadata. Authentic metadata
+publication. Authenticated level-2 roots now also support a bounded two-child
+transaction: all child leaves, both index roots, and the AGF are redistributed
+and restored together when publication fails, including empty-child collapse
+and later repopulation. Larger fan-out trees and durable crash-recovery
+transaction logging remain pending; a device flush is a persistence barrier,
+not a recovery log. Nested empty-child transitions can now be repopulated
+without leaving invalid AGF/CNT metadata. Authentic metadata
 publication and XFS inode/directory metadata writes now request the storage
 device's flush operation when available.
 Successful XFS extent-file data writes that do not change inode metadata now

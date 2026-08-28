@@ -118,6 +118,7 @@ kernel gate below is explicitly marked complete.
 - [x] Add shell `setenv <key> <value>` and multi-entry environment inheritance.
 - [x] Add shell `unsetenv <key>` environment removal.
 - [x] Add shell `status` reporting for the most recent waited process.
+- [x] Add typed pipe descriptors and blocking userland read/write wrappers.
 - [x] Add a bounded serial-input bridge into the standard-input queue for
   terminal-backed userland sessions.
 - [ ] Add reliable QEMU live keyboard verification for `run INIT.ELF`.

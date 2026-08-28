@@ -123,6 +123,15 @@ static inline uint64_t os_dup(uint64_t descriptor, uint64_t rights) {
     return os_syscall3(25, descriptor, rights, 0);
 }
 
+static inline uint64_t os_pipe(uint32_t *read_handle, uint32_t *write_handle) {
+    struct { uint32_t read_handle; uint32_t write_handle; } result;
+    uint64_t status = os_syscall3(48, (uint64_t)(uintptr_t)&result, 0, 0);
+    if (status == OS_SYSCALL_ERROR) return status;
+    if (read_handle) *read_handle = result.read_handle;
+    if (write_handle) *write_handle = result.write_handle;
+    return 0;
+}
+
 static inline uint64_t os_fstat(uint64_t descriptor, os_stat_t *stat) {
     return os_syscall3(24, descriptor, (uint64_t)(uintptr_t)stat, 0);
 }

@@ -14,6 +14,7 @@
 #include "../../../core/sync/spinlock.h"
 #include "../../../ipc/channel.h"
 #include "../../../ipc/endpoint.h"
+#include "../../../ipc/pipe.h"
 #include "../../../security/credentials.h"
 #include "../../../fs/vfs/vfs.h"
 #include "../../../fs/vfs/file.h"
@@ -3374,6 +3375,31 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("blocking IPC syscalls ready\r\n");
+    os_syscall_pipe_t pipe_result = {0};
+    char pipe_result_data[sizeof(channel_message)] = {0};
+    uint64_t pipe_create_status = syscall_dispatch(OS_SYSCALL_PIPE,
+                                                    0x8000005000ULL, 0, 0);
+    int pipe_copy_ok = syscall_copy_from_user(&pipe_result, 0x8000005000ULL,
+                                              sizeof(pipe_result));
+    uint64_t pipe_write_status = syscall_dispatch(
+        OS_SYSCALL_WRITE_FILE, pipe_result.write_handle,
+        0x8000003000ULL, sizeof(channel_message) - 1);
+    uint64_t pipe_read_status = syscall_dispatch(
+        OS_SYSCALL_READ, pipe_result.read_handle, 0x8000005000ULL,
+        sizeof(pipe_result_data) - 1);
+    int pipe_data_ok = syscall_copy_from_user(pipe_result_data,
+                                               0x8000005000ULL,
+                                               sizeof(pipe_result_data) - 1);
+    if (pipe_create_status != 0 || !pipe_copy_ok ||
+        pipe_write_status != sizeof(channel_message) - 1 ||
+        pipe_read_status != sizeof(channel_message) - 1 || !pipe_data_ok ||
+        pipe_result_data[0] != 'i' || pipe_result_data[2] != 'c' ||
+        syscall_dispatch(OS_SYSCALL_CLOSE, pipe_result.read_handle, 0, 0) != 0 ||
+        syscall_dispatch(OS_SYSCALL_CLOSE, pipe_result.write_handle, 0, 0) != 0) {
+        serial_write("pipe syscall failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("pipe syscalls ready\r\n");
     if (syscall_dispatch(OS_SYSCALL_YIELD, 0, 0, 0) != 0) {
         serial_write("yield syscall failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");

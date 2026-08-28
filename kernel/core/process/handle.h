@@ -8,6 +8,11 @@
 #define PROCESS_HANDLE_EXEC 0x04U
 #define PROCESS_HANDLE_SLOT_BITS 5U
 #define PROCESS_HANDLE_SLOT_MASK (PROCESS_HANDLE_CAPACITY - 1U)
+typedef enum {
+    PROCESS_HANDLE_OBJECT_GENERIC,
+    PROCESS_HANDLE_OBJECT_PIPE_READ,
+    PROCESS_HANDLE_OBJECT_PIPE_WRITE
+} process_handle_object_kind_t;
 typedef void (*process_handle_release_fn)(void *object);
 typedef void (*process_handle_retain_fn)(void *object);
 typedef struct process_handle_table process_handle_table_t;
@@ -19,12 +24,14 @@ typedef struct {
     uint32_t retained_references;
     uint8_t closing;
     uint8_t inheritable;
+    process_handle_object_kind_t kind;
 } process_handle_t;
 typedef struct {
     process_handle_table_t *table;
     process_handle_t *entry;
     void *object;
     process_handle_release_fn release;
+    process_handle_object_kind_t kind;
     uint8_t active;
 } process_handle_ref_t;
 struct process_handle_table {
@@ -43,6 +50,11 @@ int process_handle_open_owned_retain(process_handle_table_t *table, void *object
                                      uint32_t rights,
                                      process_handle_release_fn release,
                                      process_handle_retain_fn retain);
+int process_handle_open_owned_kind(process_handle_table_t *table, void *object,
+                                   uint32_t rights,
+                                   process_handle_release_fn release,
+                                   process_handle_retain_fn retain,
+                                   process_handle_object_kind_t kind);
 int process_handle_duplicate(process_handle_table_t *table, uint32_t handle,
                              uint32_t rights);
 int process_handle_set_inheritable(process_handle_table_t *table, uint32_t handle,

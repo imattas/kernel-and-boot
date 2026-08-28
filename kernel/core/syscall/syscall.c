@@ -8,6 +8,7 @@
 #include "../../mm/heap/heap.h"
 #include "../../fs/vfs/file.h"
 #include "../../ipc/endpoint.h"
+#include "../../ipc/pipe.h"
 #include "../../sched/core/scheduler.h"
 #include "../printk/serial.h"
 #include "../../drivers/input/input.h"
@@ -363,12 +364,19 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
                                            rights, &ref)) return OS_SYSCALL_ERROR;
             uint8_t buffer[OS_SYSCALL_MAX_WRITE];
             int result = number == OS_SYSCALL_READ ?
-                vfs_file_read((vfs_file_t *)ref.object, buffer, (uint32_t)arg3) : 0;
+                (ref.kind == PROCESS_HANDLE_OBJECT_PIPE_READ ?
+                 pipe_endpoint_read((pipe_endpoint_t *)ref.object, buffer,
+                                    (uint32_t)arg3) :
+                 vfs_file_read((vfs_file_t *)ref.object, buffer, (uint32_t)arg3)) : 0;
             if (number == OS_SYSCALL_READ && result > 0 &&
                 !syscall_copy_to_user(arg2, buffer, (uint32_t)result)) result = 0;
             if (number == OS_SYSCALL_WRITE_FILE) {
                 result = syscall_copy_from_user(buffer, arg2, arg3) ?
-                    vfs_file_write((vfs_file_t *)ref.object, buffer, (uint32_t)arg3) : 0;
+                    (ref.kind == PROCESS_HANDLE_OBJECT_PIPE_WRITE ?
+                     pipe_endpoint_write((pipe_endpoint_t *)ref.object, buffer,
+                                          (uint32_t)arg3) :
+                     vfs_file_write((vfs_file_t *)ref.object, buffer,
+                                    (uint32_t)arg3)) : 0;
             }
             process_handle_release_ref(&ref);
             return result > 0 ? (uint64_t)(uint32_t)result : OS_SYSCALL_ERROR;
@@ -434,6 +442,41 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
                 (process_handle_release_fn)ipc_endpoint_release);
             if (!handle) ipc_endpoint_release(endpoint);
             return handle ? (uint64_t)(uint32_t)handle : OS_SYSCALL_ERROR;
+        }
+        case OS_SYSCALL_PIPE: {
+            process_t *process = process_current();
+            os_syscall_pipe_t result = {0};
+            pipe_endpoint_t *reader = 0;
+            pipe_endpoint_t *writer = 0;
+            if (!process || !user_range(arg1, sizeof(result), 1) ||
+                !pipe_create(&reader, &writer)) return OS_SYSCALL_ERROR;
+            int read_handle = process_handle_open_owned_kind(
+                &process->handles, reader, PROCESS_HANDLE_READ,
+                (process_handle_release_fn)pipe_endpoint_release,
+                (process_handle_retain_fn)pipe_endpoint_retain,
+                PROCESS_HANDLE_OBJECT_PIPE_READ);
+            int write_handle = read_handle ? process_handle_open_owned_kind(
+                &process->handles, writer, PROCESS_HANDLE_WRITE,
+                (process_handle_release_fn)pipe_endpoint_release,
+                (process_handle_retain_fn)pipe_endpoint_retain,
+                PROCESS_HANDLE_OBJECT_PIPE_WRITE) : 0;
+            if (!read_handle || !write_handle) {
+                if (read_handle) (void)process_handle_close(&process->handles,
+                                                             (uint32_t)read_handle);
+                else pipe_endpoint_release(reader);
+                if (write_handle) (void)process_handle_close(&process->handles,
+                                                              (uint32_t)write_handle);
+                else pipe_endpoint_release(writer);
+                return OS_SYSCALL_ERROR;
+            }
+            result.read_handle = (uint32_t)read_handle;
+            result.write_handle = (uint32_t)write_handle;
+            if (!syscall_copy_to_user(arg1, &result, sizeof(result))) {
+                (void)process_handle_close(&process->handles, result.read_handle);
+                (void)process_handle_close(&process->handles, result.write_handle);
+                return OS_SYSCALL_ERROR;
+            }
+            return 0;
         }
         case OS_SYSCALL_CHANNEL_SEND:
         case OS_SYSCALL_CHANNEL_RECEIVE:

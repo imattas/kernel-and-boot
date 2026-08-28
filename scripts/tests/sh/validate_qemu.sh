@@ -103,6 +103,7 @@ grep -F 'os userland init' "$log" >/dev/null
 grep -F 'os> ' "$log" >/dev/null
 grep -F 'network runtime service ready' "$log" >/dev/null
 grep -F 'input runtime service ready' "$log" >/dev/null
+grep -F 'pipe syscalls ready' "$log" >/dev/null
 if grep -E 'X64 Exception|kernel contract invalid|KERNEL (PANIC|EXCEPTION)' "$log" >/dev/null; then
     echo "QEMU boot reported a failure" >&2
     exit 1

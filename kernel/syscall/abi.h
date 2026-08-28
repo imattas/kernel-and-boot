@@ -51,7 +51,8 @@ enum {
     OS_SYSCALL_PROCESS_REAP = 44,
     OS_SYSCALL_GETENV = 45,
     OS_SYSCALL_SETENV = 46,
-    OS_SYSCALL_UNSETENV = 47
+    OS_SYSCALL_UNSETENV = 47,
+    OS_SYSCALL_PIPE = 48
 };
 
 #define OS_SYSCALL_ERROR UINT64_MAX
@@ -77,5 +78,10 @@ typedef struct {
     uint32_t state;
     int32_t exit_status;
 } os_syscall_process_info_t;
+
+typedef struct {
+    uint32_t read_handle;
+    uint32_t write_handle;
+} os_syscall_pipe_t;
 
 #endif

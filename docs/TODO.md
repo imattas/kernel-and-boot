@@ -98,6 +98,7 @@ the init-owned shell supervisor remains the next kernel/userland boundary.
 - [x] Make `head.elf` consume standard input for pipeline execution.
 - [x] Add stdin-streaming `tee.elf` with bounded multi-file persistence and package it in the FAT32 image.
 - [x] Add stdin/file `tail.elf` with bounded final-line buffering and package it in the FAT32 image.
+- [x] Add stdin/file `sort.elf` with bounded lexical line sorting and package it in the FAT32 image.
 - [x] Add background execution and job-table tracking for PATH-resolved
   external commands.
 - [x] Poll, reap, and remove completed background jobs without blocking the

@@ -1813,4 +1813,7 @@ The following text-tool slice adds `tail.elf`, which keeps the final ten
 bounded lines from either a file or standard input and is packaged in the same
 FAT32 image namespace.
 
+The next text-tool slice adds `sort.elf`, which performs bounded lexical line
+sorting from either a file or standard input and is packaged in the same image.
+
 Continue hardening SMP, memory reclamation, storage, USB, networking, graphics, security, debugging, crash diagnostics, performance tooling, power management, hardware compatibility, and userland while maintaining explicit subsystem boundaries and automated regression coverage.

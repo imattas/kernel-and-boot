@@ -1685,6 +1685,8 @@ arguments in the bounded ring-3 `argv` stack.
 Built-in shell arguments now apply the same bounded quote and backslash rules,
 rejecting unterminated escapes/quotes while leaving external `run` argument
 text intact for kernel-side argv construction.
+Pipeline and redirection scanning now ignores operators inside quoted or
+escaped text, and quoted input/output paths are normalized before VFS access.
 
 ## Phase 10 — BIOS boot path
 

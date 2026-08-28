@@ -169,12 +169,43 @@ static uint32_t resolve_command(const char *name, uint32_t name_length,
     return 0;
 }
 
+static uint32_t shell_count_operator(const char *text, uint32_t length,
+                                      char operator, uint32_t *first) {
+    uint32_t count = 0;
+    if (first) *first = length;
+    char quote = 0;
+    int escaped = 0;
+    for (uint32_t index = 0; index < length; ++index) {
+        char value = text[index];
+        if (escaped) {
+            escaped = 0;
+        } else if (value == '\\') {
+            escaped = 1;
+        } else if (quote) {
+            if (value == quote) quote = 0;
+        } else if (value == '\'' || value == '"') {
+            quote = value;
+        } else if (value == operator) {
+            if (first && count == 0) *first = index;
+            ++count;
+        }
+    }
+    return count;
+}
+
 static int shell_run_pipeline(char *text, uint32_t length, int background,
                               uint64_t *leader_id, uint64_t *consumer_id,
                               int32_t *status) {
     uint32_t separator = length;
+    char quote = 0;
+    int escaped = 0;
     for (uint32_t index = 0; index < length; ++index) {
-        if (text[index] != '|') continue;
+        char value = text[index];
+        if (escaped) { escaped = 0; continue; }
+        if (value == '\\') { escaped = 1; continue; }
+        if (quote) { if (value == quote) quote = 0; continue; }
+        if (value == '\'' || value == '"') { quote = value; continue; }
+        if (value != '|') continue;
         if (separator != length) return 0;
         separator = index;
     }
@@ -248,11 +279,7 @@ static int shell_run_pipeline(char *text, uint32_t length, int background,
 
 static int shell_run_redirect(char *text, uint32_t length, int32_t *status) {
     uint32_t separator = length;
-    for (uint32_t index = 0; index < length; ++index) {
-        if (text[index] != '>') continue;
-        if (separator != length) return 0;
-        separator = index;
-    }
+    if (shell_count_operator(text, length, '>', &separator) != 1) return 0;
     if (separator == length) return 0;
     text[separator] = 0;
     uint32_t left_length = separator;
@@ -271,6 +298,8 @@ static int shell_run_redirect(char *text, uint32_t length, int32_t *status) {
                                                 sizeof(resolved_path));
     if (resolved_length == 0) return 0;
     uint32_t output_length = length - path_start;
+    if (!shell_unquote_argument(text + path_start, &output_length) ||
+        output_length == 0) return 0;
     uint64_t output = os_create(text + path_start, output_length, 3);
     if (output == OS_SYSCALL_ERROR) return 0;
     uint32_t arguments_start = name_length;
@@ -291,12 +320,7 @@ static int shell_run_redirect(char *text, uint32_t length, int32_t *status) {
 static int shell_run_input_redirect(char *text, uint32_t length,
                                     int32_t *status) {
     uint32_t separator = length;
-    for (uint32_t index = 0; index < length; ++index) {
-        if (text[index] != '<') continue;
-        if (separator != length) return 0;
-        separator = index;
-    }
-    if (separator == length) return 0;
+    if (shell_count_operator(text, length, '<', &separator) != 1) return 0;
     text[separator] = 0;
     uint32_t left_length = separator;
     while (left_length != 0 && (text[left_length - 1U] == ' ' ||
@@ -314,6 +338,8 @@ static int shell_run_input_redirect(char *text, uint32_t length,
                                                 sizeof(resolved_path));
     if (resolved_length == 0) return 0;
     uint32_t input_length = length - path_start;
+    if (!shell_unquote_argument(text + path_start, &input_length) ||
+        input_length == 0) return 0;
     uint64_t input = os_open(text + path_start, input_length, 1);
     if (input == OS_SYSCALL_ERROR) return 0;
     uint32_t arguments_start = name_length;
@@ -706,10 +732,10 @@ void shell_main(void) {
                 uint32_t argument_length = 0;
                 while (argument[argument_length]) ++argument_length;
                 uint32_t pipeline_count = 0;
-                for (uint32_t index = 0; index < argument_length; ++index)
-                    if (argument[index] == '|') ++pipeline_count;
+                pipeline_count = shell_count_operator(argument, argument_length,
+                                                       '|', 0);
                 int pipeline_background = pipeline_count != 0 &&
-                    argument[argument_length - 1U] == '&';
+                    argument_length != 0 && argument[argument_length - 1U] == '&';
                 if (pipeline_background) {
                     --argument_length;
                     while (argument_length != 0 &&
@@ -742,8 +768,8 @@ void shell_main(void) {
                     }
                 } else {
                 uint32_t redirect_count = 0;
-                for (uint32_t index = 0; index < argument_length; ++index)
-                    if (argument[index] == '>') ++redirect_count;
+                redirect_count = shell_count_operator(argument, argument_length,
+                                                       '>', 0);
                 if (redirect_count != 0) {
                     int32_t redirect_status = 1;
                     if (!shell_run_redirect(argument, argument_length,
@@ -757,8 +783,9 @@ void shell_main(void) {
                     }
                 } else {
                 uint32_t input_redirect_count = 0;
-                for (uint32_t index = 0; index < argument_length; ++index)
-                    if (argument[index] == '<') ++input_redirect_count;
+                input_redirect_count = shell_count_operator(argument,
+                                                             argument_length,
+                                                             '<', 0);
                 if (input_redirect_count != 0) {
                     int32_t input_status = 1;
                     if (!shell_run_input_redirect(argument, argument_length,

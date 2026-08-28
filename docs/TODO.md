@@ -124,6 +124,8 @@ kernel gate below is explicitly marked complete.
   the ring-3 argv stack.
 - [x] Unquote and unescape shell built-in arguments with bounded validation,
   while preserving raw quoting for external `run` arguments.
+- [x] Make pipeline and redirection operators quote-aware and unquote quoted
+  redirection paths before filesystem access.
 - [x] Add typed pipe descriptors and blocking userland read/write wrappers.
 - [x] Add optional per-process standard-input and standard-output bindings for
   redirected child processes.

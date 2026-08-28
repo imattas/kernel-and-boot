@@ -1734,6 +1734,10 @@ standalone-utility support and shell/application integration coverage.
 live FAT32-backed VFS namespace, and FAT-backed reads now return valid partial
 final chunks for ELF loading. The remaining application/supervision work is
 the next userland boundary.
+The shared freestanding userland runtime now centralizes bounded string
+length, complete descriptor writes, decimal parsing, and octal permission
+parsing for standalone utilities without adding a linker or syscall
+dependency.
 The shell now keeps a bounded eight-entry command history and handles split
 ANSI up/down escape sequences without feeding terminal control bytes into the
 command parser.

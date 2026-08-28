@@ -62,7 +62,7 @@ Current focus: continue userland contracts and shell/application behavior;
 XFS feature expansion is paused. Kernel hardening continues separately, and
 the init-owned shell supervisor remains the next kernel/userland boundary.
 
-- [ ] Add a small userland runtime layer for shared argument parsing, status
+- [x] Add a small userland runtime layer for shared argument parsing, status
   handling, and diagnostic output across standalone applications.
 - [ ] Add shell/application integration coverage for filesystem mutation,
   pipelines, redirection, background jobs, and inherited environment state.

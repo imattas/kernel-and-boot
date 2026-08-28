@@ -60,7 +60,10 @@ kernel may be declared complete.
 
 Current focus: continue userland contracts and shell/application behavior;
 XFS feature expansion is paused. Kernel hardening continues separately, and
-the init-owned shell supervisor remains the next kernel/userland boundary.
+the init-owned shell supervisor remains a deferred kernel/userland boundary
+because the first live spawn attempt stalled after init's initial write.
+Keep the stable kernel-created shell handoff until the spawn/wait path has a
+focused lifecycle fix.
 
 The current userland slice adds the `version` shell built-in. XFS expansion
 and init-owned supervision remain paused while the stable boot path is kept.
@@ -92,6 +95,8 @@ type, string, and numeric tests.
   userland transitions.
 - [ ] Add shell/application integration coverage for filesystem mutation,
   pipelines, redirection, background jobs, and inherited environment state.
+- [ ] Implement and verify init-owned shell supervision through spawn/wait/reap;
+  do not replace the stable direct shell handoff until live QEMU proves it.
 - [x] Add direct contract coverage for quote-aware command sequencing.
 - [x] Add shell `clear` terminal control and parser coverage.
 - [x] Add bounded shell aliases with explicit `alias` and `unalias` commands.

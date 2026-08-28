@@ -1536,7 +1536,11 @@ tried, preventing leaked BAR/PIO ownership from blocking fallback binding.
 
 ## Phase 10 — Userland begins after the kernel gate
 
-Only after the kernel completion gate passes populate `userland/`. Begin with the minimum runtime and init environment needed to exercise the real kernel ABI, then expand toward libraries, shell/tooling, and system services.
+Only after the kernel completion gate passes populate `userland/`. The first
+userland slice now provides a freestanding ring-3 init ELF that exercises the
+existing `write` and `exit` syscall ABI; loading it from the UEFI boot contract
+and launching it remains the next userland milestone. Then expand toward
+libraries, shell/tooling, and system services.
 
 ## Phase 10 — BIOS boot path
 

@@ -42,6 +42,9 @@ ZSTD_FIXTURE := $(TEST_DIR)/zstd_real.zst
 FSE_TEST := $(TEST_DIR)/fse_contract
 CACHE_TEST := $(TEST_DIR)/cache_contract
 DEVICE_TEST := $(TEST_DIR)/device_contract
+USERLAND_INIT_ELF := $(BUILD_DIR)/userland/init.elf
+USERLAND_INIT_OBJ := $(BUILD_DIR)/userland/init_start.o
+USERLAND_LD := userland/init/init.ld
 UEFI_OBJ := $(BUILD_DIR)/uefi/efi_main.obj
 UEFI_ENTRY_OBJ := $(BUILD_DIR)/uefi/entry.obj
 UEFI_CONSOLE_OBJ := $(BUILD_DIR)/uefi/console.obj
@@ -92,9 +95,21 @@ OVMF_CODE ?= /usr/share/edk2/x64/OVMF_CODE.4m.fd
 OVMF_VARS ?= /usr/share/edk2/x64/OVMF_VARS.4m.fd
 QEMU_LOG := $(BUILD_DIR)/qemu-serial.log
 
-.PHONY: all test image qemu-test fat32-test exfat-test ext4-test xfs-test xfs-rename-test xfs-alloc-test xfs-unwritten-test xfs-auth-test btrfs-test deflate-test lzo-test zstd-test fse-test cache-test device-test run clean distclean
+.PHONY: all test userland-test image qemu-test fat32-test exfat-test ext4-test xfs-test xfs-rename-test xfs-alloc-test xfs-unwritten-test xfs-auth-test btrfs-test deflate-test lzo-test zstd-test fse-test cache-test device-test run clean distclean
 
-all: $(CONTRACT_ELF) $(UEFI_EFI) $(KERNEL_ELF)
+all: $(CONTRACT_ELF) $(UEFI_EFI) $(KERNEL_ELF) $(USERLAND_INIT_ELF)
+
+userland-test: $(USERLAND_INIT_ELF)
+	sh scripts/tests/sh/validate_userland.sh $(USERLAND_INIT_ELF)
+
+$(BUILD_DIR)/userland:
+	mkdir -p $@
+
+$(USERLAND_INIT_OBJ): userland/init/start.asm | $(BUILD_DIR)/userland
+	$(NASM) -f elf64 $< -o $@
+
+$(USERLAND_INIT_ELF): $(USERLAND_INIT_OBJ) $(USERLAND_LD) | $(BUILD_DIR)/userland
+	$(LD) -m elf_x86_64 -T $(USERLAND_LD) --build-id=none -o $@ $(USERLAND_INIT_OBJ)
 
 $(TEST_DIR):
 	mkdir -p $@

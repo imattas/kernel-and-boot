@@ -125,6 +125,8 @@ kernel gate below is explicitly marked complete.
 - [x] Add shell output redirection: `run <command> > <path>`.
 - [x] Add shell input redirection: `run <command> < <path>`.
 - [x] Add shell `fg <pid>` foregrounding for tracked background jobs.
+- [x] Track both processes in background two-stage pipelines and reap them
+  together through `wait`/`fg`.
 - [x] Add a bounded serial-input bridge into the standard-input queue for
   terminal-backed userland sessions.
 - [ ] Add reliable QEMU live keyboard verification for `run INIT.ELF`.

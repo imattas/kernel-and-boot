@@ -1638,6 +1638,8 @@ Input redirection is also supported with `run <command> < <path>`, binding a
 readable VFS file as standard input for the child.
 Background jobs can now be foregrounded with `fg <pid>`, which waits for and
 reaps a tracked job before removing it from the job table.
+Background two-stage pipelines now retain both child IDs in the shell job
+table; `wait` and `fg` reap both ends and report the consumer's status.
 The FAT32 image builder now chains a second root-directory cluster, removing
 the one-sector root-entry ceiling for continued userland growth.
 The standalone `ECHO.ELF` utility is now stored in the expanded root directory

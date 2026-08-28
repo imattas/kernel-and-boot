@@ -64,27 +64,58 @@ static int parse_number(const char *text, uint32_t length, uint64_t *value) {
     return 1;
 }
 
-static uint64_t jobs[16];
+typedef struct {
+    uint64_t process_id;
+    uint64_t peer_id;
+} shell_job_t;
+
+static shell_job_t jobs[16];
 static uint32_t job_count;
 
-static void job_add(uint64_t process_id) {
+static void job_add(uint64_t process_id, uint64_t peer_id) {
     if (job_count < sizeof(jobs) / sizeof(jobs[0]))
-        jobs[job_count++] = process_id;
+        jobs[job_count++] = (shell_job_t){process_id, peer_id};
+}
+
+static int job_find(uint64_t process_id, uint32_t *index) {
+    for (uint32_t i = 0; i < job_count; ++i)
+        if (jobs[i].process_id == process_id || jobs[i].peer_id == process_id) {
+            if (index) *index = i;
+            return 1;
+        }
+    return 0;
+}
+
+static int job_get(uint64_t process_id, uint64_t *leader, uint64_t *peer) {
+    uint32_t index = 0;
+    if (!job_find(process_id, &index)) return 0;
+    if (leader) *leader = jobs[index].process_id;
+    if (peer) *peer = jobs[index].peer_id;
+    return 1;
 }
 
 static void job_remove(uint64_t process_id) {
-    for (uint32_t index = 0; index < job_count; ++index) {
-        if (jobs[index] != process_id) continue;
-        jobs[index] = jobs[--job_count];
-        return;
-    }
+    uint32_t found = 0;
+    if (!job_find(process_id, &found)) return;
+    jobs[found] = jobs[--job_count];
 }
 
 static int job_contains(uint64_t process_id) {
-    for (uint32_t index = 0; index < job_count; ++index)
-        if (jobs[index] == process_id) return 1;
-    return 0;
+    return job_find(process_id, 0);
 }
+
+static int shell_wait_job(uint64_t process_id, int32_t *status) {
+    uint64_t leader = 0;
+    uint64_t peer = 0;
+    if (!job_get(process_id, &leader, &peer)) return 0;
+    int32_t leader_status = -1;
+    if (peer != 0 && (os_wait(leader, &leader_status) == OS_SYSCALL_ERROR ||
+                      os_reap(leader) == OS_SYSCALL_ERROR)) return 0;
+    if (os_wait(peer != 0 ? peer : leader, status) == OS_SYSCALL_ERROR ||
+        os_reap(peer != 0 ? peer : leader) == OS_SYSCALL_ERROR) return 0;
+    return 1;
+}
+
 
 static uint32_t resolve_command(const char *name, uint32_t name_length,
                                 char *path, uint32_t capacity) {
@@ -133,7 +164,9 @@ static uint32_t resolve_command(const char *name, uint32_t name_length,
     return 0;
 }
 
-static int shell_run_pipeline(char *text, uint32_t length, int32_t *status) {
+static int shell_run_pipeline(char *text, uint32_t length, int background,
+                              uint64_t *leader_id, uint64_t *consumer_id,
+                              int32_t *status) {
     uint32_t separator = length;
     for (uint32_t index = 0; index < length; ++index) {
         if (text[index] != '|') continue;
@@ -193,6 +226,11 @@ static int shell_run_pipeline(char *text, uint32_t length, int32_t *status) {
     (void)os_close(read_handle);
     (void)os_close(write_handle);
     if (right_process == OS_SYSCALL_ERROR) return 0;
+    if (background) {
+        if (leader_id) *leader_id = left_process;
+        if (consumer_id) *consumer_id = right_process;
+        return 1;
+    }
     int32_t left_status = -1;
     int32_t right_status = -1;
     if (os_wait(left_process, &left_status) == OS_SYSCALL_ERROR ||
@@ -374,9 +412,13 @@ void shell_main(void) {
             else if (command == SHELL_JOBS) {
                 for (uint32_t index = 0; index < job_count; ++index) {
                     os_process_info_t info;
-                    if (os_process_status(jobs[index], &info) != 0) continue;
+                    if (os_process_status(jobs[index].process_id, &info) != 0) continue;
                     print("pid=", 4);
                     print_number(info.id);
+                    if (jobs[index].peer_id != 0) {
+                        print(" peer=", 6);
+                        print_number(jobs[index].peer_id);
+                    }
                     print(" state=", 7);
                     print_number(info.state);
                     print("\r\n", 2);
@@ -389,8 +431,7 @@ void shell_main(void) {
                 int32_t status = -1;
                 if (!parse_number(argument, pid_length, &process_id) ||
                     !job_contains(process_id) ||
-                    os_wait(process_id, &status) == OS_SYSCALL_ERROR ||
-                    os_reap(process_id) == OS_SYSCALL_ERROR) {
+                    !shell_wait_job(process_id, &status)) {
                     print(unknown, sizeof(unknown) - 1U);
                 } else {
                     last_status = status;
@@ -624,9 +665,11 @@ void shell_main(void) {
                 while (argument[pid_length]) ++pid_length;
                 uint64_t process_id = 0;
                 int32_t status = -1;
-                if (!parse_number(argument, pid_length, &process_id) ||
-                    os_wait(process_id, &status) == OS_SYSCALL_ERROR ||
-                    os_reap(process_id) == OS_SYSCALL_ERROR) {
+                int waited = parse_number(argument, pid_length, &process_id) &&
+                    (job_contains(process_id) ? shell_wait_job(process_id, &status) :
+                     (os_wait(process_id, &status) != OS_SYSCALL_ERROR &&
+                      os_reap(process_id) != OS_SYSCALL_ERROR));
+                if (!waited) {
                     last_status = 1;
                     print(unknown, sizeof(unknown) - 1U);
                 } else {
@@ -642,11 +685,32 @@ void shell_main(void) {
                 uint32_t pipeline_count = 0;
                 for (uint32_t index = 0; index < argument_length; ++index)
                     if (argument[index] == '|') ++pipeline_count;
+                int pipeline_background = pipeline_count != 0 &&
+                    argument[argument_length - 1U] == '&';
+                if (pipeline_background) {
+                    --argument_length;
+                    while (argument_length != 0 &&
+                           (argument[argument_length - 1U] == ' ' ||
+                            argument[argument_length - 1U] == '\t')) --argument_length;
+                    argument[argument_length] = 0;
+                }
                 if (pipeline_count != 0) {
                     int32_t pipeline_status = 1;
+                    uint64_t pipeline_leader = 0;
+                    uint64_t pipeline_consumer = 0;
                     if (!shell_run_pipeline(argument, argument_length,
+                                             pipeline_background,
+                                             &pipeline_leader, &pipeline_consumer,
                                              &pipeline_status))
                         print(unknown, sizeof(unknown) - 1U);
+                    else if (pipeline_background) {
+                        job_add(pipeline_leader, pipeline_consumer);
+                        print("pid=", 4);
+                        print_number(pipeline_consumer);
+                        print(" peer=", 6);
+                        print_number(pipeline_leader);
+                        print("\r\n", 2);
+                    }
                     else {
                         last_status = pipeline_status;
                         print("exit=", 5);
@@ -713,7 +777,7 @@ void shell_main(void) {
                     last_status = 1;
                     print(unknown, sizeof(unknown) - 1U);
                 } else if (background) {
-                    job_add(process_id);
+                    job_add(process_id, 0);
                     print("pid=", 4);
                     print_number(process_id);
                     print("\r\n", 2);

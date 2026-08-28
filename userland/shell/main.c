@@ -33,9 +33,21 @@ static void print_status(int32_t status) {
     }
 }
 
+static int parse_number(const char *text, uint32_t length, uint64_t *value) {
+    if (!text || !value || length == 0) return 0;
+    uint64_t result = 0;
+    for (uint32_t index = 0; index < length; ++index) {
+        if (text[index] < '0' || text[index] > '9' || result >
+            (UINT64_MAX - (uint64_t)(text[index] - '0')) / 10U) return 0;
+        result = result * 10U + (uint64_t)(text[index] - '0');
+    }
+    *value = result;
+    return 1;
+}
+
 void shell_main(void) {
     static const char prompt[] = "os> ";
-    static const char help[] = "help id ps env echo pwd cd ls cat mkdir rm rmdir touch write run exit\r\n";
+    static const char help[] = "help id ps env inherit echo pwd cd ls cat mkdir rm rmdir touch write run exit\r\n";
     static const char unknown[] = "unknown command\r\n";
     static char line[128];
     static char argument[128];
@@ -98,6 +110,26 @@ void shell_main(void) {
                     print(value, length);
                     print("\r\n", 2);
                 }
+            }
+            else if (command == SHELL_INHERIT) {
+                uint32_t descriptor_length = 0;
+                while (argument[descriptor_length] && argument[descriptor_length] != ' ' &&
+                       argument[descriptor_length] != '\t') ++descriptor_length;
+                uint32_t mode_start = descriptor_length;
+                while (argument[mode_start] == ' ' || argument[mode_start] == '\t')
+                    ++mode_start;
+                uint32_t mode_length = 0;
+                while (argument[mode_start + mode_length]) ++mode_length;
+                uint64_t descriptor = 0;
+                int enabled = mode_length == 2 && argument[mode_start] == 'o' &&
+                              argument[mode_start + 1] == 'n';
+                int disabled = mode_length == 3 && argument[mode_start] == 'o' &&
+                               argument[mode_start + 1] == 'f' &&
+                               argument[mode_start + 2] == 'f';
+                if (!parse_number(argument, descriptor_length, &descriptor) ||
+                    (!enabled && !disabled) ||
+                    os_set_inheritable(descriptor, enabled) == OS_SYSCALL_ERROR)
+                    print(unknown, sizeof(unknown) - 1U);
             }
             else if (command == SHELL_ECHO) {
                 uint32_t argument_length = 0;

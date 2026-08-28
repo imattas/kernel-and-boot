@@ -39,6 +39,11 @@ static inline uint64_t os_getenv(const char *key, void *value,
                        (uint64_t)(uintptr_t)value, capacity);
 }
 
+static inline uint64_t os_set_inheritable(uint64_t descriptor,
+                                          uint64_t enabled) {
+    return os_syscall3(30, descriptor, enabled, 0);
+}
+
 static inline uint64_t os_write(uint64_t descriptor, const void *buffer,
                                 uint64_t length) {
     return os_syscall3(1, descriptor, (uint64_t)(uintptr_t)buffer, length);

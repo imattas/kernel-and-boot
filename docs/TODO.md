@@ -80,6 +80,7 @@ kernel gate below is explicitly marked complete.
 - [x] Add shell `ps` live process-ID listing.
 - [x] Add process status details to shell `ps`.
 - [x] Add bounded inherited `PATH` environment support and shell `env`.
+- [x] Add shell descriptor inheritance policy control.
 - [x] Reap completed spawned processes and report `run` exit status.
 - [x] Pass initial arguments to spawned user programs.
 - [ ] Add reliable QEMU live keyboard verification for `run INIT.ELF`.

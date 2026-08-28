@@ -39,6 +39,7 @@ shell_command_t shell_parse(const char *line, uint32_t length,
         !same_word(line, command_length, "touch") &&
         !same_word(line, command_length, "write") &&
         !same_word(line, command_length, "run") &&
+        !same_word(line, command_length, "inherit") &&
         !same_word(line, command_length, "echo") &&
         !same_word(line, command_length, "cd")) return SHELL_UNKNOWN;
     uint32_t start = command_length;
@@ -56,5 +57,6 @@ shell_command_t shell_parse(const char *line, uint32_t length,
     if (same_word(line, command_length, "touch")) return SHELL_TOUCH;
     if (same_word(line, command_length, "write")) return SHELL_WRITE;
     if (same_word(line, command_length, "run")) return SHELL_RUN;
+    if (same_word(line, command_length, "inherit")) return SHELL_INHERIT;
     return SHELL_ECHO;
 }

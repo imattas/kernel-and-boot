@@ -1046,6 +1046,8 @@ kernel process table.
 exit status through the process-status syscall.
 Processes now carry a bounded inherited `PATH` environment value, exposed to
 userland through `getenv` and the shell `env` command.
+The shell also exposes descriptor inheritance policy through `inherit <fd>
+<on|off>`.
 Waiting now reaps completed child processes, and `run` reports their exit
 status before returning to the prompt.
 Reaping is exposed as a separate parent-validated syscall, preserving the

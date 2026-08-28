@@ -1183,15 +1183,26 @@ static int xfs_journal_configured(const xfs_fs_t *fs, uint32_t records) {
 
 static int xfs_journal_clear(xfs_fs_t *fs) {
     uint8_t header[4096];
+    int result = 1;
     memset(header, 0, fs->block_size);
     for (uint32_t i = 0; i < fs->journal_blocks; ++i)
-        if (!xfs_write_block(fs, fs->journal_start + i, header)) return 0;
-    return xfs_flush_metadata(fs);
+        if (!xfs_write_block(fs, fs->journal_start + i, header)) {
+            result = 0;
+            break;
+        }
+    if (result && !xfs_flush_metadata(fs)) result = 0;
+    if (fs->journal_locked) {
+        fs->journal_locked = 0;
+        spinlock_unlock_irqrestore(&fs->journal_lock, fs->journal_flags);
+    }
+    return result;
 }
 
 static int xfs_journal_prepare(xfs_fs_t *fs, const uint64_t *targets,
                                const uint8_t *const *images, uint32_t records) {
     uint8_t header[4096];
+    fs->journal_flags = spinlock_lock_irqsave(&fs->journal_lock);
+    fs->journal_locked = 1;
     if (!xfs_journal_configured(fs, records) || !targets || !images ||
         24U + records * 12U > fs->block_size) return 0;
     for (uint32_t i = 0; i < records; ++i) {
@@ -1258,15 +1269,9 @@ static int xfs_write_journaled_block(xfs_fs_t *fs, uint64_t block,
     uint64_t target = block;
     const uint8_t *image = data;
     int journal_active = 0;
-    uint64_t journal_flags = 0;
     if (fs->journal_blocks) {
-        journal_flags = spinlock_lock_irqsave(&fs->journal_lock);
         if (!xfs_journal_prepare(fs, &target, &image, 1U))
-        {
-            int result = xfs_journal_clear(fs);
-            spinlock_unlock_irqrestore(&fs->journal_lock, journal_flags);
-            return result;
-        }
+            return xfs_journal_clear(fs);
         journal_active = 1;
     }
     int result = 0;
@@ -1275,7 +1280,6 @@ static int xfs_write_journaled_block(xfs_fs_t *fs, uint64_t block,
     } else {
         result = !journal_active || xfs_journal_clear(fs);
     }
-    if (fs->journal_blocks) spinlock_unlock_irqrestore(&fs->journal_lock, journal_flags);
     return result;
 }
 
@@ -1963,15 +1967,9 @@ static int xfs_write_inode(xfs_fs_t *fs, uint64_t inode,
     uint64_t journal_target = block;
     const uint8_t *journal_image = block_data;
     int journal_active = 0;
-    uint64_t journal_flags = 0;
     if (fs->journal_blocks) {
-        journal_flags = spinlock_lock_irqsave(&fs->journal_lock);
         if (!xfs_journal_prepare(fs, &journal_target, &journal_image, 1U))
-        {
-            int result = xfs_journal_clear(fs);
-            spinlock_unlock_irqrestore(&fs->journal_lock, journal_flags);
-            return result;
-        }
+            return xfs_journal_clear(fs);
         journal_active = 1;
     }
     int result = 0;
@@ -1980,7 +1978,6 @@ static int xfs_write_inode(xfs_fs_t *fs, uint64_t inode,
     } else {
         result = !journal_active || xfs_journal_clear(fs);
     }
-    if (fs->journal_blocks) spinlock_unlock_irqrestore(&fs->journal_lock, journal_flags);
     return result;
 }
 
@@ -2371,15 +2368,9 @@ static int xfs_write_inode_pair(xfs_fs_t *fs, uint64_t first_inode,
     const uint8_t *images[2] = {first_data, second_data};
     uint32_t target_count = same_block ? 1U : 2U;
     int journal_active = 0;
-    uint64_t journal_flags = 0;
     if (fs->journal_blocks) {
-        journal_flags = spinlock_lock_irqsave(&fs->journal_lock);
         if (!xfs_journal_prepare(fs, targets, images, target_count))
-        {
-            int result = xfs_journal_clear(fs);
-            spinlock_unlock_irqrestore(&fs->journal_lock, journal_flags);
-            return result;
-        }
+            return xfs_journal_clear(fs);
         journal_active = 1;
     }
     int result = 0;
@@ -2392,7 +2383,6 @@ static int xfs_write_inode_pair(xfs_fs_t *fs, uint64_t first_inode,
     } else {
         result = !journal_active || xfs_journal_clear(fs);
     }
-    if (fs->journal_blocks) spinlock_unlock_irqrestore(&fs->journal_lock, journal_flags);
     return result;
 }
 

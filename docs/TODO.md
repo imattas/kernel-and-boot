@@ -47,8 +47,8 @@ kernel gate below is explicitly marked complete.
   by port-idle confirmation.
 - [x] Bound storage-device name validation and duplicate comparisons.
 - [x] Bound device-driver name validation and duplicate comparisons.
-- [x] Serialize XFS journal-backed data-block, inode, and paired-inode
-  publication across journal prepare, flush, and clear.
+- [x] Serialize every XFS journal-backed publication path across journal
+  prepare, target writes, flush, and clear.
 - [ ] Final kernel audit: no required kernel directory is empty or only a
   placeholder; every retained component has build integration and evidence.
 - [ ] Final completion gate: clean build, image validation/mountability checks,

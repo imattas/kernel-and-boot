@@ -127,6 +127,14 @@ static inline uint64_t os_close(uint64_t descriptor) {
     return os_syscall3(12, descriptor, 0, 0);
 }
 
+static inline uint64_t os_seek(uint64_t descriptor, uint64_t offset) {
+    return os_syscall3(13, descriptor, offset, 0);
+}
+
+static inline uint64_t os_truncate(uint64_t descriptor, uint64_t size) {
+    return os_syscall3(26, descriptor, size, 0);
+}
+
 static inline uint64_t os_dup(uint64_t descriptor, uint64_t rights) {
     return os_syscall3(25, descriptor, rights, 0);
 }

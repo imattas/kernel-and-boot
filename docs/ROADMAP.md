@@ -1696,6 +1696,9 @@ credential, process-list, and process-status syscalls from ring 3 and are
 packaged in the FAT32 root.
 Standalone `WAIT.ELF` now exercises the ring-3 wait/reap lifecycle ABI and
 returns the waited process status to its caller.
+Userland now exposes the existing file-position and resize syscalls through
+`os_seek`/`os_truncate`, with `TRUNCATE.ELF` providing an independent ring-3
+file-size mutation utility packaged in the FAT32 root.
 
 ## Phase 10 — BIOS boot path
 

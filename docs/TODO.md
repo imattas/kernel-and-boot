@@ -105,6 +105,7 @@ kernel gate below is explicitly marked complete.
 - [x] Add standalone `STAT.ELF` using descriptor metadata.
 - [x] Add native shell `stat <path>` metadata reporting.
 - [x] Add native shell `chmod <mode> <path>` permission updates.
+- [x] Add native shell `kill <pid> <signal>` process signaling.
 - [ ] Add reliable QEMU live keyboard verification for `run INIT.ELF`.
 - [ ] Add the command-line shell and terminal/console I/O.
 - [ ] Add process tools and initial utilities (`init`, `echo`, `ls`, `cat`,

@@ -129,7 +129,7 @@ static uint32_t resolve_command(const char *name, uint32_t name_length,
 
 void shell_main(void) {
     static const char prompt[] = "os> ";
-    static const char help[] = "help id ps env jobs which inherit echo pwd cd ls cat stat chmod mkdir rm rmdir touch write run wait exit\r\n";
+    static const char help[] = "help id ps env jobs which inherit echo pwd cd ls cat stat chmod kill mkdir rm rmdir touch write run wait exit\r\n";
     static const char unknown[] = "unknown command\r\n";
     static char line[128];
     static char argument[128];
@@ -326,6 +326,23 @@ void shell_main(void) {
                     path_start == argument_length ||
                     os_chmod(argument + path_start, argument_length - path_start,
                              mode) == OS_SYSCALL_ERROR)
+                    print(unknown, sizeof(unknown) - 1U);
+            } else if (command == SHELL_KILL) {
+                uint32_t argument_length = 0;
+                while (argument[argument_length]) ++argument_length;
+                uint32_t separator = 0;
+                while (separator < argument_length && argument[separator] != ' ' &&
+                       argument[separator] != '\t') ++separator;
+                uint32_t signal_start = separator;
+                while (signal_start < argument_length &&
+                       (argument[signal_start] == ' ' || argument[signal_start] == '\t'))
+                    ++signal_start;
+                uint64_t process_id;
+                uint64_t signal_number;
+                if (!parse_number(argument, separator, &process_id) ||
+                    !parse_number(argument + signal_start,
+                                  argument_length - signal_start, &signal_number) ||
+                    os_signal_send_to(process_id, signal_number) == OS_SYSCALL_ERROR)
                     print(unknown, sizeof(unknown) - 1U);
             } else if (command == SHELL_MKDIR) {
                 uint32_t argument_length = 0;

@@ -1591,6 +1591,8 @@ with `jobs`, removing entries after explicit reaping.
 The shell also reports descriptor metadata directly with `stat <path>`, using
 the same open/fstat/close ABI as the standalone utility.
 It also exposes `chmod <mode> <path>` through the permission-update syscall.
+The process-control surface now includes `kill <pid> <signal>` through the
+targeted signal-send syscall.
 The FAT32 image builder now chains a second root-directory cluster, removing
 the one-sector root-entry ceiling for continued userland growth.
 The standalone `ECHO.ELF` utility is now stored in the expanded root directory

@@ -27,6 +27,11 @@ static inline uint64_t os_getppid(void) { return os_syscall3(40, 0, 0, 0); }
 static inline uint64_t os_getuid(void) { return os_syscall3(38, 0, 0, 0); }
 static inline uint64_t os_getgid(void) { return os_syscall3(39, 0, 0, 0); }
 
+static inline uint64_t os_signal_send_to(uint64_t process_id,
+                                         uint64_t signal_number) {
+    return os_syscall3(7, process_id, signal_number, 0);
+}
+
 static inline uint64_t os_process_list(uint64_t *ids, uint64_t capacity) {
     return os_syscall3(42, (uint64_t)(uintptr_t)ids, capacity, 0);
 }

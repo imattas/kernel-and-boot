@@ -713,6 +713,18 @@ void shell_main(void) {
             history_offset = 0;
             shell_command_t command = shell_parse(line, length, argument,
                                                    sizeof(argument));
+            if ((command == SHELL_HEAD || command == SHELL_WC ||
+                 command == SHELL_GREP) &&
+                (shell_count_operator(line, length, '|', 0) != 0 ||
+                 shell_count_operator(line, length, '>', 0) != 0 ||
+                 shell_count_operator(line, length, '<', 0) != 0)) {
+                if (length >= sizeof(argument)) command = SHELL_UNKNOWN;
+                else {
+                    for (uint32_t index = 0; index <= length; ++index)
+                        argument[index] = line[index];
+                    command = SHELL_RUN;
+                }
+            }
             uint32_t argument_length = 0;
             while (argument[argument_length]) ++argument_length;
             if (command != SHELL_EMPTY &&

@@ -1737,6 +1737,8 @@ lower-level `run` command.
 Unknown shell commands now receive a PATH-based external-application fallback;
 failed resolution still reports `unknown command`, while successful children
 return their exit status through the shell.
+External text utilities now preserve their full command expression when paired
+with the shell's existing pipeline and redirection operators.
 The standalone `HELP.ELF` utility now provides the same command inventory through
 the external process path as the native shell `help` command.
 The complete `make test` gate now passes with the expanded 34-artifact

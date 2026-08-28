@@ -86,6 +86,8 @@ the init-owned shell supervisor remains the next kernel/userland boundary.
 - [x] Dispatch the packaged text utilities directly through shell
   spawn/wait/reap integration.
 - [x] Add PATH-based fallback execution for packaged external applications.
+- [x] Preserve direct external utility commands through pipeline and
+  redirection dispatch.
 - [ ] Make init supervise `shell.elf` through the normal spawn/wait ABI after
   the namespace-retain and shared-scheduler startup deadlocks are fixed.
 

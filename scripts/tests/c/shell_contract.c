@@ -22,6 +22,10 @@ int main(void) {
     assert(line_length == 1 && line[0] == 'z');
     assert(shell_parse("help", 4, argument, sizeof(argument)) == SHELL_HELP);
     assert(shell_parse("clear", 5, argument, sizeof(argument)) == SHELL_CLEAR);
+    assert(shell_parse("alias ll ls", 11, argument, sizeof(argument)) == SHELL_ALIAS);
+    assert(strcmp(argument, "ll ls") == 0);
+    assert(shell_parse("unalias ll", 10, argument, sizeof(argument)) == SHELL_UNALIAS);
+    assert(strcmp(argument, "ll") == 0);
     assert(shell_parse("id", 2, argument, sizeof(argument)) == SHELL_ID);
     assert(shell_parse("ps", 2, argument, sizeof(argument)) == SHELL_PS);
     assert(shell_parse("env", 3, argument, sizeof(argument)) == SHELL_ENV);

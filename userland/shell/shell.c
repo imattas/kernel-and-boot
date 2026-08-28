@@ -218,6 +218,8 @@ shell_command_t shell_parse(const char *line, uint32_t length,
         !same_word(line, command_length, "status") &&
         !same_word(line, command_length, "true") &&
         !same_word(line, command_length, "false") &&
+        !same_word(line, command_length, "alias") &&
+        !same_word(line, command_length, "unalias") &&
         !same_word(line, command_length, "fg")) {
         if (!shell_has_operator(line, length) || length >= capacity)
             return SHELL_UNKNOWN;
@@ -283,6 +285,8 @@ shell_command_t shell_parse(const char *line, uint32_t length,
     if (same_word(line, command_length, "status")) return SHELL_STATUS;
     if (same_word(line, command_length, "true")) return SHELL_TRUE;
     if (same_word(line, command_length, "false")) return SHELL_FALSE;
+    if (same_word(line, command_length, "alias")) return SHELL_ALIAS;
+    if (same_word(line, command_length, "unalias")) return SHELL_UNALIAS;
     if (same_word(line, command_length, "fg")) return SHELL_FG;
     if (same_word(line, command_length, "mkdir")) return SHELL_MKDIR;
     if (same_word(line, command_length, "rm")) return SHELL_RM;

@@ -77,6 +77,7 @@ the init-owned shell supervisor remains the next kernel/userland boundary.
   pipelines, redirection, background jobs, and inherited environment state.
 - [x] Add direct contract coverage for quote-aware command sequencing.
 - [x] Add shell `clear` terminal control and parser coverage.
+- [x] Add bounded shell aliases with explicit `alias` and `unalias` commands.
 - [x] Keep standalone `HELP.ELF` command inventory synchronized with shell
   built-ins.
 - [x] Add the first bounded file-reading utility, `head.elf`, to the packaged

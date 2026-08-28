@@ -9,6 +9,13 @@ typedef struct {
 static const char shell_unknown[] = "unknown command\r\n";
 static int32_t *shell_active_status;
 
+static uint32_t shell_text_length(const char *text) {
+    uint32_t length = 0;
+    if (!text) return 0;
+    while (text[length]) ++length;
+    return length;
+}
+
 static void print(const char *text, uint64_t length) {
     if (shell_active_status && text == shell_unknown)
         *shell_active_status = 1;
@@ -76,6 +83,84 @@ typedef struct {
 
 static shell_job_t jobs[16];
 static uint32_t job_count;
+
+typedef struct {
+    char name[32];
+    char value[96];
+} shell_alias_t;
+
+static shell_alias_t aliases[8];
+static uint32_t alias_count;
+
+static int alias_find(const char *name, uint32_t length) {
+    for (uint32_t index = 0; index < alias_count; ++index) {
+        uint32_t existing = 0;
+        while (existing < sizeof(aliases[index].name) &&
+               aliases[index].name[existing]) ++existing;
+        if (existing != length) continue;
+        uint32_t character = 0;
+        while (character < length &&
+               aliases[index].name[character] == name[character]) ++character;
+        if (character == length) return (int)index;
+    }
+    return -1;
+}
+
+static int alias_set(const char *name, uint32_t name_length,
+                     const char *value, uint32_t value_length) {
+    if (!name || !value || name_length == 0 || name_length >= 32 ||
+        value_length == 0 || value_length >= 96) return 0;
+    int found = alias_find(name, name_length);
+    uint32_t index = found >= 0 ? (uint32_t)found : alias_count;
+    if (found < 0 && alias_count == sizeof(aliases) / sizeof(aliases[0]))
+        return 0;
+    for (uint32_t character = 0; character < name_length; ++character)
+        aliases[index].name[character] = name[character];
+    aliases[index].name[name_length] = 0;
+    for (uint32_t character = 0; character < value_length; ++character)
+        aliases[index].value[character] = value[character];
+    aliases[index].value[value_length] = 0;
+    if (found < 0) ++alias_count;
+    return 1;
+}
+
+static int alias_remove(const char *name, uint32_t length) {
+    int found = alias_find(name, length);
+    if (found < 0) return 0;
+    aliases[(uint32_t)found] = aliases[--alias_count];
+    return 1;
+}
+
+static int shell_expand_alias(char *line, uint32_t *length, uint32_t capacity) {
+    if (!line || !length || *length == 0 || capacity == 0) return 1;
+    uint32_t name_length = 0;
+    while (name_length < *length && line[name_length] != ' ' &&
+           line[name_length] != '\t') ++name_length;
+    if (name_length == 0 || (name_length == 5 && line[0] == 'a' &&
+                             line[1] == 'l' && line[2] == 'i' &&
+                             line[3] == 'a' && line[4] == 's') ||
+        (name_length == 7 && line[0] == 'u' && line[1] == 'n' &&
+         line[2] == 'a' && line[3] == 'l' && line[4] == 'i' &&
+         line[5] == 'a' && line[6] == 's')) return 1;
+    int found = alias_find(line, name_length);
+    if (found < 0) return 1;
+    uint32_t value_length = 0;
+    while (value_length < sizeof(aliases[(uint32_t)found].value) &&
+           aliases[(uint32_t)found].value[value_length]) ++value_length;
+    uint32_t remainder = *length - name_length;
+    if (value_length + remainder >= capacity) return 0;
+    char expanded[128];
+    for (uint32_t index = 0; index < value_length; ++index)
+        expanded[index] = aliases[(uint32_t)found].value[index];
+    for (uint32_t index = 0; index < remainder; ++index)
+        expanded[value_length + index] = line[name_length + index];
+    uint32_t expanded_length = value_length + remainder;
+    for (uint32_t index = 0; index < expanded_length; ++index)
+        line[index] = expanded[index];
+    line[expanded_length] = 0;
+    *length = expanded_length;
+    return 1;
+}
 
 static void job_add(uint64_t process_id, uint64_t peer_id) {
     if (job_count < sizeof(jobs) / sizeof(jobs[0]))
@@ -657,7 +742,7 @@ static int shell_remove_tree(const char *path, uint32_t length,
 
 void shell_main(void) {
     static const char prompt[] = "os> ";
-    static const char help[] = "help clear id ps env setenv unsetenv status true false jobs history fg which inherit echo printf basename dirname cut tr cmp pwd cd ls cat head wc grep tee tail sort uniq stat chmod kill sleep mv cp mkdir rm rmdir touch write run wait exit\r\n";
+    static const char help[] = "help clear alias unalias id ps env setenv unsetenv status true false jobs history fg which inherit echo printf basename dirname cut tr cmp pwd cd ls cat head wc grep tee tail sort uniq stat chmod kill sleep mv cp mkdir rm rmdir touch write run wait exit\r\n";
     static const char *unknown = shell_unknown;
     static char line[128];
     static char input[64];
@@ -771,8 +856,10 @@ void shell_main(void) {
                                                sizeof(history[0]),
                                                history_count, line, length);
             history_offset = 0;
-            shell_command_t command = shell_parse(line, length, argument,
-                                                   sizeof(argument));
+            int alias_valid = shell_expand_alias(line, &length, sizeof(line));
+            shell_command_t command = alias_valid ?
+                shell_parse(line, length, argument, sizeof(argument)) :
+                SHELL_UNKNOWN;
             job_collect_finished();
             if ((command == SHELL_HEAD || command == SHELL_WC ||
                  command == SHELL_GREP) &&
@@ -805,6 +892,35 @@ void shell_main(void) {
                 last_status = 0;
             if (command == SHELL_HELP) print(help, sizeof(help) - 1U);
             else if (command == SHELL_CLEAR) print("\x1b[2J\x1b[H", 7);
+            else if (command == SHELL_ALIAS) {
+                if (argument_length == 0) {
+                    for (uint32_t index = 0; index < alias_count; ++index) {
+                        print(aliases[index].name,
+                              shell_text_length(aliases[index].name));
+                        print("=", 1);
+                        print(aliases[index].value,
+                              shell_text_length(aliases[index].value));
+                        print("\r\n", 2);
+                    }
+                } else {
+                    uint32_t name_length = 0;
+                    while (name_length < argument_length &&
+                           argument[name_length] != ' ' &&
+                           argument[name_length] != '\t') ++name_length;
+                    uint32_t value_start = name_length;
+                    while (value_start < argument_length &&
+                           (argument[value_start] == ' ' ||
+                            argument[value_start] == '\t')) ++value_start;
+                    if (!alias_set(argument, name_length,
+                                   argument + value_start,
+                                   argument_length - value_start))
+                        print(unknown, sizeof(unknown) - 1U);
+                }
+            } else if (command == SHELL_UNALIAS) {
+                if (argument_length == 0 || !alias_remove(argument,
+                                                           argument_length))
+                    print(unknown, sizeof(unknown) - 1U);
+            }
             else if (command == SHELL_ID) {
                 print("pid=", 4);
                 print_number(os_getpid());

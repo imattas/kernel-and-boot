@@ -34,6 +34,8 @@ typedef enum {
     SHELL_STATUS,
     SHELL_TRUE,
     SHELL_FALSE,
+    SHELL_ALIAS,
+    SHELL_UNALIAS,
     SHELL_MKDIR,
     SHELL_RM,
     SHELL_RMDIR,

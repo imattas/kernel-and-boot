@@ -2131,6 +2131,26 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("userland core utility namespace ready\r\n");
+    static const char rm_short_name[11] = {
+        'R','M',' ',' ',' ',' ',' ',' ','E','L','F'
+    };
+    static const char rmdir_short_name[11] = {
+        'R','M','D','I','R',' ',' ',' ','E','L','F'
+    };
+    static const char touch_short_name[11] = {
+        'T','O','U','C','H',' ',' ',' ','E','L','F'
+    };
+    static const char write_short_name[11] = {
+        'W','R','I','T','E',' ',' ',' ','E','L','F'
+    };
+    if (!fat32_vfs_attach_file(&fat32, vfs_root, rm_short_name, "rm.elf") ||
+        !fat32_vfs_attach_file(&fat32, vfs_root, rmdir_short_name, "rmdir.elf") ||
+        !fat32_vfs_attach_file(&fat32, vfs_root, touch_short_name, "touch.elf") ||
+        !fat32_vfs_attach_file(&fat32, vfs_root, write_short_name, "write.elf")) {
+        serial_write("userland filesystem utility VFS attach failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("userland filesystem utility namespace ready\r\n");
     vfs_node_t *vfs_foreign = vfs_node_create("foreign", VFS_NODE_REGULAR,
                                                0, 0, 0444);
     int vfs_remove_result = vfs_foreign ?

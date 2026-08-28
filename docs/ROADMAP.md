@@ -1741,6 +1741,9 @@ dependency. All packaged standalone applications now consume that shared
 runtime seam; their existing syscall contracts remain unchanged.
 Host contract coverage now exercises the shared parser and string-helper
 boundaries, including overflow, malformed input, and bounded octal modes.
+The build now also validates the complete packaged userland ELF set and
+requires every artifact to be a freestanding x86-64 executable with `_start`
+before image creation.
 The shell now keeps a bounded eight-entry command history and handles split
 ANSI up/down escape sequences without feeding terminal control bytes into the
 command parser.

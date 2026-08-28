@@ -121,6 +121,129 @@ static int shell_wait_job(uint64_t process_id, int32_t *status) {
     return 1;
 }
 
+static int shell_append_text(char *destination, uint32_t capacity,
+                             uint32_t *length, const char *text,
+                             uint64_t text_length) {
+    if (!destination || !length || *length > capacity - 1U ||
+        text_length > capacity - 1U - *length) return 0;
+    for (uint64_t index = 0; index < text_length; ++index)
+        destination[(*length)++] = text[index];
+    return 1;
+}
+
+static int shell_append_number(char *destination, uint32_t capacity,
+                               uint32_t *length, int64_t value) {
+    char digits[20];
+    uint64_t magnitude = value < 0 ? (uint64_t)(-value) : (uint64_t)value;
+    uint32_t count = 0;
+    if (value < 0 && !shell_append_text(destination, capacity, length, "-", 1))
+        return 0;
+    do {
+        digits[count++] = (char)('0' + magnitude % 10U);
+        magnitude /= 10U;
+    } while (magnitude != 0);
+    while (count != 0 && shell_append_text(destination, capacity, length,
+                                             &digits[--count], 1)) {}
+    return count == 0;
+}
+
+static int shell_expand_variables(const char *source, uint32_t length,
+                                  char *destination, uint32_t capacity,
+                                  int32_t last_status,
+                                  uint32_t *expanded_length) {
+    if (!source || !destination || !expanded_length || capacity == 0) return 0;
+    uint32_t output = 0;
+    char quote = 0;
+    int escaped = 0;
+    for (uint32_t index = 0; index < length;) {
+        char current = source[index];
+        if (escaped) {
+            if (!shell_append_text(destination, capacity, &output, &current, 1))
+                return 0;
+            escaped = 0;
+            ++index;
+            continue;
+        }
+        if (current == '\\') {
+            if (!shell_append_text(destination, capacity, &output, "\\", 1))
+                return 0;
+            escaped = 1;
+            ++index;
+            continue;
+        }
+        if (quote == '\'') {
+            if (!shell_append_text(destination, capacity, &output, &current, 1))
+                return 0;
+            if (current == '\'') quote = 0;
+            ++index;
+            continue;
+        }
+        if (current == '\'') {
+            if (!shell_append_text(destination, capacity, &output, "'", 1))
+                return 0;
+            quote = '\'';
+            ++index;
+            continue;
+        }
+        if (current == '"') {
+            if (!shell_append_text(destination, capacity, &output, "\"", 1))
+                return 0;
+            quote = quote == '"' ? 0 : '"';
+            ++index;
+            continue;
+        }
+        if (source[index] != '$') {
+            if (!shell_append_text(destination, capacity, &output, &current, 1))
+                return 0;
+            ++index;
+            continue;
+        }
+        if (index + 1U < length && source[index + 1U] == '?') {
+            if (!shell_append_number(destination, capacity, &output, last_status))
+                return 0;
+            index += 2;
+            continue;
+        }
+        if (index + 1U < length && source[index + 1U] == '$') {
+            if (!shell_append_number(destination, capacity, &output,
+                                      (int64_t)os_getpid())) return 0;
+            index += 2;
+            continue;
+        }
+        uint32_t key_start = index + 1U;
+        if (key_start >= length ||
+            !((source[key_start] >= 'A' && source[key_start] <= 'Z') ||
+              (source[key_start] >= 'a' && source[key_start] <= 'z') ||
+              source[key_start] == '_')) {
+            if (!shell_append_text(destination, capacity, &output, "$", 1))
+                return 0;
+            ++index;
+            continue;
+        }
+        uint32_t key_length = 1;
+        while (key_start + key_length < length) {
+            char value = source[key_start + key_length];
+            if (!((value >= 'A' && value <= 'Z') ||
+                  (value >= 'a' && value <= 'z') ||
+                  (value >= '0' && value <= '9') || value == '_')) break;
+            ++key_length;
+        }
+        if (key_length > 32U) return 0;
+        char key[33];
+        char value[128];
+        for (uint32_t character = 0; character < key_length; ++character)
+            key[character] = source[key_start + character];
+        key[key_length] = 0;
+        uint64_t value_length = os_getenv(key, value, sizeof(value));
+        if (value_length != OS_SYSCALL_ERROR &&
+            !shell_append_text(destination, capacity, &output, value,
+                                value_length)) return 0;
+        index = key_start + key_length;
+    }
+    destination[output] = 0;
+    *expanded_length = output;
+    return 1;
+}
 
 static uint32_t resolve_command(const char *name, uint32_t name_length,
                                 char *path, uint32_t capacity) {
@@ -363,6 +486,7 @@ void shell_main(void) {
     static const char *unknown = shell_unknown;
     static char line[128];
     static char argument[128];
+    static char expanded_argument[128];
     uint32_t length = 0;
     int32_t last_status = 0;
     shell_active_status = &last_status;
@@ -399,6 +523,16 @@ void shell_main(void) {
                                                    sizeof(argument));
             uint32_t argument_length = 0;
             while (argument[argument_length]) ++argument_length;
+            if (command != SHELL_EMPTY &&
+                !shell_expand_variables(argument, argument_length,
+                                        expanded_argument,
+                                        sizeof(expanded_argument), last_status,
+                                        &argument_length))
+                command = SHELL_UNKNOWN;
+            else if (command != SHELL_EMPTY) {
+                for (uint32_t index = 0; index <= argument_length; ++index)
+                    argument[index] = expanded_argument[index];
+            }
             if (command != SHELL_EMPTY && command != SHELL_RUN &&
                 !shell_unquote_argument(argument, &argument_length))
                 command = SHELL_UNKNOWN;

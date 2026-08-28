@@ -1701,6 +1701,9 @@ Userland now exposes the existing file-position and resize syscalls through
 file-size mutation utility packaged in the FAT32 root.
 `SEEK.ELF` now completes the file-position probe by seeking to a supplied
 offset, reading one byte, and reporting it from ring 3.
+The shell now expands bounded environment references (`$KEY`), the previous
+status (`$?`), and the shell PID (`$$`); single quotes suppress expansion and
+escaped dollars remain literal.
 
 ## Phase 10 — BIOS boot path
 

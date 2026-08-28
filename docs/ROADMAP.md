@@ -1825,6 +1825,11 @@ sorting from either a file or standard input and is packaged in the same image.
 The following text-tool slice adds streaming adjacent-duplicate filtering with
 `uniq.elf`, available from either a file operand or standard input.
 
+The next userland utility slice adds `printf.elf`, a freestanding formatter
+supporting bounded string and decimal-style substitutions, literal percent
+output, and common escaped control characters. It is included in the FAT32
+image and available through shell PATH resolution.
+
 Shell integration contracts now directly cover the quote-aware sequence
 splitter, including semicolons and conditional operators preserved inside
 quoted arguments; this joins

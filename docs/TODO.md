@@ -103,6 +103,8 @@ the init-owned shell supervisor remains the next kernel/userland boundary.
 - [x] Add stdin/file `tail.elf` with bounded final-line buffering and package it in the FAT32 image.
 - [x] Add stdin/file `sort.elf` with bounded lexical line sorting and package it in the FAT32 image.
 - [x] Add stdin/file `uniq.elf` with streaming adjacent-duplicate filtering and package it in the FAT32 image.
+- [x] Add standalone `printf.elf` with bounded `%s`, `%d`, `%%`, and basic
+  escaped-control output through PATH and the FAT32 image.
 - [x] Add background execution and job-table tracking for PATH-resolved
   external commands.
 - [x] Poll, reap, and remove completed background jobs without blocking the

@@ -292,17 +292,13 @@ static uint32_t resolve_command(const char *name, uint32_t name_length,
     return 0;
 }
 
-static int shell_run_utility(const char *name, uint32_t name_length,
-                             char *arguments, int32_t *status) {
+static uint64_t shell_start_utility(const char *name, uint32_t name_length,
+                                    char *arguments) {
     char path[128];
     uint32_t path_length = resolve_command(name, name_length, path,
                                            sizeof(path));
-    if (path_length == 0) return 0;
-    uint64_t process_id = os_spawn(path, path_length, arguments);
-    if (process_id == OS_SYSCALL_ERROR ||
-        os_wait(process_id, status) == OS_SYSCALL_ERROR ||
-        os_reap(process_id) == OS_SYSCALL_ERROR) return 0;
-    return 1;
+    if (path_length == 0) return OS_SYSCALL_ERROR;
+    return os_spawn(path, path_length, arguments);
 }
 
 static uint32_t shell_count_operator(const char *text, uint32_t length,
@@ -903,15 +899,39 @@ void shell_main(void) {
                     (command == SHELL_WC ? "wc" : "grep");
                 uint32_t utility_length = command == SHELL_WC ? 2U : 4U;
                 int32_t utility_status = 1;
-                if (!shell_run_utility(utility, utility_length, argument,
-                                        &utility_status)) {
+                int background = argument_length != 0 &&
+                    argument[argument_length - 1U] == '&';
+                if (background) {
+                    --argument_length;
+                    while (argument_length != 0 &&
+                           (argument[argument_length - 1U] == ' ' ||
+                            argument[argument_length - 1U] == '\t'))
+                        --argument_length;
+                    argument[argument_length] = 0;
+                }
+                uint64_t process_id = background && job_count == 16 ?
+                    OS_SYSCALL_ERROR : shell_start_utility(utility,
+                                                            utility_length,
+                                                            argument);
+                if (process_id == OS_SYSCALL_ERROR) {
                     last_status = 1;
                     print(unknown, sizeof(unknown) - 1U);
+                } else if (background) {
+                    job_add(process_id, 0);
+                    print("pid=", 4);
+                    print_number(process_id);
+                    print("\r\n", 2);
                 } else {
+                    if (os_wait(process_id, &utility_status) == OS_SYSCALL_ERROR ||
+                        os_reap(process_id) == OS_SYSCALL_ERROR) {
+                        last_status = 1;
+                        print(unknown, sizeof(unknown) - 1U);
+                    } else {
                     last_status = utility_status;
                     print("exit=", 5);
                     print_status(utility_status);
                     print("\r\n", 2);
+                    }
                 }
             } else if (command == SHELL_CAT) {
                 uint32_t argument_length = 0;
@@ -1273,16 +1293,34 @@ void shell_main(void) {
                        (line[argument_start] == ' ' ||
                         line[argument_start] == '\t')) ++argument_start;
                 int32_t external_status = 1;
-                if (name_length == 0 ||
-                    !shell_run_utility(line, name_length,
-                                       line + argument_start,
-                                       &external_status)) {
+                int background = length != 0 && line[length - 1U] == '&';
+                if (background) {
+                    --length;
+                    while (length != 0 && (line[length - 1U] == ' ' ||
+                                           line[length - 1U] == '\t')) --length;
+                    line[length] = 0;
+                }
+                uint64_t process_id = name_length == 0 ||
+                    (background && job_count == 16) ? OS_SYSCALL_ERROR :
+                    shell_start_utility(line, name_length,
+                                        line + argument_start);
+                if (process_id == OS_SYSCALL_ERROR) {
                     print(unknown, sizeof(unknown) - 1U);
-                } else {
-                    last_status = external_status;
-                    print("exit=", 5);
-                    print_status(external_status);
+                } else if (background) {
+                    job_add(process_id, 0);
+                    print("pid=", 4);
+                    print_number(process_id);
                     print("\r\n", 2);
+                } else {
+                    if (os_wait(process_id, &external_status) == OS_SYSCALL_ERROR ||
+                        os_reap(process_id) == OS_SYSCALL_ERROR) {
+                        print(unknown, sizeof(unknown) - 1U);
+                    } else {
+                        last_status = external_status;
+                        print("exit=", 5);
+                        print_status(external_status);
+                        print("\r\n", 2);
+                    }
                 }
             }
             length = 0;

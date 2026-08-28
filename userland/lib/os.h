@@ -8,6 +8,11 @@
 uint64_t os_syscall3(uint64_t number, uint64_t arg1, uint64_t arg2,
                      uint64_t arg3);
 
+static inline uint64_t os_getpid(void) { return os_syscall3(3, 0, 0, 0); }
+static inline uint64_t os_getppid(void) { return os_syscall3(40, 0, 0, 0); }
+static inline uint64_t os_getuid(void) { return os_syscall3(38, 0, 0, 0); }
+static inline uint64_t os_getgid(void) { return os_syscall3(39, 0, 0, 0); }
+
 static inline uint64_t os_write(uint64_t descriptor, const void *buffer,
                                 uint64_t length) {
     return os_syscall3(1, descriptor, (uint64_t)(uintptr_t)buffer, length);

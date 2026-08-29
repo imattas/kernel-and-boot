@@ -2112,5 +2112,6 @@ the graphical shell was exercised with host key events through
   preparation now completes and external ELF output is visible; wait/reap
   return-to-shell behavior still needs completion proof.
 - Framebuffer console output is implemented and serial stdin fallback is
-  removed. The graphical keyboard path has a PS/2 polling fallback; live
-  keyboard typing still needs an end-to-end QEMU display check.
+  removed. Windows QEMU now uses an explicit IDE disk and PS/2 keyboard;
+  host key events were delivered after `interactive shell ready`. Full-device
+  Linux QEMU validation also passes through `QEMU UEFI handoff: PASS`.

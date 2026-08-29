@@ -1794,7 +1794,7 @@ run: $(IMAGE)
 	exec qemu-system-x86_64 -machine pc -smp 2 -m 128M \
 		-drive if=pflash,format=raw,readonly=on,file="$(OVMF_CODE)" \
 		-drive if=pflash,format=raw,file=$(BUILD_DIR)/OVMF_VARS.4m.fd \
-		-drive format=raw,file=$(IMAGE) -serial stdio \
+		-drive format=raw,file=$(IMAGE) -serial file:$(BUILD_DIR)/qemu-run.log \
 		-netdev user,id=osnet -device e1000,netdev=osnet \
 		-device piix3-usb-uhci \
 		-device usb-kbd \

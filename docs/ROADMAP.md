@@ -2091,6 +2091,8 @@ The normal `make run` target now leaves the QEMU display enabled: the
 framebuffer is the user console and serial is reserved for diagnostics.
 Keyboard input is accepted through the PS/2 polling path and USB HID runtime;
 the terminal that launched QEMU is not the shell console.
+The normal launchers now write serial diagnostics to `build/qemu-run.log`
+instead of presenting serial as a second interactive prompt.
 ### Current userland gate
 
 - Shell input reaches and parses `run`; explicit-path resolution now delegates

@@ -23,6 +23,7 @@ void task_initialize(task_t *task, uint32_t id) {
     task_wait_node_initialize(&task->wait_node, task);
     task->stack = 0;
     task->stack_size = 0;
+    task->process = 0;
 }
 
 task_t *task_create_kernel(uint32_t id, void (*entry)(void *), void *argument,
@@ -63,6 +64,7 @@ task_t *task_create_user(uint32_t id, struct process *process,
     task_initialize(task, id);
     task->stack = stack;
     task->stack_size = kernel_stack_size;
+    task->process = process;
     task_context_initialize_user(&task->context,
                                  (uint8_t *)stack + kernel_stack_size,
                                  process, space, entry, user_stack);

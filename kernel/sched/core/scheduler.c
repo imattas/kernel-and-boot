@@ -2,6 +2,7 @@
 #include "../policy/round_robin.h"
 #include "../../arch/x86_64/cpu/tables.h"
 #include "../../arch/x86_64/smp/percpu.h"
+#include "../../core/process/process.h"
 
 static task_wait_queue_t ready_queue;
 static task_t *current_task;
@@ -67,6 +68,7 @@ void scheduler_set_current(task_t *task) {
     current_task = task;
     if (task) task->state = TASK_RUNNING;
     spinlock_unlock_irqrestore(&scheduler_lock, flags);
+    if (task && task->process) (void)process_activate(task->process);
     const arch_percpu_t *cpu = arch_percpu_current();
     if (task && cpu && task->stack && task->stack_size)
         arch_set_kernel_stack(cpu->logical_id,

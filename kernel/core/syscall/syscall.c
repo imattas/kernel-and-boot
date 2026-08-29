@@ -227,7 +227,6 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
             return valid ? 0 : OS_SYSCALL_ERROR;
         }
         case OS_SYSCALL_PROCESS_WAIT: {
-            serial_write("wait-enter\r\n");
             process_t *caller = process_current();
             if (!user_range(arg2, sizeof(int32_t), 1)) return OS_SYSCALL_ERROR;
             process_t *target = process_lookup_retain(arg1);

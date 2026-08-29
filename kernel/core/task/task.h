@@ -15,6 +15,7 @@ typedef struct task {
     task_wait_node_t wait_node;
     void *stack;
     uint64_t stack_size;
+    struct process *process;
 } task_t;
 
 void task_initialize(task_t *task, uint32_t id);

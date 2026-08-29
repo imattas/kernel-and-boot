@@ -12,6 +12,7 @@
 #include "../../sched/core/scheduler.h"
 #include "../printk/serial.h"
 #include "../../drivers/input/input.h"
+#include "../../drivers/display/console.h"
 #include "../../drivers/time/rtc.h"
 #include "../process/thread.h"
 
@@ -143,7 +144,7 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
                 if (!syscall_copy_from_user(buffer, arg2, arg3))
                     return OS_SYSCALL_ERROR;
                 buffer[arg3] = '\0';
-                serial_write(buffer);
+                console_write(buffer, (uint32_t)arg3);
                 return arg3;
             }
             if (arg1 != 1 || process->standard_output_handle == 0)
@@ -426,8 +427,6 @@ standard_io_rw:
                 process->standard_input_handle == 0) {
                 uint8_t input[OS_SYSCALL_MAX_WRITE];
                 uint32_t count = input_read_standard(input, (uint32_t)arg3);
-                if (count == 0)
-                    count = serial_poll_input((char *)input, (uint32_t)arg3);
                 return count != 0 && syscall_copy_to_user(arg2, input, count) ? count : 0;
             }
             if (number == OS_SYSCALL_READ && arg1 == 0)

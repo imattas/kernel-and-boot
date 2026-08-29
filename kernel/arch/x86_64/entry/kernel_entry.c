@@ -30,6 +30,7 @@
 #include "../../../fs/fat/fat32_vfs.h"
 #include "../../../drivers/input/input.h"
 #include "../../../drivers/input/ps2.h"
+#include "../../../drivers/display/console.h"
 #include "../../../drivers/display/framebuffer.h"
 #include "../../../drivers/usb/usb.h"
 #include "../../../drivers/usb/hid.h"
@@ -2694,7 +2695,7 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("framebuffer surface ready\r\n");
-    framebuffer_t firmware_framebuffer;
+    static framebuffer_t firmware_framebuffer;
     uint64_t firmware_pixels = (uint64_t)info->framebuffer_pitch * info->framebuffer_height;
     if (!info->framebuffer_base || info->framebuffer_base >= (1ULL << 32) ||
         firmware_pixels > UINT64_MAX / sizeof(uint32_t) ||
@@ -2708,6 +2709,11 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("firmware framebuffer ready\r\n");
+    if (!console_initialize(&firmware_framebuffer)) {
+        serial_write("console initialization failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("framebuffer console ready\r\n");
     static const uint8_t usb_device_descriptor[18] = {
         18, 1, 0, 2, 0, 0, 0, 64, 0x34, 0x12, 0x78, 0x56, 0, 1, 1, 2, 3, 1
     };

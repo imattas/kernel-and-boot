@@ -67,6 +67,7 @@ grep -F 'standard input ready' "$log" >/dev/null
 grep -F 'PS2 keyboard ready' "$log" >/dev/null
 grep -F 'framebuffer surface ready' "$log" >/dev/null
 grep -F 'firmware framebuffer ready' "$log" >/dev/null
+grep -F 'framebuffer console ready' "$log" >/dev/null
 grep -F 'USB descriptor layer ready' "$log" >/dev/null
 grep -F 'USB HID keyboard ready' "$log" >/dev/null
 grep -F 'UHCI bulk transfer ready' "$log" >/dev/null
@@ -99,8 +100,6 @@ grep -F 'process handles ready' "$log" >/dev/null
 grep -F 'external userland init ready' "$log" >/dev/null
 grep -F 'interactive shell ready' "$log" >/dev/null
 grep -F 'userland runtime ready' "$log" >/dev/null
-grep -F 'os userland init' "$log" >/dev/null
-grep -F 'os> ' "$log" >/dev/null
 grep -F 'network runtime service ready' "$log" >/dev/null
 grep -F 'input runtime service ready' "$log" >/dev/null
 grep -F 'pipe syscalls ready' "$log" >/dev/null

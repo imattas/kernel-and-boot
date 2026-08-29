@@ -1102,7 +1102,8 @@ KERNEL_BTRFS_FSE_OBJ := $(BUILD_DIR)/kernel/btrfs_fse.o
 KERNEL_BTRFS_VFS_OBJ := $(BUILD_DIR)/kernel/btrfs_vfs.o
 KERNEL_INPUT_OBJ := $(BUILD_DIR)/kernel/input.o
 KERNEL_PS2_OBJ := $(BUILD_DIR)/kernel/ps2.o
-KERNEL_FRAMEBUFFER_OBJ := $(BUILD_DIR)/kernel/framebuffer.o
+KERNEL_CONSOLE_OBJ := $(BUILD_DIR)/kernel/console.o
+KERNEL_FRAMEBUFFER_OBJ := $(BUILD_DIR)/kernel/framebuffer.o $(KERNEL_CONSOLE_OBJ)
 KERNEL_USB_OBJ := $(BUILD_DIR)/kernel/usb.o
 KERNEL_HID_OBJ := $(BUILD_DIR)/kernel/hid.o
 KERNEL_UHCI_OBJ := $(BUILD_DIR)/kernel/uhci.o
@@ -1250,7 +1251,11 @@ $(KERNEL_PS2_OBJ): kernel/drivers/input/ps2.c kernel/drivers/input/ps2.h kernel/
 	$(CC) -target x86_64-pc-none-elf -std=c11 -ffreestanding -fno-builtin -fno-stack-protector -fPIE -fno-plt \
 		-mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@
 
-$(KERNEL_FRAMEBUFFER_OBJ): kernel/drivers/display/framebuffer.c kernel/drivers/display/framebuffer.h | $(BUILD_DIR)/kernel
+$(BUILD_DIR)/kernel/framebuffer.o: kernel/drivers/display/framebuffer.c kernel/drivers/display/framebuffer.h | $(BUILD_DIR)/kernel
+	$(CC) -target x86_64-pc-none-elf -std=c11 -ffreestanding -fno-builtin -fno-stack-protector -fPIE -fno-plt \
+		-mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@
+
+$(KERNEL_CONSOLE_OBJ): kernel/drivers/display/console.c kernel/drivers/display/console.h kernel/drivers/display/framebuffer.h | $(BUILD_DIR)/kernel
 	$(CC) -target x86_64-pc-none-elf -std=c11 -ffreestanding -fno-builtin -fno-stack-protector -fPIE -fno-plt \
 		-mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@
 
@@ -1418,7 +1423,7 @@ $(KERNEL_PROCESS_THREAD_OBJ): kernel/core/process/thread.c kernel/core/process/t
 	$(CC) -target x86_64-pc-none-elf -std=c11 -ffreestanding -fno-builtin -fno-stack-protector -fPIE -fno-plt \
 		-mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@
 
-$(KERNEL_SYSCALL_OBJ): kernel/core/syscall/syscall.c kernel/core/syscall/syscall.h kernel/syscall/abi.h kernel/time/clock.h kernel/core/process/process.h kernel/fs/vfs/file.h kernel/ipc/endpoint.h kernel/arch/x86_64/cpu/tables.h kernel/arch/x86_64/time/timer.h kernel/mm/virtual/address_space.h kernel/drivers/input/input.h | $(BUILD_DIR)/kernel
+$(KERNEL_SYSCALL_OBJ): kernel/core/syscall/syscall.c kernel/core/syscall/syscall.h kernel/syscall/abi.h kernel/time/clock.h kernel/core/process/process.h kernel/fs/vfs/file.h kernel/ipc/endpoint.h kernel/arch/x86_64/cpu/tables.h kernel/arch/x86_64/time/timer.h kernel/mm/virtual/address_space.h kernel/drivers/input/input.h kernel/drivers/display/console.h | $(BUILD_DIR)/kernel
 	$(CC) -target x86_64-pc-none-elf -std=c11 -ffreestanding -fno-builtin -fno-stack-protector -fPIE -fno-plt \
 		-mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@
 
@@ -1800,7 +1805,7 @@ run: $(IMAGE)
 		-device ide-hd,drive=ahcidisk2,bus=ahci.2 \
 		-device nvme,drive=nvmedisk,serial=OSNVME01 \
 		-drive if=none,id=nvmedisk,format=raw,file=$(BUILD_DIR)/nvme-test.img \
-		-display none -no-reboot -no-shutdown
+		-no-reboot -no-shutdown
 
 clean:
 	rm -rf $(BUILD_DIR)

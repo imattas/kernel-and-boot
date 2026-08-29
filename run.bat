@@ -29,8 +29,8 @@ if errorlevel 1 exit /b %errorlevel%
 "%QEMU%" -machine pc -smp 2 -m 128M ^
     -drive if=pflash,format=raw,readonly=on,file="%OVMF_CODE%" ^
     -drive if=pflash,format=raw,file="%CD%\build\OVMF_VARS.windows.fd" ^
-    -drive format=raw,file="%CD%\dist\os.img" ^
+    -drive if=ide,index=0,media=disk,format=raw,file="%CD%\dist\os.img" ^
        -serial file:build\qemu-run.log -no-reboot -no-shutdown ^
     -netdev user,id=osnet -device e1000,netdev=osnet ^
-    -device piix3-usb-uhci -device usb-kbd
+    -device piix3-usb-uhci
 exit /b %errorlevel%

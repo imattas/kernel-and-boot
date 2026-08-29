@@ -3006,7 +3006,8 @@ void kernel_main(void *boot_info) {
     }
     serial_write("ipc blocking ready\r\n");
     interrupts_initialize();
-    if (uhci_controller_count() != 0 && uhci_interrupt_enabled() != 0) {
+    if (uhci_controller_count() != 0 && uhci_root_port_count() != 0 &&
+        uhci_interrupt_enabled() != 0) {
         static const uint8_t uhci_irq_probe_setup[8] =
             {0x80, 0x06, 0, 1, 0, 0, 8, 0};
         static uint8_t uhci_irq_probe_descriptor[8];

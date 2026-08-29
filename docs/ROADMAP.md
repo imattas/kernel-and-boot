@@ -2095,6 +2095,9 @@ The normal launchers now write serial diagnostics to `build/qemu-run.log`
 instead of presenting serial as a second interactive prompt.
 The Windows launcher uses QEMU's `file:` serial backend syntax so it starts
 correctly with the graphical console.
+Windows QEMU now uses an explicit IDE disk and the emulated PS/2 keyboard;
+the graphical shell was exercised with host key events through
+`interactive shell ready`.
 ### Current userland gate
 
 - Shell input reaches and parses `run`; explicit-path resolution now delegates

@@ -2087,9 +2087,10 @@ namespace inheritance and syscall snapshots to retain nodes without taking a
 node mutex while another process lock is held. External `run` execution still
 requires final live proof.
 
-The normal `make run` target now explicitly selects `-display none` so its
-`os> ` prompt is visibly and reliably attached to the launching terminal;
-the graphical/VNC surface is not a terminal and does not accept shell input.
+The normal `make run` target now leaves the QEMU display enabled: the
+framebuffer is the user console and serial is reserved for diagnostics.
+Keyboard input is accepted through the PS/2 polling path and USB HID runtime;
+the terminal that launched QEMU is not the shell console.
 ### Current userland gate
 
 - Shell input reaches and parses `run`; explicit-path resolution now delegates
@@ -2103,3 +2104,6 @@ the graphical/VNC surface is not a terminal and does not accept shell input.
   and argument token storage is now heap-backed, but argument-stack
   preparation now completes and external ELF output is visible; wait/reap
   return-to-shell behavior still needs completion proof.
+- Framebuffer console output is implemented and serial stdin fallback is
+  removed. The graphical keyboard path has a PS/2 polling fallback; live
+  keyboard typing still needs an end-to-end QEMU display check.

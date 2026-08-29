@@ -2093,6 +2093,8 @@ Keyboard input is accepted through the PS/2 polling path and USB HID runtime;
 the terminal that launched QEMU is not the shell console.
 The normal launchers now write serial diagnostics to `build/qemu-run.log`
 instead of presenting serial as a second interactive prompt.
+The Windows launcher uses QEMU's `file:` serial backend syntax so it starts
+correctly with the graphical console.
 ### Current userland gate
 
 - Shell input reaches and parses `run`; explicit-path resolution now delegates

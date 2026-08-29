@@ -2099,8 +2099,8 @@ the graphical shell was exercised with host key events through
   directly to `OS_SPAWN` instead of preflighting with a second `OS_OPEN`.
 - Added `run.bat` for Windows-hosted QEMU with WSL image building and
   configurable OVMF firmware paths.
-- External ELF launch remains blocked in the kernel VFS namespace handoff and
-  must be fixed before this gate is considered complete.
+- External ELF launch now completes the kernel VFS namespace handoff and
+  reaches the child lifecycle gate.
 - FAT32 runtime reads now keep cluster and directory buffers off the kernel
   stack; external launch progresses through image loading and stack mapping,
   and argument token storage is now heap-backed, but argument-stack
@@ -2110,6 +2110,11 @@ the graphical shell was exercised with host key events through
   removed. Windows QEMU now uses an explicit IDE disk and PS/2 keyboard;
   host key events were delivered after `interactive shell ready`. Full-device
   Linux QEMU validation also passes through `QEMU UEFI handoff: PASS`.
+- A controlled external ELF trace proves `spawn -> wait -> reap` returns to
+  the shell; the prior apparent missing prompt was serial-only observation of
+  a framebuffer console.
+- The standard-input syscall no longer falls through after a nonempty
+  framebuffer-console read; the stale serial-fallback branch was removed.
 - PS/2 keyboard events now carry an explicit source marker before ASCII
   translation, preventing PS/2 scan codes from colliding with USB HID codes;
   Enter, Backspace, Space, and letter keys map through the correct table.

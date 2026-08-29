@@ -2068,14 +2068,9 @@ the normal init-owned supervisor remains a separate follow-up because its
 shared-scheduler handoff still needs live QEMU proof.
 
 The shell console path now echoes printable input and coalesces CRLF into one
-submission. Serial reads are serviced directly by `read(0, ...)`, so shell
-input no longer depends on the optional background input task being scheduled.
-
-The interactive serial path now has a dedicated `qemu-input-test` gate. It
-waits for the UEFI boot to reach `os> `, submits a delayed `echo input-test`
-through QEMU's serial stdin, and verifies the command is received and echoed by
-the live shell. Live USB/PS2 keyboard injection remains a separate verification
-follow-up.
+submission. Serial is diagnostics-only; shell input is delivered through the
+graphical PS/2/USB input path, with Windows host-key delivery verified after
+`interactive shell ready`.
 
 The external shell `run` open path now follows the same lock-order rule as
 spawn: it snapshots the current process namespace before retaining VFS nodes.

@@ -1,4 +1,5 @@
 #include "input.h"
+#include "ps2.h"
 
 static input_queue_t *standard_queue;
 
@@ -89,6 +90,9 @@ void input_set_standard_queue(input_queue_t *queue) { standard_queue = queue; }
 
 uint32_t input_read_standard(void *buffer, uint32_t capacity) {
     if (!standard_queue || !buffer || capacity == 0) return 0;
+    /* Keep console input usable on firmware/QEMU configurations that do not
+       route the legacy keyboard IRQ while the scheduler is running. */
+    (void)ps2_keyboard_poll(standard_queue);
     uint8_t *output = (uint8_t *)buffer;
     uint32_t count = 0;
     input_event_t event;

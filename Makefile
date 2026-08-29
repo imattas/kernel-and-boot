@@ -1243,7 +1243,7 @@ $(KERNEL_BTRFS_VFS_OBJ): kernel/fs/btrfs/btrfs_vfs.c kernel/fs/btrfs/btrfs_vfs.h
 	$(CC) -target x86_64-pc-none-elf -std=c11 -ffreestanding -fno-builtin -fno-stack-protector -fPIE -fno-plt \
 		-mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@
 
-$(KERNEL_INPUT_OBJ): kernel/drivers/input/input.c kernel/drivers/input/input.h kernel/core/sync/spinlock.h | $(BUILD_DIR)/kernel
+$(KERNEL_INPUT_OBJ): kernel/drivers/input/input.c kernel/drivers/input/input.h kernel/drivers/input/ps2.h kernel/core/sync/spinlock.h | $(BUILD_DIR)/kernel
 	$(CC) -target x86_64-pc-none-elf -std=c11 -ffreestanding -fno-builtin -fno-stack-protector -fPIE -fno-plt \
 		-mno-red-zone -Wall -Wextra -Werror -O2 -c $< -o $@
 

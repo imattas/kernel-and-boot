@@ -245,6 +245,7 @@ int ps2_keyboard_poll(input_queue_t *queue) {
         code |= 0x0100U;
         extended_scancode = 0;
     }
+    code |= INPUT_KEY_PS2;
     input_event_t event = {
         .type = INPUT_EVENT_KEY,
         .code = code,

@@ -5,6 +5,7 @@
 #include "../../core/sync/spinlock.h"
 
 #define INPUT_EVENT_CAPACITY 64U
+#define INPUT_KEY_PS2 0x0200U
 
 typedef enum {
     INPUT_EVENT_KEY,

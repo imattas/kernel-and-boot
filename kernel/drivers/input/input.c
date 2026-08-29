@@ -4,6 +4,20 @@
 static input_queue_t *standard_queue;
 
 static char key_to_ascii(uint16_t code) {
+    if ((code & INPUT_KEY_PS2) != 0) {
+        code &= (uint16_t)~INPUT_KEY_PS2;
+        if (code == 0x1c) return '\n';
+        if (code == 0x0e) return '\b';
+        if (code == 0x39) return ' ';
+        if (code >= 0x1e && code <= 0x32) {
+            static const char ps2[21] = {
+                'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', ';', '\'', '`',
+                0, '\\', 'z', 'x', 'c', 'v', 'b', 'n', 'm'
+            };
+            return ps2[code - 0x1e];
+        }
+        return 0;
+    }
     if (code >= 0x1e && code <= 0x32) {
         static const char ps2[21] = {
             'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', ';', '\'', '`',

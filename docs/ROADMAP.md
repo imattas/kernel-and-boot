@@ -2110,3 +2110,6 @@ the graphical shell was exercised with host key events through
   removed. Windows QEMU now uses an explicit IDE disk and PS/2 keyboard;
   host key events were delivered after `interactive shell ready`. Full-device
   Linux QEMU validation also passes through `QEMU UEFI handoff: PASS`.
+- PS/2 keyboard events now carry an explicit source marker before ASCII
+  translation, preventing PS/2 scan codes from colliding with USB HID codes;
+  Enter, Backspace, Space, and letter keys map through the correct table.

@@ -2118,3 +2118,6 @@ the graphical shell was exercised with host key events through
 - PS/2 keyboard events now carry an explicit source marker before ASCII
   translation, preventing PS/2 scan codes from colliding with USB HID codes;
   Enter, Backspace, Space, and letter keys map through the correct table.
+- Init now owns shell supervision: the kernel queues init and runtime services,
+  then starts one scheduler run; init spawns, waits for, and reaps `/shell.elf`.
+  The full-device QEMU gate passes with the new handoff.

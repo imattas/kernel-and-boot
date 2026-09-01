@@ -20,10 +20,19 @@ int compositor_initialize(compositor_t *compositor,
 uint32_t compositor_add_layer(compositor_t *compositor,
                               display_surface_t *surface, int32_t x,
                               int32_t y, uint32_t z) {
-    if (!compositor || !surface || !surface->pixels ||
-        compositor->layer_count >= COMPOSITOR_LAYER_CAPACITY)
+    if (!compositor || !surface || !surface->pixels)
         return COMPOSITOR_INVALID_LAYER;
-    uint32_t layer = compositor->layer_count++;
+    uint32_t layer = COMPOSITOR_INVALID_LAYER;
+    for (uint32_t index = 0; index < compositor->layer_count; ++index)
+        if (!compositor->layers[index].surface) {
+            layer = index;
+            break;
+        }
+    if (layer == COMPOSITOR_INVALID_LAYER) {
+        if (compositor->layer_count >= COMPOSITOR_LAYER_CAPACITY)
+            return COMPOSITOR_INVALID_LAYER;
+        layer = compositor->layer_count++;
+    }
     compositor->layers[layer] = (compositor_layer_t){surface, x, y, z, 1};
     return layer;
 }
@@ -40,6 +49,13 @@ int compositor_set_layer_position(compositor_t *compositor, uint32_t layer,
     if (!valid_layer(compositor, layer)) return 0;
     compositor->layers[layer].x = x;
     compositor->layers[layer].y = y;
+    return 1;
+}
+
+int compositor_set_layer_z(compositor_t *compositor, uint32_t layer,
+                           uint32_t z) {
+    if (!valid_layer(compositor, layer)) return 0;
+    compositor->layers[layer].z = z;
     return 1;
 }
 

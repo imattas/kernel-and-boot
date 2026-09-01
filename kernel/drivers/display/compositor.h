@@ -29,6 +29,8 @@ uint32_t compositor_add_layer(compositor_t *compositor,
 int compositor_remove_layer(compositor_t *compositor, uint32_t layer);
 int compositor_set_layer_position(compositor_t *compositor, uint32_t layer,
                                   int32_t x, int32_t y);
+int compositor_set_layer_z(compositor_t *compositor, uint32_t layer,
+                           uint32_t z);
 int compositor_set_layer_visible(compositor_t *compositor, uint32_t layer,
                                  int visible);
 int compositor_compose(compositor_t *compositor, uint32_t clear_color);

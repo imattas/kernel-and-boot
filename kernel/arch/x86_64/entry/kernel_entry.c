@@ -35,6 +35,7 @@
 #include "../../../drivers/display/bochs_vga.h"
 #include "../../../drivers/display/surface.h"
 #include "../../../drivers/display/compositor.h"
+#include "../../../drivers/display/window_manager.h"
 #include "../../../drivers/usb/usb.h"
 #include "../../../drivers/usb/hid.h"
 #include "../../../drivers/usb/uhci.h"
@@ -2835,6 +2836,34 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("display compositor ready\r\n");
+    window_manager_t window_manager;
+    uint32_t window_a_storage[4] = {1U, 2U, 3U, 4U};
+    uint32_t window_b_storage[4] = {5U, 6U, 7U, 8U};
+    display_surface_t window_a_surface;
+    display_surface_t window_b_surface;
+    if (!display_surface_initialize(&window_a_surface, window_a_storage, 2,
+                                    2, 2) ||
+        !display_surface_initialize(&window_b_surface, window_b_storage, 2,
+                                    2, 2) ||
+        !window_manager_initialize(&window_manager, &compositor) ||
+        window_manager_create(&window_manager, &window_a_surface, 0, 0) ==
+            WINDOW_MANAGER_INVALID_WINDOW ||
+        window_manager_create(&window_manager, &window_b_surface, 1, 1) ==
+            WINDOW_MANAGER_INVALID_WINDOW) {
+        serial_write("window manager initialization failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    if (window_manager_hit_test(&window_manager, 1, 1) ==
+            WINDOW_MANAGER_INVALID_WINDOW ||
+        !window_manager_focus(&window_manager,
+                              window_manager_hit_test(&window_manager, 1, 1)) ||
+        !window_manager_move(&window_manager, 1, 2, 2) ||
+        window_manager_hit_test(&window_manager, 1, 1) != 0 ||
+        !window_manager_compose(&window_manager, 0U)) {
+        serial_write("window manager routing failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("window manager core ready\r\n");
     if (!console_initialize(&framebuffer) ||
         console_write("A", 1) != 1 ||
         console_write("\x1b[2J\x1b[H", 7) != 7) {

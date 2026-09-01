@@ -2156,6 +2156,9 @@ the graphical shell was exercised with host key events through
 - The compositor core now provides fixed-capacity visible layers, stable
   z-order composition, position updates, and full-target redraw through the
   GPU display-surface contract; window-manager policy is intentionally next.
+- The window-manager core now owns fixed-capacity window lifecycle, movement,
+  visibility, focus/z-order updates, pointer hit-testing, and compositor
+  submission. Desktop policy and application chrome remain separate phases.
 - The Windows QEMU launcher now pins host keyboard translation to `en-us`,
   keeping host layout state from changing the scan codes consumed by the
   guest keyboard decoder.

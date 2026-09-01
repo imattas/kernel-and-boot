@@ -2864,6 +2864,35 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("window manager core ready\r\n");
+    uint32_t window_a = 0;
+    uint32_t window_b = 1;
+    input_event_t routed_key = {
+        .type = INPUT_EVENT_KEY, .code = 27, .value = 1, .timestamp = 20
+    };
+    input_event_t pointer_x = {
+        .type = INPUT_EVENT_AXIS, .code = 0, .value = 2, .timestamp = 21
+    };
+    input_event_t pointer_y = {
+        .type = INPUT_EVENT_AXIS, .code = 1, .value = 2, .timestamp = 22
+    };
+    input_event_t pointer_button = {
+        .type = INPUT_EVENT_BUTTON, .code = 0, .value = 1, .timestamp = 23
+    };
+    input_event_t routed_output;
+    if (!window_manager_focus(&window_manager, window_b) ||
+        !window_manager_route_event(&window_manager, &routed_key) ||
+        !window_manager_read_event(&window_manager, window_b, &routed_output) ||
+        routed_output.code != routed_key.code ||
+        !window_manager_move(&window_manager, window_b, 2, 2) ||
+        !window_manager_route_event(&window_manager, &pointer_x) ||
+        !window_manager_route_event(&window_manager, &pointer_y) ||
+        !window_manager_route_event(&window_manager, &pointer_button) ||
+        window_manager_hit_test(&window_manager, 2, 2) != window_b ||
+        window_manager_hit_test(&window_manager, 1, 1) != window_a) {
+        serial_write("window manager input routing failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("window manager input routing ready\r\n");
     if (!console_initialize(&framebuffer) ||
         console_write("A", 1) != 1 ||
         console_write("\x1b[2J\x1b[H", 7) != 7) {

@@ -10,6 +10,8 @@ int window_manager_initialize(window_manager_t *manager,
     if (!manager || !compositor || !compositor->target) return 0;
     manager->compositor = compositor;
     manager->next_z = 0;
+    manager->pointer_x = 0;
+    manager->pointer_y = 0;
     for (uint32_t index = 0; index < WINDOW_MANAGER_WINDOW_CAPACITY; ++index)
         manager->windows[index] = (window_t){0};
     return 1;
@@ -25,7 +27,14 @@ uint32_t window_manager_create(window_manager_t *manager,
                                                    x, y, manager->next_z++);
             if (layer == COMPOSITOR_INVALID_LAYER)
                 return WINDOW_MANAGER_INVALID_WINDOW;
-            manager->windows[index] = (window_t){surface, layer, x, y, 1, 0};
+            manager->windows[index] = (window_t){
+                .surface = surface,
+                .compositor_layer = layer,
+                .x = x,
+                .y = y,
+                .visible = 1
+            };
+            input_queue_initialize(&manager->windows[index].input);
             return index;
         }
     return WINDOW_MANAGER_INVALID_WINDOW;
@@ -75,6 +84,57 @@ int window_manager_focus(window_manager_t *manager, uint32_t window) {
         return 0;
     entry->focused = 1;
     return 1;
+}
+
+int window_manager_route_event(window_manager_t *manager,
+                               const input_event_t *event) {
+    if (!manager || !event) return 0;
+    uint32_t target = WINDOW_MANAGER_INVALID_WINDOW;
+    if (event->type == INPUT_EVENT_KEY) {
+        for (uint32_t index = 0; index < WINDOW_MANAGER_WINDOW_CAPACITY; ++index)
+            if (manager->windows[index].surface &&
+                manager->windows[index].visible && manager->windows[index].focused) {
+                target = index;
+                break;
+            }
+    } else if (event->type == INPUT_EVENT_AXIS) {
+        int64_t coordinate = event->code == 0 ? manager->pointer_x :
+                             event->code == 1 ? manager->pointer_y : 0;
+        coordinate += event->value;
+        int64_t limit = event->code == 0 ? manager->compositor->target->width :
+                         event->code == 1 ? manager->compositor->target->height : 0;
+        if (event->code <= 1 && limit > 0) {
+            if (coordinate < 0) coordinate = 0;
+            if (coordinate >= limit) coordinate = limit - 1;
+            if (event->code == 0) manager->pointer_x = (int32_t)coordinate;
+            else manager->pointer_y = (int32_t)coordinate;
+        }
+        target = window_manager_hit_test(manager, manager->pointer_x,
+                                         manager->pointer_y);
+        if (target == WINDOW_MANAGER_INVALID_WINDOW)
+            for (uint32_t index = 0; index < WINDOW_MANAGER_WINDOW_CAPACITY;
+                 ++index)
+                if (manager->windows[index].surface &&
+                    manager->windows[index].visible &&
+                    manager->windows[index].focused) {
+                    target = index;
+                    break;
+                }
+    } else if (event->type == INPUT_EVENT_BUTTON) {
+        target = window_manager_hit_test(manager, manager->pointer_x,
+                                         manager->pointer_y);
+        if (target != WINDOW_MANAGER_INVALID_WINDOW && event->value != 0 &&
+            !window_manager_focus(manager, target))
+            return 0;
+    }
+    return target != WINDOW_MANAGER_INVALID_WINDOW &&
+           input_queue_push(&manager->windows[target].input, event);
+}
+
+uint32_t window_manager_read_event(window_manager_t *manager, uint32_t window,
+                                   input_event_t *event) {
+    if (!valid_window(manager, window) || !event) return 0;
+    return input_queue_pop(&manager->windows[window].input, event);
 }
 
 uint32_t window_manager_hit_test(const window_manager_t *manager, int32_t x,

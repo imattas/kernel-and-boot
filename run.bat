@@ -1,5 +1,7 @@
 @echo off
 setlocal
+set "SCRIPT_DIR=%~dp0"
+cd /d "%SCRIPT_DIR%"
 
 rem Build the FAT32 image through WSL, then run it with Windows QEMU.
 wsl.exe bash -lc "cd /mnt/g/os && make image"
@@ -28,9 +30,9 @@ if errorlevel 1 exit /b %errorlevel%
 
 "%QEMU%" -machine pc -smp 2 -m 128M ^
     -drive if=pflash,format=raw,readonly=on,file="%OVMF_CODE%" ^
-    -drive if=pflash,format=raw,file="%CD%\build\OVMF_VARS.windows.fd" ^
-    -drive if=ide,index=0,media=disk,format=raw,file="%CD%\dist\os.img" ^
+    -drive if=pflash,format=raw,file="%SCRIPT_DIR%build\OVMF_VARS.windows.fd" ^
+    -drive if=ide,index=0,media=disk,format=raw,file="%SCRIPT_DIR%dist\os.img" ^
        -serial file:build\qemu-run.log -no-reboot -no-shutdown ^
     -netdev user,id=osnet -device e1000,netdev=osnet ^
-    -device piix3-usb-uhci -device usb-kbd
+    -device piix3-usb-uhci
 exit /b %errorlevel%

@@ -2134,6 +2134,6 @@ the graphical shell was exercised with host key events through
   buffer fills, while modifier release events are consumed on the next read;
   the queue-boundary regression contract passes in QEMU.
 - The Windows `run.bat` launcher is anchored to its own directory so shortcuts
-  and callers from other working directories use the intended image; it keeps
-  QEMU's implicit PS/2 keyboard path because the Windows USB-HID runtime does
-  not yet deliver interactive events reliably.
+  and callers from other working directories use the intended image; it uses
+  QEMU's built-in PS/2 keyboard directly because the Windows USB-HID runtime
+  does not yet deliver interactive events reliably.

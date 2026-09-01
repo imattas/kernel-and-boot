@@ -6,12 +6,48 @@ static uint8_t keyboard_ctrl;
 static uint8_t keyboard_shift;
 static uint8_t keyboard_caps;
 
+static char keyboard_symbol(uint16_t code, int ps2) {
+    static const char normal[] = "1234567890-=[]\\;',./`";
+    static const char shifted[] = "!@#$%^&*()_+{}|:\\\"<>?~";
+    uint16_t index = 0;
+    if (ps2) {
+        if (code >= 0x02 && code <= 0x0d) index = code - 0x02;
+        else if (code == 0x1a) index = 12;
+        else if (code == 0x1b) index = 13;
+        else if (code == 0x2b) index = 14;
+        else if (code == 0x27) index = 15;
+        else if (code == 0x28) index = 16;
+        else if (code == 0x33) index = 17;
+        else if (code == 0x34) index = 18;
+        else if (code == 0x35) index = 19;
+        else if (code == 0x29) index = 20;
+        else return 0;
+    } else {
+        if (code >= 30 && code <= 39) index = code - 30;
+        else if (code == 45) index = 10;
+        else if (code == 46) index = 11;
+        else if (code == 47) index = 12;
+        else if (code == 48) index = 13;
+        else if (code == 49) index = 14;
+        else if (code == 51) index = 15;
+        else if (code == 52) index = 16;
+        else if (code == 54) index = 17;
+        else if (code == 55) index = 18;
+        else if (code == 56) index = 19;
+        else if (code == 53) index = 20;
+        else return 0;
+    }
+    return keyboard_shift ? shifted[index] : normal[index];
+}
+
 static char key_to_ascii(uint16_t code) {
     if ((code & INPUT_KEY_PS2) != 0) {
         code &= (uint16_t)~INPUT_KEY_PS2;
         if (code == 0x1c) return '\n';
         if (code == 0x0e) return '\b';
         if (code == 0x39) return ' ';
+        char symbol = keyboard_symbol(code, 1);
+        if (symbol) return symbol;
         if (code >= 0x1e && code <= 0x32) {
             static const char ps2[21] = {
                 'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', ';', '\'', '`',
@@ -42,6 +78,8 @@ static char key_to_ascii(uint16_t code) {
             return (char)(value - 'A' + 1);
         return value;
     }
+    char symbol = keyboard_symbol(code, 0);
+    if (symbol) return symbol;
     if (code >= 4 && code <= 29) {
         char value = (char)('a' + code - 4);
         if (keyboard_shift ^ keyboard_caps) value = (char)(value - 'a' + 'A');

@@ -2127,3 +2127,6 @@ the graphical shell was exercised with host key events through
   Ctrl-C produces byte `0x03` for the shell's existing cancel path, while
   Shift/Caps produce correctly cased letters. The keyboard control contract
   passes in the full-device QEMU gate.
+- Keyboard symbol translation now covers digits and punctuation for both PS/2
+  scan codes and USB HID usages, including shifted punctuation. The punctuation
+  contract and full-device QEMU gate pass.

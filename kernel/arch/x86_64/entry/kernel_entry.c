@@ -2694,6 +2694,26 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("keyboard controls ready\r\n");
+    input_event_t shift_down = {
+        .type = INPUT_EVENT_KEY, .code = INPUT_KEY_PS2 | 0x2aU,
+        .value = 1, .timestamp = 12
+    };
+    input_event_t one_down = {
+        .type = INPUT_EVENT_KEY, .code = INPUT_KEY_PS2 | 0x02U,
+        .value = 1, .timestamp = 13
+    };
+    input_event_t shift_up = shift_down;
+    shift_up.value = 0;
+    if (!input_queue_push(&input_queue, &shift_down) ||
+        !input_queue_push(&input_queue, &one_down) ||
+        !input_queue_push(&input_queue, &shift_up) ||
+        input_read_standard(standard_input_probe, 1) != 1 ||
+        standard_input_probe[0] != '!' ||
+        input_read_standard(standard_input_probe, 1) != 0) {
+        serial_write("keyboard punctuation failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("keyboard punctuation ready\r\n");
     uint32_t framebuffer_storage[160];
     framebuffer_t framebuffer;
     if (!framebuffer_initialize(&framebuffer, framebuffer_storage, 8, 16, 10)) {

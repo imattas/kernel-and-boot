@@ -2145,3 +2145,6 @@ the graphical shell was exercised with host key events through
   does not yet deliver interactive events reliably.
 - The keyboard contract now covers PS/2 F, USB HID F, and PS/2 Backspace
   together, guarding the exact F-to-C and Backspace-to-Space regressions.
+- The Windows QEMU launcher now pins host keyboard translation to `en-us`,
+  keeping host layout state from changing the scan codes consumed by the
+  guest keyboard decoder.

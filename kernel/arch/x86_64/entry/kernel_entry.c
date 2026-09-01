@@ -2914,6 +2914,23 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("window manager buffers ready\r\n");
+    uint32_t cursor_storage[1] = {0xf0U};
+    display_surface_t cursor_surface;
+    input_event_t cursor_x = pointer_x;
+    input_event_t cursor_y = pointer_y;
+    cursor_x.value = 0;
+    cursor_y.value = 0;
+    if (!display_surface_initialize(&cursor_surface, cursor_storage, 1, 1, 1) ||
+        !window_manager_set_cursor(&window_manager, &cursor_surface) ||
+        !window_manager_set_cursor_visible(&window_manager, 1) ||
+        !window_manager_route_event(&window_manager, &cursor_x) ||
+        !window_manager_route_event(&window_manager, &cursor_y) ||
+        !window_manager_compose(&window_manager, 0U) ||
+        compositor_target_storage[10] != 0xf0U) {
+        serial_write("window manager cursor failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("window manager cursor ready\r\n");
     if (!console_initialize(&framebuffer) ||
         console_write("A", 1) != 1 ||
         console_write("\x1b[2J\x1b[H", 7) != 7) {

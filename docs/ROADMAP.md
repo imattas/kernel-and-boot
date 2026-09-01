@@ -2165,6 +2165,9 @@ the graphical shell was exercised with host key events through
 - Window-manager windows can now own bounded heap-backed pixel surfaces, with
   allocation, compositor submission, destruction, and slot reuse covered by
   the boot contract.
+- The window manager now supports an independent topmost cursor surface that
+  follows bounded pointer motion, remains outside hit-testing, and supports
+  visibility control through the compositor.
 - The Windows QEMU launcher now pins host keyboard translation to `en-us`,
   keeping host layout state from changing the scan codes consumed by the
   guest keyboard decoder.

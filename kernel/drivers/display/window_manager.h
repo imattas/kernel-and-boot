@@ -25,6 +25,7 @@ typedef struct {
     uint32_t next_z;
     int32_t pointer_x;
     int32_t pointer_y;
+    uint32_t cursor_layer;
 } window_manager_t;
 
 int window_manager_initialize(window_manager_t *manager,
@@ -41,6 +42,9 @@ int window_manager_move(window_manager_t *manager, uint32_t window,
 int window_manager_set_visible(window_manager_t *manager, uint32_t window,
                                int visible);
 int window_manager_focus(window_manager_t *manager, uint32_t window);
+int window_manager_set_cursor(window_manager_t *manager,
+                              display_surface_t *surface);
+int window_manager_set_cursor_visible(window_manager_t *manager, int visible);
 int window_manager_route_event(window_manager_t *manager,
                                const input_event_t *event);
 uint32_t window_manager_read_event(window_manager_t *manager, uint32_t window,

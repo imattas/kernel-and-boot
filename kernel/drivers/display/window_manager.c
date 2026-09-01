@@ -13,6 +13,7 @@ int window_manager_initialize(window_manager_t *manager,
     manager->next_z = 0;
     manager->pointer_x = 0;
     manager->pointer_y = 0;
+    manager->cursor_layer = COMPOSITOR_INVALID_LAYER;
     for (uint32_t index = 0; index < WINDOW_MANAGER_WINDOW_CAPACITY; ++index)
         manager->windows[index] = (window_t){0};
     return 1;
@@ -125,6 +126,25 @@ int window_manager_focus(window_manager_t *manager, uint32_t window) {
     return 1;
 }
 
+int window_manager_set_cursor(window_manager_t *manager,
+                              display_surface_t *surface) {
+    if (!manager || !surface || !surface->pixels) return 0;
+    if (manager->cursor_layer != COMPOSITOR_INVALID_LAYER &&
+        !compositor_remove_layer(manager->compositor, manager->cursor_layer))
+        return 0;
+    manager->cursor_layer = compositor_add_layer(manager->compositor, surface,
+                                                  manager->pointer_x,
+                                                  manager->pointer_y,
+                                                  UINT32_MAX);
+    return manager->cursor_layer != COMPOSITOR_INVALID_LAYER;
+}
+
+int window_manager_set_cursor_visible(window_manager_t *manager, int visible) {
+    return manager && manager->cursor_layer != COMPOSITOR_INVALID_LAYER &&
+           compositor_set_layer_visible(manager->compositor,
+                                         manager->cursor_layer, visible);
+}
+
 int window_manager_route_event(window_manager_t *manager,
                                const input_event_t *event) {
     if (!manager || !event) return 0;
@@ -148,6 +168,12 @@ int window_manager_route_event(window_manager_t *manager,
             if (event->code == 0) manager->pointer_x = (int32_t)coordinate;
             else manager->pointer_y = (int32_t)coordinate;
         }
+        if (manager->cursor_layer != COMPOSITOR_INVALID_LAYER &&
+            !compositor_set_layer_position(manager->compositor,
+                                           manager->cursor_layer,
+                                           manager->pointer_x,
+                                           manager->pointer_y))
+            return 0;
         target = window_manager_hit_test(manager, manager->pointer_x,
                                          manager->pointer_y);
         if (target == WINDOW_MANAGER_INVALID_WINDOW)

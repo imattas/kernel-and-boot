@@ -1963,10 +1963,10 @@ the existing parser coverage for pipelines, redirection, jobs, and expansion.
 
 Continue hardening SMP, memory reclamation, storage, USB, networking, graphics, security, debugging, crash diagnostics, performance tooling, power management, hardware compatibility, and userland while maintaining explicit subsystem boundaries and automated regression coverage.
 
-The init-owned shell supervisor remains deferred: the first spawn attempt
-stalled during process namespace setup. The stable kernel-managed shell handoff
-remains active until process-lock ownership is made SMP-safe and live QEMU
-verifies the normal spawn/wait path.
+The init-owned shell supervisor is now the active handoff: init is queued with
+the runtime services and owns the shell spawn/wait/reap loop. The former
+kernel-managed shell creation path has been removed after the namespace-retain
+and shared-scheduler startup fixes.
 
 The VFS self-test now preserves the root node's ownership reference after
 exercising removal and lookup operations. That root is later shared by the
@@ -2040,13 +2040,11 @@ packaged FAT32/PATH namespace.
 Shell history now supports bounded `history -c` clearing while preserving the
 existing listing and ANSI navigation behavior.
 
-A headless QEMU input probe reaches the live `os> ` prompt but monitor-injected
-USB keyboard events do not yet arrive at the shell input queue. The probe was
-discarded rather than promoted to a passing test; reliable interactive QEMU
-input remains an explicit follow-up item. A second probe using a bidirectional
-Unix serial chardev also reaches the prompt but does not deliver the injected
-bytes to the guest COM1 poller, so neither harness is currently evidence for
-interactive command execution.
+A headless QEMU input probe remains intentionally limited to boot diagnostics;
+the normal Windows launcher uses the graphical framebuffer console and PS/2
+keyboard path. PS/2 scan codes now carry an explicit source marker, preventing
+Enter (`0x1c`) from being translated as USB HID `A` (`0x1c`); Windows host key
+delivery was exercised through the graphical shell.
 
 The shell now has a dedicated integration contract covering mutation commands,
 multi-stage pipelines, truncating and append redirection, input redirection,

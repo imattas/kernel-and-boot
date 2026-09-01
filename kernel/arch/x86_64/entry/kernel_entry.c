@@ -2704,16 +2704,23 @@ void kernel_main(void *boot_info) {
     };
     input_event_t shift_up = shift_down;
     shift_up.value = 0;
+    input_event_t b_down = {
+        .type = INPUT_EVENT_KEY, .code = INPUT_KEY_PS2 | 0x30U,
+        .value = 1, .timestamp = 14
+    };
     if (!input_queue_push(&input_queue, &shift_down) ||
         !input_queue_push(&input_queue, &one_down) ||
         !input_queue_push(&input_queue, &shift_up) ||
+        !input_queue_push(&input_queue, &b_down) ||
         input_read_standard(standard_input_probe, 1) != 1 ||
         standard_input_probe[0] != '!' ||
-        input_read_standard(standard_input_probe, 1) != 0) {
+        input_read_standard(standard_input_probe, 1) != 1 ||
+        standard_input_probe[0] != 'b') {
         serial_write("keyboard punctuation failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("keyboard punctuation ready\r\n");
+    serial_write("keyboard queue boundaries ready\r\n");
     uint32_t framebuffer_storage[160];
     framebuffer_t framebuffer;
     if (!framebuffer_initialize(&framebuffer, framebuffer_storage, 8, 16, 10)) {

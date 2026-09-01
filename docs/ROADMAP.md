@@ -2123,3 +2123,7 @@ the graphical shell was exercised with host key events through
   (`ESC[2J`), home (`ESC[H`/`ESC[f`), and erase-to-end-of-line (`ESC[K`);
   ANSI foreground colors (`ESC[30m`-`ESC[37m`) are also supported; its kernel
   contract and full-device QEMU gate pass.
+- Keyboard input now tracks PS/2 and USB Ctrl, Shift, and Caps Lock state;
+  Ctrl-C produces byte `0x03` for the shell's existing cancel path, while
+  Shift/Caps produce correctly cased letters. The keyboard control contract
+  passes in the full-device QEMU gate.

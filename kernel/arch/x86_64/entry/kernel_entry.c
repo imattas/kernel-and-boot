@@ -2674,6 +2674,26 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("standard input ready\r\n");
+    input_event_t ctrl_down = {
+        .type = INPUT_EVENT_KEY, .code = INPUT_KEY_PS2 | 0x1dU,
+        .value = 1, .timestamp = 10
+    };
+    input_event_t c_down = {
+        .type = INPUT_EVENT_KEY, .code = INPUT_KEY_PS2 | 0x2eU,
+        .value = 1, .timestamp = 11
+    };
+    input_event_t ctrl_up = ctrl_down;
+    ctrl_up.value = 0;
+    if (!input_queue_push(&input_queue, &ctrl_down) ||
+        !input_queue_push(&input_queue, &c_down) ||
+        !input_queue_push(&input_queue, &ctrl_up) ||
+        input_read_standard(standard_input_probe, 1) != 1 ||
+        standard_input_probe[0] != 0x03 ||
+        input_read_standard(standard_input_probe, 1) != 0) {
+        serial_write("keyboard control failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("keyboard controls ready\r\n");
     uint32_t framebuffer_storage[160];
     framebuffer_t framebuffer;
     if (!framebuffer_initialize(&framebuffer, framebuffer_storage, 8, 16, 10)) {

@@ -2,6 +2,9 @@
 #include "ps2.h"
 
 static input_queue_t *standard_queue;
+static uint8_t keyboard_ctrl;
+static uint8_t keyboard_shift;
+static uint8_t keyboard_caps;
 
 static char key_to_ascii(uint16_t code) {
     if ((code & INPUT_KEY_PS2) != 0) {
@@ -14,7 +17,14 @@ static char key_to_ascii(uint16_t code) {
                 'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', ';', '\'', '`',
                 0, '\\', 'z', 'x', 'c', 'v', 'b', 'n', 'm'
             };
-            return ps2[code - 0x1e];
+            char value = ps2[code - 0x1e];
+            if (value >= 'a' && value <= 'z' && (keyboard_shift ^ keyboard_caps))
+                value = (char)(value - 'a' + 'A');
+            if (keyboard_ctrl && value >= 'a' && value <= 'z')
+                return (char)(value - 'a' + 1);
+            if (keyboard_ctrl && value >= 'A' && value <= 'Z')
+                return (char)(value - 'A' + 1);
+            return value;
         }
         return 0;
     }
@@ -23,13 +33,39 @@ static char key_to_ascii(uint16_t code) {
             'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', ';', '\'', '`',
             0, '\\', 'z', 'x', 'c', 'v', 'b', 'n', 'm'
         };
-        return ps2[code - 0x1e];
+        char value = ps2[code - 0x1e];
+        if (value >= 'a' && value <= 'z' && (keyboard_shift ^ keyboard_caps))
+            value = (char)(value - 'a' + 'A');
+        if (keyboard_ctrl && value >= 'a' && value <= 'z')
+            return (char)(value - 'a' + 1);
+        if (keyboard_ctrl && value >= 'A' && value <= 'Z')
+            return (char)(value - 'A' + 1);
+        return value;
     }
-    if (code >= 4 && code <= 29) return (char)('a' + code - 4);
+    if (code >= 4 && code <= 29) {
+        char value = (char)('a' + code - 4);
+        if (keyboard_shift ^ keyboard_caps) value = (char)(value - 'a' + 'A');
+        if (keyboard_ctrl) return (char)((value & 0x1f));
+        return value;
+    }
     if (code == 0x1c || code == 40) return '\n';
     if (code == 0x39 || code == 44) return ' ';
     if (code == 0x0e || code == 42) return '\b';
     return 0;
+}
+
+static void keyboard_update_modifiers(uint16_t code, int pressed) {
+    uint8_t ps2 = (code & INPUT_KEY_PS2) != 0;
+    if (ps2) code &= (uint16_t)~INPUT_KEY_PS2;
+    if (ps2) {
+        if (code == 0x1d) keyboard_ctrl = (uint8_t)pressed;
+        else if (code == 0x2a || code == 0x36) keyboard_shift = (uint8_t)pressed;
+        else if (code == 0x3a && pressed) keyboard_caps ^= 1U;
+    } else {
+        if (code == 0xe0 || code == 0xe4) keyboard_ctrl = (uint8_t)pressed;
+        else if (code == 0xe1 || code == 0xe5) keyboard_shift = (uint8_t)pressed;
+        else if (code == 0x39 && pressed) keyboard_caps ^= 1U;
+    }
 }
 
 void input_queue_initialize(input_queue_t *queue) {
@@ -111,6 +147,8 @@ uint32_t input_read_standard(void *buffer, uint32_t capacity) {
     uint32_t count = 0;
     input_event_t event;
     while (count < capacity && input_queue_pop(standard_queue, &event)) {
+        if (event.type == INPUT_EVENT_KEY)
+            keyboard_update_modifiers(event.code, event.value != 0);
         if (event.value == 0) continue;
         char value = event.type == INPUT_EVENT_TEXT ? (char)event.code :
                      event.type == INPUT_EVENT_KEY ? key_to_ascii(event.code) : 0;

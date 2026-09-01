@@ -64,6 +64,7 @@ grep -F 'block cache lifecycle ready' "$log" >/dev/null
 grep -F 'slab cache ready' "$log" >/dev/null
 grep -F 'input event queue ready' "$log" >/dev/null
 grep -F 'standard input ready' "$log" >/dev/null
+grep -F 'keyboard controls ready' "$log" >/dev/null
 grep -F 'console control ready' "$log" >/dev/null
 grep -F 'PS2 keyboard ready' "$log" >/dev/null
 grep -F 'framebuffer surface ready' "$log" >/dev/null

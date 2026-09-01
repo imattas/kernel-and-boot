@@ -21,9 +21,6 @@ static uint64_t lfb_size;
 static uint32_t mode_width;
 static uint32_t mode_height;
 static int initialized;
-static const device_driver_t bochs_resource_owner = {
-    "bochs-vga", DEVICE_BUS_PCI, 0, 0
-};
 
 static void out16(uint16_t port, uint16_t value) {
     __asm__ volatile ("outw %0, %1" :: "a"(value), "Nd"(port));
@@ -60,7 +57,6 @@ int bochs_vga_initialize(uint32_t width, uint32_t height) {
         if (!device || device->vendor_id != BOCHS_VENDOR ||
             device->device_id != BOCHS_DEVICE)
             continue;
-        device_t *mutable_device = (device_t *)(uintptr_t)device;
         uint32_t bar = 6;
         for (uint32_t candidate = 0; candidate < 6; ++candidate) {
             if ((device->resources[candidate].flags & 1U) == 0 &&
@@ -70,15 +66,13 @@ int bochs_vga_initialize(uint32_t width, uint32_t height) {
                 break;
             }
         }
-        if (bar == 6 || !device_claim_resource(mutable_device, bar,
-                                                &bochs_resource_owner))
+        if (bar == 6)
             continue;
         uint32_t command = pci_config_read32(device->bus_number,
                                              device->slot, device->function, 4);
         pci_config_write32(device->bus_number, device->slot, device->function,
                            4, command | 3U);
         if (vbe_read(VBE_ID) < 0xb0c0U || vbe_read(VBE_ID) > 0xb0c5U) {
-            device_release_resource(mutable_device, bar, &bochs_resource_owner);
             continue;
         }
         vbe_write(VBE_ENABLE, 0);
@@ -90,7 +84,6 @@ int bochs_vga_initialize(uint32_t width, uint32_t height) {
         vbe_write(VBE_ENABLE, VBE_ENABLED | VBE_LFB_ENABLED);
         if (vbe_read(VBE_XRES) != width || vbe_read(VBE_YRES) != height ||
             vbe_read(VBE_BPP) != 32) {
-            device_release_resource(mutable_device, bar, &bochs_resource_owner);
             continue;
         }
         lfb_address = device->resources[bar].address;

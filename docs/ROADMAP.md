@@ -2147,12 +2147,15 @@ the graphical shell was exercised with host key events through
   together, guarding the exact F-to-C and Backspace-to-Space regressions.
 - The first accelerated display milestone is now implemented: the kernel
   detects QEMU's Bochs VBE PCI device, programs a 32-bit linear mode through
-  its I/O ports, claims the linear aperture, and routes the display surface
+  its I/O ports, validates the linear aperture, and routes the display surface
   through it when available; UEFI GOP remains the validated fallback.
 - A backend-independent display-surface contract now provides validated clear,
   clipped rectangle fill, and clipped opaque blit operations for the future
   compositor, with a boot-time regression contract running against the GPU
   display path.
+- The compositor core now provides fixed-capacity visible layers, stable
+  z-order composition, position updates, and full-target redraw through the
+  GPU display-surface contract; window-manager policy is intentionally next.
 - The Windows QEMU launcher now pins host keyboard translation to `en-us`,
   keeping host layout state from changing the scan codes consumed by the
   guest keyboard decoder.

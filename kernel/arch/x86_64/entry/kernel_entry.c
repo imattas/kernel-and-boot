@@ -34,6 +34,7 @@
 #include "../../../drivers/display/framebuffer.h"
 #include "../../../drivers/display/bochs_vga.h"
 #include "../../../drivers/display/surface.h"
+#include "../../../drivers/display/compositor.h"
 #include "../../../drivers/usb/usb.h"
 #include "../../../drivers/usb/hid.h"
 #include "../../../drivers/usb/uhci.h"
@@ -2805,6 +2806,35 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("GPU display surface ready\r\n");
+    uint32_t compositor_target_storage[16] = {0};
+    uint32_t compositor_back_storage[4] = {0x10U, 0x20U, 0x30U, 0x40U};
+    display_surface_t compositor_target;
+    display_surface_t compositor_back;
+    compositor_t compositor;
+    if (!display_surface_initialize(&compositor_target,
+                                    compositor_target_storage, 4, 4, 4) ||
+        !display_surface_initialize(&compositor_back, compositor_back_storage,
+                                     2, 2, 2) ||
+        !compositor_initialize(&compositor, &compositor_target) ||
+        compositor_add_layer(&compositor, &compositor_back, 1, 1, 2) ==
+            COMPOSITOR_INVALID_LAYER) {
+        serial_write("compositor initialization failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    uint32_t compositor_front_storage[4] = {0xa0U, 0xb0U, 0xc0U, 0xd0U};
+    display_surface_t compositor_front;
+    if (!display_surface_initialize(&compositor_front, compositor_front_storage,
+                                    2, 2, 2) ||
+        compositor_add_layer(&compositor, &compositor_front, 1, 1, 1) ==
+            COMPOSITOR_INVALID_LAYER ||
+        !compositor_compose(&compositor, 0U) ||
+        compositor_target_storage[5] != 0x10U ||
+        compositor_target_storage[10] != 0x40U ||
+        compositor_target_storage[0] != 0U) {
+        serial_write("compositor composition failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("display compositor ready\r\n");
     if (!console_initialize(&framebuffer) ||
         console_write("A", 1) != 1 ||
         console_write("\x1b[2J\x1b[H", 7) != 7) {

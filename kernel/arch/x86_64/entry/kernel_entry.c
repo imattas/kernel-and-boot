@@ -32,6 +32,7 @@
 #include "../../../drivers/input/ps2.h"
 #include "../../../drivers/display/console.h"
 #include "../../../drivers/display/framebuffer.h"
+#include "../../../drivers/display/bochs_vga.h"
 #include "../../../drivers/usb/usb.h"
 #include "../../../drivers/usb/hid.h"
 #include "../../../drivers/usb/uhci.h"
@@ -530,6 +531,10 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("device model ready\r\n");
+    int gpu_display_ready = bochs_vga_initialize(info->framebuffer_width,
+                                                  info->framebuffer_height);
+    serial_write(gpu_display_ready ? "GPU VBE display backend ready\r\n" :
+                                      "GPU VBE unavailable; GOP fallback\r\n");
     device_t invalid_resource_device = {0};
     invalid_resource_device.bus = DEVICE_BUS_PCI;
     invalid_resource_device.resources[0].address = 0x1000;
@@ -2793,14 +2798,24 @@ void kernel_main(void *boot_info) {
     }
     serial_write("console control ready\r\n");
     static framebuffer_t firmware_framebuffer;
-    uint64_t firmware_pixels = (uint64_t)info->framebuffer_pitch * info->framebuffer_height;
-    if (!info->framebuffer_base || info->framebuffer_base >= (1ULL << 32) ||
+    uint64_t display_base = gpu_display_ready ? bochs_vga_framebuffer() :
+                                                 info->framebuffer_base;
+    uint64_t display_size = gpu_display_ready ? bochs_vga_framebuffer_size() :
+                                                 info->framebuffer_size;
+    uint32_t display_width = gpu_display_ready ? bochs_vga_width() :
+                                                 info->framebuffer_width;
+    uint32_t display_height = gpu_display_ready ? bochs_vga_height() :
+                                                  info->framebuffer_height;
+    uint32_t display_pitch = gpu_display_ready ? display_width :
+                                                  info->framebuffer_pitch;
+    uint64_t firmware_pixels = (uint64_t)display_pitch * display_height;
+    if (!display_base || display_base >= (1ULL << 32) ||
         firmware_pixels > UINT64_MAX / sizeof(uint32_t) ||
-        firmware_pixels * sizeof(uint32_t) > (1ULL << 32) - info->framebuffer_base ||
-        info->framebuffer_size < firmware_pixels * sizeof(uint32_t) ||
+        firmware_pixels * sizeof(uint32_t) > (1ULL << 32) - display_base ||
+        display_size < firmware_pixels * sizeof(uint32_t) ||
         !framebuffer_initialize(&firmware_framebuffer,
-            (void *)(uintptr_t)info->framebuffer_base, info->framebuffer_width,
-            info->framebuffer_height, info->framebuffer_pitch) ||
+            (void *)(uintptr_t)display_base, display_width, display_height,
+            display_pitch) ||
         !framebuffer_put_pixel(&firmware_framebuffer, 0, 0, 0)) {
         serial_write("firmware framebuffer failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");

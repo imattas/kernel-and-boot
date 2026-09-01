@@ -2145,6 +2145,10 @@ the graphical shell was exercised with host key events through
   does not yet deliver interactive events reliably.
 - The keyboard contract now covers PS/2 F, USB HID F, and PS/2 Backspace
   together, guarding the exact F-to-C and Backspace-to-Space regressions.
+- The first accelerated display milestone is now implemented: the kernel
+  detects QEMU's Bochs VBE PCI device, programs a 32-bit linear mode through
+  its I/O ports, claims the linear aperture, and routes the display surface
+  through it when available; UEFI GOP remains the validated fallback.
 - The Windows QEMU launcher now pins host keyboard translation to `en-us`,
   keeping host layout state from changing the scan codes consumed by the
   guest keyboard decoder.

@@ -19,6 +19,7 @@ grep -F 'per-CPU BSP ready' "$log" >/dev/null
 grep -F 'SMP online=' "$log" >/dev/null
 grep -E 'pci devices=0x[0-9a-fA-F]*[1-9a-fA-F] resources=0x[0-9a-fA-F]*[1-9a-fA-F]' "$log" >/dev/null
 grep -F 'device model ready' "$log" >/dev/null
+grep -E 'GPU VBE display backend ready|GPU VBE unavailable; GOP fallback' "$log" >/dev/null
 grep -E 'UHCI driver ready controllers=0x[0-9a-fA-F]*[1-9a-fA-F]' "$log" >/dev/null
 grep -E 'UHCI root hub ready ports=0x[0-9a-fA-F]*[1-9a-fA-F]' "$log" >/dev/null
 grep -F 'UHCI control transfer ready' "$log" >/dev/null

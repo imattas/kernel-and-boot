@@ -2674,6 +2674,16 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("standard input ready\r\n");
+    input_event_t hid_five_event = {
+        .type = INPUT_EVENT_KEY, .code = 0x22, .value = 1, .timestamp = 10
+    };
+    if (!input_queue_push(&input_queue, &hid_five_event) ||
+        input_read_standard(standard_input_probe, 1) != 1 ||
+        standard_input_probe[0] != '5') {
+        serial_write("HID key mapping failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("HID key mapping ready\r\n");
     input_event_t ctrl_down = {
         .type = INPUT_EVENT_KEY, .code = INPUT_KEY_PS2 | 0x1dU,
         .value = 1, .timestamp = 10

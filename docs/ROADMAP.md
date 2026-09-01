@@ -2130,6 +2130,10 @@ the graphical shell was exercised with host key events through
 - Keyboard symbol translation now covers digits and punctuation for both PS/2
   scan codes and USB HID usages, including shifted punctuation. The punctuation
   contract and full-device QEMU gate pass.
+- Removed the remaining unmarked PS/2 fallback from standard input; unmarked
+  events are now decoded strictly as USB HID usages, eliminating aliases such
+  as `5`/letters and the Enter/Backspace misinterpretations. The HID mapping
+  regression and full-device QEMU gate pass.
 - Keyboard reads preserve unread printable events when the caller's output
   buffer fills, while modifier release events are consumed on the next read;
   the queue-boundary regression contract passes in QEMU.

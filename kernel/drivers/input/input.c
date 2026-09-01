@@ -64,20 +64,6 @@ static char key_to_ascii(uint16_t code) {
         }
         return 0;
     }
-    if (code >= 0x1e && code <= 0x32) {
-        static const char ps2[21] = {
-            'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', ';', '\'', '`',
-            0, '\\', 'z', 'x', 'c', 'v', 'b', 'n', 'm'
-        };
-        char value = ps2[code - 0x1e];
-        if (value >= 'a' && value <= 'z' && (keyboard_shift ^ keyboard_caps))
-            value = (char)(value - 'a' + 'A');
-        if (keyboard_ctrl && value >= 'a' && value <= 'z')
-            return (char)(value - 'a' + 1);
-        if (keyboard_ctrl && value >= 'A' && value <= 'Z')
-            return (char)(value - 'A' + 1);
-        return value;
-    }
     char symbol = keyboard_symbol(code, 0);
     if (symbol) return symbol;
     if (code >= 4 && code <= 29) {

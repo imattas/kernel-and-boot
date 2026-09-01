@@ -33,6 +33,7 @@
 #include "../../../drivers/display/console.h"
 #include "../../../drivers/display/framebuffer.h"
 #include "../../../drivers/display/bochs_vga.h"
+#include "../../../drivers/display/surface.h"
 #include "../../../drivers/usb/usb.h"
 #include "../../../drivers/usb/hid.h"
 #include "../../../drivers/usb/uhci.h"
@@ -2781,6 +2782,29 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("framebuffer surface ready\r\n");
+    uint32_t surface_storage[16] = {0};
+    uint32_t surface_source_storage[4] = {0xa1U, 0xb2U, 0xc3U, 0xd4U};
+    display_surface_t display_surface;
+    display_surface_t surface_source;
+    if (!display_surface_initialize(&display_surface, surface_storage, 4, 4,
+                                    4) ||
+        !display_surface_initialize(&surface_source, surface_source_storage,
+                                     2, 2, 2)) {
+        serial_write("display surface initialization failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    display_surface_clear(&display_surface, 0x11223344U);
+    if (!display_surface_fill_rect(&display_surface, -1, -1, 3, 3,
+                                   0x55667788U) ||
+        !display_surface_blit(&display_surface, &surface_source, 3, 3) ||
+        surface_storage[0] != 0x55667788U ||
+        surface_storage[5] != 0x55667788U ||
+        surface_storage[15] != 0xa1U ||
+        surface_storage[3] != 0x11223344U) {
+        serial_write("display surface operation failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("GPU display surface ready\r\n");
     if (!console_initialize(&framebuffer) ||
         console_write("A", 1) != 1 ||
         console_write("\x1b[2J\x1b[H", 7) != 7) {

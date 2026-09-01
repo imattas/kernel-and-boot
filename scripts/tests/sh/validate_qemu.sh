@@ -73,6 +73,7 @@ grep -F 'keyboard queue boundaries ready' "$log" >/dev/null
 grep -F 'console control ready' "$log" >/dev/null
 grep -F 'PS2 keyboard ready' "$log" >/dev/null
 grep -F 'framebuffer surface ready' "$log" >/dev/null
+grep -F 'GPU display surface ready' "$log" >/dev/null
 grep -F 'firmware framebuffer ready' "$log" >/dev/null
 grep -F 'framebuffer console ready' "$log" >/dev/null
 grep -F 'USB descriptor layer ready' "$log" >/dev/null

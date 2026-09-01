@@ -2149,6 +2149,10 @@ the graphical shell was exercised with host key events through
   detects QEMU's Bochs VBE PCI device, programs a 32-bit linear mode through
   its I/O ports, claims the linear aperture, and routes the display surface
   through it when available; UEFI GOP remains the validated fallback.
+- A backend-independent display-surface contract now provides validated clear,
+  clipped rectangle fill, and clipped opaque blit operations for the future
+  compositor, with a boot-time regression contract running against the GPU
+  display path.
 - The Windows QEMU launcher now pins host keyboard translation to `en-us`,
   keeping host layout state from changing the scan codes consumed by the
   guest keyboard decoder.

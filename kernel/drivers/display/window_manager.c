@@ -1,4 +1,5 @@
 #include "window_manager.h"
+#include "../../mm/heap/heap.h"
 
 static int valid_window(const window_manager_t *manager, uint32_t window) {
     return manager && window < WINDOW_MANAGER_WINDOW_CAPACITY &&
@@ -27,17 +28,49 @@ uint32_t window_manager_create(window_manager_t *manager,
                                                    x, y, manager->next_z++);
             if (layer == COMPOSITOR_INVALID_LAYER)
                 return WINDOW_MANAGER_INVALID_WINDOW;
+            input_queue_t *input = (input_queue_t *)kmalloc(sizeof(*input));
+            if (!input) {
+                compositor_remove_layer(manager->compositor, layer);
+                return WINDOW_MANAGER_INVALID_WINDOW;
+            }
+            input_queue_initialize(input);
             manager->windows[index] = (window_t){
                 .surface = surface,
                 .compositor_layer = layer,
                 .x = x,
                 .y = y,
-                .visible = 1
+                .visible = 1,
+                .input = input
             };
-            input_queue_initialize(&manager->windows[index].input);
             return index;
         }
     return WINDOW_MANAGER_INVALID_WINDOW;
+}
+
+uint32_t window_manager_create_buffered(window_manager_t *manager,
+                                        uint32_t width, uint32_t height,
+                                        int32_t x, int32_t y) {
+    if (!manager || width == 0 || height == 0 || width > 4096U ||
+        height > 4096U || (uint64_t)width * height > UINT64_MAX / 4U)
+        return WINDOW_MANAGER_INVALID_WINDOW;
+    uint64_t bytes = (uint64_t)width * height * 4U;
+    void *pixels = kmalloc(bytes);
+    if (!pixels) return WINDOW_MANAGER_INVALID_WINDOW;
+    display_surface_t *surface = (display_surface_t *)kmalloc(sizeof(*surface));
+    if (!surface || !display_surface_initialize(surface, pixels, width, height,
+                                                width)) {
+        kfree(surface);
+        kfree(pixels);
+        return WINDOW_MANAGER_INVALID_WINDOW;
+    }
+    uint32_t window = window_manager_create(manager, surface, x, y);
+    if (window == WINDOW_MANAGER_INVALID_WINDOW) {
+        kfree(surface);
+        kfree(pixels);
+        return window;
+    }
+    manager->windows[window].owned_pixels = pixels;
+    return window;
 }
 
 int window_manager_destroy(window_manager_t *manager, uint32_t window) {
@@ -45,7 +78,13 @@ int window_manager_destroy(window_manager_t *manager, uint32_t window) {
         !compositor_remove_layer(manager->compositor,
                                  manager->windows[window].compositor_layer))
         return 0;
+    display_surface_t *surface = manager->windows[window].surface;
+    void *owned_pixels = manager->windows[window].owned_pixels;
+    input_queue_t *input = manager->windows[window].input;
     manager->windows[window] = (window_t){0};
+    if (owned_pixels) kfree(owned_pixels);
+    if (surface && owned_pixels) kfree(surface);
+    if (input) kfree(input);
     return 1;
 }
 
@@ -128,13 +167,13 @@ int window_manager_route_event(window_manager_t *manager,
             return 0;
     }
     return target != WINDOW_MANAGER_INVALID_WINDOW &&
-           input_queue_push(&manager->windows[target].input, event);
+           input_queue_push(manager->windows[target].input, event);
 }
 
 uint32_t window_manager_read_event(window_manager_t *manager, uint32_t window,
                                    input_event_t *event) {
     if (!valid_window(manager, window) || !event) return 0;
-    return input_queue_pop(&manager->windows[window].input, event);
+    return input_queue_pop(manager->windows[window].input, event);
 }
 
 uint32_t window_manager_hit_test(const window_manager_t *manager, int32_t x,

@@ -2162,6 +2162,9 @@ the graphical shell was exercised with host key events through
 - Window-manager input routing now delivers keys to the focused window and
   pointer motion/buttons to the hit-tested window, with bounded pointer state
   and focus-on-press behavior covered by the boot contract.
+- Window-manager windows can now own bounded heap-backed pixel surfaces, with
+  allocation, compositor submission, destruction, and slot reuse covered by
+  the boot contract.
 - The Windows QEMU launcher now pins host keyboard translation to `en-us`,
   keeping host layout state from changing the scan codes consumed by the
   guest keyboard decoder.

@@ -15,7 +15,8 @@ typedef struct {
     int32_t y;
     uint8_t visible;
     uint8_t focused;
-    input_queue_t input;
+    void *owned_pixels;
+    input_queue_t *input;
 } window_t;
 
 typedef struct {
@@ -31,6 +32,9 @@ int window_manager_initialize(window_manager_t *manager,
 uint32_t window_manager_create(window_manager_t *manager,
                                display_surface_t *surface, int32_t x,
                                int32_t y);
+uint32_t window_manager_create_buffered(window_manager_t *manager,
+                                        uint32_t width, uint32_t height,
+                                        int32_t x, int32_t y);
 int window_manager_destroy(window_manager_t *manager, uint32_t window);
 int window_manager_move(window_manager_t *manager, uint32_t window,
                         int32_t x, int32_t y);

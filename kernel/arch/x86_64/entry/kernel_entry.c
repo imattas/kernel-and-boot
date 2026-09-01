@@ -2893,6 +2893,27 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("window manager input routing ready\r\n");
+    uint32_t buffered_window = window_manager_create_buffered(&window_manager,
+                                                               2, 2, 0, 0);
+    if (buffered_window == WINDOW_MANAGER_INVALID_WINDOW ||
+        !window_manager.windows[buffered_window].surface ||
+        !window_manager.windows[buffered_window].owned_pixels) {
+        serial_write("window manager buffer allocation failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    window_manager.windows[buffered_window].surface->pixels[0] = 0xeeU;
+    uint32_t reused_window;
+    if (!window_manager_compose(&window_manager, 0U) ||
+        compositor_target_storage[0] != 0xeeU ||
+        !window_manager_destroy(&window_manager, buffered_window) ||
+        (reused_window = window_manager_create_buffered(&window_manager, 2,
+                                                        2, 0, 0)) ==
+            WINDOW_MANAGER_INVALID_WINDOW ||
+        !window_manager_destroy(&window_manager, reused_window)) {
+        serial_write("window manager buffer lifecycle failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("window manager buffers ready\r\n");
     if (!console_initialize(&framebuffer) ||
         console_write("A", 1) != 1 ||
         console_write("\x1b[2J\x1b[H", 7) != 7) {

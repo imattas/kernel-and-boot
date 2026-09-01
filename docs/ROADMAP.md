@@ -2143,3 +2143,5 @@ the graphical shell was exercised with host key events through
   and callers from other working directories use the intended image; it uses
   QEMU's built-in PS/2 keyboard directly because the Windows USB-HID runtime
   does not yet deliver interactive events reliably.
+- The keyboard contract now covers PS/2 F, USB HID F, and PS/2 Backspace
+  together, guarding the exact F-to-C and Backspace-to-Space regressions.

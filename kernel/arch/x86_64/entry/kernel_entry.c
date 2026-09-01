@@ -2674,6 +2674,30 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("standard input ready\r\n");
+    input_event_t ps2_f_event = {
+        .type = INPUT_EVENT_KEY, .code = INPUT_KEY_PS2 | 0x21U,
+        .value = 1, .timestamp = 10
+    };
+    input_event_t ps2_backspace_event = {
+        .type = INPUT_EVENT_KEY, .code = INPUT_KEY_PS2 | 0x0eU,
+        .value = 1, .timestamp = 11
+    };
+    input_event_t hid_f_event = {
+        .type = INPUT_EVENT_KEY, .code = 9, .value = 1, .timestamp = 12
+    };
+    if (!input_queue_push(&input_queue, &ps2_f_event) ||
+        !input_queue_push(&input_queue, &ps2_backspace_event) ||
+        !input_queue_push(&input_queue, &hid_f_event) ||
+        input_read_standard(standard_input_probe, 1) != 1 ||
+        standard_input_probe[0] != 'f' ||
+        input_read_standard(standard_input_probe, 1) != 1 ||
+        standard_input_probe[0] != '\b' ||
+        input_read_standard(standard_input_probe, 1) != 1 ||
+        standard_input_probe[0] != 'f') {
+        serial_write("keyboard alpha/editing failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("keyboard alpha/editing ready\r\n");
     input_event_t hid_five_event = {
         .type = INPUT_EVENT_KEY, .code = 0x22, .value = 1, .timestamp = 10
     };

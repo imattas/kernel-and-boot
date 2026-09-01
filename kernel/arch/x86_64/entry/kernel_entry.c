@@ -2914,6 +2914,17 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("window manager buffers ready\r\n");
+    uint32_t resized_window = window_manager_create_buffered(&window_manager,
+                                                              2, 2, 0, 0);
+    if (resized_window == WINDOW_MANAGER_INVALID_WINDOW ||
+        !window_manager_resize_buffered(&window_manager, resized_window, 3, 1) ||
+        window_manager.windows[resized_window].surface->width != 3 ||
+        window_manager.windows[resized_window].surface->height != 1 ||
+        !window_manager_destroy(&window_manager, resized_window)) {
+        serial_write("window manager resize failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("window manager resize ready\r\n");
     uint32_t cursor_storage[1] = {0xf0U};
     display_surface_t cursor_surface;
     input_event_t cursor_x = pointer_x;

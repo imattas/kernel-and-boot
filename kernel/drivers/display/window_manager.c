@@ -74,6 +74,38 @@ uint32_t window_manager_create_buffered(window_manager_t *manager,
     return window;
 }
 
+int window_manager_resize_buffered(window_manager_t *manager, uint32_t window,
+                                   uint32_t width, uint32_t height) {
+    if (!valid_window(manager, window) || !manager->windows[window].owned_pixels ||
+        width == 0 || height == 0 || width > 4096U || height > 4096U ||
+        (uint64_t)width * height > UINT64_MAX / 4U)
+        return 0;
+    uint64_t bytes = (uint64_t)width * height * 4U;
+    void *pixels = kmalloc(bytes);
+    display_surface_t *surface = (display_surface_t *)kmalloc(sizeof(*surface));
+    if (!pixels || !surface || !display_surface_initialize(surface, pixels,
+                                                            width, height,
+                                                            width)) {
+        kfree(surface);
+        kfree(pixels);
+        return 0;
+    }
+    window_t *entry = &manager->windows[window];
+    if (!compositor_set_layer_surface(manager->compositor,
+                                      entry->compositor_layer, surface)) {
+        kfree(surface);
+        kfree(pixels);
+        return 0;
+    }
+    void *old_pixels = entry->owned_pixels;
+    display_surface_t *old_surface = entry->surface;
+    entry->surface = surface;
+    entry->owned_pixels = pixels;
+    kfree(old_pixels);
+    kfree(old_surface);
+    return 1;
+}
+
 int window_manager_destroy(window_manager_t *manager, uint32_t window) {
     if (!valid_window(manager, window) ||
         !compositor_remove_layer(manager->compositor,

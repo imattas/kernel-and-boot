@@ -52,6 +52,15 @@ int compositor_set_layer_position(compositor_t *compositor, uint32_t layer,
     return 1;
 }
 
+int compositor_set_layer_surface(compositor_t *compositor, uint32_t layer,
+                                 display_surface_t *surface) {
+    if (!valid_layer(compositor, layer) || !surface || !surface->pixels ||
+        surface->width == 0 || surface->height == 0)
+        return 0;
+    compositor->layers[layer].surface = surface;
+    return 1;
+}
+
 int compositor_set_layer_z(compositor_t *compositor, uint32_t layer,
                            uint32_t z) {
     if (!valid_layer(compositor, layer)) return 0;

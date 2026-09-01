@@ -2168,6 +2168,9 @@ the graphical shell was exercised with host key events through
 - The window manager now supports an independent topmost cursor surface that
   follows bounded pointer motion, remains outside hit-testing, and supports
   visibility control through the compositor.
+- Kernel-owned windows now support transactional resize: replacement buffers
+  are validated and attached before the old surface is released, with failure
+  preservation and lifecycle reuse covered by the boot contract.
 - The Windows QEMU launcher now pins host keyboard translation to `en-us`,
   keeping host layout state from changing the scan codes consumed by the
   guest keyboard decoder.

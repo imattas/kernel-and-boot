@@ -36,6 +36,8 @@ uint32_t window_manager_create(window_manager_t *manager,
 uint32_t window_manager_create_buffered(window_manager_t *manager,
                                         uint32_t width, uint32_t height,
                                         int32_t x, int32_t y);
+int window_manager_resize_buffered(window_manager_t *manager, uint32_t window,
+                                   uint32_t width, uint32_t height);
 int window_manager_destroy(window_manager_t *manager, uint32_t window);
 int window_manager_move(window_manager_t *manager, uint32_t window,
                         int32_t x, int32_t y);

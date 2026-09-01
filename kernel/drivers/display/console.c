@@ -8,6 +8,7 @@ static uint32_t cursor_x;
 static uint32_t cursor_y;
 static uint8_t escape_state;
 static uint32_t escape_parameter;
+static uint32_t foreground_color;
 
 static void console_clear_pixels(void) {
     uint32_t total = console_framebuffer->height * console_framebuffer->pitch_pixels;
@@ -54,6 +55,14 @@ static int console_control(char value) {
             for (uint32_t x = cursor_x * CONSOLE_GLYPH_WIDTH; x < width; ++x)
                 console_framebuffer->pixels[(uint64_t)(y + row) *
                     console_framebuffer->pitch_pixels + x] = 0;
+    } else if (value == 'm') {
+        static const uint32_t colors[8] = {
+            0xff000000U, 0xffff0000U, 0xff00ff00U, 0xffffff00U,
+            0xff0000ffU, 0xffff00ffU, 0xff00ffffU, 0xffffffffU
+        };
+        if (escape_parameter == 0) foreground_color = 0xffffffffU;
+        else if (escape_parameter >= 30U && escape_parameter <= 37U)
+            foreground_color = colors[escape_parameter - 30U];
     }
     escape_state = 0;
     escape_parameter = 0;
@@ -124,7 +133,7 @@ static void console_character(char value) {
         for (uint32_t row = 0; row < 7; ++row)
             for (uint32_t column = 0; column < 5; ++column)
                 if (glyph_row(value, row) & (1U << (4U - column)))
-                    console_framebuffer->pixels[(uint64_t)(y + row) * console_framebuffer->pitch_pixels + x + column] = 0xffffffff;
+                    console_framebuffer->pixels[(uint64_t)(y + row) * console_framebuffer->pitch_pixels + x + column] = foreground_color;
         ++cursor_x;
     }
     if (cursor_x >= console_framebuffer->width / CONSOLE_GLYPH_WIDTH) {
@@ -140,6 +149,7 @@ int console_initialize(framebuffer_t *framebuffer) {
     cursor_x = cursor_y = 0;
     escape_state = 0;
     escape_parameter = 0;
+    foreground_color = 0xffffffffU;
     framebuffer_clear(framebuffer, 0);
     return 1;
 }

@@ -2121,4 +2121,5 @@ the graphical shell was exercised with host key events through
   The full-device QEMU gate passes with the new handoff.
 - The framebuffer console now has a terminal-control layer for clear-screen
   (`ESC[2J`), home (`ESC[H`/`ESC[f`), and erase-to-end-of-line (`ESC[K`);
-  its kernel contract and full-device QEMU gate pass.
+  ANSI foreground colors (`ESC[30m`-`ESC[37m`) are also supported; its kernel
+  contract and full-device QEMU gate pass.

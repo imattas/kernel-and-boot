@@ -2706,6 +2706,10 @@ void kernel_main(void *boot_info) {
             serial_write("console clear failure\r\n");
             for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
         }
+    if (console_write("\x1b[31mA", 6) != 6 || framebuffer_storage[1] != 0xffff0000U) {
+        serial_write("console color failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
     serial_write("console control ready\r\n");
     static framebuffer_t firmware_framebuffer;
     uint64_t firmware_pixels = (uint64_t)info->framebuffer_pitch * info->framebuffer_height;

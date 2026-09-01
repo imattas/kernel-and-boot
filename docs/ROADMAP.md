@@ -2119,3 +2119,6 @@ the graphical shell was exercised with host key events through
 - Init now owns shell supervision: the kernel queues init and runtime services,
   then starts one scheduler run; init spawns, waits for, and reaps `/shell.elf`.
   The full-device QEMU gate passes with the new handoff.
+- The framebuffer console now has a terminal-control layer for clear-screen
+  (`ESC[2J`), home (`ESC[H`/`ESC[f`), and erase-to-end-of-line (`ESC[K`);
+  its kernel contract and full-device QEMU gate pass.

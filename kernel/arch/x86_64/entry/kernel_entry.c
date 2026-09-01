@@ -2674,9 +2674,9 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("standard input ready\r\n");
-    uint32_t framebuffer_storage[50];
+    uint32_t framebuffer_storage[160];
     framebuffer_t framebuffer;
-    if (!framebuffer_initialize(&framebuffer, framebuffer_storage, 8, 5, 10)) {
+    if (!framebuffer_initialize(&framebuffer, framebuffer_storage, 8, 16, 10)) {
         serial_write("framebuffer setup failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
@@ -2695,6 +2695,18 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("framebuffer surface ready\r\n");
+    if (!console_initialize(&framebuffer) ||
+        console_write("A", 1) != 1 ||
+        console_write("\x1b[2J\x1b[H", 7) != 7) {
+        serial_write("console control setup failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    for (uint32_t pixel = 0; pixel < 160; ++pixel)
+        if (framebuffer_storage[pixel] != 0) {
+            serial_write("console clear failure\r\n");
+            for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+        }
+    serial_write("console control ready\r\n");
     static framebuffer_t firmware_framebuffer;
     uint64_t firmware_pixels = (uint64_t)info->framebuffer_pitch * info->framebuffer_height;
     if (!info->framebuffer_base || info->framebuffer_base >= (1ULL << 32) ||

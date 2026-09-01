@@ -6,6 +6,59 @@
 static framebuffer_t *console_framebuffer;
 static uint32_t cursor_x;
 static uint32_t cursor_y;
+static uint8_t escape_state;
+static uint32_t escape_parameter;
+
+static void console_clear_pixels(void) {
+    uint32_t total = console_framebuffer->height * console_framebuffer->pitch_pixels;
+    for (uint32_t index = 0; index < total; ++index)
+        console_framebuffer->pixels[index] = 0;
+    cursor_x = 0;
+    cursor_y = 0;
+}
+
+static int console_control(char value) {
+    if (escape_state == 0) {
+        if ((uint8_t)value == 0x1b) {
+            escape_state = 1;
+            return 1;
+        }
+        return 0;
+    }
+    if (escape_state == 1) {
+        if (value == '[') {
+            escape_state = 2;
+            escape_parameter = 0;
+            return 1;
+        }
+        escape_state = 0;
+        return 1;
+    }
+    if (value >= '0' && value <= '9') {
+        if (escape_parameter <= 100000U)
+            escape_parameter = escape_parameter * 10U + (uint32_t)(value - '0');
+        return 1;
+    }
+    if (value == ';') return 1;
+    if (value == 'J') {
+        if (escape_parameter == 0 || escape_parameter == 2)
+            console_clear_pixels();
+    } else if (value == 'H' || value == 'f') {
+        cursor_x = 0;
+        cursor_y = 0;
+    } else if (value == 'K') {
+        uint32_t width = console_framebuffer->width;
+        uint32_t y = cursor_y * CONSOLE_GLYPH_HEIGHT;
+        for (uint32_t row = 0; row < CONSOLE_GLYPH_HEIGHT && y + row <
+             console_framebuffer->height; ++row)
+            for (uint32_t x = cursor_x * CONSOLE_GLYPH_WIDTH; x < width; ++x)
+                console_framebuffer->pixels[(uint64_t)(y + row) *
+                    console_framebuffer->pitch_pixels + x] = 0;
+    }
+    escape_state = 0;
+    escape_parameter = 0;
+    return 1;
+}
 
 static uint8_t glyph_row(char value, uint32_t row) {
     static const uint8_t digits[10][7] = {
@@ -61,6 +114,7 @@ static void console_scroll(void) {
 }
 
 static void console_character(char value) {
+    if (console_control(value)) return;
     if (value == '\r') { cursor_x = 0; return; }
     if (value == '\n') { cursor_x = 0; ++cursor_y; }
     else if (value == '\b') { if (cursor_x) --cursor_x; }
@@ -84,6 +138,8 @@ int console_initialize(framebuffer_t *framebuffer) {
         framebuffer->height < CONSOLE_GLYPH_HEIGHT) return 0;
     console_framebuffer = framebuffer;
     cursor_x = cursor_y = 0;
+    escape_state = 0;
+    escape_parameter = 0;
     framebuffer_clear(framebuffer, 0);
     return 1;
 }

@@ -2133,3 +2133,6 @@ the graphical shell was exercised with host key events through
 - Keyboard reads preserve unread printable events when the caller's output
   buffer fills, while modifier release events are consumed on the next read;
   the queue-boundary regression contract passes in QEMU.
+- The Windows `run.bat` launcher now attaches an explicit USB HID keyboard to
+  its UHCI controller, matching the validated HID input path instead of
+  relying on QEMU's implicit keyboard device.

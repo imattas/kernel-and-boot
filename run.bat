@@ -32,5 +32,5 @@ if errorlevel 1 exit /b %errorlevel%
     -drive if=ide,index=0,media=disk,format=raw,file="%CD%\dist\os.img" ^
        -serial file:build\qemu-run.log -no-reboot -no-shutdown ^
     -netdev user,id=osnet -device e1000,netdev=osnet ^
-    -device piix3-usb-uhci
+    -device piix3-usb-uhci -device usb-kbd
 exit /b %errorlevel%

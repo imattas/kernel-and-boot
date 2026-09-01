@@ -2134,6 +2134,8 @@ the graphical shell was exercised with host key events through
   events are now decoded strictly as USB HID usages, eliminating aliases such
   as `5`/letters and the Enter/Backspace misinterpretations. The HID mapping
   regression and full-device QEMU gate pass.
+- The complete `make test` gate has been rerun after the keyboard mapping fix;
+  all packaged userland, filesystem, kernel, UEFI, image, and QEMU checks pass.
 - Keyboard reads preserve unread printable events when the caller's output
   buffer fills, while modifier release events are consumed on the next read;
   the queue-boundary regression contract passes in QEMU.

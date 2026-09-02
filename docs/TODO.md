@@ -324,6 +324,9 @@ type, string, and numeric tests.
   that the command reaches the live shell.
 - [x] Prefer the active USB HID keyboard over the legacy PS/2 stream when both
   are exposed by QEMU, preventing duplicate or cross-mapped Windows input.
+- [x] Keep PS/2 enabled as a fallback until the first valid USB HID report is
+  received, so an exposed-but-inactive Windows USB endpoint cannot disable the
+  working legacy keyboard path.
 - [x] Emit a runtime source-selection marker so QEMU logs prove USB HID
   arbitration was enabled.
 - [x] Emit a first-event USB HID runtime marker to separate host-device

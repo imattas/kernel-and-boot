@@ -33,7 +33,7 @@ static void wake_all_signal_waiters(process_t *process) {
     while (scheduler_wake_one(&process->signal_waiters)) { }
 }
 
-static void process_orphan_children(process_t *parent) {
+static void process_reparent_children(process_t *parent) {
     if (!parent) return;
     process_t *children[PROCESS_MAX];
     uint32_t child_count = 0;
@@ -49,14 +49,26 @@ static void process_orphan_children(process_t *parent) {
     spinlock_unlock_irqrestore(&process_table_lock, flags);
     for (uint32_t index = 0; index < child_count; ++index) {
         process_t *child = children[index];
+        process_t *replacement = parent->id == 7 ? 0 : process_lookup_retain(7);
         int orphaned = 0;
+        int adopted = 0;
+        if (replacement && replacement != parent) {
+            uint64_t replacement_flags = spinlock_lock_irqsave(&replacement->lock);
+            adopted = replacement->state != PROCESS_EXITED;
+            spinlock_unlock_irqrestore(&replacement->lock, replacement_flags);
+        }
         flags = spinlock_lock_irqsave(&child->lock);
         if (child->parent == parent) {
-            child->parent = 0;
+            if (adopted) child->parent = replacement;
+            else child->parent = 0;
             orphaned = 1;
         }
         spinlock_unlock_irqrestore(&child->lock, flags);
-        if (orphaned) process_release(parent);
+        if (orphaned) {
+            process_release(parent);
+            if (adopted) replacement = 0;
+        }
+        if (replacement) process_release(replacement);
         process_release(child);
     }
 }
@@ -75,7 +87,7 @@ __attribute__((noreturn)) void process_exit_current(int32_t status) {
     process->exit_status = status;
     process->state = PROCESS_EXITED;
     spinlock_unlock_irqrestore(&process->lock, flags);
-    process_orphan_children(process);
+    process_reparent_children(process);
     flags = spinlock_lock_irqsave(&process_table_lock);
     if (current_process == process)
         current_process = process->parent;
@@ -846,7 +858,7 @@ int process_destroy(process_t *process) {
         spinlock_unlock_irqrestore(&process->lock, process_flags);
         return 0;
     }
-    process_orphan_children(process);
+    process_reparent_children(process);
     exec_unload_image(&process->address_space, &process->image);
     if (!address_space_destroy(&process->address_space)) {
         spinlock_unlock_irqrestore(&process->lock, process_flags);

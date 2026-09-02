@@ -3261,16 +3261,17 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("process thread lifecycle ready\r\n");
+    process_t *orphan_reaper = process_create(7);
     process_t *orphan_parent = process_create(60);
     process_t *orphan_child = process_create(61);
-    if (!orphan_parent || !orphan_child ||
+    if (!orphan_reaper || !orphan_parent || !orphan_child ||
         !process_set_parent(orphan_child, orphan_parent)) {
         serial_write("process orphan setup failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     orphan_parent->state = PROCESS_EXITED;
-    if (!process_destroy(orphan_parent) || orphan_child->parent != 0 ||
-        !process_destroy(orphan_child)) {
+    if (!process_destroy(orphan_parent) || orphan_child->parent != orphan_reaper ||
+        !process_destroy(orphan_child) || !process_destroy(orphan_reaper)) {
         serial_write("process orphan lifecycle failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }

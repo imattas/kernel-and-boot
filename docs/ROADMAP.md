@@ -2190,6 +2190,9 @@ the graphical shell was exercised with host key events through
   of allowing an atomic increment to wrap back to zero.
 - Process exit and teardown now orphan live children before the parent object is
   released, preventing child process records from retaining dangling parents.
+- Non-init process exit now reparents live children to init when available, so
+  they remain eligible for normal wait/reap supervision; init-owned children
+  still become parentless if init itself exits.
 - VFS node retention now reports saturation/destruction failure, file opens
   reject an unretained node, and child attachment rejects reference overflow.
 - Init supervision now retries failed shell launches with scheduler-friendly

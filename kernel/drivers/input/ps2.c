@@ -80,16 +80,6 @@ static int keyboard_command_noarg(uint8_t command) {
     return in8(0x60) == 0xfa;
 }
 
-static int keyboard_query_scancode_set(uint8_t *set) {
-    if (!set || !wait_write()) return 0;
-    out8(0x60, 0xf0);
-    if (!wait_read() || in8(0x60) != 0xfa || !wait_write()) return 0;
-    out8(0x60, 0x00);
-    if (!wait_read() || in8(0x60) != 0xfa || !wait_read()) return 0;
-    *set = in8(0x60);
-    return *set == 1 || *set == 2 || *set == 3;
-}
-
 uint8_t ps2_scancode_set2_to_set1(uint8_t code) {
     static const uint8_t map[128] = {
         [0x01] = 0x43, [0x03] = 0x3f, [0x04] = 0x3d,
@@ -154,10 +144,10 @@ int ps2_keyboard_initialize(input_queue_t *queue) {
     out8(0x64, 0xae);
     if (!keyboard_command(0xf0, 1)) return 0;
     if (!keyboard_command_noarg(0xf4)) return 0;
+    /* The preceding command explicitly selected set 1.  Do not replace
+       that state with a stale or malformed query response: interpreting
+       set-1 bytes as set-2 is exactly what turns F (0x21) into C. */
     keyboard_scancode_set = 1;
-    uint8_t detected_set = 0;
-    if (keyboard_query_scancode_set(&detected_set))
-        keyboard_scancode_set = detected_set;
     while ((in8(0x64) & 1) != 0) (void)in8(0x60);
     keyboard_queue = queue;
     keyboard_enabled = 1;

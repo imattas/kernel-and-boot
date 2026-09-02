@@ -1989,6 +1989,8 @@ and initializes its destination before attempting input so failed reads cannot
 inspect uninitialized memory.
 It also consumes a following LF when a CRLF line ending is received, keeping the
 next shell command from seeing a stray empty line.
+The suppression state also persists when CR and LF arrive in separate input
+reads.
 
 The kernel boot contract now directly checks Set-2 normalization for the keys
 that exposed the original cross-mapping symptoms: F, C, Enter, and Backspace.

@@ -906,6 +906,7 @@ static int shell_remove_tree(const char *path, uint32_t length,
 
 static int shell_read_line(char *output, uint32_t capacity, char *buffer,
                            uint64_t received, uint64_t *input_index) {
+    static uint8_t suppress_lf;
     if (!output || capacity == 0 || !buffer || !input_index) return 0;
     uint32_t length = 0;
     while (length + 1U < capacity) {
@@ -920,9 +921,14 @@ static int shell_read_line(char *output, uint32_t capacity, char *buffer,
                 continue;
             }
         }
+        if (suppress_lf) {
+            suppress_lf = 0;
+            if (input == '\n') continue;
+        }
         if (input == '\r' || input == '\n') {
             if (input == '\r' && *input_index < received &&
                 buffer[*input_index] == '\n') ++*input_index;
+            if (input == '\r') suppress_lf = 1;
             output[length] = 0;
             return 1;
         }

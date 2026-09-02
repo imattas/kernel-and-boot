@@ -347,6 +347,7 @@ type, string, and numeric tests.
   Backspace.
 - [x] Coalesce CRLF in the shell `read` builtin so a trailing LF cannot become
   an unintended blank command.
+- [x] Preserve CRLF coalescing across separate input reads.
 - [x] Accept valid padded USB HID boot-keyboard packets without changing the
   canonical eight-byte report decoding.
 - [ ] Add reliable QEMU live USB/PS2 keyboard verification for `run INIT.ELF`.

@@ -341,6 +341,8 @@ type, string, and numeric tests.
   transport failures from HID report decoding failures.
 - [x] Detect the active PS/2 scan set and normalize Set-2 keyboard reports to
   the canonical Set-1 key codes used by the input layer.
+- [x] Give the shell `read` builtin the same editing controls as the main
+  prompt and initialize its failure buffer safely.
 - [x] Accept valid padded USB HID boot-keyboard packets without changing the
   canonical eight-byte report decoding.
 - [ ] Add reliable QEMU live USB/PS2 keyboard verification for `run INIT.ELF`.

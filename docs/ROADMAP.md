@@ -1983,6 +1983,11 @@ and normalizes Set-2 make/break codes for the standard keyboard controls and
 printable keys. This removes the previous assumption that every controller
 accepted the Set-1 command and records the detected set in the boot log.
 
+The shell `read` builtin now uses the same basic terminal editing semantics as
+the command prompt for Backspace/Delete and Ctrl-C, echoes accepted characters,
+and initializes its destination before attempting input so failed reads cannot
+inspect uninitialized memory.
+
 The Windows launcher now explicitly selects QEMU's SDL display backend and
 USB-enabled machine profile, making the visible emulator window the canonical
 keyboard-focus target.

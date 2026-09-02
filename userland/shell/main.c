@@ -924,7 +924,21 @@ static int shell_read_line(char *output, uint32_t capacity, char *buffer,
             output[length] = 0;
             return 1;
         }
+        if (input == 0x03) {
+            output[0] = 0;
+            print("^C\r\n", 4);
+            return 1;
+        }
+        if (input == '\b' || (unsigned char)input == 0x7f) {
+            if (length != 0) {
+                --length;
+                print("\b \b", 3);
+            }
+            continue;
+        }
+        if ((unsigned char)input < 0x20) continue;
         output[length++] = input;
+        print(&input, 1);
     }
     output[length] = 0;
     return 0;
@@ -1532,6 +1546,7 @@ void shell_main(void) {
                     if (index == 0 && value >= '0' && value <= '9') valid = 0;
                 }
                 char value[128];
+                value[0] = 0;
                 uint32_t value_length = 0;
                 uint64_t input_index = index + 1U;
                 if (valid && !shell_read_line(value, sizeof(value), input,

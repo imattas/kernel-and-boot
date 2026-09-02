@@ -8,6 +8,11 @@
 #define INPUT_KEY_PS2 0x0200U
 
 typedef enum {
+    INPUT_SOURCE_HID = 0,
+    INPUT_SOURCE_PS2 = 1
+} input_source_t;
+
+typedef enum {
     INPUT_EVENT_KEY,
     INPUT_EVENT_BUTTON,
     INPUT_EVENT_AXIS,
@@ -19,6 +24,7 @@ typedef struct {
     uint16_t code;
     int32_t value;
     uint64_t timestamp;
+    input_source_t source;
 } input_event_t;
 
 typedef struct {
@@ -34,6 +40,7 @@ int input_queue_push(input_queue_t *queue, const input_event_t *event);
 int input_queue_push_batch(input_queue_t *queue, const input_event_t *events,
                            uint32_t count);
 void input_queue_discard_ps2_keys(input_queue_t *queue);
+void input_queue_discard_ps2_pointer(input_queue_t *queue);
 int input_queue_pop(input_queue_t *queue, input_event_t *event);
 int input_queue_pop_pointer(input_queue_t *queue, input_event_t *event);
 uint32_t input_queue_count(const input_queue_t *queue);

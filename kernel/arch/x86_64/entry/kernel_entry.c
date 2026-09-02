@@ -125,6 +125,7 @@ static int input_runtime_mouse;
 static int input_runtime_ready;
 static int input_runtime_pending;
 static int input_runtime_reported;
+static int input_runtime_mouse_reported;
 static int input_runtime_transfer_reported;
 static display_service_t input_runtime_display;
 static framebuffer_t input_runtime_console_framebuffer;
@@ -180,12 +181,20 @@ static void input_runtime_task(void *argument) {
             if (decoded)
                 (void)input_queue_push_batch(input_runtime_queue, events,
                                              event_count);
-            if (decoded && event_count != 0 && !input_runtime_reported) {
-                input_runtime_reported = 1;
-                input_queue_discard_ps2_keys(input_runtime_queue);
-                ps2_keyboard_set_enabled(0);
-                serial_write("USB HID input event received\r\n");
-                serial_write("USB HID active; PS2 fallback disabled\r\n");
+            if (decoded && event_count != 0) {
+                if (input_runtime_mouse) {
+                    input_queue_discard_ps2_pointer(input_runtime_queue);
+                    if (!input_runtime_mouse_reported) {
+                        input_runtime_mouse_reported = 1;
+                        serial_write("USB HID mouse input event received\r\n");
+                    }
+                } else if (!input_runtime_reported) {
+                    input_runtime_reported = 1;
+                    input_queue_discard_ps2_keys(input_runtime_queue);
+                    ps2_keyboard_set_enabled(0);
+                    serial_write("USB HID input event received\r\n");
+                    serial_write("USB HID active; PS2 fallback disabled\r\n");
+                }
             }
             input_runtime_pending = 0;
             } else if (completed < 0) {
@@ -2761,6 +2770,28 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("input pointer routing ready\r\n");
+    input_event_t stale_ps2_pointer = {
+        .type = INPUT_EVENT_AXIS, .code = 0, .value = 3, .timestamp = 11,
+        .source = INPUT_SOURCE_PS2
+    };
+    input_event_t hid_pointer = {
+        .type = INPUT_EVENT_AXIS, .code = 0, .value = 4, .timestamp = 12,
+        .source = INPUT_SOURCE_HID
+    };
+    if (!input_queue_push(&input_queue, &stale_ps2_pointer) ||
+        !input_queue_push(&input_queue, &hid_pointer)) {
+        serial_write("input pointer handoff setup failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    input_queue_discard_ps2_pointer(&input_queue);
+    if (input_queue_count(&input_queue) != 1 ||
+        !input_queue_pop_pointer(&input_queue, &input_out) ||
+        input_out.source != INPUT_SOURCE_HID || input_out.value != 4 ||
+        input_queue_count(&input_queue) != 0) {
+        serial_write("input pointer handoff failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("input pointer handoff ready\r\n");
     input_event_t stale_ps2 = {
         .type = INPUT_EVENT_KEY, .code = INPUT_KEY_PS2 | 0x2eU,
         .value = 1, .timestamp = 8

@@ -254,9 +254,12 @@ int ps2_mouse_decode(const uint8_t packet[3], input_event_t events[3],
     int32_t y = (int32_t)(int8_t)packet[2];
     uint64_t timestamp = timer_ticks();
     events[0] = (input_event_t){INPUT_EVENT_BUTTON, 0,
-                                (int32_t)(packet[0] & 0x07U), timestamp};
-    events[1] = (input_event_t){INPUT_EVENT_AXIS, 0, x, timestamp};
-    events[2] = (input_event_t){INPUT_EVENT_AXIS, 1, y, timestamp};
+                                (int32_t)(packet[0] & 0x07U), timestamp,
+                                INPUT_SOURCE_PS2};
+    events[1] = (input_event_t){INPUT_EVENT_AXIS, 0, x, timestamp,
+                                INPUT_SOURCE_PS2};
+    events[2] = (input_event_t){INPUT_EVENT_AXIS, 1, y, timestamp,
+                                INPUT_SOURCE_PS2};
     *event_count = 3;
     return 1;
 }
@@ -267,7 +270,8 @@ int ps2_mouse_decode_wheel(const uint8_t packet[4], input_event_t events[4],
         !ps2_mouse_decode(packet, events, event_count)) return 0;
     int32_t wheel = (int32_t)(packet[3] & 0x0fU);
     if ((wheel & 8) != 0) wheel -= 16;
-    events[3] = (input_event_t){INPUT_EVENT_AXIS, 2, wheel, timer_ticks()};
+    events[3] = (input_event_t){INPUT_EVENT_AXIS, 2, wheel, timer_ticks(),
+                                INPUT_SOURCE_PS2};
     *event_count = 4;
     return 1;
 }
@@ -279,7 +283,8 @@ int ps2_mouse_decode_explorer(const uint8_t packet[4], input_event_t events[4],
     events[0].value |= (int32_t)((packet[3] & 0x30U) >> 1);
     int32_t wheel = (int32_t)(packet[3] & 0x0fU);
     if ((wheel & 8) != 0) wheel -= 16;
-    events[3] = (input_event_t){INPUT_EVENT_AXIS, 2, wheel, timer_ticks()};
+    events[3] = (input_event_t){INPUT_EVENT_AXIS, 2, wheel, timer_ticks(),
+                                INPUT_SOURCE_PS2};
     *event_count = 4;
     return 1;
 }
@@ -327,7 +332,8 @@ int ps2_keyboard_poll(input_queue_t *queue) {
         .type = INPUT_EVENT_KEY,
         .code = code,
         .value = (scancode & 0x80) == 0,
-        .timestamp = timer_ticks()
+        .timestamp = timer_ticks(),
+        .source = INPUT_SOURCE_PS2
     };
     spinlock_unlock_irqrestore(&ps2_lock, flags);
     return input_queue_push(queue, &event);

@@ -686,6 +686,9 @@ The live GPU display service now owns a compositor base surface for terminal
 output plus a cursor layer. Console writes and pointer button/axis events are
 presented through the same runtime window-manager path, so cursor damage does
 not erase terminal pixels or remove keyboard events from the shell queue.
+Input events now carry explicit HID/PS2 source metadata. USB pointer takeover
+purges stale PS/2 pointer events without disabling the independent PS/2
+keyboard fallback.
 The HID state tracker now also emits transitions for all eight boot-report
 modifier bits using stable modifier key codes.
 The shared input queue now supports atomic bounded event batches, so one

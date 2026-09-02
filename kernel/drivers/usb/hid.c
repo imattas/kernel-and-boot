@@ -29,7 +29,7 @@ int usb_hid_keyboard_decode_report(const uint8_t *report, uint32_t length,
     for (uint32_t i = 2; i < 8; ++i) {
         if (report[i] == 0) continue;
         events[*event_count] = (input_event_t){INPUT_EVENT_KEY, report[i], 1,
-                                              timestamp};
+                                              timestamp, INPUT_SOURCE_HID};
         ++*event_count;
     }
     return 1;
@@ -64,13 +64,13 @@ int usb_hid_keyboard_decode_state(const uint8_t *report, uint32_t length,
             if (count == 20) return 0;
             events[count++] = (input_event_t){INPUT_EVENT_KEY,
                                               (uint16_t)(0xe0U + bit), 0,
-                                              timestamp};
+                                              timestamp, INPUT_SOURCE_HID};
         }
     for (uint32_t i = 0; i < 6; ++i)
         if (state->keys[i] != 0 && !hid_key_present(next, state->keys[i])) {
             if (count == 20) return 0;
             events[count++] = (input_event_t){INPUT_EVENT_KEY, state->keys[i], 0,
-                                              timestamp};
+                                              timestamp, INPUT_SOURCE_HID};
         }
     for (uint32_t bit = 0; bit < 8; ++bit)
         if ((report[0] & (uint8_t)(1U << bit)) != 0 &&
@@ -78,13 +78,13 @@ int usb_hid_keyboard_decode_state(const uint8_t *report, uint32_t length,
             if (count == 20) return 0;
             events[count++] = (input_event_t){INPUT_EVENT_KEY,
                                               (uint16_t)(0xe0U + bit), 1,
-                                              timestamp};
+                                              timestamp, INPUT_SOURCE_HID};
         }
     for (uint32_t i = 0; i < 6; ++i)
         if (next[i] != 0 && !hid_key_present(state->keys, next[i])) {
             if (count == 20) return 0;
             events[count++] = (input_event_t){INPUT_EVENT_KEY, next[i], 1,
-                                              timestamp};
+                                              timestamp, INPUT_SOURCE_HID};
         }
     for (uint32_t i = 0; i < 6; ++i) state->keys[i] = next[i];
     state->modifiers = report[0];
@@ -98,14 +98,18 @@ int usb_hid_mouse_decode(const uint8_t *report, uint32_t length,
         (report[0] & 0xf0U) != 0) return 0;
     uint64_t timestamp = timer_ticks();
     events[0] = (input_event_t){INPUT_EVENT_BUTTON, 0,
-                                (int32_t)(report[0] & 0x0fU), timestamp};
+                                (int32_t)(report[0] & 0x0fU), timestamp,
+                                INPUT_SOURCE_HID};
     events[1] = (input_event_t){INPUT_EVENT_AXIS, 0,
-                                (int32_t)(int8_t)report[1], timestamp};
+                                (int32_t)(int8_t)report[1], timestamp,
+                                INPUT_SOURCE_HID};
     events[2] = (input_event_t){INPUT_EVENT_AXIS, 1,
-                                (int32_t)(int8_t)report[2], timestamp};
+                                (int32_t)(int8_t)report[2], timestamp,
+                                INPUT_SOURCE_HID};
     if (length == 4) {
         events[3] = (input_event_t){INPUT_EVENT_AXIS, 2,
-                                    (int32_t)(int8_t)report[3], timestamp};
+                                    (int32_t)(int8_t)report[3], timestamp,
+                                    INPUT_SOURCE_HID};
         *event_count = 4;
     } else {
         *event_count = 3;

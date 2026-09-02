@@ -188,6 +188,24 @@ void input_queue_discard_ps2_keys(input_queue_t *queue) {
     spinlock_unlock_irqrestore(&queue->lock, flags);
 }
 
+void input_queue_discard_ps2_pointer(input_queue_t *queue) {
+    if (!queue) return;
+    uint64_t flags = spinlock_lock_irqsave(&queue->lock);
+    uint32_t kept = 0;
+    for (uint32_t index = 0; index < queue->count; ++index) {
+        uint32_t position = (queue->head + index) % INPUT_EVENT_CAPACITY;
+        input_event_t event = queue->events[position];
+        if ((event.type == INPUT_EVENT_BUTTON ||
+             event.type == INPUT_EVENT_AXIS) &&
+            event.source == INPUT_SOURCE_PS2) continue;
+        queue->events[(queue->head + kept) % INPUT_EVENT_CAPACITY] = event;
+        ++kept;
+    }
+    queue->count = kept;
+    queue->tail = (queue->head + kept) % INPUT_EVENT_CAPACITY;
+    spinlock_unlock_irqrestore(&queue->lock, flags);
+}
+
 int input_queue_pop(input_queue_t *queue, input_event_t *event) {
     if (!queue || !event) return 0;
     uint64_t flags = spinlock_lock_irqsave(&queue->lock);
@@ -298,7 +316,7 @@ int input_queue_push_text(input_queue_t *queue, const char *text,
         if (text[index] == 0) return 0;
         events[index] = (input_event_t){INPUT_EVENT_TEXT,
                                         (uint16_t)(uint8_t)text[index], 1,
-                                        timestamp};
+                                        timestamp, INPUT_SOURCE_HID};
     }
     return input_queue_push_batch(queue, events, length);
 }

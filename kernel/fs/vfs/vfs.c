@@ -198,7 +198,8 @@ int vfs_node_add_child(vfs_node_t *parent, vfs_node_t *child) {
     vfs_node_t *second = parent_first ? child : parent;
     uint64_t first_flags = spinlock_lock_irqsave(&first->lock);
     uint64_t second_flags = spinlock_lock_irqsave(&second->lock);
-    if (child->parent || child->destroying || child->references == 0) {
+    if (child->parent || child->destroying || child->references == 0 ||
+        child->references == UINT32_MAX) {
         spinlock_unlock_irqrestore(&second->lock, second_flags);
         spinlock_unlock_irqrestore(&first->lock, first_flags);
         return 0;
@@ -382,14 +383,16 @@ vfs_node_t *vfs_lookup_path_at_access(vfs_node_t *root, vfs_node_t *working,
     return current;
 }
 
-void vfs_node_retain(vfs_node_t *node) {
-    if (!node) return;
+int vfs_node_retain(vfs_node_t *node) {
+    if (!node) return 0;
     uint32_t references = __atomic_load_n(&node->references, __ATOMIC_ACQUIRE);
     while (!__atomic_load_n(&node->destroying, __ATOMIC_ACQUIRE) &&
            references != 0 && references != UINT32_MAX &&
            !__atomic_compare_exchange_n(&node->references, &references,
                                         references + 1U, 0, __ATOMIC_ACQ_REL,
                                         __ATOMIC_ACQUIRE)) { }
+    return references != 0 && references != UINT32_MAX &&
+           !__atomic_load_n(&node->destroying, __ATOMIC_ACQUIRE);
 }
 
 void vfs_node_release(vfs_node_t *node) {

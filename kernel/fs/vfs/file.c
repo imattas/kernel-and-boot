@@ -20,7 +20,10 @@ vfs_file_t *vfs_file_open(vfs_node_t *node, uint32_t flags) {
     file->offset = 0;
     file->flags = flags;
     file->references = 1;
-    vfs_node_retain(node);
+    if (!vfs_node_retain(node)) {
+        kfree(file);
+        return 0;
+    }
     return file;
 }
 

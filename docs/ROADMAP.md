@@ -2190,6 +2190,8 @@ the graphical shell was exercised with host key events through
   of allowing an atomic increment to wrap back to zero.
 - Process exit and teardown now orphan live children before the parent object is
   released, preventing child process records from retaining dangling parents.
+- VFS node retention now reports saturation/destruction failure, file opens
+  reject an unretained node, and child attachment rejects reference overflow.
 - Init supervision now retries failed shell launches with scheduler-friendly
   backoff and waits/reaps a launched shell until the kernel reports completion.
 - Window content changes can now explicitly invalidate their compositor layer,

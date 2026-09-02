@@ -62,7 +62,7 @@ int vfs_node_access(const vfs_node_t *node,
 int vfs_node_set_mode(vfs_node_t *node, const security_context_t *context,
                       uint32_t mode);
 int vfs_node_stat(const vfs_node_t *node, vfs_stat_t *stat);
-void vfs_node_retain(vfs_node_t *node);
+int vfs_node_retain(vfs_node_t *node);
 void vfs_node_release(vfs_node_t *node);
 int vfs_node_remove(vfs_node_t *parent, vfs_node_t *child);
 int vfs_node_rename(vfs_node_t *parent, vfs_node_t *child, const char *name);

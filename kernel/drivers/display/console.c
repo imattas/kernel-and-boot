@@ -9,6 +9,8 @@ static uint32_t cursor_y;
 static uint8_t escape_state;
 static uint32_t escape_parameter;
 static uint32_t foreground_color;
+static console_present_fn present_callback;
+static void *present_context;
 
 static void console_clear_pixels(void) {
     uint32_t total = console_framebuffer->height * console_framebuffer->pitch_pixels;
@@ -150,8 +152,15 @@ int console_initialize(framebuffer_t *framebuffer) {
     escape_state = 0;
     escape_parameter = 0;
     foreground_color = 0xffffffffU;
+    present_callback = 0;
+    present_context = 0;
     framebuffer_clear(framebuffer, 0);
     return 1;
+}
+
+void console_set_present_callback(console_present_fn callback, void *context) {
+    present_callback = callback;
+    present_context = context;
 }
 
 uint32_t console_write(const void *buffer, uint32_t length) {
@@ -160,5 +169,6 @@ uint32_t console_write(const void *buffer, uint32_t length) {
     const char *text = (const char *)buffer;
     for (uint32_t index = 0; index < length; ++index) console_character(text[index]);
     spinlock_unlock_irqrestore(&console_framebuffer->lock, flags);
+    if (present_callback) present_callback(present_context);
     return length;
 }

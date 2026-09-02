@@ -682,9 +682,10 @@ The interactive shell currently exposes its prompt through the QEMU serial
 console (`-serial stdio`); the graphical/VNC display has no terminal surface,
 and live USB/PS2 keyboard-to-shell input remains an unfinished verification
 item.
-The live GPU display service now owns a cursor compositor layer and consumes
-pointer button/axis events without removing keyboard events from the shell
-queue; pointer movement is composed through the runtime window-manager path.
+The live GPU display service now owns a compositor base surface for terminal
+output plus a cursor layer. Console writes and pointer button/axis events are
+presented through the same runtime window-manager path, so cursor damage does
+not erase terminal pixels or remove keyboard events from the shell queue.
 The HID state tracker now also emits transitions for all eight boot-report
 modifier bits using stable modifier key codes.
 The shared input queue now supports atomic bounded event batches, so one

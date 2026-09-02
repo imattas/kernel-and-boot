@@ -124,6 +124,7 @@ static usb_hid_keyboard_state_t input_runtime_hid_state;
 static int input_runtime_mouse;
 static int input_runtime_ready;
 static int input_runtime_pending;
+static int input_runtime_reported;
 static volatile int init_supervisor_probe_result;
 
 static void network_runtime_task(void *argument) {
@@ -157,6 +158,10 @@ static void input_runtime_task(void *argument) {
             if (decoded)
                 (void)input_queue_push_batch(input_runtime_queue, events,
                                              event_count);
+            if (decoded && event_count != 0 && !input_runtime_reported) {
+                input_runtime_reported = 1;
+                serial_write("USB HID input event received\r\n");
+            }
             input_runtime_pending = 0;
             } else if (completed < 0) {
                 input_runtime_pending = 0;

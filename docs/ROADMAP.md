@@ -1972,7 +1972,8 @@ parallel legacy PS/2 keyboard stream. This avoids duplicate and apparently
 cross-mapped keystrokes on the Windows QEMU run path while retaining PS/2 as
 the fallback when no USB keyboard is available. The runtime also logs the
 selected source for integration diagnostics. HID boot-keyboard decoding also
-accepts larger interrupt packets whose trailing bytes are padding.
+accepts larger interrupt packets whose trailing bytes are padding, and the
+runtime records the first decoded HID event for host-path diagnosis.
 
 The init-owned shell supervisor is now the active handoff: init is queued with
 the runtime services and owns the shell spawn/wait/reap loop. The former

@@ -2177,6 +2177,8 @@ the graphical shell was exercised with host key events through
 - The window manager now has an explicit shutdown path that releases managed
   windows, heap-backed surfaces, input queues, and cursor layers, leaving no
   owned resources behind.
+- GPU-backed desktop policy now owns a bounded background and panel layout with
+  color updates, reflow, and teardown above the existing window manager.
 - A display-service boundary now bundles the GPU surface, compositor, and
   window manager with route, compose, and shutdown operations, and its full
   lifecycle is exercised during QEMU boot.

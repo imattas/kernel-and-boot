@@ -44,6 +44,8 @@ kernel may be declared complete.
   scope; it remains explicitly deferred and is not claimed complete.
 - [x] Driver hardening: grouped error paths, reset/timeout behavior, resource
   ownership, and QEMU coverage for all enabled drivers.
+- [x] Add GPU-backed desktop policy for bounded background/panel lifecycle,
+  color updates, reflow, and teardown.
 - [x] AHCI failed-probe and failed-IDENTIFY command-list/FIS cleanup is bounded
   by port-idle confirmation.
 - [x] Bound storage-device name validation and duplicate comparisons.

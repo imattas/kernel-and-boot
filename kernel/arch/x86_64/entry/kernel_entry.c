@@ -37,6 +37,7 @@
 #include "../../../drivers/display/compositor.h"
 #include "../../../drivers/display/window_manager.h"
 #include "../../../drivers/display/display_service.h"
+#include "../../../drivers/display/desktop.h"
 #include "../../../drivers/usb/usb.h"
 #include "../../../drivers/usb/hid.h"
 #include "../../../drivers/usb/uhci.h"
@@ -3024,6 +3025,18 @@ void kernel_main(void *boot_info) {
     }
     uint32_t service_window = window_manager_create_buffered(
         &display_service.window_manager, 1, 1, 0, 0);
+    static desktop_t desktop;
+    if (!desktop_initialize(&desktop, &display_service, 0x10203040U,
+                            0xa0b0c0d0U, 1) ||
+        !desktop_set_colors(&desktop, 0x20304050U, 0xb0c0d0e0U) ||
+        !desktop_reflow(&desktop) ||
+        !display_service_compose_damage(&display_service, 0U) ||
+        display_service_pixels[12] != 0xb0c0d0e0U ||
+        !desktop_shutdown(&desktop) || desktop.initialized) {
+        serial_write("desktop policy lifecycle failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("desktop policy ready\r\n");
     if (service_window == WINDOW_MANAGER_INVALID_WINDOW ||
         !window_manager_focus(&display_service.window_manager, service_window) ||
         !display_service_route_event(&display_service, &routed_key) ||

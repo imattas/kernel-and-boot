@@ -13,6 +13,16 @@ static process_t *current_process;
 static process_t *process_table[PROCESS_MAX];
 static spinlock_t process_table_lock;
 
+static int process_retain_namespace(vfs_node_t *root,
+                                    vfs_node_t *working_directory) {
+    if (!root || !working_directory || !vfs_node_retain(root)) return 0;
+    if (!vfs_node_retain(working_directory)) {
+        vfs_node_release(root);
+        return 0;
+    }
+    return 1;
+}
+
 static int process_retain_existing(process_t *process) {
     if (!process) return 0;
     uint64_t flags = spinlock_lock_irqsave(&process_table_lock);
@@ -211,8 +221,7 @@ int process_set_namespace(process_t *process, vfs_node_t *root,
     if (!process || !root || !working_directory ||
         root->type != VFS_NODE_DIRECTORY ||
         working_directory->type != VFS_NODE_DIRECTORY) return 0;
-    vfs_node_retain(root);
-    vfs_node_retain(working_directory);
+    if (!process_retain_namespace(root, working_directory)) return 0;
     uint64_t flags = spinlock_lock_irqsave(&process->lock);
     if (process->state == PROCESS_EXITED) {
         spinlock_unlock_irqrestore(&process->lock, flags);
@@ -242,8 +251,10 @@ int process_inherit_namespace(process_t *child, process_t *parent) {
     }
     root = parent->root_directory;
     working = parent->working_directory;
-    vfs_node_retain(root);
-    vfs_node_retain(working);
+    if (!process_retain_namespace(root, working)) {
+        spinlock_unlock_irqrestore(&parent->lock, flags);
+        return 0;
+    }
     spinlock_unlock_irqrestore(&parent->lock, flags);
 
     flags = spinlock_lock_irqsave(&child->lock);
@@ -437,7 +448,7 @@ int process_environment_unset(process_t *process, const char *key,
 
 int process_set_working_directory(process_t *process, vfs_node_t *directory) {
     if (!process || !directory || directory->type != VFS_NODE_DIRECTORY) return 0;
-    vfs_node_retain(directory);
+    if (!vfs_node_retain(directory)) return 0;
     uint64_t flags = spinlock_lock_irqsave(&process->lock);
     if (process->state == PROCESS_EXITED || !process->root_directory) {
         spinlock_unlock_irqrestore(&process->lock, flags);
@@ -509,8 +520,10 @@ process_t *process_clone_user(process_t *parent, uint64_t id,
         spinlock_unlock_irqrestore(&parent->lock, parent_flags);
         return 0;
     }
-    vfs_node_retain(root);
-    vfs_node_retain(working);
+    if (!process_retain_namespace(root, working)) {
+        spinlock_unlock_irqrestore(&parent->lock, parent_flags);
+        return 0;
+    }
     if (!process_retain_existing(parent)) {
         spinlock_unlock_irqrestore(&parent->lock, parent_flags);
         vfs_node_release(working);

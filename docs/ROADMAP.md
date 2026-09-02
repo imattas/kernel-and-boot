@@ -2272,6 +2272,9 @@ the graphical shell was exercised with host key events through
 - Process namespace installation, inheritance, cloning, and working-directory
   changes now require successful VFS node retention with rollback on partial
   failure, preventing saturated or destructing nodes from entering a process.
+- The boot contract now exercises both first-node and partial-second-node
+  namespace-retention failures, proving process state and successful retains
+  are restored together.
 - Init supervision now retries failed shell launches with scheduler-friendly
   backoff and waits/reaps a launched shell until the kernel reports completion.
 - Shell pipeline and redirection failures now publish status 1, preserving

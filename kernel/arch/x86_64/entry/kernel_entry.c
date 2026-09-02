@@ -3983,6 +3983,35 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("process namespace inheritance ready\r\n");
+    process_t *namespace_retention_probe = process_create_auto();
+    uint32_t namespace_root_references = vfs_root->references;
+    uint32_t namespace_dev_references = vfs_dev->references;
+    vfs_dev->references = UINT32_MAX;
+    int namespace_partial_rejected =
+        namespace_retention_probe &&
+        !process_set_namespace(namespace_retention_probe, vfs_root, vfs_dev) &&
+        namespace_retention_probe->root_directory == 0 &&
+        namespace_retention_probe->working_directory == 0 &&
+        vfs_root->references == namespace_root_references;
+    vfs_dev->references = namespace_dev_references;
+    if (!namespace_partial_rejected ||
+        !process_destroy(namespace_retention_probe)) {
+        serial_write("process namespace retention failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    vfs_root->references = UINT32_MAX;
+    process_t *namespace_root_probe = process_create_auto();
+    int namespace_root_rejected =
+        namespace_root_probe &&
+        !process_set_namespace(namespace_root_probe, vfs_root, vfs_root) &&
+        namespace_root_probe->root_directory == 0 &&
+        namespace_root_probe->working_directory == 0;
+    vfs_root->references = namespace_root_references;
+    if (!namespace_root_rejected || !process_destroy(namespace_root_probe)) {
+        serial_write("process namespace root retention failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("process namespace retention ready\r\n");
     static uint32_t inherited_handle_object;
     inherited_handle_retain_count = 0;
     owned_handle_release_count = 0;

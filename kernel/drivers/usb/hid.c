@@ -15,7 +15,10 @@ int usb_hid_keyboard_decode(const uint8_t *report, uint32_t length,
 int usb_hid_keyboard_decode_report(const uint8_t *report, uint32_t length,
                                    input_event_t events[6],
                                    uint32_t *event_count) {
-    if (!report || !events || !event_count || length != 8 || report[1] != 0)
+    /* Boot-protocol keyboard reports use the first eight bytes. Some
+       descriptors advertise a larger interrupt packet, so accept the
+       trailing padding instead of rejecting an otherwise valid report. */
+    if (!report || !events || !event_count || length < 8 || report[1] != 0)
         return 0;
     for (uint32_t i = 2; i < 8; ++i)
         for (uint32_t j = i + 1; j < 8; ++j)

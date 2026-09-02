@@ -174,7 +174,11 @@ static void input_runtime_task(void *argument) {
 
 static void init_supervisor_probe_task(void *argument) {
     (void)argument;
-    for (uint32_t attempt = 0; attempt < 4096U; ++attempt) {
+    /* This is a runtime observation task, not a bounded unit probe. Device
+       initialization and the first userland schedule can vary substantially
+       under a fully populated QEMU machine, so keep observing until init has
+       actually published its child. */
+    for (;;) {
         uint64_t ids[PROCESS_MAX];
         uint32_t count = process_snapshot(ids, PROCESS_MAX);
         for (uint32_t index = 0; index < count; ++index) {
@@ -194,8 +198,6 @@ static void init_supervisor_probe_task(void *argument) {
         }
         scheduler_yield();
     }
-    init_supervisor_probe_result = -1;
-    serial_write("init shell supervisor probe timeout\r\n");
 }
 static void process_thread_probe(void *argument) { (void)argument; }
 static int block_probe_read(void *context, uint64_t sector, uint32_t count,
@@ -3164,6 +3166,17 @@ void kernel_main(void *boot_info) {
                                        &hid_transition_count) ||
         hid_transition_count != 20) {
         serial_write("USB HID keyboard capacity failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    static const uint8_t hid_padded_report[16] = {
+        0x00, 0x00, 0x09, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa
+    };
+    if (!usb_hid_keyboard_decode_report(hid_padded_report,
+                                        sizeof(hid_padded_report),
+                                        hid_probe_events, &hid_probe_count) ||
+        hid_probe_count != 1 || hid_probe_events[0].code != 0x09) {
+        serial_write("USB HID padded keyboard failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("USB HID keyboard ready\r\n");

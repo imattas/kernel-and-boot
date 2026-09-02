@@ -1971,7 +1971,8 @@ When a USB HID keyboard endpoint is active, the input layer now suppresses the
 parallel legacy PS/2 keyboard stream. This avoids duplicate and apparently
 cross-mapped keystrokes on the Windows QEMU run path while retaining PS/2 as
 the fallback when no USB keyboard is available. The runtime also logs the
-selected source for integration diagnostics.
+selected source for integration diagnostics. HID boot-keyboard decoding also
+accepts larger interrupt packets whose trailing bytes are padding.
 
 The init-owned shell supervisor is now the active handoff: init is queued with
 the runtime services and owns the shell spawn/wait/reap loop. The former

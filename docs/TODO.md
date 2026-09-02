@@ -326,6 +326,8 @@ type, string, and numeric tests.
   are exposed by QEMU, preventing duplicate or cross-mapped Windows input.
 - [x] Emit a runtime source-selection marker so QEMU logs prove USB HID
   arbitration was enabled.
+- [x] Accept valid padded USB HID boot-keyboard packets without changing the
+  canonical eight-byte report decoding.
 - [ ] Add reliable QEMU live USB/PS2 keyboard verification for `run INIT.ELF`.
 - [x] Expose the complete multi-cluster FAT32 boot-image application set in the
   live VFS namespace for reliable external `run` execution.

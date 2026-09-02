@@ -125,6 +125,7 @@ static int input_runtime_mouse;
 static int input_runtime_ready;
 static int input_runtime_pending;
 static int input_runtime_reported;
+static int input_runtime_transfer_reported;
 static volatile int init_supervisor_probe_result;
 
 static void network_runtime_task(void *argument) {
@@ -145,6 +146,10 @@ static void input_runtime_task(void *argument) {
         if (input_runtime_ready && input_runtime_pending) {
             int completed = uhci_interrupt_poll();
             if (completed > 0) {
+            if (!input_runtime_transfer_reported) {
+                input_runtime_transfer_reported = 1;
+                serial_write("USB HID interrupt report received\r\n");
+            }
             input_event_t events[20];
             uint32_t event_count = 0;
             int decoded = input_runtime_mouse ?

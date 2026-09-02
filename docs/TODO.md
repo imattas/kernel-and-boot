@@ -337,6 +337,8 @@ type, string, and numeric tests.
   arbitration was enabled.
 - [x] Emit a first-event USB HID runtime marker to separate host-device
   delivery failures from shell processing failures.
+- [x] Emit a first completed UHCI interrupt-report marker to separate USB
+  transport failures from HID report decoding failures.
 - [x] Accept valid padded USB HID boot-keyboard packets without changing the
   canonical eight-byte report decoding.
 - [ ] Add reliable QEMU live USB/PS2 keyboard verification for `run INIT.ELF`.

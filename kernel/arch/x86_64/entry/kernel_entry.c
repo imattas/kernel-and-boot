@@ -126,6 +126,10 @@ static int input_runtime_ready;
 static int input_runtime_pending;
 static int input_runtime_reported;
 static int input_runtime_transfer_reported;
+static display_service_t input_runtime_display;
+static display_surface_t input_runtime_cursor_surface;
+static uint32_t input_runtime_cursor_pixels[16 * 16];
+static int input_runtime_display_ready;
 static volatile int init_supervisor_probe_result;
 
 static void network_runtime_task(void *argument) {
@@ -173,6 +177,16 @@ static void input_runtime_task(void *argument) {
             input_runtime_pending = 0;
             } else if (completed < 0) {
                 input_runtime_pending = 0;
+            }
+        }
+        if (input_runtime_display_ready) {
+            input_event_t pointer_event;
+            while (input_queue_pop_pointer(input_runtime_queue,
+                                            &pointer_event)) {
+                (void)window_manager_route_event(
+                    &input_runtime_display.window_manager, &pointer_event);
+                (void)display_service_compose_damage(&input_runtime_display,
+                                                     0U);
             }
         }
         if (input_runtime_ready && !input_runtime_pending)
@@ -2715,6 +2729,26 @@ void kernel_main(void *boot_info) {
         serial_write("input batch failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
+    input_event_t queue_pointer_axis = {
+        .type = INPUT_EVENT_AXIS, .code = 0, .value = 4, .timestamp = 9
+    };
+    input_event_t queue_pointer_button = {
+        .type = INPUT_EVENT_BUTTON, .code = 0, .value = 1, .timestamp = 10
+    };
+    if (!input_queue_push(&input_queue, &input_event) ||
+        !input_queue_push(&input_queue, &queue_pointer_axis) ||
+        !input_queue_push(&input_queue, &queue_pointer_button) ||
+        !input_queue_pop_pointer(&input_queue, &input_out) ||
+        input_out.type != INPUT_EVENT_AXIS || input_out.value != 4 ||
+        input_queue_count(&input_queue) != 2 ||
+        !input_queue_pop(&input_queue, &input_out) || input_out.code != 30 ||
+        !input_queue_pop_pointer(&input_queue, &input_out) ||
+        input_out.type != INPUT_EVENT_BUTTON || input_out.value != 1 ||
+        input_queue_count(&input_queue) != 0) {
+        serial_write("input pointer extraction failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("input pointer routing ready\r\n");
     input_event_t stale_ps2 = {
         .type = INPUT_EVENT_KEY, .code = INPUT_KEY_PS2 | 0x2eU,
         .value = 1, .timestamp = 8
@@ -3182,6 +3216,27 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("framebuffer console ready\r\n");
+    for (uint32_t row = 0; row < 16; ++row)
+        for (uint32_t column = 0; column < 16; ++column)
+            input_runtime_cursor_pixels[row * 16U + column] =
+                (column <= row && column < 2U) ||
+                (row == 0 && column < 8U) ? 0xffffffffU : 0;
+    if (display_service_initialize(&input_runtime_display,
+                                   (void *)(uintptr_t)display_base,
+                                   display_width, display_height,
+                                   display_pitch) &&
+        display_surface_initialize(&input_runtime_cursor_surface,
+                                   input_runtime_cursor_pixels, 16, 16, 16) &&
+        window_manager_set_cursor(&input_runtime_display.window_manager,
+                                  &input_runtime_cursor_surface) &&
+        window_manager_set_cursor_visible(&input_runtime_display.window_manager,
+                                          1)) {
+        input_runtime_display_ready = 1;
+        serial_write("GPU pointer compositor ready\r\n");
+    } else {
+        input_runtime_display_ready = 0;
+        serial_write("GPU pointer compositor unavailable\r\n");
+    }
     static const uint8_t usb_device_descriptor[18] = {
         18, 1, 0, 2, 0, 0, 0, 64, 0x34, 0x12, 0x78, 0x56, 0, 1, 1, 2, 3, 1
     };

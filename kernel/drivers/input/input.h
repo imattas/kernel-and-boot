@@ -35,6 +35,7 @@ int input_queue_push_batch(input_queue_t *queue, const input_event_t *events,
                            uint32_t count);
 void input_queue_discard_ps2_keys(input_queue_t *queue);
 int input_queue_pop(input_queue_t *queue, input_event_t *event);
+int input_queue_pop_pointer(input_queue_t *queue, input_event_t *event);
 uint32_t input_queue_count(const input_queue_t *queue);
 void input_set_standard_queue(input_queue_t *queue);
 void input_set_runtime_enabled(int enabled);

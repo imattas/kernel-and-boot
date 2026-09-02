@@ -202,6 +202,34 @@ int input_queue_pop(input_queue_t *queue, input_event_t *event) {
     return 1;
 }
 
+int input_queue_pop_pointer(input_queue_t *queue, input_event_t *event) {
+    if (!queue || !event) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&queue->lock);
+    uint32_t found = INPUT_EVENT_CAPACITY;
+    for (uint32_t index = 0; index < queue->count; ++index) {
+        uint32_t position = (queue->head + index) % INPUT_EVENT_CAPACITY;
+        if (queue->events[position].type == INPUT_EVENT_BUTTON ||
+            queue->events[position].type == INPUT_EVENT_AXIS) {
+            found = index;
+            *event = queue->events[position];
+            break;
+        }
+    }
+    if (found == INPUT_EVENT_CAPACITY) {
+        spinlock_unlock_irqrestore(&queue->lock, flags);
+        return 0;
+    }
+    for (uint32_t index = found; index + 1U < queue->count; ++index) {
+        uint32_t from = (queue->head + index + 1U) % INPUT_EVENT_CAPACITY;
+        uint32_t to = (queue->head + index) % INPUT_EVENT_CAPACITY;
+        queue->events[to] = queue->events[from];
+    }
+    --queue->count;
+    queue->tail = (queue->head + queue->count) % INPUT_EVENT_CAPACITY;
+    spinlock_unlock_irqrestore(&queue->lock, flags);
+    return 1;
+}
+
 uint32_t input_queue_count(const input_queue_t *queue) {
     if (!queue) return 0;
     input_queue_t *mutable_queue = (input_queue_t *)queue;

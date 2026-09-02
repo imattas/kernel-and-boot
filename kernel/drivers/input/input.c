@@ -8,7 +8,7 @@ static uint8_t keyboard_caps;
 
 static char keyboard_symbol(uint16_t code, int ps2) {
     static const char normal[] = "1234567890-=[]\\;',./`";
-    static const char shifted[] = "!@#$%^&*()_+{}|:\\\"<>?~";
+    static const char shifted[] = "!@#$%^&*()_+{}|:\"<>?~";
     uint16_t index = 0;
     if (ps2) {
         if (code >= 0x02 && code <= 0x0d) index = code - 0x02;

@@ -68,6 +68,7 @@ grep -F 'standard input ready' "$log" >/dev/null
 grep -F 'keyboard alpha/editing ready' "$log" >/dev/null
 grep -F 'keyboard controls ready' "$log" >/dev/null
 grep -F 'keyboard punctuation ready' "$log" >/dev/null
+grep -F 'keyboard shifted punctuation ready' "$log" >/dev/null
 grep -F 'HID key mapping ready' "$log" >/dev/null
 grep -F 'keyboard queue boundaries ready' "$log" >/dev/null
 grep -F 'console control ready' "$log" >/dev/null

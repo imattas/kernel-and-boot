@@ -47,10 +47,29 @@ int display_surface_blit(display_surface_t *destination,
     if (!destination || !source || !destination->pixels || !source->pixels ||
         source->width == 0 || source->height == 0)
         return 0;
+    return display_surface_blit_region(destination, source, x, y, 0, 0,
+                                       destination->width,
+                                       destination->height);
+}
+
+int display_surface_blit_region(display_surface_t *destination,
+                                const display_surface_t *source, int32_t x,
+                                int32_t y, int32_t clip_x, int32_t clip_y,
+                                uint32_t clip_width, uint32_t clip_height) {
+    if (!destination || !source || !destination->pixels || !source->pixels ||
+        source->width == 0 || source->height == 0 || clip_width == 0 ||
+        clip_height == 0)
+        return 0;
     int64_t left = x < 0 ? 0 : x;
     int64_t top = y < 0 ? 0 : y;
     int64_t right = (int64_t)x + source->width;
     int64_t bottom = (int64_t)y + source->height;
+    int64_t clip_right = (int64_t)clip_x + clip_width;
+    int64_t clip_bottom = (int64_t)clip_y + clip_height;
+    if (left < clip_x) left = clip_x;
+    if (top < clip_y) top = clip_y;
+    if (right > clip_right) right = clip_right;
+    if (bottom > clip_bottom) bottom = clip_bottom;
     if (right > destination->width) right = destination->width;
     if (bottom > destination->height) bottom = destination->height;
     if (left >= right || top >= bottom) return 1;

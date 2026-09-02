@@ -75,6 +75,7 @@ grep -F 'PS2 keyboard ready' "$log" >/dev/null
 grep -F 'framebuffer surface ready' "$log" >/dev/null
 grep -F 'GPU display surface ready' "$log" >/dev/null
 grep -F 'display compositor ready' "$log" >/dev/null
+grep -F 'display damage composition ready' "$log" >/dev/null
 grep -F 'window manager core ready' "$log" >/dev/null
 grep -F 'window manager input routing ready' "$log" >/dev/null
 grep -F 'window manager buffers ready' "$log" >/dev/null

@@ -2168,6 +2168,9 @@ the graphical shell was exercised with host key events through
 - The window manager now supports an independent topmost cursor surface that
   follows bounded pointer motion, remains outside hit-testing, and supports
   visibility control through the compositor.
+- Compositor layer changes now track a clipped union damage region and can
+  redraw only that region, including old/new bounds after movement, through
+  the GPU display-surface clipping path.
 - Kernel-owned windows now support transactional resize: replacement buffers
   are validated and attached before the old surface is released, with failure
   preservation and lifecycle reuse covered by the boot contract.

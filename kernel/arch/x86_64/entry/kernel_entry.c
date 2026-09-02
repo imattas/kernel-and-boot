@@ -2836,6 +2836,15 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("display compositor ready\r\n");
+    if (!compositor_set_layer_position(&compositor, 1, 3, 3) ||
+        !compositor_compose_damage(&compositor, 0U) ||
+        compositor_target_storage[5] != 0x10U ||
+        compositor_target_storage[15] != 0xa0U ||
+        compositor_target_storage[0] != 0U) {
+        serial_write("display damage composition failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("display damage composition ready\r\n");
     window_manager_t window_manager;
     uint32_t window_a_storage[4] = {1U, 2U, 3U, 4U};
     uint32_t window_b_storage[4] = {5U, 6U, 7U, 8U};

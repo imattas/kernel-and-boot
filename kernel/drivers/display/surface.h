@@ -20,5 +20,9 @@ int display_surface_fill_rect(display_surface_t *surface, int32_t x,
 int display_surface_blit(display_surface_t *destination,
                          const display_surface_t *source, int32_t x,
                          int32_t y);
+int display_surface_blit_region(display_surface_t *destination,
+                                const display_surface_t *source, int32_t x,
+                                int32_t y, int32_t clip_x, int32_t clip_y,
+                                uint32_t clip_width, uint32_t clip_height);
 
 #endif

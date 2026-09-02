@@ -101,8 +101,8 @@ type, string, and numeric tests.
   pipelines, redirection, background jobs, and inherited environment state.
 - [x] Make native shell `ls <path>` honor its directory operand consistently
   with standalone `ls.elf`.
-- [ ] Implement and verify init-owned shell supervision through spawn/wait/reap;
-  do not replace the stable direct shell handoff until live QEMU proves it.
+- [x] Implement and verify init-owned shell supervision through spawn/wait/reap;
+  the live QEMU shell-run gate proves the complete child lifecycle.
 - [x] Add direct contract coverage for quote-aware command sequencing.
 - [x] Add shell `clear` terminal control and parser coverage.
 - [x] Add bounded shell aliases with explicit `alias` and `unalias` commands.
@@ -192,8 +192,8 @@ type, string, and numeric tests.
   external commands.
 - [x] Poll, reap, and remove completed background jobs without blocking the
   shell prompt.
-- [ ] Make init supervise `shell.elf` through the normal spawn/wait ABI after
-  the namespace-retain and shared-scheduler startup deadlocks are fixed.
+- [x] Make init supervise `shell.elf` through the normal spawn/wait ABI after
+  the namespace-retain and shared-scheduler startup deadlocks were fixed.
 
 - [x] Tell the user before creating ring-3/userland implementation.
 - [x] Build the first freestanding ring-3 init ELF against the existing syscall
@@ -213,9 +213,8 @@ type, string, and numeric tests.
 - [x] Add shell `rmdir` backed by the rmdir syscall.
 - [x] Add shell `touch` and userland file create/write wrappers.
 - [x] Add shell `write <path> <text>` file-writing behavior.
-- [ ] Fix and verify shell `run <path>` process execution through spawn/wait;
-  current live QEMU reproduction hangs during namespace VFS lookup before the
-  child is created.
+- [x] Fix and verify shell `run <path>` process execution through spawn/wait;
+  the live QEMU gate proves spawn, wait, and reap for `/true.elf`.
 - [x] Add shell `id` process and credential identity utility.
 - [x] Add shell `ps` live process-ID listing.
 - [x] Add process status details to shell `ps`.
@@ -328,7 +327,7 @@ type, string, and numeric tests.
 - [ ] Add reliable QEMU live USB/PS2 keyboard verification for `run INIT.ELF`.
 - [x] Expose the complete multi-cluster FAT32 boot-image application set in the
   live VFS namespace for reliable external `run` execution.
-- [ ] Make userland init spawn the shell through the normal process ABI after
+- [x] Make userland init spawn the shell through the normal process ABI after
   scheduler/runtime service startup can support an immediately-blocking child.
 - [x] Add the command-line shell and terminal/console I/O.
 - [x] Add process tools and initial utilities (`init`, `echo`, `ls`, `cat`,

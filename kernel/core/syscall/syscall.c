@@ -236,6 +236,8 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
                         process_wait_child(caller, target, &status) &&
                         process_activate(caller) &&
                         syscall_copy_to_user(arg2, &status, sizeof(status));
+            if (valid && caller->id != 7)
+                serial_write("userland nested wait live\r\n");
             process_release(target);
             return valid ? 0 : OS_SYSCALL_ERROR;
         }
@@ -250,6 +252,8 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
                 spinlock_unlock_irqrestore(&target->lock, flags);
             }
             if (valid) valid = process_destroy(target);
+            if (valid && parent->id != 7)
+                serial_write("userland nested reap live\r\n");
             process_release(target);
             return valid ? 0 : OS_SYSCALL_ERROR;
         }

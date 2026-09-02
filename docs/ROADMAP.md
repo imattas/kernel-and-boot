@@ -1963,6 +1963,10 @@ the existing parser coverage for pipelines, redirection, jobs, and expansion.
 
 Continue hardening SMP, memory reclamation, storage, USB, networking, graphics, security, debugging, crash diagnostics, performance tooling, power management, hardware compatibility, and userland while maintaining explicit subsystem boundaries and automated regression coverage.
 
+The grouped runtime gate now requires successful non-init spawn, wait, and reap
+markers for the shell's `/true.elf` command, closing the previously indirect
+process-lifecycle evidence gap.
+
 When a USB HID keyboard endpoint is active, the input layer now suppresses the
 parallel legacy PS/2 keyboard stream. This avoids duplicate and apparently
 cross-mapped keystrokes on the Windows QEMU run path while retaining PS/2 as

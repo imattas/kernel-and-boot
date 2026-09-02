@@ -2183,6 +2183,9 @@ the graphical shell was exercised with host key events through
 - Display-service initialization now rejects accidental double ownership, and
   shutdown clears embedded surface/compositor state so a stopped service cannot
   be mistaken for a live display.
+- The grouped completion gate was rerun after the display and keyboard changes:
+  userland contracts, filesystem contracts, kernel/UEFI/image validation, and
+  the QEMU UEFI handoff all pass together.
 - Window content changes can now explicitly invalidate their compositor layer,
   and the WM exposes damage-only composition for efficient redraw.
 - The Windows QEMU launcher now pins host keyboard translation to `en-us`,

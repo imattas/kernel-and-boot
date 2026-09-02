@@ -3,7 +3,8 @@
 int display_service_initialize(display_service_t *service, void *pixels,
                                uint32_t width, uint32_t height,
                                uint32_t pitch_pixels) {
-    if (!service || !display_surface_initialize(&service->surface, pixels,
+    if (!service || service->initialized ||
+        !display_surface_initialize(&service->surface, pixels,
                                                 width, height, pitch_pixels) ||
         !compositor_initialize(&service->compositor, &service->surface) ||
         !window_manager_initialize(&service->window_manager,
@@ -18,6 +19,8 @@ int display_service_shutdown(display_service_t *service) {
         !window_manager_shutdown(&service->window_manager))
         return 0;
     service->initialized = 0;
+    service->surface = (display_surface_t){0};
+    service->compositor = (compositor_t){0};
     return 1;
 }
 

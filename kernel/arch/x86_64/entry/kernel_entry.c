@@ -2990,6 +2990,11 @@ void kernel_main(void *boot_info) {
         serial_write("display service initialization failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
+    if (display_service_initialize(&display_service, display_service_pixels,
+                                   4, 4, 4)) {
+        serial_write("display service reinitialization failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
     uint32_t service_window = window_manager_create_buffered(
         &display_service.window_manager, 1, 1, 0, 0);
     if (service_window == WINDOW_MANAGER_INVALID_WINDOW ||
@@ -2997,7 +3002,9 @@ void kernel_main(void *boot_info) {
         !display_service_route_event(&display_service, &routed_key) ||
         !window_manager_invalidate(&display_service.window_manager, service_window) ||
         !display_service_compose_damage(&display_service, 0U) ||
-        !display_service_shutdown(&display_service)) {
+        !display_service_shutdown(&display_service) ||
+        display_service_shutdown(&display_service) ||
+        display_service.surface.pixels || display_service.compositor.target) {
         serial_write("display service lifecycle failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }

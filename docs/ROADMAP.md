@@ -2180,6 +2180,9 @@ the graphical shell was exercised with host key events through
 - A display-service boundary now bundles the GPU surface, compositor, and
   window manager with route, compose, and shutdown operations, and its full
   lifecycle is exercised during QEMU boot.
+- Display-service initialization now rejects accidental double ownership, and
+  shutdown clears embedded surface/compositor state so a stopped service cannot
+  be mistaken for a live display.
 - Window content changes can now explicitly invalidate their compositor layer,
   and the WM exposes damage-only composition for efficient redraw.
 - The Windows QEMU launcher now pins host keyboard translation to `en-us`,

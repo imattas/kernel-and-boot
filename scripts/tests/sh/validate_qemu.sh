@@ -81,6 +81,7 @@ grep -F 'window manager input routing ready' "$log" >/dev/null
 grep -F 'window manager buffers ready' "$log" >/dev/null
 grep -F 'window manager resize ready' "$log" >/dev/null
 grep -F 'window manager cursor ready' "$log" >/dev/null
+grep -F 'window manager shutdown ready' "$log" >/dev/null
 grep -F 'firmware framebuffer ready' "$log" >/dev/null
 grep -F 'framebuffer console ready' "$log" >/dev/null
 grep -F 'USB descriptor layer ready' "$log" >/dev/null

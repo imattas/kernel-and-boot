@@ -2174,6 +2174,9 @@ the graphical shell was exercised with host key events through
 - Kernel-owned windows now support transactional resize: replacement buffers
   are validated and attached before the old surface is released, with failure
   preservation and lifecycle reuse covered by the boot contract.
+- The window manager now has an explicit shutdown path that releases managed
+  windows, heap-backed surfaces, input queues, and cursor layers, leaving no
+  owned resources behind.
 - The Windows QEMU launcher now pins host keyboard translation to `en-us`,
   keeping host layout state from changing the scan codes consumed by the
   guest keyboard decoder.

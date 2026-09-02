@@ -30,6 +30,7 @@ typedef struct {
 
 int window_manager_initialize(window_manager_t *manager,
                               compositor_t *compositor);
+int window_manager_shutdown(window_manager_t *manager);
 uint32_t window_manager_create(window_manager_t *manager,
                                display_surface_t *surface, int32_t x,
                                int32_t y);

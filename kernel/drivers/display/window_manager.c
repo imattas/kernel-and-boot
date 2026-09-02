@@ -19,6 +19,20 @@ int window_manager_initialize(window_manager_t *manager,
     return 1;
 }
 
+int window_manager_shutdown(window_manager_t *manager) {
+    if (!manager || !manager->compositor) return 0;
+    for (uint32_t index = 0; index < WINDOW_MANAGER_WINDOW_CAPACITY; ++index)
+        if (manager->windows[index].surface &&
+            !window_manager_destroy(manager, index))
+            return 0;
+    if (manager->cursor_layer != COMPOSITOR_INVALID_LAYER &&
+        !compositor_remove_layer(manager->compositor, manager->cursor_layer))
+        return 0;
+    manager->cursor_layer = COMPOSITOR_INVALID_LAYER;
+    manager->compositor = 0;
+    return 1;
+}
+
 uint32_t window_manager_create(window_manager_t *manager,
                                display_surface_t *surface, int32_t x,
                                int32_t y) {

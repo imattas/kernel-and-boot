@@ -2951,6 +2951,14 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("window manager cursor ready\r\n");
+    if (!window_manager_shutdown(&window_manager) ||
+        window_manager.windows[0].surface ||
+        window_manager.windows[1].surface ||
+        window_manager.cursor_layer != COMPOSITOR_INVALID_LAYER) {
+        serial_write("window manager shutdown failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("window manager shutdown ready\r\n");
     if (!console_initialize(&framebuffer) ||
         console_write("A", 1) != 1 ||
         console_write("\x1b[2J\x1b[H", 7) != 7) {

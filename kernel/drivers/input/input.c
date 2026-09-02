@@ -8,6 +8,29 @@ static uint8_t keyboard_shift;
 static uint8_t keyboard_caps;
 static uint8_t serial_bridge_reported;
 static uint8_t runtime_input_enabled;
+static uint8_t pending_sequence[3];
+static uint8_t pending_sequence_length;
+static uint8_t pending_sequence_offset;
+
+static int keyboard_sequence(uint16_t code, int pressed) {
+    if (!pressed) return 0;
+    if ((code & INPUT_KEY_PS2) != 0) {
+        code &= (uint16_t)~INPUT_KEY_PS2;
+        if (code == 0x148) {
+            pending_sequence[0] = 0x1b; pending_sequence[1] = '[';
+            pending_sequence[2] = 'A';
+        } else if (code == 0x150) {
+            pending_sequence[0] = 0x1b; pending_sequence[1] = '[';
+            pending_sequence[2] = 'B';
+        } else return 0;
+    } else if (code == 0x52 || code == 0x51) {
+        pending_sequence[0] = 0x1b; pending_sequence[1] = '[';
+        pending_sequence[2] = (uint8_t)(code == 0x52 ? 'A' : 'B');
+    } else return 0;
+    pending_sequence_length = 3;
+    pending_sequence_offset = 0;
+    return 1;
+}
 
 static char keyboard_symbol(uint16_t code, int ps2) {
     static const char normal[] = "1234567890-=[]\\;',./`";
@@ -207,10 +230,22 @@ uint32_t input_read_standard(void *buffer, uint32_t capacity) {
     uint8_t *output = (uint8_t *)buffer;
     uint32_t count = 0;
     input_event_t event;
-    while (count < capacity && input_queue_pop(standard_queue, &event)) {
+    while (count < capacity) {
+        if (pending_sequence_offset < pending_sequence_length) {
+            output[count++] = pending_sequence[pending_sequence_offset++];
+            continue;
+        }
+        pending_sequence_length = 0;
+        pending_sequence_offset = 0;
+        if (!input_queue_pop(standard_queue, &event)) break;
         if (event.type == INPUT_EVENT_KEY)
             keyboard_update_modifiers(event.code, event.value != 0);
         if (event.value == 0) continue;
+        if (event.type == INPUT_EVENT_KEY &&
+            keyboard_sequence(event.code, event.value != 0)) {
+            output[count++] = pending_sequence[pending_sequence_offset++];
+            continue;
+        }
         char value = event.type == INPUT_EVENT_TEXT ? (char)event.code :
                      event.type == INPUT_EVENT_KEY ? key_to_ascii(event.code) : 0;
         if (value) output[count++] = (uint8_t)value;

@@ -1975,6 +1975,10 @@ The runtime logs both source-selection states for integration diagnostics. HID
 boot-keyboard decoding also accepts larger interrupt packets whose trailing
 bytes are padding, and records the first decoded HID event.
 
+The Windows launcher now explicitly selects QEMU's SDL display backend and
+USB-enabled machine profile, making the visible emulator window the canonical
+keyboard-focus target.
+
 The init-owned shell supervisor is now the active handoff: init is queued with
 the runtime services and owns the shell spawn/wait/reap loop. The former
 kernel-managed shell creation path has been removed after the namespace-retain

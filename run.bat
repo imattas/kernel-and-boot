@@ -28,12 +28,12 @@ if not exist build mkdir build
 copy /y "%OVMF_VARS%" build\OVMF_VARS.windows.fd >nul
 if errorlevel 1 exit /b %errorlevel%
 
-"%QEMU%" -machine pc -smp 2 -m 128M ^
+"%QEMU%" -machine pc,usb=on -smp 2 -m 128M ^
     -drive if=pflash,format=raw,readonly=on,file="%OVMF_CODE%" ^
     -drive if=pflash,format=raw,file="%SCRIPT_DIR%build\OVMF_VARS.windows.fd" ^
     -drive if=ide,index=0,media=disk,format=raw,file="%SCRIPT_DIR%dist\os.img" ^
     -device piix3-usb-uhci ^
     -device usb-kbd ^
-    -k en-us -serial file:build\qemu-run.log -no-reboot -no-shutdown ^
+    -display sdl -k en-us -serial file:build\qemu-run.log -no-reboot -no-shutdown ^
     -netdev user,id=osnet -device e1000,netdev=osnet
 exit /b %errorlevel%

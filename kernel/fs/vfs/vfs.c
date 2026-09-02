@@ -64,7 +64,7 @@ static vfs_node_t *parent_reference(vfs_node_t *root, vfs_node_t *current) {
     uint64_t flags = spinlock_lock_irqsave(&current->lock);
     vfs_node_t *parent = current != root && current->parent ?
         current->parent : current;
-    __atomic_add_fetch(&parent->references, 1, __ATOMIC_RELAXED);
+    if (!vfs_node_retain(parent)) parent = 0;
     spinlock_unlock_irqrestore(&current->lock, flags);
     return parent;
 }
@@ -237,8 +237,8 @@ vfs_node_t *vfs_node_lookup(vfs_node_t *parent, const char *name) {
          child = child->next_sibling) {
         if (string_equal(child->name, name)) {
             if (!__atomic_load_n(&child->destroying, __ATOMIC_ACQUIRE) &&
-                __atomic_load_n(&child->references, __ATOMIC_ACQUIRE) != 0) {
-                __atomic_add_fetch(&child->references, 1, __ATOMIC_RELAXED);
+                __atomic_load_n(&child->references, __ATOMIC_ACQUIRE) != 0 &&
+                vfs_node_retain(child)) {
                 result = child;
             }
             break;
@@ -258,8 +258,7 @@ vfs_node_t *vfs_node_child(vfs_node_t *parent, uint32_t index) {
         if (!__atomic_load_n(&child->destroying, __ATOMIC_ACQUIRE) &&
             __atomic_load_n(&child->references, __ATOMIC_ACQUIRE) != 0) {
             if (current == index) {
-                __atomic_add_fetch(&child->references, 1, __ATOMIC_RELAXED);
-                result = child;
+                if (vfs_node_retain(child)) result = child;
                 break;
             }
             ++current;
@@ -272,7 +271,7 @@ vfs_node_t *vfs_node_child(vfs_node_t *parent, uint32_t index) {
 vfs_node_t *vfs_lookup_path(vfs_node_t *root, const char *path) {
     if (!root || !path || path[0] != '/') return 0;
     vfs_node_t *current = root;
-    vfs_node_retain(current);
+    if (!vfs_node_retain(current)) return 0;
     uint32_t index = 1;
     while (path[index] != '\0') {
         while (path[index] == '/') ++index;
@@ -290,7 +289,7 @@ vfs_node_t *vfs_lookup_path(vfs_node_t *root, const char *path) {
         vfs_node_t *next;
         if (string_equal(component, ".")) {
             next = current;
-            vfs_node_retain(next);
+            if (!vfs_node_retain(next)) next = 0;
         } else if (string_equal(component, "..")) {
             next = parent_reference(root, current);
         } else {
@@ -310,7 +309,7 @@ vfs_node_t *vfs_lookup_path_at(vfs_node_t *root, vfs_node_t *working,
         working->type != VFS_NODE_DIRECTORY) return 0;
     if (path[0] == '/') return vfs_lookup_path(root, path);
     vfs_node_t *current = working;
-    vfs_node_retain(current);
+    if (!vfs_node_retain(current)) return 0;
     uint32_t index = 0;
     while (path[index] != '\0') {
         while (path[index] == '/') ++index;
@@ -328,7 +327,7 @@ vfs_node_t *vfs_lookup_path_at(vfs_node_t *root, vfs_node_t *working,
         vfs_node_t *next;
         if (string_equal(component, ".")) {
             next = current;
-            vfs_node_retain(next);
+            if (!vfs_node_retain(next)) next = 0;
         } else if (string_equal(component, "..")) {
             next = parent_reference(root, current);
         } else {
@@ -348,7 +347,7 @@ vfs_node_t *vfs_lookup_path_at_access(vfs_node_t *root, vfs_node_t *working,
         root->type != VFS_NODE_DIRECTORY || working->type != VFS_NODE_DIRECTORY)
         return 0;
     vfs_node_t *current = path[0] == '/' ? root : working;
-    vfs_node_retain(current);
+    if (!vfs_node_retain(current)) return 0;
     uint32_t index = path[0] == '/' ? 1 : 0;
     while (path[index] != '\0') {
         while (path[index] == '/') ++index;
@@ -370,7 +369,7 @@ vfs_node_t *vfs_lookup_path_at_access(vfs_node_t *root, vfs_node_t *working,
         vfs_node_t *next;
         if (string_equal(component, ".")) {
             next = current;
-            vfs_node_retain(next);
+            if (!vfs_node_retain(next)) next = 0;
         } else if (string_equal(component, "..")) {
             next = parent_reference(root, current);
         } else {

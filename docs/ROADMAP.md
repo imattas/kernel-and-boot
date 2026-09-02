@@ -2272,6 +2272,9 @@ the graphical shell was exercised with host key events through
 - Process namespace installation, inheritance, cloning, and working-directory
   changes now require successful VFS node retention with rollback on partial
   failure, preventing saturated or destructing nodes from entering a process.
+- VFS lookup, child enumeration, parent traversal, and mounted-path traversal
+  now use checked atomic retention instead of unchecked reference increments;
+  lookup fails cleanly when a node is saturated or being destroyed.
 - The boot contract now exercises both first-node and partial-second-node
   namespace-retention failures, proving process state and successful retains
   are restored together.

@@ -121,7 +121,7 @@ static vfs_node_t *mounted_root(vfs_mount_table_t *table, vfs_node_t *node) {
     for (uint32_t i = 0; i < VFS_MAX_MOUNTS; ++i) {
         if (table->mounts[i].active && table->mounts[i].mountpoint == node) {
             result = table->mounts[i].root;
-            vfs_node_retain(result);
+            if (!vfs_node_retain(result)) result = 0;
             break;
         }
     }
@@ -142,7 +142,7 @@ static vfs_node_t *mounted_mountpoint(vfs_mount_table_t *table,
             result = mountpoint->parent ? mountpoint->parent : mountpoint;
             /* The child lock keeps the parent relationship from being
                detached while the parent reference is acquired. */
-            __atomic_add_fetch(&result->references, 1, __ATOMIC_RELAXED);
+            if (!vfs_node_retain(result)) result = 0;
             spinlock_unlock_irqrestore(&mountpoint->lock, node_flags);
             break;
         }
@@ -155,7 +155,7 @@ vfs_node_t *vfs_lookup_path_mounted(vfs_mount_table_t *table,
                                     vfs_node_t *root, const char *path) {
     if (!table || !root || !path || path[0] != '/') return 0;
     vfs_node_t *current = root;
-    vfs_node_retain(current);
+    if (!vfs_node_retain(current)) return 0;
     uint32_t index = 1;
     int escaped_mount = 0;
     while (path[index] != '\0') {
@@ -174,14 +174,14 @@ vfs_node_t *vfs_lookup_path_mounted(vfs_mount_table_t *table,
         vfs_node_t *next;
         if (string_equal(component, ".")) {
             next = current;
-            vfs_node_retain(next);
+            if (!vfs_node_retain(next)) next = 0;
         } else if (string_equal(component, "..")) {
             next = mounted_mountpoint(table, current);
             if (next) escaped_mount = 1;
             else {
                 next = current != root && current->parent ?
                     current->parent : current;
-                vfs_node_retain(next);
+                if (!vfs_node_retain(next)) next = 0;
             }
         } else {
             next = vfs_node_lookup(current, component);

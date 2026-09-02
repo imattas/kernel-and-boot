@@ -2009,6 +2009,9 @@ that exposed the original cross-mapping symptoms: F, C, Enter, and Backspace.
 The Windows launcher now explicitly selects QEMU's SDL display backend and
 USB-enabled machine profile, making the visible emulator window the canonical
 keyboard-focus target.
+The launcher no longer enables an additional machine USB controller alongside
+the explicit UHCI controller, avoiding a duplicate-controller topology on
+Windows and keeping device enumeration consistent with the QEMU gate.
 
 The init-owned shell supervisor is now the active handoff: init is queued with
 the runtime services and owns the shell spawn/wait/reap loop. The former

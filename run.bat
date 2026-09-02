@@ -28,7 +28,7 @@ if not exist build mkdir build
 copy /y "%OVMF_VARS%" build\OVMF_VARS.windows.fd >nul
 if errorlevel 1 exit /b %errorlevel%
 
-"%QEMU%" -machine pc,usb=on -smp 2 -m 128M ^
+"%QEMU%" -machine pc -smp 2 -m 128M ^
     -drive if=pflash,format=raw,readonly=on,file="%OVMF_CODE%" ^
     -drive if=pflash,format=raw,file="%SCRIPT_DIR%build\OVMF_VARS.windows.fd" ^
     -drive if=ide,index=0,media=disk,format=raw,file="%SCRIPT_DIR%dist\os.img" ^

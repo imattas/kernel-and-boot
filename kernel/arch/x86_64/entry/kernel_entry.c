@@ -36,6 +36,7 @@
 #include "../../../drivers/display/surface.h"
 #include "../../../drivers/display/compositor.h"
 #include "../../../drivers/display/window_manager.h"
+#include "../../../drivers/display/display_service.h"
 #include "../../../drivers/usb/usb.h"
 #include "../../../drivers/usb/hid.h"
 #include "../../../drivers/usb/uhci.h"
@@ -2962,6 +2963,25 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("window manager shutdown ready\r\n");
+    static display_service_t display_service;
+    static uint32_t display_service_pixels[16];
+    if (!display_service_initialize(&display_service, display_service_pixels,
+                                    4, 4, 4)) {
+        serial_write("display service initialization failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    uint32_t service_window = window_manager_create_buffered(
+        &display_service.window_manager, 1, 1, 0, 0);
+    if (service_window == WINDOW_MANAGER_INVALID_WINDOW ||
+        !window_manager_focus(&display_service.window_manager, service_window) ||
+        !display_service_route_event(&display_service, &routed_key) ||
+        !window_manager_invalidate(&display_service.window_manager, service_window) ||
+        !display_service_compose_damage(&display_service, 0U) ||
+        !display_service_shutdown(&display_service)) {
+        serial_write("display service lifecycle failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("display service ready\r\n");
     if (!console_initialize(&framebuffer) ||
         console_write("A", 1) != 1 ||
         console_write("\x1b[2J\x1b[H", 7) != 7) {

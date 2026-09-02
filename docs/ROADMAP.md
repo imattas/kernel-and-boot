@@ -2177,6 +2177,9 @@ the graphical shell was exercised with host key events through
 - The window manager now has an explicit shutdown path that releases managed
   windows, heap-backed surfaces, input queues, and cursor layers, leaving no
   owned resources behind.
+- A display-service boundary now bundles the GPU surface, compositor, and
+  window manager with route, compose, and shutdown operations, and its full
+  lifecycle is exercised during QEMU boot.
 - Window content changes can now explicitly invalidate their compositor layer,
   and the WM exposes damage-only composition for efficient redraw.
 - The Windows QEMU launcher now pins host keyboard translation to `en-us`,

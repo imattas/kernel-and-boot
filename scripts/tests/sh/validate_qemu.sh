@@ -83,6 +83,7 @@ grep -F 'window manager resize ready' "$log" >/dev/null
 grep -F 'window manager damage ready' "$log" >/dev/null
 grep -F 'window manager cursor ready' "$log" >/dev/null
 grep -F 'window manager shutdown ready' "$log" >/dev/null
+grep -F 'display service ready' "$log" >/dev/null
 grep -F 'firmware framebuffer ready' "$log" >/dev/null
 grep -F 'framebuffer console ready' "$log" >/dev/null
 grep -F 'USB descriptor layer ready' "$log" >/dev/null

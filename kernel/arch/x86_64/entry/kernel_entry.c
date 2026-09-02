@@ -123,6 +123,7 @@ static usb_hid_keyboard_state_t input_runtime_hid_state;
 static int input_runtime_mouse;
 static int input_runtime_ready;
 static int input_runtime_pending;
+static volatile int init_supervisor_probe_result;
 
 static void network_runtime_task(void *argument) {
     network_runtime_context_t *runtime = (network_runtime_context_t *)argument;
@@ -168,6 +169,32 @@ static void input_runtime_task(void *argument) {
                 &input_runtime_toggle);
         scheduler_yield();
     }
+}
+
+static void init_supervisor_probe_task(void *argument) {
+    (void)argument;
+    for (uint32_t attempt = 0; attempt < 4096U; ++attempt) {
+        uint64_t ids[PROCESS_MAX];
+        uint32_t count = process_snapshot(ids, PROCESS_MAX);
+        for (uint32_t index = 0; index < count; ++index) {
+            if (ids[index] == 7) continue;
+            process_t *candidate = process_lookup_retain(ids[index]);
+            if (!candidate) continue;
+            uint64_t flags = spinlock_lock_irqsave(&candidate->lock);
+            int child_of_init = candidate->parent &&
+                                candidate->parent->id == 7;
+            spinlock_unlock_irqrestore(&candidate->lock, flags);
+            process_release(candidate);
+            if (child_of_init) {
+                init_supervisor_probe_result = 1;
+                serial_write("init shell supervisor live\r\n");
+                return;
+            }
+        }
+        scheduler_yield();
+    }
+    init_supervisor_probe_result = -1;
+    serial_write("init shell supervisor probe timeout\r\n");
 }
 static void process_thread_probe(void *argument) { (void)argument; }
 static int block_probe_read(void *context, uint64_t sector, uint32_t count,
@@ -4148,6 +4175,13 @@ void kernel_main(void *boot_info) {
             for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
         }
         serial_write("input runtime service ready\r\n");
+    }
+    init_supervisor_probe_result = 0;
+    task_t *init_supervisor_probe = task_create_kernel(
+        502, init_supervisor_probe_task, 0, 16384);
+    if (!init_supervisor_probe || !scheduler_enqueue(init_supervisor_probe)) {
+        serial_write("init shell supervisor probe setup failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     if (e1000_controller_count() != 0 || input_runtime_ready) {
         scheduler_enable_preemption(1);

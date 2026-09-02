@@ -159,6 +159,12 @@ int window_manager_set_visible(window_manager_t *manager, uint32_t window,
     return 1;
 }
 
+int window_manager_invalidate(window_manager_t *manager, uint32_t window) {
+    return valid_window(manager, window) &&
+           compositor_invalidate_layer(manager->compositor,
+                                        manager->windows[window].compositor_layer);
+}
+
 int window_manager_focus(window_manager_t *manager, uint32_t window) {
     if (!valid_window(manager, window) || !manager->windows[window].visible)
         return 0;
@@ -272,4 +278,9 @@ uint32_t window_manager_hit_test(const window_manager_t *manager, int32_t x,
 
 int window_manager_compose(window_manager_t *manager, uint32_t clear_color) {
     return manager && compositor_compose(manager->compositor, clear_color);
+}
+
+int window_manager_compose_damage(window_manager_t *manager,
+                                  uint32_t clear_color) {
+    return manager && compositor_compose_damage(manager->compositor, clear_color);
 }

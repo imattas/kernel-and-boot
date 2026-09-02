@@ -80,6 +80,7 @@ grep -F 'window manager core ready' "$log" >/dev/null
 grep -F 'window manager input routing ready' "$log" >/dev/null
 grep -F 'window manager buffers ready' "$log" >/dev/null
 grep -F 'window manager resize ready' "$log" >/dev/null
+grep -F 'window manager damage ready' "$log" >/dev/null
 grep -F 'window manager cursor ready' "$log" >/dev/null
 grep -F 'window manager shutdown ready' "$log" >/dev/null
 grep -F 'firmware framebuffer ready' "$log" >/dev/null

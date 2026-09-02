@@ -41,6 +41,7 @@ int compositor_set_layer_position(compositor_t *compositor, uint32_t layer,
                                   int32_t x, int32_t y);
 int compositor_set_layer_surface(compositor_t *compositor, uint32_t layer,
                                  display_surface_t *surface);
+int compositor_invalidate_layer(compositor_t *compositor, uint32_t layer);
 int compositor_set_layer_z(compositor_t *compositor, uint32_t layer,
                            uint32_t z);
 int compositor_set_layer_visible(compositor_t *compositor, uint32_t layer,

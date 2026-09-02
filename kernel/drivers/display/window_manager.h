@@ -44,6 +44,7 @@ int window_manager_move(window_manager_t *manager, uint32_t window,
                         int32_t x, int32_t y);
 int window_manager_set_visible(window_manager_t *manager, uint32_t window,
                                int visible);
+int window_manager_invalidate(window_manager_t *manager, uint32_t window);
 int window_manager_focus(window_manager_t *manager, uint32_t window);
 int window_manager_set_cursor(window_manager_t *manager,
                               display_surface_t *surface);
@@ -55,5 +56,7 @@ uint32_t window_manager_read_event(window_manager_t *manager, uint32_t window,
 uint32_t window_manager_hit_test(const window_manager_t *manager, int32_t x,
                                  int32_t y);
 int window_manager_compose(window_manager_t *manager, uint32_t clear_color);
+int window_manager_compose_damage(window_manager_t *manager,
+                                  uint32_t clear_color);
 
 #endif

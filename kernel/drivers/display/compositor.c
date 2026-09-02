@@ -103,6 +103,12 @@ int compositor_set_layer_surface(compositor_t *compositor, uint32_t layer,
     return 1;
 }
 
+int compositor_invalidate_layer(compositor_t *compositor, uint32_t layer) {
+    if (!valid_layer(compositor, layer)) return 0;
+    mark_layer_damage(compositor, &compositor->layers[layer]);
+    return 1;
+}
+
 int compositor_set_layer_z(compositor_t *compositor, uint32_t layer,
                            uint32_t z) {
     if (!valid_layer(compositor, layer)) return 0;

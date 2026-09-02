@@ -2811,7 +2811,7 @@ void kernel_main(void *boot_info) {
     uint32_t compositor_back_storage[4] = {0x10U, 0x20U, 0x30U, 0x40U};
     display_surface_t compositor_target;
     display_surface_t compositor_back;
-    compositor_t compositor;
+    static compositor_t compositor;
     if (!display_surface_initialize(&compositor_target,
                                     compositor_target_storage, 4, 4, 4) ||
         !display_surface_initialize(&compositor_back, compositor_back_storage,
@@ -2845,7 +2845,7 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("display damage composition ready\r\n");
-    window_manager_t window_manager;
+    static window_manager_t window_manager;
     uint32_t window_a_storage[4] = {1U, 2U, 3U, 4U};
     uint32_t window_b_storage[4] = {5U, 6U, 7U, 8U};
     display_surface_t window_a_surface;
@@ -2912,9 +2912,11 @@ void kernel_main(void *boot_info) {
     }
     window_manager.windows[buffered_window].surface->pixels[0] = 0xeeU;
     uint32_t reused_window;
-    if (!window_manager_compose(&window_manager, 0U) ||
+    if (!window_manager_invalidate(&window_manager, buffered_window) ||
+        !window_manager_compose_damage(&window_manager, 0U) ||
         compositor_target_storage[0] != 0xeeU ||
         !window_manager_destroy(&window_manager, buffered_window) ||
+        !window_manager_compose_damage(&window_manager, 0U) ||
         (reused_window = window_manager_create_buffered(&window_manager, 2,
                                                         2, 0, 0)) ==
             WINDOW_MANAGER_INVALID_WINDOW ||
@@ -2923,6 +2925,7 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("window manager buffers ready\r\n");
+    serial_write("window manager damage ready\r\n");
     uint32_t resized_window = window_manager_create_buffered(&window_manager,
                                                               2, 2, 0, 0);
     if (resized_window == WINDOW_MANAGER_INVALID_WINDOW ||

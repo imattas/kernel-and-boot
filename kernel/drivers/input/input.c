@@ -167,8 +167,10 @@ void input_set_standard_queue(input_queue_t *queue) { standard_queue = queue; }
 uint32_t input_read_standard(void *buffer, uint32_t capacity) {
     if (!standard_queue || !buffer || capacity == 0) return 0;
     char serial_input[INPUT_EVENT_CAPACITY];
-    uint32_t serial_count = serial_poll_input(serial_input,
-                                              INPUT_EVENT_CAPACITY);
+    uint32_t serial_capacity = INPUT_EVENT_CAPACITY -
+                               input_queue_count(standard_queue);
+    uint32_t serial_count = serial_capacity == 0 ? 0 :
+        serial_poll_input(serial_input, serial_capacity);
     if (serial_count != 0) {
         (void)input_queue_push_text(standard_queue, serial_input,
                                     serial_count, 0);

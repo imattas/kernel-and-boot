@@ -2204,6 +2204,8 @@ the graphical shell was exercised with host key events through
   pre-scheduler supervisor banner as runtime proof.
 - The serial-input gate now validates actual COM1 byte consumption by the
   kernel input bridge; graphical shell output remains on the GPU console.
+- Serial input polling now respects remaining queue capacity, preventing a
+  full-batch drop when input arrives in a burst against a nearly full queue.
 - Window content changes can now explicitly invalidate their compositor layer,
   and the WM exposes damage-only composition for efficient redraw.
 - The Windows QEMU launcher now pins host keyboard translation to `en-us`,

@@ -2211,3 +2211,5 @@ the graphical shell was exercised with host key events through
 - The Windows QEMU launcher now pins host keyboard translation to `en-us`,
   keeping host layout state from changing the scan codes consumed by the
   guest keyboard decoder.
+- The Windows QEMU launcher now explicitly creates the same UHCI controller
+  and USB keyboard topology used by the validated Linux QEMU path.

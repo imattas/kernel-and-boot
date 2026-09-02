@@ -1963,6 +1963,11 @@ the existing parser coverage for pipelines, redirection, jobs, and expansion.
 
 Continue hardening SMP, memory reclamation, storage, USB, networking, graphics, security, debugging, crash diagnostics, performance tooling, power management, hardware compatibility, and userland while maintaining explicit subsystem boundaries and automated regression coverage.
 
+When a USB HID keyboard endpoint is active, the input layer now suppresses the
+parallel legacy PS/2 keyboard stream. This avoids duplicate and apparently
+cross-mapped keystrokes on the Windows QEMU run path while retaining PS/2 as
+the fallback when no USB keyboard is available.
+
 The init-owned shell supervisor is now the active handoff: init is queued with
 the runtime services and owns the shell spawn/wait/reap loop. The former
 kernel-managed shell creation path has been removed after the namespace-retain

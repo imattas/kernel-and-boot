@@ -4,6 +4,7 @@
 
 static input_queue_t *keyboard_queue;
 static input_queue_t *mouse_queue;
+static uint8_t keyboard_enabled;
 static uint8_t extended_scancode;
 static uint8_t mouse_packet[4];
 static uint8_t mouse_packet_length;
@@ -114,8 +115,16 @@ int ps2_keyboard_initialize(input_queue_t *queue) {
     if (!keyboard_command_noarg(0xf4)) return 0;
     while ((in8(0x64) & 1) != 0) (void)in8(0x60);
     keyboard_queue = queue;
+    keyboard_enabled = 1;
     extended_scancode = 0;
     return 1;
+}
+
+void ps2_keyboard_set_enabled(int enabled) {
+    uint64_t flags = spinlock_lock_irqsave(&ps2_lock);
+    keyboard_enabled = enabled != 0;
+    if (!keyboard_enabled) extended_scancode = 0;
+    spinlock_unlock_irqrestore(&ps2_lock, flags);
 }
 
 int ps2_mouse_initialize(input_queue_t *queue) {
@@ -229,6 +238,10 @@ int ps2_mouse_decode_explorer(const uint8_t packet[4], input_event_t events[4],
 int ps2_keyboard_poll(input_queue_t *queue) {
     if (!queue) return 0;
     uint64_t flags = spinlock_lock_irqsave(&ps2_lock);
+    if (!keyboard_enabled) {
+        spinlock_unlock_irqrestore(&ps2_lock, flags);
+        return 0;
+    }
     uint8_t status = in8(0x64);
     if ((status & 1U) == 0 || (status & 0x20U) != 0) {
         spinlock_unlock_irqrestore(&ps2_lock, flags);

@@ -323,6 +323,8 @@ type, string, and numeric tests.
 - [x] Add reliable QEMU serial-input verification for the interactive shell;
   `make qemu-input-test` waits for boot, submits `echo input-test`, and checks
   that the command reaches the live shell.
+- [x] Prefer the active USB HID keyboard over the legacy PS/2 stream when both
+  are exposed by QEMU, preventing duplicate or cross-mapped Windows input.
 - [ ] Add reliable QEMU live USB/PS2 keyboard verification for `run INIT.ELF`.
 - [x] Expose the complete multi-cluster FAT32 boot-image application set in the
   live VFS namespace for reliable external `run` execution.

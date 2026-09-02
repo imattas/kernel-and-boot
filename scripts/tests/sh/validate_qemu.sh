@@ -92,6 +92,7 @@ grep -F 'USB HID keyboard ready' "$log" >/dev/null
 grep -F 'UHCI bulk transfer ready' "$log" >/dev/null
 grep -F 'kernel debug ready' "$log" >/dev/null
 grep -F 'process thread lifecycle ready' "$log" >/dev/null
+grep -F 'process orphan lifecycle ready' "$log" >/dev/null
 grep -F 'kernel debug ready' "$log" >/dev/null
 grep -F 'task wait queues ready' "$log" >/dev/null
 grep -F 'scheduler core ready' "$log" >/dev/null

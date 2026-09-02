@@ -2188,6 +2188,8 @@ the graphical shell was exercised with host key events through
   the QEMU UEFI handoff all pass together.
 - VFS node reference acquisition now rejects saturated reference counts instead
   of allowing an atomic increment to wrap back to zero.
+- Process exit and teardown now orphan live children before the parent object is
+  released, preventing child process records from retaining dangling parents.
 - Window content changes can now explicitly invalidate their compositor layer,
   and the WM exposes damage-only composition for efficient redraw.
 - The Windows QEMU launcher now pins host keyboard translation to `en-us`,

@@ -33,6 +33,34 @@ static void wake_all_signal_waiters(process_t *process) {
     while (scheduler_wake_one(&process->signal_waiters)) { }
 }
 
+static void process_orphan_children(process_t *parent) {
+    if (!parent) return;
+    process_t *children[PROCESS_MAX];
+    uint32_t child_count = 0;
+    uint64_t flags = spinlock_lock_irqsave(&process_table_lock);
+    for (uint32_t index = 0; index < PROCESS_MAX; ++index) {
+        process_t *candidate = process_table[index];
+        if (!candidate || candidate == parent ||
+            candidate->references == UINT32_MAX || child_count == PROCESS_MAX)
+            continue;
+        ++candidate->references;
+        children[child_count++] = candidate;
+    }
+    spinlock_unlock_irqrestore(&process_table_lock, flags);
+    for (uint32_t index = 0; index < child_count; ++index) {
+        process_t *child = children[index];
+        int orphaned = 0;
+        flags = spinlock_lock_irqsave(&child->lock);
+        if (child->parent == parent) {
+            child->parent = 0;
+            orphaned = 1;
+        }
+        spinlock_unlock_irqrestore(&child->lock, flags);
+        if (orphaned) process_release(parent);
+        process_release(child);
+    }
+}
+
 __attribute__((noreturn)) void process_exit_current(int32_t status) {
     process_t *process = process_current();
     task_t *task = scheduler_current();
@@ -47,6 +75,7 @@ __attribute__((noreturn)) void process_exit_current(int32_t status) {
     process->exit_status = status;
     process->state = PROCESS_EXITED;
     spinlock_unlock_irqrestore(&process->lock, flags);
+    process_orphan_children(process);
     flags = spinlock_lock_irqsave(&process_table_lock);
     if (current_process == process)
         current_process = process->parent;
@@ -817,6 +846,7 @@ int process_destroy(process_t *process) {
         spinlock_unlock_irqrestore(&process->lock, process_flags);
         return 0;
     }
+    process_orphan_children(process);
     exec_unload_image(&process->address_space, &process->image);
     if (!address_space_destroy(&process->address_space)) {
         spinlock_unlock_irqrestore(&process->lock, process_flags);

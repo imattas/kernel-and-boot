@@ -2027,10 +2027,10 @@ the first command-surface slice after the larger utility set. The grouped
 `make test` gate passed for that milestone, including the image contract and
 QEMU UEFI handoff.
 
-A follow-up attempt to synchronize `PWD` and `OLDPWD` from the shell stalled
-before the prompt during QEMU startup and was reverted. The interaction
-between shell startup, `getcwd`, and the VFS/process locks remains an open
-userland boundary issue.
+An earlier attempt to synchronize `PWD` and `OLDPWD` during shell startup
+stalled before the prompt and was reverted. The completed implementation now
+performs the synchronization only after a successful `cd`, avoiding that
+startup lock interaction.
 
 The identity utility slice now adds bounded `id -u` and `id -g` selectors for
 machine-readable UID/GID output while preserving the full identity report.

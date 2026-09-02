@@ -678,6 +678,7 @@ void kernel_main(void *boot_info) {
     usb_device_t uhci_keyboard;
     uint8_t uhci_interrupt_endpoint = 0;
     uint16_t uhci_interrupt_packet = 0;
+    uint8_t uhci_hid_keyboard_interface = 0;
     if (uhci_root_port_count() != 0 &&
         usb_device_parse_descriptor(&uhci_keyboard, uhci_descriptor,
                                     sizeof(uhci_descriptor))) {
@@ -686,7 +687,17 @@ void kernel_main(void *boot_info) {
         for (uint16_t offset = 0; offset + 2 <= total;) {
             uint8_t descriptor_length = uhci_config_descriptor[offset];
             if (descriptor_length < 2 || offset + descriptor_length > total) break;
-            if (uhci_config_descriptor[offset + 1] == 5 &&
+            if (uhci_config_descriptor[offset + 1] == 4) {
+                /* Only boot-protocol HID keyboard interfaces may feed the
+                   keyboard state machine.  Selecting the first interrupt
+                   endpoint blindly can route a mouse report into it when a
+                   composite USB device exposes multiple interfaces. */
+                uhci_hid_keyboard_interface = descriptor_length >= 9 &&
+                    uhci_config_descriptor[offset + 5] == 3 &&
+                    uhci_config_descriptor[offset + 6] == 1 &&
+                    uhci_config_descriptor[offset + 7] == 1;
+            } else if (uhci_hid_keyboard_interface &&
+                       uhci_config_descriptor[offset + 1] == 5 &&
                 usb_device_add_endpoint(&uhci_keyboard,
                                         &uhci_config_descriptor[offset],
                                         descriptor_length)) {

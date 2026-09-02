@@ -1678,8 +1678,10 @@ void shell_main(void) {
                                            pipeline_background,
                                            &pipeline_leader, &pipeline_consumer,
                                            &pipeline_status);
-                    if (!pipeline_ok)
+                    if (!pipeline_ok) {
+                        last_status = 1;
                         print(unknown, sizeof(unknown) - 1U);
+                    }
                     else if (pipeline_background) {
                         job_add(pipeline_leader, pipeline_consumer);
                         print("pid=", 4);
@@ -1701,8 +1703,10 @@ void shell_main(void) {
                 if (redirect_count != 0) {
                     int32_t redirect_status = 1;
                     if (!shell_run_redirect(argument, argument_length,
-                                             &redirect_status))
+                                             &redirect_status)) {
+                        last_status = 1;
                         print(unknown, sizeof(unknown) - 1U);
+                    }
                     else {
                         last_status = redirect_status;
                         print("exit=", 5);
@@ -1717,8 +1721,10 @@ void shell_main(void) {
                 if (input_redirect_count != 0) {
                     int32_t input_status = 1;
                     if (!shell_run_input_redirect(argument, argument_length,
-                                                  &input_status))
+                                                  &input_status)) {
+                        last_status = 1;
                         print(unknown, sizeof(unknown) - 1U);
+                    }
                     else {
                         last_status = input_status;
                         print("exit=", 5);

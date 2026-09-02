@@ -2194,6 +2194,8 @@ the graphical shell was exercised with host key events through
   reject an unretained node, and child attachment rejects reference overflow.
 - Init supervision now retries failed shell launches with scheduler-friendly
   backoff and waits/reaps a launched shell until the kernel reports completion.
+- Shell pipeline and redirection failures now publish status 1, preserving
+  correct conditional `&&`/`||` behavior after failed execution paths.
 - Window content changes can now explicitly invalidate their compositor layer,
   and the WM exposes damage-only composition for efficient redraw.
 - The Windows QEMU launcher now pins host keyboard translation to `en-us`,

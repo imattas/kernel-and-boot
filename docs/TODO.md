@@ -339,6 +339,8 @@ type, string, and numeric tests.
   delivery failures from shell processing failures.
 - [x] Emit a first completed UHCI interrupt-report marker to separate USB
   transport failures from HID report decoding failures.
+- [x] Detect the active PS/2 scan set and normalize Set-2 keyboard reports to
+  the canonical Set-1 key codes used by the input layer.
 - [x] Accept valid padded USB HID boot-keyboard packets without changing the
   canonical eight-byte report decoding.
 - [ ] Add reliable QEMU live USB/PS2 keyboard verification for `run INIT.ELF`.

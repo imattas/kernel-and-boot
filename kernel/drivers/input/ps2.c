@@ -1,11 +1,14 @@
 #include "ps2.h"
 #include "../../arch/x86_64/time/timer.h"
 #include "../../core/sync/spinlock.h"
+#include "../../core/printk/serial.h"
 
 static input_queue_t *keyboard_queue;
 static input_queue_t *mouse_queue;
 static uint8_t keyboard_enabled;
+static uint8_t keyboard_scancode_set;
 static uint8_t extended_scancode;
+static uint8_t scancode_break;
 static uint8_t mouse_packet[4];
 static uint8_t mouse_packet_length;
 static uint8_t mouse_packet_size;
@@ -77,6 +80,41 @@ static int keyboard_command_noarg(uint8_t command) {
     return in8(0x60) == 0xfa;
 }
 
+static int keyboard_query_scancode_set(uint8_t *set) {
+    if (!set || !wait_write()) return 0;
+    out8(0x60, 0xf0);
+    if (!wait_read() || in8(0x60) != 0xfa || !wait_write()) return 0;
+    out8(0x60, 0x00);
+    if (!wait_read() || in8(0x60) != 0xfa || !wait_read()) return 0;
+    *set = in8(0x60);
+    return *set == 1 || *set == 2 || *set == 3;
+}
+
+static uint8_t set2_to_set1(uint8_t code) {
+    static const uint8_t map[128] = {
+        [0x05] = 0x0b, [0x06] = 0x0c, [0x0d] = 0x0f,
+        [0x0e] = 0x29, [0x11] = 0x38, [0x12] = 0x2a,
+        [0x14] = 0x1d, [0x15] = 0x10, [0x16] = 0x02,
+        [0x1a] = 0x2c, [0x1b] = 0x1f, [0x1c] = 0x1e,
+        [0x1d] = 0x11, [0x1e] = 0x03, [0x21] = 0x2e,
+        [0x22] = 0x2d, [0x23] = 0x20, [0x24] = 0x12,
+        [0x25] = 0x05, [0x26] = 0x04, [0x2a] = 0x2f,
+        [0x2b] = 0x21, [0x2c] = 0x14, [0x2d] = 0x13,
+        [0x2e] = 0x06, [0x31] = 0x31, [0x32] = 0x30,
+        [0x33] = 0x23, [0x34] = 0x22, [0x35] = 0x15,
+        [0x36] = 0x07, [0x3a] = 0x32, [0x3b] = 0x24,
+        [0x3c] = 0x16, [0x3d] = 0x08, [0x3e] = 0x09,
+        [0x41] = 0x33, [0x42] = 0x25, [0x43] = 0x17,
+        [0x44] = 0x18, [0x45] = 0x0b, [0x46] = 0x0a,
+        [0x49] = 0x34, [0x4a] = 0x35, [0x4b] = 0x26,
+        [0x4c] = 0x27, [0x4d] = 0x19, [0x4e] = 0x0c,
+        [0x52] = 0x28, [0x54] = 0x1a, [0x55] = 0x0d,
+        [0x5a] = 0x1c, [0x5b] = 0x1b, [0x5d] = 0x2b,
+        [0x58] = 0x3a, [0x66] = 0x0e, [0x76] = 0x01,
+    };
+    return map[code];
+}
+
 static int mouse_command_noarg(uint8_t command) {
     if (!wait_write()) return 0;
     out8(0x64, 0xd4);
@@ -113,10 +151,18 @@ int ps2_keyboard_initialize(input_queue_t *queue) {
     out8(0x64, 0xae);
     if (!keyboard_command(0xf0, 1)) return 0;
     if (!keyboard_command_noarg(0xf4)) return 0;
+    keyboard_scancode_set = 1;
+    uint8_t detected_set = 0;
+    if (keyboard_query_scancode_set(&detected_set))
+        keyboard_scancode_set = detected_set;
     while ((in8(0x64) & 1) != 0) (void)in8(0x60);
     keyboard_queue = queue;
     keyboard_enabled = 1;
     extended_scancode = 0;
+    scancode_break = 0;
+    serial_write("PS2 keyboard scancode set=");
+    serial_write_hex(keyboard_scancode_set);
+    serial_write("\r\n");
     return 1;
 }
 
@@ -248,6 +294,21 @@ int ps2_keyboard_poll(input_queue_t *queue) {
         return 0;
     }
     uint8_t scancode = in8(0x60);
+    if (keyboard_scancode_set == 2) {
+        if (scancode == 0xf0) {
+            scancode_break = 1;
+            spinlock_unlock_irqrestore(&ps2_lock, flags);
+            return 1;
+        }
+        uint8_t normalized = set2_to_set1(scancode);
+        if (normalized == 0) {
+            scancode_break = 0;
+            spinlock_unlock_irqrestore(&ps2_lock, flags);
+            return 0;
+        }
+        scancode = (uint8_t)(normalized | (scancode_break ? 0x80U : 0));
+        scancode_break = 0;
+    }
     if (scancode == 0xe0) {
         extended_scancode = 1;
         spinlock_unlock_irqrestore(&ps2_lock, flags);

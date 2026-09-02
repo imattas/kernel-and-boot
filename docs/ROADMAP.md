@@ -1978,6 +1978,11 @@ events are discarded at the USB handoff to prevent stale duplicate input. The
 first completed UHCI report is also logged so host transport and HID decoding
 failures can be distinguished.
 
+The PS/2 backend now queries the keyboard's active scan set after initialization
+and normalizes Set-2 make/break codes for the standard keyboard controls and
+printable keys. This removes the previous assumption that every controller
+accepted the Set-1 command and records the detected set in the boot log.
+
 The Windows launcher now explicitly selects QEMU's SDL display backend and
 USB-enabled machine profile, making the visible emulator window the canonical
 keyboard-focus target.

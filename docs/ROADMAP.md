@@ -691,6 +691,8 @@ purges stale PS/2 pointer events without disabling the independent PS/2
 keyboard fallback.
 VFS mount publication now requires both mountpoint and mounted-root retention
 to succeed, with rollback if either reference is saturated or unavailable.
+Mount tables now have a shutdown lifecycle that blocks new publications and
+releases every active mount reference before returning.
 The HID state tracker now also emits transitions for all eight boot-report
 modifier bits using stable modifier key codes.
 The shared input queue now supports atomic bounded event batches, so one

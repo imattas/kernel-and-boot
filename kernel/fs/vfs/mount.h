@@ -15,9 +15,11 @@ typedef struct {
 typedef struct {
     spinlock_t lock;
     vfs_mount_t mounts[VFS_MAX_MOUNTS];
+    uint8_t shutting_down;
 } vfs_mount_table_t;
 
 void vfs_mount_table_initialize(vfs_mount_table_t *table);
+int vfs_mount_table_shutdown(vfs_mount_table_t *table);
 int vfs_mount(vfs_mount_table_t *table, vfs_node_t *mountpoint,
               vfs_node_t *root);
 int vfs_unmount(vfs_mount_table_t *table, vfs_node_t *mountpoint);

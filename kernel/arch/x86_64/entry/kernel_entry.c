@@ -2524,6 +2524,13 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     vfs_node_release(vfs_mounted_child);
+    if (!vfs_mount(&vfs_mounts, vfs_root, vfs_mounted_root) ||
+        !vfs_mount_table_shutdown(&vfs_mounts) ||
+        vfs_mount(&vfs_mounts, vfs_root, vfs_mounted_root)) {
+        serial_write("VFS mount table shutdown failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("VFS mount table lifecycle ready\r\n");
     vfs_node_release(vfs_mounted_root);
     uint32_t devfs_count = devfs_populate(vfs_dev);
     vfs_node_t *devfs_probe = vfs_lookup_path(vfs_root, "/dev/pci0");

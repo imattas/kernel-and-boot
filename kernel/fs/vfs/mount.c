@@ -13,10 +13,30 @@ static int string_equal(const char *left, const char *right) {
 void vfs_mount_table_initialize(vfs_mount_table_t *table) {
     if (!table) return;
     spinlock_init(&table->lock);
+    table->shutting_down = 0;
     for (uint32_t i = 0; i < VFS_MAX_MOUNTS; ++i) {
         table->mounts[i].mountpoint = 0;
         table->mounts[i].root = 0;
         table->mounts[i].active = 0;
+    }
+}
+
+int vfs_mount_table_shutdown(vfs_mount_table_t *table) {
+    if (!table) return 0;
+    uint64_t flags = spinlock_lock_irqsave(&table->lock);
+    table->shutting_down = 1;
+    spinlock_unlock_irqrestore(&table->lock, flags);
+    for (;;) {
+        vfs_node_t *mountpoint = 0;
+        flags = spinlock_lock_irqsave(&table->lock);
+        for (uint32_t i = 0; i < VFS_MAX_MOUNTS; ++i)
+            if (table->mounts[i].active) {
+                mountpoint = table->mounts[i].mountpoint;
+                break;
+            }
+        spinlock_unlock_irqrestore(&table->lock, flags);
+        if (!mountpoint) return 1;
+        if (!vfs_unmount(table, mountpoint)) return 0;
     }
 }
 
@@ -40,6 +60,10 @@ int vfs_mount(vfs_mount_table_t *table, vfs_node_t *mountpoint,
     if (ancestor) return 0;
 
     uint64_t flags = spinlock_lock_irqsave(&table->lock);
+    if (table->shutting_down) {
+        spinlock_unlock_irqrestore(&table->lock, flags);
+        return 0;
+    }
     uint32_t free_slot = VFS_MAX_MOUNTS;
     for (uint32_t i = 0; i < VFS_MAX_MOUNTS; ++i) {
         if (table->mounts[i].active &&

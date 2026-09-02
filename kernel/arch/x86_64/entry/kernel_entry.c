@@ -2779,6 +2779,17 @@ void kernel_main(void *boot_info) {
         serial_write("PS2 navigation mapping failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
+    input_event_t ps2_down_event = {
+        .type = INPUT_EVENT_KEY, .code = INPUT_KEY_PS2 | 0x150U,
+        .value = 1, .timestamp = 16
+    };
+    if (!input_queue_push(&input_queue, &ps2_down_event) ||
+        input_read_standard(escape_probe, sizeof(escape_probe)) != 3 ||
+        escape_probe[0] != 0x1b || escape_probe[1] != '[' ||
+        escape_probe[2] != 'B') {
+        serial_write("PS2 down navigation failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
     serial_write("keyboard navigation contracts ready\r\n");
     input_event_t ps2_f_event = {
         .type = INPUT_EVENT_KEY, .code = INPUT_KEY_PS2 | 0x21U,

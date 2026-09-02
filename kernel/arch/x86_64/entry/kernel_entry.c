@@ -2770,6 +2770,14 @@ void kernel_main(void *boot_info) {
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
     serial_write("keyboard alpha/editing ready\r\n");
+    if (ps2_scancode_set2_to_set1(0x2b) != 0x21 ||
+        ps2_scancode_set2_to_set1(0x21) != 0x2e ||
+        ps2_scancode_set2_to_set1(0x5a) != 0x1c ||
+        ps2_scancode_set2_to_set1(0x66) != 0x0e) {
+        serial_write("PS2 scan-set normalization failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("PS2 scan-set normalization ready\r\n");
     input_event_t hid_five_event = {
         .type = INPUT_EVENT_KEY, .code = 0x22, .value = 1, .timestamp = 10
     };

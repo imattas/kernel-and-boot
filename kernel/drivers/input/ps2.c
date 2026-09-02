@@ -90,7 +90,7 @@ static int keyboard_query_scancode_set(uint8_t *set) {
     return *set == 1 || *set == 2 || *set == 3;
 }
 
-static uint8_t set2_to_set1(uint8_t code) {
+uint8_t ps2_scancode_set2_to_set1(uint8_t code) {
     static const uint8_t map[128] = {
         [0x01] = 0x43, [0x03] = 0x3f, [0x04] = 0x3d,
         [0x05] = 0x3b, [0x06] = 0x3c, [0x07] = 0x58,
@@ -303,7 +303,7 @@ int ps2_keyboard_poll(input_queue_t *queue) {
             spinlock_unlock_irqrestore(&ps2_lock, flags);
             return 1;
         }
-        uint8_t normalized = set2_to_set1(scancode);
+        uint8_t normalized = ps2_scancode_set2_to_set1(scancode);
         if (normalized == 0) {
             scancode_break = 0;
             spinlock_unlock_irqrestore(&ps2_lock, flags);

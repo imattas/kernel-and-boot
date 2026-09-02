@@ -343,6 +343,8 @@ type, string, and numeric tests.
   the canonical Set-1 key codes used by the input layer.
 - [x] Give the shell `read` builtin the same editing controls as the main
   prompt and initialize its failure buffer safely.
+- [x] Add a boot contract covering Set-2 normalization for F, C, Enter, and
+  Backspace.
 - [x] Accept valid padded USB HID boot-keyboard packets without changing the
   canonical eight-byte report decoding.
 - [ ] Add reliable QEMU live USB/PS2 keyboard verification for `run INIT.ELF`.

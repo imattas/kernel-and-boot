@@ -1988,6 +1988,9 @@ the command prompt for Backspace/Delete and Ctrl-C, echoes accepted characters,
 and initializes its destination before attempting input so failed reads cannot
 inspect uninitialized memory.
 
+The kernel boot contract now directly checks Set-2 normalization for the keys
+that exposed the original cross-mapping symptoms: F, C, Enter, and Backspace.
+
 The Windows launcher now explicitly selects QEMU's SDL display backend and
 USB-enabled machine profile, making the visible emulator window the canonical
 keyboard-focus target.

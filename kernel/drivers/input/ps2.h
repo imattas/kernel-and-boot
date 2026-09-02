@@ -4,6 +4,7 @@
 #include "input.h"
 
 int ps2_keyboard_initialize(input_queue_t *queue);
+uint8_t ps2_scancode_set2_to_set1(uint8_t code);
 void ps2_keyboard_set_enabled(int enabled);
 int ps2_keyboard_poll(input_queue_t *queue);
 void ps2_keyboard_irq(void);

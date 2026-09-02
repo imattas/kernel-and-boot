@@ -324,6 +324,8 @@ type, string, and numeric tests.
   that the command reaches the live shell.
 - [x] Prefer the active USB HID keyboard over the legacy PS/2 stream when both
   are exposed by QEMU, preventing duplicate or cross-mapped Windows input.
+- [x] Emit a runtime source-selection marker so QEMU logs prove USB HID
+  arbitration was enabled.
 - [ ] Add reliable QEMU live USB/PS2 keyboard verification for `run INIT.ELF`.
 - [x] Expose the complete multi-cluster FAT32 boot-image application set in the
   live VFS namespace for reliable external `run` execution.

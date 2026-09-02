@@ -3221,7 +3221,10 @@ void kernel_main(void *boot_info) {
     /* QEMU's Windows USB keyboard and the emulated legacy controller can
        otherwise deliver the same host key through two different protocols.
        Prefer the fully decoded HID stream whenever it is available. */
-    if (input_runtime_ready) ps2_keyboard_set_enabled(0);
+    if (input_runtime_ready) {
+        ps2_keyboard_set_enabled(0);
+        serial_write("USB HID keyboard preferred over PS2\r\n");
+    }
     serial_write("PS2 keyboard ready\r\n");
     static const uint8_t ps2_mouse_probe_packet[3] = {0x09, 0x05, 0xfb};
     input_event_t ps2_mouse_probe_events[3];

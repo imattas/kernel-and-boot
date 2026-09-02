@@ -3,6 +3,7 @@ set -eu
 log=${1:?usage: validate_qemu_run.sh <serial-log>}
 test -f "$log"
 grep -F 'serial input bridge consumed' "$log" >/dev/null
+grep -F 'USB HID keyboard preferred over PS2' "$log" >/dev/null
 grep -F 'init shell supervisor live' "$log" >/dev/null
 grep -F 'userland nested spawn live' "$log" >/dev/null
 grep -F 'userland nested wait live' "$log" >/dev/null

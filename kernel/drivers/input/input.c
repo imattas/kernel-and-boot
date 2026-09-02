@@ -140,6 +140,23 @@ int input_queue_push_batch(input_queue_t *queue, const input_event_t *events,
     return 1;
 }
 
+void input_queue_discard_ps2_keys(input_queue_t *queue) {
+    if (!queue) return;
+    uint64_t flags = spinlock_lock_irqsave(&queue->lock);
+    uint32_t kept = 0;
+    for (uint32_t index = 0; index < queue->count; ++index) {
+        uint32_t position = (queue->head + index) % INPUT_EVENT_CAPACITY;
+        input_event_t event = queue->events[position];
+        if (event.type == INPUT_EVENT_KEY &&
+            (event.code & INPUT_KEY_PS2) != 0) continue;
+        queue->events[(queue->head + kept) % INPUT_EVENT_CAPACITY] = event;
+        ++kept;
+    }
+    queue->count = kept;
+    queue->tail = (queue->head + kept) % INPUT_EVENT_CAPACITY;
+    spinlock_unlock_irqrestore(&queue->lock, flags);
+}
+
 int input_queue_pop(input_queue_t *queue, input_event_t *event) {
     if (!queue || !event) return 0;
     uint64_t flags = spinlock_lock_irqsave(&queue->lock);

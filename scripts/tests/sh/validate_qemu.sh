@@ -65,6 +65,7 @@ grep -F 'block cache lifecycle ready' "$log" >/dev/null
 grep -F 'slab cache ready' "$log" >/dev/null
 grep -F 'input event queue ready' "$log" >/dev/null
 grep -F 'standard input ready' "$log" >/dev/null
+grep -F 'input source handoff ready' "$log" >/dev/null
 grep -F 'keyboard alpha/editing ready' "$log" >/dev/null
 grep -F 'keyboard controls ready' "$log" >/dev/null
 grep -F 'keyboard punctuation ready' "$log" >/dev/null

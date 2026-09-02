@@ -160,6 +160,7 @@ static void input_runtime_task(void *argument) {
                                              event_count);
             if (decoded && event_count != 0 && !input_runtime_reported) {
                 input_runtime_reported = 1;
+                input_queue_discard_ps2_keys(input_runtime_queue);
                 ps2_keyboard_set_enabled(0);
                 serial_write("USB HID input event received\r\n");
                 serial_write("USB HID active; PS2 fallback disabled\r\n");
@@ -2709,6 +2710,26 @@ void kernel_main(void *boot_info) {
         serial_write("input batch failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
+    input_event_t stale_ps2 = {
+        .type = INPUT_EVENT_KEY, .code = INPUT_KEY_PS2 | 0x2eU,
+        .value = 1, .timestamp = 8
+    };
+    input_event_t retained_hid = {
+        .type = INPUT_EVENT_KEY, .code = 9, .value = 1, .timestamp = 8
+    };
+    if (!input_queue_push(&input_queue, &stale_ps2) ||
+        !input_queue_push(&input_queue, &retained_hid)) {
+        serial_write("input source handoff setup failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    input_queue_discard_ps2_keys(&input_queue);
+    if (input_queue_count(&input_queue) != 1 ||
+        !input_queue_pop(&input_queue, &input_out) ||
+        input_out.code != 9 || input_queue_count(&input_queue) != 0) {
+        serial_write("input source handoff failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    serial_write("input source handoff ready\r\n");
     input_event_t standard_input_event = {
         .type = INPUT_EVENT_KEY, .code = 4, .value = 1, .timestamp = 9
     };

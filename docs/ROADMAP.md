@@ -1973,7 +1973,8 @@ keeps Windows QEMU usable when its USB endpoint is exposed but does not receive
 host events, while disabling duplicate PS/2 delivery once USB is proven active.
 The runtime logs both source-selection states for integration diagnostics. HID
 boot-keyboard decoding also accepts larger interrupt packets whose trailing
-bytes are padding, and records the first decoded HID event.
+bytes are padding, and records the first decoded HID event. Queued PS/2 key
+events are discarded at the USB handoff to prevent stale duplicate input.
 
 The Windows launcher now explicitly selects QEMU's SDL display backend and
 USB-enabled machine profile, making the visible emulator window the canonical

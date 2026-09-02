@@ -327,6 +327,10 @@ type, string, and numeric tests.
 - [x] Keep PS/2 enabled as a fallback until the first valid USB HID report is
   received, so an exposed-but-inactive Windows USB endpoint cannot disable the
   working legacy keyboard path.
+- [x] Discard queued PS/2 key events at the first USB report handoff so the
+  source transition cannot duplicate or cross-map a character.
+- [x] Add a kernel contract proving the handoff preserves HID events while
+  removing stale PS/2 key events.
 - [x] Select the Windows SDL QEMU display backend explicitly so GUI keyboard
   focus is routed through the same visible emulator window.
 - [x] Emit a runtime source-selection marker so QEMU logs prove USB HID

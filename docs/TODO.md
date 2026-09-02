@@ -339,8 +339,9 @@ type, string, and numeric tests.
   delivery failures from shell processing failures.
 - [x] Emit a first completed UHCI interrupt-report marker to separate USB
   transport failures from HID report decoding failures.
-- [x] Detect the active PS/2 scan set and normalize Set-2 keyboard reports to
-  the canonical Set-1 key codes used by the input layer.
+- [x] Select PS/2 Set-1 explicitly after controller initialization and retain
+  the canonical Set-1 key-code path; Set-2 normalization remains covered by
+  the standalone converter contract.
 - [x] Give the shell `read` builtin the same editing controls as the main
   prompt and initialize its failure buffer safely.
 - [x] Add a boot contract covering Set-2 normalization for F, C, Enter, and

@@ -708,6 +708,10 @@ USB descriptor endpoint registration now rejects duplicate endpoint addresses,
 keeping transfer routing unambiguous for each configured device.
 USB HID keyboard and mouse events now sample one monotonic kernel tick per
 report, matching PS/2 event timestamp semantics.
+PS/2 keyboard initialization now explicitly retains the requested Set-1
+protocol instead of trusting a potentially stale query response; this keeps
+the canonical Set-1 translation stable for F/C, Enter, Backspace, and the
+remaining legacy key path.
 PS/2 mouse initialization now verifies the controller auxiliary-port test
 before enabling mouse commands, preventing an unavailable second port from
 being published as an active input backend.

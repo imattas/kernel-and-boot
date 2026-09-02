@@ -1325,11 +1325,17 @@ void shell_main(void) {
                     for (uint32_t character = 0; character <= current_length;
                          ++character)
                         previous_directory[character] = current_directory[character];
+                    char next_directory[128];
+                    uint64_t next_length = os_getcwd(next_directory,
+                                                     sizeof(next_directory));
+                    if (next_length == OS_SYSCALL_ERROR ||
+                        next_length >= sizeof(next_directory) ||
+                        os_setenv("OLDPWD", current_directory) == OS_SYSCALL_ERROR ||
+                        os_setenv("PWD", next_directory) == OS_SYSCALL_ERROR) {
+                        print(unknown, sizeof(unknown) - 1U);
+                    }
                     if (switch_previous) {
-                        uint64_t next = os_getcwd(current_directory,
-                                                  sizeof(current_directory));
-                        if (next != OS_SYSCALL_ERROR)
-                            print(current_directory, next);
+                        print(next_directory, next_length);
                         print("\r\n", 2);
                     }
                 }

@@ -355,6 +355,7 @@ type, string, and numeric tests.
 - [x] Accept valid padded USB HID boot-keyboard packets without changing the
   canonical eight-byte report decoding.
 - [ ] Add reliable QEMU live USB/PS2 keyboard verification for `run INIT.ELF`.
+- [x] Synchronize shell `PWD` and `OLDPWD` after successful `cd` operations.
 - [x] Expose the complete multi-cluster FAT32 boot-image application set in the
   live VFS namespace for reliable external `run` execution.
 - [x] Make userland init spawn the shell through the normal process ABI after

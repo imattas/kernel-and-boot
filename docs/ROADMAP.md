@@ -1992,6 +1992,10 @@ next shell command from seeing a stray empty line.
 The suppression state also persists when CR and LF arrive in separate input
 reads.
 
+Shell directory changes now update `OLDPWD` to the prior working directory and
+`PWD` to the post-`chdir` path, including `cd -`, without performing any extra
+working-directory lookup during shell startup.
+
 USB HID and PS/2 Up/Down key events now become ANSI cursor sequences at the
 standard-input boundary, allowing the shell's existing history navigation to
 work with graphical keyboard input. Sequence bytes remain queued across small

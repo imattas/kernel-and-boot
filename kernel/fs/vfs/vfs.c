@@ -386,7 +386,7 @@ void vfs_node_retain(vfs_node_t *node) {
     if (!node) return;
     uint32_t references = __atomic_load_n(&node->references, __ATOMIC_ACQUIRE);
     while (!__atomic_load_n(&node->destroying, __ATOMIC_ACQUIRE) &&
-           references != 0 &&
+           references != 0 && references != UINT32_MAX &&
            !__atomic_compare_exchange_n(&node->references, &references,
                                         references + 1U, 0, __ATOMIC_ACQ_REL,
                                         __ATOMIC_ACQUIRE)) { }

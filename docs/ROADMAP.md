@@ -2186,6 +2186,8 @@ the graphical shell was exercised with host key events through
 - The grouped completion gate was rerun after the display and keyboard changes:
   userland contracts, filesystem contracts, kernel/UEFI/image validation, and
   the QEMU UEFI handoff all pass together.
+- VFS node reference acquisition now rejects saturated reference counts instead
+  of allowing an atomic increment to wrap back to zero.
 - Window content changes can now explicitly invalidate their compositor layer,
   and the WM exposes damage-only composition for efficient redraw.
 - The Windows QEMU launcher now pins host keyboard translation to `en-us`,

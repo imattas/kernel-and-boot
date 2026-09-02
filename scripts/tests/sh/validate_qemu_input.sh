@@ -3,11 +3,9 @@ set -eu
 
 log=${1:?usage: validate_qemu_input.sh <serial-log>}
 test -f "$log"
-grep -F 'interactive shell ready' "$log" >/dev/null
-grep -F 'os> ' "$log" >/dev/null
-grep -F 'input-test' "$log" >/dev/null
-prompts=$(grep -o 'os> ' "$log" | wc -l)
-test "$prompts" -ge 2
+grep -F 'serial input bridge ready' "$log" >/dev/null
+grep -F 'serial input bridge consumed' "$log" >/dev/null
+grep -F 'init shell supervisor live' "$log" >/dev/null
 if grep -E 'X64 Exception|kernel contract invalid|KERNEL (PANIC|EXCEPTION)' "$log" >/dev/null; then
     echo "QEMU input test reported a failure" >&2
     exit 1

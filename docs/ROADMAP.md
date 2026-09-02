@@ -2202,6 +2202,8 @@ the graphical shell was exercised with host key events through
 - QEMU now includes a post-scheduler probe that confirms init has produced a
   live child process through the normal spawn path, rather than treating the
   pre-scheduler supervisor banner as runtime proof.
+- The serial-input gate now validates actual COM1 byte consumption by the
+  kernel input bridge; graphical shell output remains on the GPU console.
 - Window content changes can now explicitly invalidate their compositor layer,
   and the WM exposes damage-only composition for efficient redraw.
 - The Windows QEMU launcher now pins host keyboard translation to `en-us`,

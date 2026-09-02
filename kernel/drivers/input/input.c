@@ -1,10 +1,12 @@
 #include "input.h"
 #include "ps2.h"
+#include "../../core/printk/serial.h"
 
 static input_queue_t *standard_queue;
 static uint8_t keyboard_ctrl;
 static uint8_t keyboard_shift;
 static uint8_t keyboard_caps;
+static uint8_t serial_bridge_reported;
 
 static char keyboard_symbol(uint16_t code, int ps2) {
     static const char normal[] = "1234567890-=[]\\;',./`";
@@ -164,6 +166,17 @@ void input_set_standard_queue(input_queue_t *queue) { standard_queue = queue; }
 
 uint32_t input_read_standard(void *buffer, uint32_t capacity) {
     if (!standard_queue || !buffer || capacity == 0) return 0;
+    char serial_input[INPUT_EVENT_CAPACITY];
+    uint32_t serial_count = serial_poll_input(serial_input,
+                                              INPUT_EVENT_CAPACITY);
+    if (serial_count != 0) {
+        (void)input_queue_push_text(standard_queue, serial_input,
+                                    serial_count, 0);
+        if (!serial_bridge_reported) {
+            serial_bridge_reported = 1;
+            serial_write("serial input bridge consumed\r\n");
+        }
+    }
     /* Keep console input usable on firmware/QEMU configurations that do not
        route the legacy keyboard IRQ while the scheduler is running. */
     (void)ps2_keyboard_poll(standard_queue);

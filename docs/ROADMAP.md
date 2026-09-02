@@ -1987,6 +1987,8 @@ The shell `read` builtin now uses the same basic terminal editing semantics as
 the command prompt for Backspace/Delete and Ctrl-C, echoes accepted characters,
 and initializes its destination before attempting input so failed reads cannot
 inspect uninitialized memory.
+It also consumes a following LF when a CRLF line ending is received, keeping the
+next shell command from seeing a stray empty line.
 
 The kernel boot contract now directly checks Set-2 normalization for the keys
 that exposed the original cross-mapping symptoms: F, C, Enter, and Backspace.

@@ -345,6 +345,8 @@ type, string, and numeric tests.
   prompt and initialize its failure buffer safely.
 - [x] Add a boot contract covering Set-2 normalization for F, C, Enter, and
   Backspace.
+- [x] Coalesce CRLF in the shell `read` builtin so a trailing LF cannot become
+  an unintended blank command.
 - [x] Accept valid padded USB HID boot-keyboard packets without changing the
   canonical eight-byte report decoding.
 - [ ] Add reliable QEMU live USB/PS2 keyboard verification for `run INIT.ELF`.

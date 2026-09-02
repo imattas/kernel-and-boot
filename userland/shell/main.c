@@ -921,6 +921,8 @@ static int shell_read_line(char *output, uint32_t capacity, char *buffer,
             }
         }
         if (input == '\r' || input == '\n') {
+            if (input == '\r' && *input_index < received &&
+                buffer[*input_index] == '\n') ++*input_index;
             output[length] = 0;
             return 1;
         }

@@ -2003,6 +2003,10 @@ consumer reads.
 Boot contracts now cover USB Down and PS/2 Up/Down in addition to USB Up,
 including consuming an escape sequence one byte at a time.
 
+The shell editor now supports cursor-aware insertion and deletion, with
+whole-line redraws for history replacement so editing remains correct when the
+cursor is not at the end of the command.
+
 The kernel boot contract now directly checks Set-2 normalization for the keys
 that exposed the original cross-mapping symptoms: F, C, Enter, and Backspace.
 

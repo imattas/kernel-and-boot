@@ -352,6 +352,8 @@ type, string, and numeric tests.
   sequences.
 - [x] Validate USB Down and PS/2 Up/Down navigation, including split sequence
   reads.
+- [x] Add cursor-aware shell insertion/deletion and whole-line redraw for
+  left/right editing and history replacement.
 - [x] Accept valid padded USB HID boot-keyboard packets without changing the
   canonical eight-byte report decoding.
 - [ ] Add reliable QEMU live USB/PS2 keyboard verification for `run INIT.ELF`.

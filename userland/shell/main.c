@@ -22,6 +22,17 @@ static void print(const char *text, uint64_t length) {
     (void)os_write(1, text, length);
 }
 
+static void shell_redraw_line(const char *prompt, const char *line,
+                              uint32_t length, uint32_t cursor) {
+    print("\x1b[2K\r", 5);
+    print(prompt, 4);
+    print(line, length);
+    while (cursor < length) {
+        print("\x1b[D", 3);
+        ++cursor;
+    }
+}
+
 static void print_number(uint64_t value) {
     char digits[20];
     uint32_t length = 0;
@@ -968,6 +979,7 @@ void shell_main(void) {
     uint32_t escape_state = 0;
     uint32_t suppress_lf = 0;
     uint32_t length = 0;
+    uint32_t cursor = 0;
     uint32_t pending_length = 0;
     shell_sequence_operator_t pending_operator = SHELL_SEQUENCE_NONE;
     shell_sequence_operator_t command_operator = SHELL_SEQUENCE_NONE;
@@ -982,6 +994,7 @@ void shell_main(void) {
             os_yield();
             continue;
         }
+        if (length == 0) cursor = 0;
         for (uint64_t index = 0; index < received; ++index) {
             char value = input[index];
             if (suppress_lf) {
@@ -995,13 +1008,11 @@ void shell_main(void) {
             if (escape_state == 2) {
                 escape_state = 0;
                 if (value == 'A' || value == 'B') {
-                    uint32_t previous_length = length;
                     if (value == 'A') {
                         if (history_offset < history_count) ++history_offset;
                     } else if (history_offset != 0) {
                         --history_offset;
                     }
-                    while (previous_length-- != 0) print("\b \b", 3);
                     if (history_offset == 0) {
                         length = 0;
                         line[0] = 0;
@@ -1011,8 +1022,15 @@ void shell_main(void) {
                         length = 0;
                         line[0] = 0;
                     }
-                    print(line, length);
+                    cursor = length;
+                    shell_redraw_line(prompt, line, length, cursor);
                     continue;
+                } else if (value == 'C' && cursor < length) {
+                    print("\x1b[C", 3);
+                    ++cursor;
+                } else if (value == 'D' && cursor != 0) {
+                    print("\x1b[D", 3);
+                    --cursor;
                 }
                 continue;
             }
@@ -1024,27 +1042,30 @@ void shell_main(void) {
                 value != 0x15 && value != '\r' && value != '\n')
                 history_offset = 0;
             uint32_t previous_length = length;
-            shell_edit_result_t edit = shell_edit_line(line, &length,
-                                                        sizeof(line) - 1U,
-                                                        value);
-            if (value == '\b' || (unsigned char)value == 0x7f) {
-                if (previous_length != length) print("\b \b", 3);
-                continue;
-            }
+            uint32_t previous_cursor = cursor;
+            shell_edit_result_t edit = shell_edit_line_cursor(
+                line, &length, &cursor, sizeof(line) - 1U, value);
             if (value == 0x15) {
-                while (previous_length-- != 0) print("\b \b", 3);
+                shell_redraw_line(prompt, line, length, cursor);
                 continue;
             }
             if (value == '\r') suppress_lf = 1;
-            if (edit == SHELL_EDIT_CONTINUE &&
-                (unsigned char)value >= 0x20)
-                print(&value, 1);
             if (edit == SHELL_EDIT_CANCEL) {
-                while (previous_length-- != 0) print("\b \b", 3);
+                print("\x1b[2K\r", 5);
                 print("^C\r\n", 4);
                 print(prompt, sizeof(prompt) - 1U);
                 history_offset = 0;
+                cursor = 0;
                 continue;
+            }
+            if ((edit == SHELL_EDIT_CONTINUE &&
+                 (unsigned char)value >= 0x20) ||
+                ((value == '\b' || (unsigned char)value == 0x7f) &&
+                 previous_length != length))
+                shell_redraw_line(prompt, line, length, cursor);
+            else if (edit == SHELL_EDIT_CONTINUE &&
+                     cursor != previous_cursor) {
+                shell_redraw_line(prompt, line, length, cursor);
             }
             if (edit != SHELL_EDIT_SUBMIT) continue;
         command_ready:
@@ -1064,6 +1085,7 @@ void shell_main(void) {
             if (!run_command) {
                 if (pending_length != 0) {
                     length = pending_length;
+                    cursor = length;
                     for (uint32_t index = 0; index <= length; ++index)
                         line[index] = pending_line[index];
                     pending_length = 0;

@@ -22,10 +22,18 @@ static int keyboard_sequence(uint16_t code, int pressed) {
         } else if (code == 0x150) {
             pending_sequence[0] = 0x1b; pending_sequence[1] = '[';
             pending_sequence[2] = 'B';
+        } else if (code == 0x14b) {
+            pending_sequence[0] = 0x1b; pending_sequence[1] = '[';
+            pending_sequence[2] = 'D';
+        } else if (code == 0x14d) {
+            pending_sequence[0] = 0x1b; pending_sequence[1] = '[';
+            pending_sequence[2] = 'C';
         } else return 0;
-    } else if (code == 0x52 || code == 0x51) {
+    } else if (code >= 0x4f && code <= 0x52) {
         pending_sequence[0] = 0x1b; pending_sequence[1] = '[';
-        pending_sequence[2] = (uint8_t)(code == 0x52 ? 'A' : 'B');
+        pending_sequence[2] = (uint8_t)(code == 0x52 ? 'A' :
+                                         code == 0x51 ? 'B' :
+                                         code == 0x50 ? 'C' : 'D');
     } else return 0;
     pending_sequence_length = 3;
     pending_sequence_offset = 0;

@@ -92,5 +92,8 @@ int shell_split_next(char *line, uint32_t *length,
 
 shell_edit_result_t shell_edit_line(char *line, uint32_t *length,
                                     uint32_t capacity, char value);
+shell_edit_result_t shell_edit_line_cursor(char *line, uint32_t *length,
+                                           uint32_t *cursor,
+                                           uint32_t capacity, char value);
 
 #endif

@@ -20,6 +20,17 @@ int main(void) {
     shell_edit_line(line, &line_length, sizeof(line) - 1U, 'z');
     assert(shell_edit_line(line, &line_length, sizeof(line) - 1U, '\n') == SHELL_EDIT_SUBMIT);
     assert(line_length == 1 && line[0] == 'z');
+
+    line[0] = 'a'; line[1] = 'b'; line[2] = 0;
+    line_length = 2;
+    uint32_t cursor = 1;
+    assert(shell_edit_line_cursor(line, &line_length, &cursor,
+                                  sizeof(line) - 1U, 'x') == SHELL_EDIT_CONTINUE);
+    assert(line_length == 3 && cursor == 2 && line[0] == 'a' &&
+           line[1] == 'x' && line[2] == 'b');
+    assert(shell_edit_line_cursor(line, &line_length, &cursor,
+                                  sizeof(line) - 1U, '\b') == SHELL_EDIT_CONTINUE);
+    assert(line_length == 2 && cursor == 1 && line[0] == 'a' && line[1] == 'b');
     assert(shell_parse("help", 4, argument, sizeof(argument)) == SHELL_HELP);
     assert(shell_parse("version", 7, argument, sizeof(argument)) == SHELL_VERSION);
     assert(shell_parse("clear", 5, argument, sizeof(argument)) == SHELL_CLEAR);

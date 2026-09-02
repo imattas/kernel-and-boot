@@ -108,18 +108,24 @@ int shell_history_get(char history[][SHELL_HISTORY_LINE_CAPACITY],
     return 1;
 }
 
-shell_edit_result_t shell_edit_line(char *line, uint32_t *length,
-                                    uint32_t capacity, char value) {
-    if (!line || !length || capacity == 0 || *length > capacity)
+shell_edit_result_t shell_edit_line_cursor(char *line, uint32_t *length,
+                                           uint32_t *cursor,
+                                           uint32_t capacity, char value) {
+    if (!line || !length || !cursor || capacity == 0 || *length > capacity ||
+        *cursor > *length)
         return SHELL_EDIT_CONTINUE;
     if (value == '\r' || value == '\n') return SHELL_EDIT_SUBMIT;
     if (value == 0x03 || value == 0x15) {
         *length = 0;
+        *cursor = 0;
         line[0] = 0;
         return value == 0x03 ? SHELL_EDIT_CANCEL : SHELL_EDIT_CONTINUE;
     }
     if (value == '\b' || (unsigned char)value == 0x7f) {
-        if (*length != 0) {
+        if (*cursor != 0) {
+            for (uint32_t index = *cursor; index < *length; ++index)
+                line[index - 1U] = line[index];
+            --*cursor;
             --*length;
             line[*length] = 0;
         }
@@ -127,9 +133,19 @@ shell_edit_result_t shell_edit_line(char *line, uint32_t *length,
     }
     if ((unsigned char)value < 0x20) return SHELL_EDIT_CONTINUE;
     if (*length == capacity) return SHELL_EDIT_CONTINUE;
-    line[(*length)++] = value;
+    for (uint32_t index = *length; index > *cursor; --index)
+        line[index] = line[index - 1U];
+    line[(*cursor)++] = value;
+    ++*length;
     line[*length] = 0;
     return SHELL_EDIT_CONTINUE;
+}
+
+shell_edit_result_t shell_edit_line(char *line, uint32_t *length,
+                                    uint32_t capacity, char value) {
+    if (!length) return SHELL_EDIT_CONTINUE;
+    uint32_t cursor = *length;
+    return shell_edit_line_cursor(line, length, &cursor, capacity, value);
 }
 
 static int same_word(const char *line, uint32_t length, const char *word) {

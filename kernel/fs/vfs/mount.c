@@ -54,8 +54,15 @@ int vfs_mount(vfs_mount_table_t *table, vfs_node_t *mountpoint,
         spinlock_unlock_irqrestore(&table->lock, flags);
         return 0;
     }
-    vfs_node_retain(mountpoint);
-    vfs_node_retain(root);
+    if (!vfs_node_retain(mountpoint)) {
+        spinlock_unlock_irqrestore(&table->lock, flags);
+        return 0;
+    }
+    if (!vfs_node_retain(root)) {
+        vfs_node_release(mountpoint);
+        spinlock_unlock_irqrestore(&table->lock, flags);
+        return 0;
+    }
     table->mounts[free_slot].mountpoint = mountpoint;
     table->mounts[free_slot].root = root;
     table->mounts[free_slot].active = 1;

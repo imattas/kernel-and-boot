@@ -2474,6 +2474,24 @@ void kernel_main(void *boot_info) {
         serial_write("VFS mount failure\r\n");
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     }
+    vfs_node_t *vfs_saturated_mountpoint = vfs_node_create(
+        "sat-mount", VFS_NODE_DIRECTORY, 0, 0, 0755);
+    vfs_node_t *vfs_saturated_root = vfs_node_create(
+        "sat-root", VFS_NODE_DIRECTORY, 0, 0, 0755);
+    if (!vfs_saturated_mountpoint || !vfs_saturated_root) {
+        serial_write("VFS mount saturation setup failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    vfs_saturated_mountpoint->references = UINT32_MAX;
+    if (vfs_mount(&vfs_mounts, vfs_saturated_mountpoint,
+                  vfs_saturated_root)) {
+        serial_write("VFS mount saturation failure\r\n");
+        for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
+    }
+    vfs_saturated_mountpoint->references = 1;
+    vfs_node_release(vfs_saturated_mountpoint);
+    vfs_node_release(vfs_saturated_root);
+    serial_write("VFS mount ownership ready\r\n");
     vfs_node_release(vfs_mounted_file);
     vfs_node_t *vfs_mounted_found =
         vfs_lookup_path_mounted(&vfs_mounts, vfs_root, "/dev/hello");

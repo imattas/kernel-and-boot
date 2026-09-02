@@ -689,6 +689,8 @@ not erase terminal pixels or remove keyboard events from the shell queue.
 Input events now carry explicit HID/PS2 source metadata. USB pointer takeover
 purges stale PS/2 pointer events without disabling the independent PS/2
 keyboard fallback.
+VFS mount publication now requires both mountpoint and mounted-root retention
+to succeed, with rollback if either reference is saturated or unavailable.
 The HID state tracker now also emits transitions for all eight boot-report
 modifier bits using stable modifier key codes.
 The shared input queue now supports atomic bounded event batches, so one

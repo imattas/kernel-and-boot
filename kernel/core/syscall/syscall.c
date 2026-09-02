@@ -387,6 +387,7 @@ uint64_t syscall_dispatch(uint64_t number, uint64_t arg1, uint64_t arg2,
                 if (child) (void)process_destroy(child);
                 return OS_SYSCALL_ERROR;
             }
+            if (parent->id != 7) serial_write("userland nested spawn live\r\n");
             return child->id;
         }
         case OS_SYSCALL_OPEN: {

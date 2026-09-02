@@ -310,7 +310,7 @@ OVMF_CODE ?= /usr/share/edk2/x64/OVMF_CODE.4m.fd
 OVMF_VARS ?= /usr/share/edk2/x64/OVMF_VARS.4m.fd
 QEMU_LOG := $(BUILD_DIR)/qemu-serial.log
 
-.PHONY: all test userland-test userland-set-test userland-runtime-test test-predicate-test shell-test shell-integration-test args-test env-test cat-test pwd-test mkdir-test rm-test rmdir-test touch-test write-test ls-test chmod-test echo-test help-test stat-test mv-test kill-test sleep-test setenv-test unsetenv-test uptime-test date-test clear-test ipc-test dup-test true-test seq-test false-test id-test ps-test wait-test truncate-test seek-test chdir-test cp-test head-test wc-test grep-test tee-test tail-test sort-test uniq-test printf-test basename-test dirname-test cut-test tr-test cmp-test which-test find-test expr-test test-utility-test image qemu-test qemu-input-test fat32-test exfat-test ext4-test xfs-test xfs-rename-test xfs-alloc-test xfs-unwritten-test xfs-auth-test btrfs-test deflate-test lzo-test zstd-test fse-test cache-test device-test run clean distclean
+.PHONY: all test userland-test userland-set-test userland-runtime-test test-predicate-test shell-test shell-integration-test args-test env-test cat-test pwd-test mkdir-test rm-test rmdir-test touch-test write-test ls-test chmod-test echo-test help-test stat-test mv-test kill-test sleep-test setenv-test unsetenv-test uptime-test date-test clear-test ipc-test dup-test true-test seq-test false-test id-test ps-test wait-test truncate-test seek-test chdir-test cp-test head-test wc-test grep-test tee-test tail-test sort-test uniq-test printf-test basename-test dirname-test cut-test tr-test cmp-test which-test find-test expr-test test-utility-test image qemu-test qemu-input-test qemu-run-test fat32-test exfat-test ext4-test xfs-test xfs-rename-test xfs-alloc-test xfs-unwritten-test xfs-auth-test btrfs-test deflate-test lzo-test zstd-test fse-test cache-test device-test run clean distclean
 
 all: $(CONTRACT_ELF) $(UEFI_EFI) $(KERNEL_ELF) $(USERLAND_INIT_ELF) $(USERLAND_SHELL_ELF) $(USERLAND_ARGS_ELF) $(USERLAND_ENV_ELF) $(USERLAND_CAT_ELF) $(USERLAND_PWD_ELF) $(USERLAND_MKDIR_ELF) $(USERLAND_RM_ELF) $(USERLAND_RMDIR_ELF) $(USERLAND_TOUCH_ELF) $(USERLAND_WRITE_ELF) $(USERLAND_LS_ELF) $(USERLAND_CHMOD_ELF) $(USERLAND_ECHO_ELF) $(USERLAND_HELP_ELF) $(USERLAND_STAT_ELF) $(USERLAND_MV_ELF) $(USERLAND_KILL_ELF) $(USERLAND_SLEEP_ELF) $(USERLAND_SETENV_ELF) $(USERLAND_IPC_ELF) $(USERLAND_DUP_ELF) $(USERLAND_TRUE_ELF) $(USERLAND_FALSE_ELF) $(USERLAND_ID_ELF) $(USERLAND_PS_ELF) $(USERLAND_WAIT_ELF) $(USERLAND_TRUNCATE_ELF) $(USERLAND_SEEK_ELF) $(USERLAND_CHDIR_ELF) $(USERLAND_CP_ELF) $(USERLAND_HEAD_ELF) $(USERLAND_WC_ELF) $(USERLAND_GREP_ELF) $(USERLAND_TEE_ELF) $(USERLAND_TAIL_ELF) $(USERLAND_SORT_ELF) $(USERLAND_UNIQ_ELF) $(USERLAND_PRINTF_ELF) $(USERLAND_BASENAME_ELF) $(USERLAND_DIRNAME_ELF) $(USERLAND_CUT_ELF)
 all: $(USERLAND_TR_ELF)
@@ -1808,6 +1808,20 @@ qemu-input-test: $(IMAGE)
 		-drive format=raw,file=$(IMAGE) -serial stdio -display none -no-reboot -no-shutdown \
 		> $(BUILD_DIR)/qemu-input.log 2>&1) || test $$? -eq 124
 	sh scripts/tests/sh/validate_qemu_input.sh $(BUILD_DIR)/qemu-input.log
+
+qemu-run-test: $(IMAGE)
+	@test -f "$(OVMF_CODE)" || (echo "OVMF_CODE not found: $(OVMF_CODE)" >&2; exit 2)
+	@test -f "$(OVMF_VARS)" || (echo "OVMF_VARS not found: $(OVMF_VARS)" >&2; exit 2)
+	cp "$(OVMF_VARS)" $(BUILD_DIR)/OVMF_RUN_VARS.4m.fd
+	: > $(BUILD_DIR)/qemu-run.log
+	((sleep 20; printf 'run /true.elf\r') | timeout 45s qemu-system-x86_64 -machine pc -smp 2 -m 128M \
+		-drive if=pflash,format=raw,readonly=on,file="$(OVMF_CODE)" \
+		-drive if=pflash,format=raw,file=$(BUILD_DIR)/OVMF_RUN_VARS.4m.fd \
+		-drive format=raw,file=$(IMAGE) -serial stdio -display none -no-reboot -no-shutdown \
+		-netdev user,id=osnet -device e1000,netdev=osnet \
+		-device piix3-usb-uhci -device usb-kbd \
+		> $(BUILD_DIR)/qemu-run.log 2>&1) || test $$? -eq 124
+	sh scripts/tests/sh/validate_qemu_run.sh $(BUILD_DIR)/qemu-run.log
 
 run: $(IMAGE)
 	@test -f "$(OVMF_CODE)" || (echo "OVMF_CODE not found: $(OVMF_CODE)" >&2; exit 2)

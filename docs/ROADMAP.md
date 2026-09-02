@@ -2206,6 +2206,10 @@ the graphical shell was exercised with host key events through
   kernel input bridge; graphical shell output remains on the GPU console.
 - Serial input polling now respects remaining queue capacity, preventing a
   full-batch drop when input arrives in a burst against a nearly full queue.
+- A QEMU shell-run gate now verifies that serial input reaches `run /true.elf`
+  and that the shell successfully creates a nested user process.
+- The kernel heap ceiling now supports larger contiguous user-process image
+  staging allocations without exhausting the former 2 MiB arena.
 - Window content changes can now explicitly invalidate their compositor layer,
   and the WM exposes damage-only composition for efficient redraw.
 - The Windows QEMU launcher now pins host keyboard translation to `en-us`,

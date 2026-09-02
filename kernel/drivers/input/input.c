@@ -7,6 +7,7 @@ static uint8_t keyboard_ctrl;
 static uint8_t keyboard_shift;
 static uint8_t keyboard_caps;
 static uint8_t serial_bridge_reported;
+static uint8_t runtime_input_enabled;
 
 static char keyboard_symbol(uint16_t code, int ps2) {
     static const char normal[] = "1234567890-=[]\\;',./`";
@@ -104,7 +105,7 @@ void input_queue_initialize(input_queue_t *queue) {
 
 int input_queue_push(input_queue_t *queue, const input_event_t *event) {
     if (!queue || !event || event->type < INPUT_EVENT_KEY ||
-        event->type > INPUT_EVENT_AXIS) return 0;
+        event->type > INPUT_EVENT_TEXT) return 0;
     uint64_t flags = spinlock_lock_irqsave(&queue->lock);
     if (queue->count == INPUT_EVENT_CAPACITY) {
         spinlock_unlock_irqrestore(&queue->lock, flags);
@@ -123,7 +124,7 @@ int input_queue_push_batch(input_queue_t *queue, const input_event_t *events,
         return 0;
     for (uint32_t i = 0; i < count; ++i)
         if (events[i].type < INPUT_EVENT_KEY ||
-            events[i].type > INPUT_EVENT_AXIS)
+            events[i].type > INPUT_EVENT_TEXT)
             return 0;
     uint64_t flags = spinlock_lock_irqsave(&queue->lock);
     if (count > INPUT_EVENT_CAPACITY - queue->count) {
@@ -164,13 +165,17 @@ uint32_t input_queue_count(const input_queue_t *queue) {
 
 void input_set_standard_queue(input_queue_t *queue) { standard_queue = queue; }
 
+void input_set_runtime_enabled(int enabled) {
+    runtime_input_enabled = enabled != 0;
+}
+
 uint32_t input_read_standard(void *buffer, uint32_t capacity) {
     if (!standard_queue || !buffer || capacity == 0) return 0;
     char serial_input[INPUT_EVENT_CAPACITY];
     uint32_t serial_capacity = INPUT_EVENT_CAPACITY -
                                input_queue_count(standard_queue);
-    uint32_t serial_count = serial_capacity == 0 ? 0 :
-        serial_poll_input(serial_input, serial_capacity);
+    uint32_t serial_count = runtime_input_enabled && serial_capacity != 0 ?
+        serial_poll_input(serial_input, serial_capacity) : 0;
     if (serial_count != 0) {
         (void)input_queue_push_text(standard_queue, serial_input,
                                     serial_count, 0);

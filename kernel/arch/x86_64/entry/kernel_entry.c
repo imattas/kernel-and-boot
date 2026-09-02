@@ -4159,6 +4159,7 @@ void kernel_main(void *boot_info) {
     if (!kernel_init_state_advance(&init_state, KERNEL_INIT_SERVICES))
         for (;;) __asm__ volatile ("cli\n\t hlt" ::: "memory");
     serial_write("userland runtime ready\r\n");
+    input_set_runtime_enabled(1);
     if (e1000_controller_count() != 0) {
         task_t *network_task = task_create_kernel(500, network_runtime_task,
                                                    &network_runtime, 16384);

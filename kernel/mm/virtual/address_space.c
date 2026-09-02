@@ -13,11 +13,15 @@
 #define PAGE_WRITE_THROUGH 0x008ULL
 #define PAGE_USER 0x004ULL
 #define PAGE_NX (1ULL << 63)
+#define HEAP_BASE 0x40000000ULL
+#define HEAP_PAGE_COUNT 4096ULL
+#define HEAP_PAGE_TABLE_COUNT (HEAP_PAGE_COUNT / 512ULL)
 
 static uint64_t pml4[512] __attribute__((aligned(PAGE_SIZE)));
 static uint64_t pdpt[512] __attribute__((aligned(PAGE_SIZE)));
 static uint64_t page_directories[4][512] __attribute__((aligned(PAGE_SIZE)));
-static uint64_t heap_page_table[512] __attribute__((aligned(PAGE_SIZE)));
+static uint64_t heap_page_tables[HEAP_PAGE_TABLE_COUNT][512]
+    __attribute__((aligned(PAGE_SIZE)));
 static int heap_page_table_active;
 static uint64_t root;
 static uint64_t active_roots[64];
@@ -85,13 +89,22 @@ static int virtual_memory_map_page_locked(uint64_t virtual_address,
                                           uint64_t physical_address,
                                           uint64_t flags) {
     if ((virtual_address & (PAGE_SIZE - 1)) != 0 || (physical_address & (PAGE_SIZE - 1)) != 0 ||
-        virtual_address < 0x40000000ULL || virtual_address >= 0x40200000ULL || physical_address >= 0x100000000ULL) return 0;
+        virtual_address < HEAP_BASE ||
+        virtual_address >= HEAP_BASE + HEAP_PAGE_COUNT * PAGE_SIZE ||
+        physical_address >= 0x100000000ULL) return 0;
     if (!heap_page_table_active) {
-        for (uint64_t i = 0; i < 512; ++i) heap_page_table[i] = 0;
-        page_directories[1][0] = (uint64_t)(uintptr_t)heap_page_table | PAGE_PRESENT | PAGE_WRITABLE;
+        for (uint64_t table = 0; table < HEAP_PAGE_TABLE_COUNT; ++table)
+            for (uint64_t i = 0; i < 512; ++i)
+                heap_page_tables[table][i] = 0;
+        for (uint64_t table = 0; table < HEAP_PAGE_TABLE_COUNT; ++table)
+            page_directories[1][table] =
+                (uint64_t)(uintptr_t)heap_page_tables[table] |
+                PAGE_PRESENT | PAGE_WRITABLE;
         heap_page_table_active = 1;
     }
-    heap_page_table[(virtual_address - 0x40000000ULL) / PAGE_SIZE] = physical_address | flags | PAGE_PRESENT;
+    uint64_t page = (virtual_address - HEAP_BASE) / PAGE_SIZE;
+    heap_page_tables[page / 512U][page % 512U] =
+        physical_address | flags | PAGE_PRESENT;
     x86_64_load_page_root(root);
     return 1;
 }

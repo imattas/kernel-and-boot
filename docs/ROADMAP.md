@@ -1996,6 +1996,8 @@ USB HID and PS/2 Up/Down key events now become ANSI cursor sequences at the
 standard-input boundary, allowing the shell's existing history navigation to
 work with graphical keyboard input. Sequence bytes remain queued across small
 consumer reads.
+Boot contracts now cover USB Down and PS/2 Up in addition to USB Up, including
+consuming an escape sequence one byte at a time.
 
 The kernel boot contract now directly checks Set-2 normalization for the keys
 that exposed the original cross-mapping symptoms: F, C, Enter, and Backspace.

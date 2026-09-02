@@ -350,6 +350,7 @@ type, string, and numeric tests.
 - [x] Preserve CRLF coalescing across separate input reads.
 - [x] Translate USB/PS2 Up and Down keys into the shell's ANSI history
   sequences.
+- [x] Validate USB Down and PS/2 Up navigation, including split sequence reads.
 - [x] Accept valid padded USB HID boot-keyboard packets without changing the
   canonical eight-byte report decoding.
 - [ ] Add reliable QEMU live USB/PS2 keyboard verification for `run INIT.ELF`.
